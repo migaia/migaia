@@ -73,7 +73,7 @@
                 "type": "table",
                 "headers": ["API / 选项", "用途"],
                 "rows": [
-                  ["`stages`", "默认 message、peer；其他物理/信封阶段显式启用"],
+                  ["`stages`", "默认 message、peer、forward；其他物理/信封阶段显式启用"],
                   ["`capture` / `redact`", "显式内容捕获与同步内容投影"],
                   ["`methods` / `sample`", "精确方法过滤、确定性采样，0 < sample ≤ 1"],
                   ["`maxEvents`", "主环容量，默认 10000"],
@@ -94,6 +94,10 @@
               {
                 "type": "paragraph",
                 "text": "collector.service 可由应用在既有 Host 上显式 provide；应用负责授权，capture 与 exposeContent 是独立选择。本包错误 source 为 rpc.devtools，保留原生类型与 cause。更多容量、录制和清理规则见使用指南。"
+              },
+              {
+                "type": "paragraph",
+                "text": "默认包含转发事件。查询或记录有序事件后，可关联 `messageId`、`route` 与调用方可选 `trace`，查看各 host 的 `hop`、`maxHops` 和拒绝原因。既有环在保留事件时复制借用路由；实时 probe 回调仍只借用该数组。"
               }
             ]
           }
@@ -130,7 +134,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "业务返回 42；事件数取决于两端实际合格观察，不能把一次业务固定等同于一条事件。默认 message/peer 足够观察这次调用；其他阶段要显式启用，且真实载体必须提供相应事实。"
+                "text": "业务返回 42；事件数取决于两端实际合格观察，不能把一次业务固定等同于一条事件。默认 message/peer/forward 足够观察这次调用；其他阶段要显式启用，且真实载体必须提供相应事实。"
               }
             ]
           },
@@ -191,6 +195,14 @@
               {
                 "type": "paragraph",
                 "text": "自定义 probe 从 `@migaia/rpc-host/plugins/probe` 导入；SDK 从 `@migaia/rpc-host/sdk` 导入。物理 carrier/protected 阶段依赖实际路径，不用语义消息伪造。诊断失败不得替换原业务结果；错误 source 为 rpc.devtools，包含 INVALID_OPTION、CLOSED、RECORD_ACTIVE/RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID，保留原类型与 cause。"
+              },
+              {
+                "type": "paragraph",
+                "text": "默认包含转发事件。查询或记录有序事件后，可关联 `messageId`、`route` 与调用方可选 `trace`，查看各 host 的 `hop`、`maxHops` 和拒绝原因。既有环在保留事件时复制借用路由；实时 probe 回调仍只借用该数组。"
+              },
+              {
+                "type": "paragraph",
+                "text": "stats 的原始 endpoint/method 统计最多保留 4096 对，独立于事件环和名称表。新组合按首次写入顺序淘汰最早的组合；更新旧组合不刷新顺序。`stats().evictedPairs` 是本次 clear 周期内淘汰的组合数，`clear()` 将它重置为 0。"
               }
             ]
           }
@@ -265,7 +277,7 @@
                   "rows": [
                     [
                       "`stages`",
-                      "Default message/peer; explicitly enable other physical/envelope stages"
+                      "Default message/peer/forward; explicitly enable other physical/envelope stages"
                     ],
                     [
                       "`capture` / `redact`",
@@ -296,6 +308,10 @@
                 {
                   "type": "paragraph",
                   "text": "Applications may explicitly provide collector.service on an existing Host, with their own authorization. Capture and exposeContent are independent settings. Errors use source rpc.devtools while preserving native types and cause. See the usage guide."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Forwarding rows are included by default. Query or record the ordered rows and correlate `messageId`, `route`, and the caller’s optional `trace` to inspect each host’s `hop`, `maxHops`, and refusal reason. The existing ring copies borrowed routes when retaining rows; live probe callbacks still borrow them."
                 }
               ]
             }
@@ -332,7 +348,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The business call returns 42. Event counts depend on actual eligible observations at both ends, rather than one event per business call. Default message/peer observes this call. Other stages require explicit selection and true facts from the actual carrier."
+                  "text": "The business call returns 42. Event counts depend on actual eligible observations at both ends, rather than one event per business call. Default message/peer/forward observes this call. Other stages require explicit selection and true facts from the actual carrier."
                 }
               ]
             },
@@ -393,6 +409,14 @@
                 {
                   "type": "paragraph",
                   "text": "Import custom probes from `@migaia/rpc-host/plugins/probe` and deployment SDK from `@migaia/rpc-host/sdk`. Physical carrier/protected stages depend on actual paths, without semantic messages presented as raw data. Diagnostics must not replace business results. Errors use source rpc.devtools, including INVALID_OPTION, CLOSED, RECORD_ACTIVE/RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, SERVICE_RESULT_INVALID, with original native type and cause."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Forwarding rows are included by default. Query or record the ordered rows and correlate `messageId`, `route`, and the caller’s optional `trace` to inspect each host’s `hop`, `maxHops`, and refusal reason. The existing ring copies borrowed routes when retaining rows; live probe callbacks still borrow them."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Raw endpoint/method statistics retain at most 4096 pairs, independently of the event ring and name table. New pairs evict the earliest first insertion; updating an existing pair does not refresh its age. `stats().evictedPairs` reports the number of raw pairs evicted in the current clear epoch; `clear()` resets it to zero."
                 }
               ]
             }
@@ -419,589 +443,10 @@
       "architecturePath": "/en/docs/rpc-plugin-devtools",
       "symbols": [
         {
-          "name": "devtoolsPlugin",
-          "kind": "function",
-          "signature": "export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin;",
-          "declarationLine": 9,
-          "source": "packages/rpc-plugin-devtools/dist/plugin.d.ts",
-          "purpose": "Install one genuine observe flow plugin backed by the caller-owned collector. Direct query/watch/stats/describe/close methods refer to that same collector.",
-          "core": "IDevtoolsPlugin with one collector plus direct query/watch/stats/describe/close projections; retain the exact installed object.\nmethods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/plugins/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content.\nInstall the original bounded collector directly into real host observation. Same feature object may observe multiple hosts; closing one host withdraws only its observation and never closes the collector.",
-          "advanced": "The observe hook lends events to the caller-owned collector. Uninstall releases this Host observation; the caller closes its collector.\nInspect calls, loss and cumulative statistics without modifying providers.",
-          "parameters": ["options: IRpcDevtoolsOptions (optional)"],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "IRpcDevtoolsOptions",
-              "optional": true
-            }
-          ],
-          "returns": "IDevtoolsPlugin",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}",
-            "import { devtoolsPlugin, type IRpcDevtools } from '@migaia/rpc-plugin-devtools'\nimport type { IRpcHost } from '@migaia/rpc-host'\n\nexport const tools = devtoolsPlugin({\n  stages: ['message', 'peer', 'carrier'],\n  capture: ['message'],\n  redact: () => ({ redacted: true }),\n  maxEvents: 2000,\n  maxContentBytes: 1024 * 1024,\n  onError: (error) => console.error(error)\n})\n\nexport function readPage(collector: IRpcDevtools, afterSeq: number) {\n  const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })\n  return { events: page.events, cursor: page.nextSeq, loss: page.counters }\n}\n\nexport function exposeDiagnostics(host: IRpcHost) {\n  host.provide({ diagnostics: tools.collector.service })\n}",
-            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}",
-            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 2000 })\n  tools.collector.pause()\n  console.log(tools.describe().paused)\n  tools.collector.resume()\n  console.log(tools.describe().paused)\n  const text = tools.collector.exportRecord(recording.stop())\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
-          ],
-          "members": [],
-          "composes": [],
-          "aliasOf": "devtoolsPlugin",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "IRpcDevtoolsOptions",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": ["IDevtoolsPlugin"],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Install one genuine observe flow plugin backed by the caller-owned collector. Direct query/watch/stats/describe/close methods refer to that same collector."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import devtoolsPlugin from @migaia/rpc-plugin-devtools, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use devtoolsPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when devtoolsPlugin does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "IDevtoolsPlugin with one collector plus direct query/watch/stats/describe/close projections; retain the exact installed object.\nmethods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/plugins/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content.\nInstall the original bounded collector directly into real host observation. Same feature object may observe multiple hosts; closing one host withdraws only its observation and never closes the collector."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "The observe hook lends events to the caller-owned collector. Uninstall releases this Host observation; the caller closes its collector.\nInspect calls, loss and cumulative statistics without modifying providers."
-            }
-          ],
-          "declaredConfiguration": [
-            {
-              "name": "stages",
-              "type": "readonly IRpcProbeStageName[]",
-              "optional": true,
-              "description": "Defaults to message and peer; pass physical stages here or use setStages() to enable them."
-            },
-            {
-              "name": "capture",
-              "type": "readonly IRpcProbeStageName[]",
-              "optional": true,
-              "description": "Explicit captured stages, default none; capture must be a subset of subscribed stages."
-            },
-            {
-              "name": "redact",
-              "type": "(stage: RpcProbeStage, content: unknown) => unknown",
-              "optional": true,
-              "description": "Optional synchronous projection; throws report REDACT_FAILED and discard this content."
-            },
-            {
-              "name": "methods",
-              "type": "readonly string[]",
-              "optional": true,
-              "description": "Optional exact method selection compiled by Core; omission observes all eligible methods."
-            },
-            {
-              "name": "sample",
-              "type": "number",
-              "optional": true,
-              "description": "Deterministic sampling ratio, default 1; greater than 0 and at most 1."
-            },
-            {
-              "name": "maxEvents",
-              "type": "number",
-              "optional": true,
-              "description": "Main-ring capacity, default 10000; positive safe integer within JavaScript array limits."
-            },
-            {
-              "name": "maxContentBytes",
-              "type": "number",
-              "optional": true,
-              "description": "Main-ring budget, default 8388608 bytes, allowing 0; record/watch references are independent."
-            },
-            {
-              "name": "maxInterned",
-              "type": "number",
-              "optional": true,
-              "description": "Reader name capacity, default 65536; positive bounded safe integer, with overflow counted."
-            },
-            {
-              "name": "exposeContent",
-              "type": "boolean",
-              "optional": true,
-              "description": "Defaults to false; only true permits captured content across the remote service boundary."
-            },
-            {
-              "name": "onError",
-              "type": "(error: unknown) => void",
-              "optional": true,
-              "description": "Optional diagnostic sink; omission or a throwing sink uses Core's host failure route."
-            }
-          ],
-          "identity": "packages/rpc-plugin-devtools/dist/plugin.d.ts:devtoolsPlugin:export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin;",
-          "guidance": [],
-          "usageScore": 54,
-          "configuration": [
-            {
-              "name": "stages",
-              "type": "readonly IRpcProbeStageName[]",
-              "optional": true,
-              "description": "`stages` — 默认 message、peer；其他物理/信封阶段显式启用",
-              "descriptionEn": "Defaults to message and peer; pass physical stages here or use setStages() to enable them.",
-              "descriptionZh": "`stages` — 默认 message、peer；其他物理/信封阶段显式启用"
-            },
-            {
-              "name": "capture",
-              "type": "readonly IRpcProbeStageName[]",
-              "optional": true,
-              "description": "`capture` / `redact` — 显式内容捕获与同步内容投影",
-              "descriptionEn": "Explicit captured stages, default none; capture must be a subset of subscribed stages.",
-              "descriptionZh": "`capture` / `redact` — 显式内容捕获与同步内容投影"
-            },
-            {
-              "name": "redact",
-              "type": "(stage: RpcProbeStage, content: unknown) => unknown",
-              "optional": true,
-              "description": "`capture` / `redact` — 显式内容捕获与同步内容投影",
-              "descriptionEn": "Optional synchronous projection; throws report REDACT_FAILED and discard this content.",
-              "descriptionZh": "`capture` / `redact` — 显式内容捕获与同步内容投影"
-            },
-            {
-              "name": "methods",
-              "type": "readonly string[]",
-              "optional": true,
-              "description": "`methods` / `sample` — 精确方法过滤、确定性采样，0 < sample ≤ 1",
-              "descriptionEn": "Optional exact method selection compiled by Core; omission observes all eligible methods.",
-              "descriptionZh": "`methods` / `sample` — 精确方法过滤、确定性采样，0 < sample ≤ 1"
-            },
-            {
-              "name": "sample",
-              "type": "number",
-              "optional": true,
-              "description": "`methods` / `sample` — 精确方法过滤、确定性采样，0 < sample ≤ 1",
-              "descriptionEn": "Deterministic sampling ratio, default 1; greater than 0 and at most 1.",
-              "descriptionZh": "`methods` / `sample` — 精确方法过滤、确定性采样，0 < sample ≤ 1"
-            },
-            {
-              "name": "maxEvents",
-              "type": "number",
-              "optional": true,
-              "description": "`maxEvents` — 主环容量，默认 10000",
-              "descriptionEn": "Main-ring capacity, default 10000; positive safe integer within JavaScript array limits.",
-              "descriptionZh": "`maxEvents` — 主环容量，默认 10000"
-            },
-            {
-              "name": "maxContentBytes",
-              "type": "number",
-              "optional": true,
-              "description": "`maxContentBytes` — 主环内容预算，默认 8 MiB",
-              "descriptionEn": "Main-ring budget, default 8388608 bytes, allowing 0; record/watch references are independent.",
-              "descriptionZh": "`maxContentBytes` — 主环内容预算，默认 8 MiB"
-            },
-            {
-              "name": "maxInterned",
-              "type": "number",
-              "optional": true,
-              "description": "Reader name capacity, default 65536; positive bounded safe integer, with overflow counted.",
-              "descriptionEn": "Reader name capacity, default 65536; positive bounded safe integer, with overflow counted.",
-              "descriptionZh": ""
-            },
-            {
-              "name": "exposeContent",
-              "type": "boolean",
-              "optional": true,
-              "description": "Defaults to false; only true permits captured content across the remote service boundary.",
-              "descriptionEn": "Defaults to false; only true permits captured content across the remote service boundary.",
-              "descriptionZh": ""
-            },
-            {
-              "name": "onError",
-              "type": "(error: unknown) => void",
-              "optional": true,
-              "description": "Optional diagnostic sink; omission or a throwing sink uses Core's host failure route.",
-              "descriptionEn": "Optional diagnostic sink; omission or a throwing sink uses Core's host failure route.",
-              "descriptionZh": ""
-            }
-          ],
-          "fragment": "rpc-plugin-devtools-index--devtoolsPlugin"
-        },
-        {
-          "name": "IDevtoolsPlugin",
-          "kind": "type",
-          "signature": "export type IDevtoolsPlugin = IRpcFlowPlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;",
-          "declarationLine": 5,
-          "source": "packages/rpc-plugin-devtools/dist/plugin.d.ts",
-          "purpose": "Complete flow plugin retaining its collector and the same query, watch, stats, describe and close methods. Collector close does not close observing Hosts.",
-          "core": "collector: Exact original collector; the application owns its final close.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED.",
-          "advanced": "Share a collector across two actual hosts while preserving separate host cleanup.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "collector",
-              "kind": "property",
-              "optional": false,
-              "signature": "collector: IRpcDevtools;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IRpcDevtools"
-            },
-            {
-              "name": "query",
-              "kind": "method",
-              "optional": false,
-              "signature": "query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage;",
-              "description": "Read retained history after a sequence cursor; locally captured content is available.",
-              "parameterDetails": [
-                {
-                  "name": "input",
-                  "type": "IRpcDevtoolsQuery",
-                  "optional": true
-                }
-              ],
-              "returns": "IRpcDevtoolsPage"
-            },
-            {
-              "name": "watch",
-              "kind": "method",
-              "optional": false,
-              "signature": "watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>;",
-              "description": "A local iterator return wakes its pending next and releases only that watch, not the Collector. First next subscribes to future events; query reads history. Batches contain at most 256 events with 64 queued batches and a loss count. Collector close rejects pending next with CLOSED rather than leaving it suspended.",
-              "parameterDetails": [
-                {
-                  "name": "input",
-                  "type": "Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>",
-                  "optional": true
-                }
-              ],
-              "returns": "AsyncGenerator<IRpcDevtoolsWatchBatch>"
-            },
-            {
-              "name": "stats",
-              "kind": "method",
-              "optional": false,
-              "signature": "stats(): IRpcDevtoolsStats;",
-              "description": "Snapshot cumulative eligible message statistics; ring eviction does not reset them.",
-              "parameterDetails": [],
-              "returns": "IRpcDevtoolsStats"
-            },
-            {
-              "name": "describe",
-              "kind": "method",
-              "optional": false,
-              "signature": "describe(): IRpcDevtoolsDescribe;",
-              "description": "Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after close.",
-              "parameterDetails": [],
-              "returns": "IRpcDevtoolsDescribe"
-            },
-            {
-              "name": "close",
-              "kind": "method",
-              "optional": false,
-              "signature": "close(): void;",
-              "description": "Synchronously retire storage and wake watches; idempotent, without closing any serving Peer.",
-              "parameterDetails": [],
-              "returns": "void"
-            }
-          ],
-          "composes": ["IRpcFlowPlugin"],
-          "aliasOf": "IDevtoolsPlugin",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IDevtoolsPlugin = IRpcFlowPlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Share a collector across two actual hosts while preserving separate host cleanup.",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Complete flow plugin retaining its collector and the same query, watch, stats, describe and close methods. Collector close does not close observing Hosts."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IDevtoolsPlugin from @migaia/rpc-plugin-devtools, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IDevtoolsPlugin when its type contract and declared inputs match the result you need. Choose a different public symbol when IDevtoolsPlugin does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "collector: Exact original collector; the application owns its final close.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "Share a collector across two actual hosts while preserving separate host cleanup."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-devtools/dist/plugin.d.ts:IDevtoolsPlugin:export type IDevtoolsPlugin = IRpcFlowPlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-plugin-devtools-index--IDevtoolsPlugin"
-        },
-        {
-          "name": "IRpcDevtools",
-          "kind": "type",
-          "signature": "export type IRpcDevtools = IRpcProbe & Readonly<{ /** * Consume a reusable Core view now; metadata is copied, nested error/content/detail retain * references. */ emit(view: IRpcProbeEventView): void; /** Read retained history after a sequence cursor; locally captured content is available. */ query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; /** * A local iterator return wakes its pending next and releases only that watch, not the * Collector. First next subscribes to future events; query reads history. Batches contain at * most 256 events with 64 queued batches and a loss count. Collector close rejects pending next * with CLOSED rather than leaving it suspended. */ watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; /** Snapshot cumulative eligible message statistics; ring eviction does not reset them. */ stats(): IRpcDevtoolsStats; /** * Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after * close. */ describe(): IRpcDevtoolsDescribe; /** * Start the sole independent recording; maxEvents defaults to the main capacity, and stop * consumes this handle. */ record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; /** Pure NDJSON encoding, without persistence or an open-collector requirement. */ exportRecord(record: IRpcDevtoolsRecord): string; /** Pure decoding, without ingesting events into this collector; usable after close. */ importRecord(text: string): IRpcDevtoolsRecord; /** Temporarily remove current stages and save their selection; repeated pause is harmless. */ pause(): void; /** Restore the saved selection, without reviving a closed collector. */ resume(): void; /** * Reset the main ring, statistics and counters, retaining sequence progress and record/watch * ownership. */ clear(): void; /** Synchronously retire storage and wake watches; idempotent, without closing any serving Peer. */ close(): void; /** Nested provide object; wire content is hidden unless exposeContent is true. */ readonly service: IRpcProvide; }>;",
-          "declarationLine": 30,
-          "source": "packages/rpc-plugin-devtools/dist/collector-types.d.ts",
-          "purpose": "Collector exposed by devtoolsPlugin().collector, composed with external IRpcProbe. The Core owns stage masks and setStages; this collector owns retention, queries, recording, service projection and explicit close.",
-          "core": "emit: Consumes a reusable IRpcProbeEventView synchronously into retained columns; never retains the view. The installed observe flow forwards actual Host observation here.\nemit.view: IRpcProbeEventView issued by an installed Core emitter, valid only during its synchronous emit call; external type semantics remain in @migaia/rpc-host/plugins/probe.\nMetadata is retained or accounted as filtered, paused, closed or reentrant loss. Observation failures are reported instead of reaching the business caller.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nrecord: Starts one independent bounded recording ring. Pair its handle stop() with exportRecord to obtain an offline record; only one recording may be active.\nrecord.options: Optional maxEvents positive safe integer capacity, defaulting to the collector maxEvents. This bound is separate from main query retention.\nA handle with stop() returning its captured record, taking no arguments and stopping only its own active ring. Duplicate start throws RECORD_ACTIVE; a stale or repeated stop throws RECORD_NOT_ACTIVE; closure throws CLOSED.\nexportRecord: Encodes a stopped record through the standalone canonical record codec; this method does not change retained collector state.\nexportRecord.record: A captured record returned by a recording handle stop or importRecord.\nVersion-one NDJSON string; unsupported record input throws RECORD_FORMAT_INVALID with cause.\nimportRecord: Decodes offline text into an independent record; it does not append events to this collector or change its ring.\nimportRecord.text: Version-one text returned by exportRecord.\nA record with revived native errors and bytes, or RECORD_FORMAT_INVALID with cause.\npause: Snapshots current effective stage subscriptions and replaces them with an empty selection. Repeated pause is harmless; retained data remains queryable.\nCollection is paused without pausing business RPC; closed collectors throw CLOSED.\nresume: Restores the effective stage selection saved by the first pause. It does not revive a closed collector.\nCollection resumes with prior subscriptions; repeated resume is harmless and closed collectors throw CLOSED.\nclear: Clears main query retention, aggregate statistics and loss counters. Independent recording and watch windows keep their ownership.\nMain retention and statistics are empty; the collector stays open. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED.\nservice: Nested IRpcProvide object installed explicitly on a separate authorized Host; the application owns that serving connection and its cleanup.",
-          "advanced": "Observe endpoint traffic locally and serve a separate diagnostics connection without owning business transports.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [
-            "import { devtoolsPlugin, type IRpcDevtools } from '@migaia/rpc-plugin-devtools'\nimport type { IRpcHost } from '@migaia/rpc-host'\n\nexport const tools = devtoolsPlugin({\n  stages: ['message', 'peer', 'carrier'],\n  capture: ['message'],\n  redact: () => ({ redacted: true }),\n  maxEvents: 2000,\n  maxContentBytes: 1024 * 1024,\n  onError: (error) => console.error(error)\n})\n\nexport function readPage(collector: IRpcDevtools, afterSeq: number) {\n  const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })\n  return { events: page.events, cursor: page.nextSeq, loss: page.counters }\n}\n\nexport function exposeDiagnostics(host: IRpcHost) {\n  host.provide({ diagnostics: tools.collector.service })\n}"
-          ],
-          "members": [
-            {
-              "name": "emit",
-              "kind": "method",
-              "optional": false,
-              "signature": "emit(view: IRpcProbeEventView): void;",
-              "description": "Consume a reusable Core view now; metadata is copied, nested error/content/detail retain references.",
-              "parameterDetails": [
-                {
-                  "name": "view",
-                  "type": "IRpcProbeEventView",
-                  "optional": false
-                }
-              ],
-              "returns": "void"
-            },
-            {
-              "name": "query",
-              "kind": "method",
-              "optional": false,
-              "signature": "query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage;",
-              "description": "Read retained history after a sequence cursor; locally captured content is available.",
-              "parameterDetails": [
-                {
-                  "name": "input",
-                  "type": "IRpcDevtoolsQuery",
-                  "optional": true
-                }
-              ],
-              "returns": "IRpcDevtoolsPage"
-            },
-            {
-              "name": "watch",
-              "kind": "method",
-              "optional": false,
-              "signature": "watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>;",
-              "description": "A local iterator return wakes its pending next and releases only that watch, not the Collector. First next subscribes to future events; query reads history. Batches contain at most 256 events with 64 queued batches and a loss count. Collector close rejects pending next with CLOSED rather than leaving it suspended.",
-              "parameterDetails": [
-                {
-                  "name": "input",
-                  "type": "Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>",
-                  "optional": true
-                }
-              ],
-              "returns": "AsyncGenerator<IRpcDevtoolsWatchBatch>"
-            },
-            {
-              "name": "stats",
-              "kind": "method",
-              "optional": false,
-              "signature": "stats(): IRpcDevtoolsStats;",
-              "description": "Snapshot cumulative eligible message statistics; ring eviction does not reset them.",
-              "parameterDetails": [],
-              "returns": "IRpcDevtoolsStats"
-            },
-            {
-              "name": "describe",
-              "kind": "method",
-              "optional": false,
-              "signature": "describe(): IRpcDevtoolsDescribe;",
-              "description": "Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after close.",
-              "parameterDetails": [],
-              "returns": "IRpcDevtoolsDescribe"
-            },
-            {
-              "name": "record",
-              "kind": "method",
-              "optional": false,
-              "signature": "record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>;",
-              "description": "Start the sole independent recording; maxEvents defaults to the main capacity, and stop consumes this handle.",
-              "parameterDetails": [
-                {
-                  "name": "options",
-                  "type": "Readonly<{ maxEvents?: number; }>",
-                  "optional": true
-                }
-              ],
-              "returns": "Readonly<{ stop(): IRpcDevtoolsRecord; }>"
-            },
-            {
-              "name": "exportRecord",
-              "kind": "method",
-              "optional": false,
-              "signature": "exportRecord(record: IRpcDevtoolsRecord): string;",
-              "description": "Pure NDJSON encoding, without persistence or an open-collector requirement.",
-              "parameterDetails": [
-                {
-                  "name": "record",
-                  "type": "IRpcDevtoolsRecord",
-                  "optional": false
-                }
-              ],
-              "returns": "string"
-            },
-            {
-              "name": "importRecord",
-              "kind": "method",
-              "optional": false,
-              "signature": "importRecord(text: string): IRpcDevtoolsRecord;",
-              "description": "Pure decoding, without ingesting events into this collector; usable after close.",
-              "parameterDetails": [
-                {
-                  "name": "text",
-                  "type": "string",
-                  "optional": false
-                }
-              ],
-              "returns": "IRpcDevtoolsRecord"
-            },
-            {
-              "name": "pause",
-              "kind": "method",
-              "optional": false,
-              "signature": "pause(): void;",
-              "description": "Temporarily remove current stages and save their selection; repeated pause is harmless.",
-              "parameterDetails": [],
-              "returns": "void"
-            },
-            {
-              "name": "resume",
-              "kind": "method",
-              "optional": false,
-              "signature": "resume(): void;",
-              "description": "Restore the saved selection, without reviving a closed collector.",
-              "parameterDetails": [],
-              "returns": "void"
-            },
-            {
-              "name": "clear",
-              "kind": "method",
-              "optional": false,
-              "signature": "clear(): void;",
-              "description": "Reset the main ring, statistics and counters, retaining sequence progress and record/watch ownership.",
-              "parameterDetails": [],
-              "returns": "void"
-            },
-            {
-              "name": "close",
-              "kind": "method",
-              "optional": false,
-              "signature": "close(): void;",
-              "description": "Synchronously retire storage and wake watches; idempotent, without closing any serving Peer.",
-              "parameterDetails": [],
-              "returns": "void"
-            },
-            {
-              "name": "service",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly service: IRpcProvide;",
-              "description": "Nested provide object; wire content is hidden unless exposeContent is true.",
-              "parameterDetails": [],
-              "returns": "IRpcProvide"
-            }
-          ],
-          "composes": ["IRpcProbe"],
-          "aliasOf": "IRpcDevtools",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRpcDevtools = IRpcProbe & Readonly<{ /** * Consume a reusable Core view now; metadata is copied, nested error/content/detail retain * references. */ emit(view: IRpcProbeEventView): void; /** Read retained history after a sequence cursor; locally captured content is available. */ query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; /** * A local iterator return wakes its pending next and releases only that watch, not the * Collector. First next subscribes to future events; query reads history. Batches contain at * most 256 events with 64 queued batches and a loss count. Collector close rejects pending next * with CLOSED rather than leaving it suspended. */ watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; /** Snapshot cumulative eligible message statistics; ring eviction does not reset them. */ stats(): IRpcDevtoolsStats; /** * Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after * close. */ describe(): IRpcDevtoolsDescribe; /** * Start the sole independent recording; maxEvents defaults to the main capacity, and stop * consumes this handle. */ record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; /** Pure NDJSON encoding, without persistence or an open-collector requirement. */ exportRecord(record: IRpcDevtoolsRecord): string; /** Pure decoding, without ingesting events into this collector; usable after close. */ importRecord(text: string): IRpcDevtoolsRecord; /** Temporarily remove current stages and save their selection; repeated pause is harmless. */ pause(): void; /** Restore the saved selection, without reviving a closed collector. */ resume(): void; /** * Reset the main ring, statistics and counters, retaining sequence progress and record/watch * ownership. */ clear(): void; /** Synchronously retire storage and wake watches; idempotent, without closing any serving Peer. */ close(): void; /** Nested provide object; wire content is hidden unless exposeContent is true. */ readonly service: IRpcProvide; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Observe endpoint traffic locally and serve a separate diagnostics connection without owning business transports.",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Collector exposed by devtoolsPlugin().collector, composed with external IRpcProbe. The Core owns stage masks and setStages; this collector owns retention, queries, recording, service projection and explicit close."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRpcDevtools from @migaia/rpc-plugin-devtools, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRpcDevtools when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtools does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "emit: Consumes a reusable IRpcProbeEventView synchronously into retained columns; never retains the view. The installed observe flow forwards actual Host observation here.\nemit.view: IRpcProbeEventView issued by an installed Core emitter, valid only during its synchronous emit call; external type semantics remain in @migaia/rpc-host/plugins/probe.\nMetadata is retained or accounted as filtered, paused, closed or reentrant loss. Observation failures are reported instead of reaching the business caller.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nrecord: Starts one independent bounded recording ring. Pair its handle stop() with exportRecord to obtain an offline record; only one recording may be active.\nrecord.options: Optional maxEvents positive safe integer capacity, defaulting to the collector maxEvents. This bound is separate from main query retention.\nA handle with stop() returning its captured record, taking no arguments and stopping only its own active ring. Duplicate start throws RECORD_ACTIVE; a stale or repeated stop throws RECORD_NOT_ACTIVE; closure throws CLOSED.\nexportRecord: Encodes a stopped record through the standalone canonical record codec; this method does not change retained collector state.\nexportRecord.record: A captured record returned by a recording handle stop or importRecord.\nVersion-one NDJSON string; unsupported record input throws RECORD_FORMAT_INVALID with cause.\nimportRecord: Decodes offline text into an independent record; it does not append events to this collector or change its ring.\nimportRecord.text: Version-one text returned by exportRecord.\nA record with revived native errors and bytes, or RECORD_FORMAT_INVALID with cause.\npause: Snapshots current effective stage subscriptions and replaces them with an empty selection. Repeated pause is harmless; retained data remains queryable.\nCollection is paused without pausing business RPC; closed collectors throw CLOSED.\nresume: Restores the effective stage selection saved by the first pause. It does not revive a closed collector.\nCollection resumes with prior subscriptions; repeated resume is harmless and closed collectors throw CLOSED.\nclear: Clears main query retention, aggregate statistics and loss counters. Independent recording and watch windows keep their ownership.\nMain retention and statistics are empty; the collector stays open. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED.\nservice: Nested IRpcProvide object installed explicitly on a separate authorized Host; the application owns that serving connection and its cleanup."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "Observe endpoint traffic locally and serve a separate diagnostics connection without owning business transports."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-devtools/dist/collector-types.d.ts:IRpcDevtools:export type IRpcDevtools = IRpcProbe & Readonly<{ /** * Consume a reusable Core view now; metadata is copied, nested error/content/detail retain * references. */ emit(view: IRpcProbeEventView): void; /** Read retained history after a sequence cursor; locally captured content is available. */ query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; /** * A local iterator return wakes its pending next and releases only that watch, not the * Collector. First next subscribes to future events; query reads history. Batches contain at * most 256 events with 64 queued batches and a loss count. Collector close rejects pending next * with CLOSED rather than leaving it suspended. */ watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; /** Snapshot cumulative eligible message statistics; ring eviction does not reset them. */ stats(): IRpcDevtoolsStats; /** * Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after * close. */ describe(): IRpcDevtoolsDescribe; /** * Start the sole independent recording; maxEvents defaults to the main capacity, and stop * consumes this handle. */ record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; /** Pure NDJSON encoding, without persistence or an open-collector requirement. */ exportRecord(record: IRpcDevtoolsRecord): string; /** Pure decoding, without ingesting events into this collector; usable after close. */ importRecord(text: string): IRpcDevtoolsRecord; /** Temporarily remove current stages and save their selection; repeated pause is harmless. */ pause(): void; /** Restore the saved selection, without reviving a closed collector. */ resume(): void; /** * Reset the main ring, statistics and counters, retaining sequence progress and record/watch * ownership. */ clear(): void; /** Synchronously retire storage and wake watches; idempotent, without closing any serving Peer. */ close(): void; /** Nested provide object; wire content is hidden unless exposeContent is true. */ readonly service: IRpcProvide; }>;",
-          "guidance": [],
-          "usageScore": 14,
-          "configuration": [],
-          "fragment": "rpc-plugin-devtools-index--IRpcDevtools"
-        },
-        {
           "name": "IRpcDevtoolsErrorCode",
           "kind": "type",
           "signature": "export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
-          "declarationLine": 506,
+          "declarationLine": 474,
           "source": "packages/rpc-contract/dist/error-code.d.ts",
           "purpose": "Value union of the devtools semantic code table; classify with RPC_DEVTOOLS_SOURCE and preserve original cause chains.",
           "core": "Value union of the devtools semantic code table; classify with RPC_DEVTOOLS_SOURCE and preserve original cause chains.",
@@ -1063,183 +508,10 @@
           "fragment": "rpc-plugin-devtools-index--IRpcDevtoolsErrorCode"
         },
         {
-          "name": "IRpcDevtoolsOptions",
-          "kind": "type",
-          "signature": "export type IRpcDevtoolsOptions = Readonly<{ /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */ stages?: readonly IRpcProbeStageName[]; /** Explicit captured stages, default none; capture must be a subset of subscribed stages. */ capture?: readonly IRpcProbeStageName[]; /** Optional synchronous projection; throws report REDACT_FAILED and discard this content. */ redact?(stage: RpcProbeStage, content: unknown): unknown; /** Optional exact method selection compiled by Core; omission observes all eligible methods. */ methods?: readonly string[]; /** Deterministic sampling ratio, default 1; greater than 0 and at most 1. */ sample?: number; /** Main-ring capacity, default 10000; positive safe integer within JavaScript array limits. */ maxEvents?: number; /** Main-ring budget, default 8388608 bytes, allowing 0; record/watch references are independent. */ maxContentBytes?: number; /** Reader name capacity, default 65536; positive bounded safe integer, with overflow counted. */ maxInterned?: number; /** Defaults to false; only true permits captured content across the remote service boundary. */ exposeContent?: boolean; /** Optional diagnostic sink; omission or a throwing sink uses Core's host failure route. */ onError?(error: unknown): void; }>;",
-          "declarationLine": 7,
-          "source": "packages/rpc-plugin-devtools/dist/collector-types.d.ts",
-          "purpose": "Construction policies for a bounded collector; capacities are captured once, while effective subscriptions can later change through the Core probe setStages API.",
-          "core": "methods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/plugins/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "stages",
-              "kind": "property",
-              "optional": true,
-              "signature": "stages?: readonly IRpcProbeStageName[];",
-              "description": "Defaults to message and peer; pass physical stages here or use setStages() to enable them.",
-              "parameterDetails": [],
-              "returns": "readonly IRpcProbeStageName[]"
-            },
-            {
-              "name": "capture",
-              "kind": "property",
-              "optional": true,
-              "signature": "capture?: readonly IRpcProbeStageName[];",
-              "description": "Explicit captured stages, default none; capture must be a subset of subscribed stages.",
-              "parameterDetails": [],
-              "returns": "readonly IRpcProbeStageName[]"
-            },
-            {
-              "name": "redact",
-              "kind": "method",
-              "optional": true,
-              "signature": "redact?(stage: RpcProbeStage, content: unknown): unknown;",
-              "description": "Optional synchronous projection; throws report REDACT_FAILED and discard this content.",
-              "parameterDetails": [
-                {
-                  "name": "stage",
-                  "type": "RpcProbeStage",
-                  "optional": false
-                },
-                {
-                  "name": "content",
-                  "type": "unknown",
-                  "optional": false
-                }
-              ],
-              "returns": "unknown"
-            },
-            {
-              "name": "methods",
-              "kind": "property",
-              "optional": true,
-              "signature": "methods?: readonly string[];",
-              "description": "Optional exact method selection compiled by Core; omission observes all eligible methods.",
-              "parameterDetails": [],
-              "returns": "readonly string[]"
-            },
-            {
-              "name": "sample",
-              "kind": "property",
-              "optional": true,
-              "signature": "sample?: number;",
-              "description": "Deterministic sampling ratio, default 1; greater than 0 and at most 1.",
-              "parameterDetails": [],
-              "returns": "number"
-            },
-            {
-              "name": "maxEvents",
-              "kind": "property",
-              "optional": true,
-              "signature": "maxEvents?: number;",
-              "description": "Main-ring capacity, default 10000; positive safe integer within JavaScript array limits.",
-              "parameterDetails": [],
-              "returns": "number"
-            },
-            {
-              "name": "maxContentBytes",
-              "kind": "property",
-              "optional": true,
-              "signature": "maxContentBytes?: number;",
-              "description": "Main-ring budget, default 8388608 bytes, allowing 0; record/watch references are independent.",
-              "parameterDetails": [],
-              "returns": "number"
-            },
-            {
-              "name": "maxInterned",
-              "kind": "property",
-              "optional": true,
-              "signature": "maxInterned?: number;",
-              "description": "Reader name capacity, default 65536; positive bounded safe integer, with overflow counted.",
-              "parameterDetails": [],
-              "returns": "number"
-            },
-            {
-              "name": "exposeContent",
-              "kind": "property",
-              "optional": true,
-              "signature": "exposeContent?: boolean;",
-              "description": "Defaults to false; only true permits captured content across the remote service boundary.",
-              "parameterDetails": [],
-              "returns": "boolean"
-            },
-            {
-              "name": "onError",
-              "kind": "method",
-              "optional": true,
-              "signature": "onError?(error: unknown): void;",
-              "description": "Optional diagnostic sink; omission or a throwing sink uses Core's host failure route.",
-              "parameterDetails": [
-                {
-                  "name": "error",
-                  "type": "unknown",
-                  "optional": false
-                }
-              ],
-              "returns": "void"
-            }
-          ],
-          "composes": [],
-          "aliasOf": "IRpcDevtoolsOptions",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRpcDevtoolsOptions = Readonly<{ /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */ stages?: readonly IRpcProbeStageName[]; /** Explicit captured stages, default none; capture must be a subset of subscribed stages. */ capture?: readonly IRpcProbeStageName[]; /** Optional synchronous projection; throws report REDACT_FAILED and discard this content. */ redact?(stage: RpcProbeStage, content: unknown): unknown; /** Optional exact method selection compiled by Core; omission observes all eligible methods. */ methods?: readonly string[]; /** Deterministic sampling ratio, default 1; greater than 0 and at most 1. */ sample?: number; /** Main-ring capacity, default 10000; positive safe integer within JavaScript array limits. */ maxEvents?: number; /** Main-ring budget, default 8388608 bytes, allowing 0; record/watch references are independent. */ maxContentBytes?: number; /** Reader name capacity, default 65536; positive bounded safe integer, with overflow counted. */ maxInterned?: number; /** Defaults to false; only true permits captured content across the remote service boundary. */ exposeContent?: boolean; /** Optional diagnostic sink; omission or a throwing sink uses Core's host failure route. */ onError?(error: unknown): void; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Construction policies for a bounded collector; capacities are captured once, while effective subscriptions can later change through the Core probe setStages API."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRpcDevtoolsOptions from @migaia/rpc-plugin-devtools, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRpcDevtoolsOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDevtoolsOptions does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "methods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/plugins/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-devtools/dist/collector-types.d.ts:IRpcDevtoolsOptions:export type IRpcDevtoolsOptions = Readonly<{ /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */ stages?: readonly IRpcProbeStageName[]; /** Explicit captured stages, default none; capture must be a subset of subscribed stages. */ capture?: readonly IRpcProbeStageName[]; /** Optional synchronous projection; throws report REDACT_FAILED and discard this content. */ redact?(stage: RpcProbeStage, content: unknown): unknown; /** Optional exact method selection compiled by Core; omission observes all eligible methods. */ methods?: readonly string[]; /** Deterministic sampling ratio, default 1; greater than 0 and at most 1. */ sample?: number; /** Main-ring capacity, default 10000; positive safe integer within JavaScript array limits. */ maxEvents?: number; /** Main-ring budget, default 8388608 bytes, allowing 0; record/watch references are independent. */ maxContentBytes?: number; /** Reader name capacity, default 65536; positive bounded safe integer, with overflow counted. */ maxInterned?: number; /** Defaults to false; only true permits captured content across the remote service boundary. */ exposeContent?: boolean; /** Optional diagnostic sink; omission or a throwing sink uses Core's host failure route. */ onError?(error: unknown): void; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-plugin-devtools-index--IRpcDevtoolsOptions"
-        },
-        {
           "name": "RPC_DEVTOOLS_SOURCE",
           "kind": "const",
           "signature": "export declare const RPC_DEVTOOLS_SOURCE = \"rpc.devtools\";",
-          "declarationLine": 483,
+          "declarationLine": 451,
           "source": "packages/rpc-contract/dist/error-code.d.ts",
           "purpose": "Stable rpc.devtools source declared by @migaia/rpc-contract/error-code and re-exported here. Other RPC/native families retain their own source and code.",
           "core": "Stable rpc.devtools source declared by @migaia/rpc-contract/error-code and re-exported here. Other RPC/native families retain their own source and code.",
@@ -1302,7 +574,7 @@
           "name": "RpcDevtoolsErrorCode",
           "kind": "const",
           "signature": "export declare const RpcDevtoolsErrorCode: { /** Captured service data cannot be encoded; inspect cause or disable content exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector options violate their supported domain; fix the option before construction. */ readonly invalidOption: 'INVALID_OPTION'; /** Collector is closed; create a new instance rather than reviving retained resources. */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another. */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it. */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record. */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector). */ readonly redactFailed: 'REDACT_FAILED'; };",
-          "declarationLine": 489,
+          "declarationLine": 457,
           "source": "packages/rpc-contract/dist/error-code.d.ts",
           "purpose": "Stable semantic error vocabulary for options, collector lifecycle, recording and portable service conversion. Original causes remain reachable through native error chains.",
           "core": "serviceResultInvalid: Service result cannot become portable wire data; inspect the original conversion cause.\ninvalidOption: Collector options violate a supported domain; correct the supplied option.\nclosed: An operation uses a closed collector; create a live instance rather than reviving it.\nrecordActive: A recording is already active on the collector; stop it before starting another.\nrecordNotActive: Stop has no matching active recording, including repeated stop or a stale handle.\nrecordFormatInvalid: Record header, event, bytes or error graph fails the frozen version-one format boundary.\nredactFailed: Collector redaction throws; content is discarded and the original cause is reported.",

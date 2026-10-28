@@ -87,10 +87,10 @@ These storage packages are currently `private: true` workspace packages in this 
 pnpm add --workspace @migaia/storage-host @migaia/storage-contract
 ```
 
-Memory needs no database client. Install other backends through their own plugins. The optional peer below is needed only when importing `/plugins/journal` (for `storageJournalPlugin`):
+Memory needs no database client. Install other backends through their own plugins. The optional peers below are needed only when importing `/plugins/journal` (for `storageJournalPlugin`):
 
 ```bash
-pnpm add --workspace @migaia/logger
+pnpm add --workspace @migaia/log-host @migaia/log-plugin-durable
 ```
 
 ## Common APIs

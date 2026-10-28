@@ -1,4 +1,25 @@
 {
   "package": "middleware-pipeline",
-  "codes": {}
+  "codes": {
+    "ABORTED": {
+      "source": "middleware.pipeline",
+      "scenario": "A cooperative checkpoint observes cancellation."
+    },
+    "ABORT_CLEANUP_FAILED": {
+      "source": "middleware.pipeline",
+      "scenario": "Iterator cleanup failed during cancellation."
+    },
+    "EXECUTION_FAILED": {
+      "source": "middleware.pipeline",
+      "scenario": "Reports failure in both the current stage and its started downstream when no error combiner is supplied."
+    },
+    "INVALID_OPTION": {
+      "source": "middleware.pipeline",
+      "scenario": "Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target."
+    },
+    "MULTIPLE_DOWNSTREAM_FAILED": {
+      "source": "middleware.pipeline",
+      "scenario": "Several independent sync traversals or unobserved async traversals failed."
+    }
+  }
 }

@@ -56,7 +56,7 @@ Use [rpc-plugin-browser](../rpc-plugin-browser/README.en.md) in browser pages an
 
 ## Policies and lifetime
 
-Calls accept `signal`, complete `timeout({ ms })` and `retry({ attempts })` instances, or `false`. Selection precedence is per-call options, transport features, then link-policy plugin. An absent policy adds no automatic timeout or retry. Cancellation is cooperative and cannot preempt a synchronous loop.
+Calls accept `signal`, complete `timeoutFeature({ ms })` and `retryFeature({ attempts })` instances, or `false`. Selection precedence is per-call options, transport features, then link-policy plugin. An absent policy adds no automatic timeout or retry. Cancellation is cooperative and cannot preempt a synchronous loop.
 
 The native Thread `spec.limits.callWallTimeMs` is a separate hard cap. Explicit `timeout: false` disables the optional business timeout without extending that cap. A complete timeout instance uses the actual launch spec and its original scheduler.
 

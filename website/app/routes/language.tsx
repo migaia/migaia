@@ -91,7 +91,17 @@ const ARCHITECTURE_FAMILIES = [
     bodyEn:
       'Reuse common operations, encode values for storage or transport, and compose log output.',
     bodyZh: '复用通用操作，将值编码为可存储或传输的数据，并组合日志输出。',
-    libraries: ['utils', 'serialize', 'logger']
+    libraries: [
+      'utils',
+      'serialize',
+      'log-host',
+      'log-plugin-console',
+      'log-plugin-file',
+      'log-plugin-http',
+      'log-plugin-process',
+      'log-plugin-reasoning',
+      'log-plugin-durable'
+    ]
   },
   {
     titleEn: 'Lifecycle, reactivity, and events',

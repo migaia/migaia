@@ -87,7 +87,11 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "单次调用传 `signal`，以及完整的 `timeout({ ms })`、`retry({ attempts })` 实例或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。"
+                "text": "单次调用传 `signal`，以及完整的 `timeoutFeature({ ms })`、`retryFeature({ attempts })` 实例或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Thread 的原生 `spec.limits.callWallTimeMs` 是独立硬上限；显式 `timeout: false` 只关闭可选业务 timeout，不能延长该上限。它由真实 launch spec 与同一 scheduler 创建的完整 timeout 实例执行。"
               },
               {
                 "type": "paragraph",
@@ -128,7 +132,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeout, retry } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeout({ ms: 1500 }), retry({ attempts: 2 })]\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeout({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
+                "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })]\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
               },
               {
                 "type": "paragraph",
@@ -155,7 +159,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "`timeout`、`retry` 只能是完整 feature 实例或 `false`。优先级为单次调用、transport 安装值、链路策略 plugin。上例单次调用使用 500 ms timeout，并关闭该次 retry；没有选中的策略就不自动启用。原生启动、health、stop 与业务调用的期限各有原 owner，不能用业务 timeout 推断它们的时钟。"
+                "text": "`timeoutFeature`、`retryFeature` 只能是完整 feature 实例或 `false`。优先级为单次调用、transport 安装值、链路策略 plugin。上例单次调用使用 500 ms timeout，并关闭该次 retry；没有选中的策略就不自动启用。原生启动、health、stop 与业务调用的期限各有原 owner，不能用业务 timeout 推断它们的时钟。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Thread 的 `spec.limits.callWallTimeMs` 围住整个 originating 调用，包括 retry/backoff；同一原生 registration 保留其初始已准入 spec 的上限，重启或替换不会偷偷换掉该配置。较短的业务 timeout 仍可提前结束调用，`timeout: false` 不能取消该原生上限。未设置原生上限时，`timeout: false` 不自动添加期限。"
               },
               {
                 "type": "paragraph",
@@ -178,6 +186,14 @@
               {
                 "type": "paragraph",
                 "text": "自定义载体的真实接入路径是 `@migaia/rpc-host/sdk`；只读原始载体与流程观察使用 `@migaia/rpc-host/plugins/probe`。线程资源查询只报告实际原生采样；线程共享进程 PID，不以进程 RSS 冒充单个线程内存。"
+              },
+              {
+                "type": "paragraph",
+                "text": "原生 `messageerror` 只报告一次该诊断，不关闭仍合法的连接；诊断字符串转换失败先报告带原 cause 的转换错误。只读 probe 回调失败保留 `TRANSPORT` 与原 cause，不阻止原生投递。没有真实原生错误的主动重启/替换不会伪造 TRANSPORT cause；REMOTE_CLOSED 的代次信息仍保留。"
+              },
+              {
+                "type": "paragraph",
+                "text": "重启后重新按 namespace 发起的无目标调用读取当时 accepted 集合；空集合使用正常 fanout 结果。此前持有的函数仍绑定原代，退场后拒绝 `TARGET_UNKNOWN`，不会自动指向新 Worker。"
               }
             ]
           },
@@ -284,7 +300,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Calls accept `signal`, complete `timeout({ ms })` and `retry({ attempts })` instances, or `false`. Selection precedence is per-call options, transport features, then link-policy plugin. An absent policy adds no automatic timeout or retry. Cancellation is cooperative and cannot preempt a synchronous loop."
+                  "text": "Calls accept `signal`, complete `timeoutFeature({ ms })` and `retryFeature({ attempts })` instances, or `false`. Selection precedence is per-call options, transport features, then link-policy plugin. An absent policy adds no automatic timeout or retry. Cancellation is cooperative and cannot preempt a synchronous loop."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The native Thread `spec.limits.callWallTimeMs` is a separate hard cap. Explicit `timeout: false` disables the optional business timeout without extending that cap. A complete timeout instance uses the actual launch spec and its original scheduler."
                 },
                 {
                   "type": "paragraph",
@@ -325,7 +345,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeout, retry } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeout({ ms: 1500 }), retry({ attempts: 2 })]\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeout({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
+                  "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })]\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
                 },
                 {
                   "type": "paragraph",
@@ -352,7 +372,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`timeout` and `retry` accept complete feature instances or `false`. Precedence is per-call, installed transport policy, then link-policy plugin. The example chooses a 500 ms call timeout and disables retry for that call. No selected policy means no automatic policy. Native startup, health, stop, and business deadlines keep their respective owners; business timeout does not configure those clocks."
+                  "text": "`timeoutFeature` and `retryFeature` accept complete feature instances or `false`. Precedence is per-call, installed transport policy, then link-policy plugin. The example chooses a 500 ms call timeout and disables retry for that call. No selected policy means no automatic policy. Native startup, health, stop, and business deadlines keep their respective owners; business timeout does not configure those clocks."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Thread `spec.limits.callWallTimeMs` surrounds the whole originating call, including retry/backoff. The native registration retains its initially admitted spec's cap across restart and replacement. A shorter business timeout may end the call earlier; `timeout: false` cannot disable the native cap. Without a native cap, `timeout: false` adds no deadline."
                 },
                 {
                   "type": "paragraph",
@@ -375,6 +399,14 @@
                 {
                   "type": "paragraph",
                   "text": "Custom carriers use `@migaia/rpc-host/sdk`; readonly carrier/flow observation uses `@migaia/rpc-host/plugins/probe`. Resource queries report actual native samples. Threads share a process PID, so process RSS is not reported as one thread's memory."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A native `messageerror` reports that diagnostic once without closing a valid connection. Failed diagnostic conversion first reports its original cause. Readonly probe callback failures retain `TRANSPORT` and the original cause without blocking native delivery. An intentional restart/replacement without a native error does not fabricate a TRANSPORT cause; REMOTE_CLOSED retains its generation detail."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "An untargeted namespace call made during restart selects the currently accepted set, using ordinary fanout results for an empty set. A previously held function remains bound to its original generation and rejects with `TARGET_UNKNOWN` after departure instead of moving to the successor Worker."
                 }
               ]
             },
@@ -418,7 +450,7 @@
           "name": "IRpcThreadErrorCode",
           "kind": "type",
           "signature": "export type IRpcThreadErrorCode = (typeof RpcThreadErrorCode)[keyof typeof RpcThreadErrorCode];",
-          "declarationLine": 411,
+          "declarationLine": 379,
           "source": "packages/rpc-contract/dist/error-code.d.ts",
           "purpose": "Union of `RpcThreadErrorCode` values.",
           "core": "Union of `RpcThreadErrorCode` values.",
@@ -480,777 +512,10 @@
           "fragment": "rpc-plugin-thread-index--IRpcThreadErrorCode"
         },
         {
-          "name": "isThreadChild",
-          "kind": "function",
-          "signature": "export declare function isThreadChild(): Promise<boolean>;",
-          "declarationLine": 23,
-          "source": "packages/rpc-plugin-thread/dist/threads/child.d.ts",
-          "purpose": "Tells whether the current module runs inside a Worker started by this library, so one file can branch between parent and Worker for `spawn: true`.",
-          "core": "Resolves `true` in a library-launched Worker; it does not authorise foreign Workers.",
-          "advanced": "Self spawn is unsupported in browsers, Electron, REPL/eval sessions, bundled executables and entries controlled by a test runner; use an explicit built Worker URL.",
-          "parameters": ["This function declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "Promise<boolean>",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [threadPlugin({ spawn: true })] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-          ],
-          "members": [],
-          "composes": [],
-          "aliasOf": "isThreadChild",
-          "exportPath": ".",
-          "overloadSignatures": ["export declare function isThreadChild(): Promise<boolean>;"],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": ["Promise<boolean>"],
-          "whenToUse": "",
-          "notUse": "Self spawn is unsupported in browsers, Electron, REPL/eval sessions, bundled executables and entries controlled by a test runner; use an explicit built Worker URL.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Tells whether the current module runs inside a Worker started by this library, so one file can branch between parent and Worker for `spawn: true`."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import isThreadChild from @migaia/rpc-plugin-thread, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use isThreadChild when its function contract and declared inputs match the result you need. Choose a different public symbol when isThreadChild does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Resolves `true` in a library-launched Worker; it does not authorise foreign Workers."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "Self spawn is unsupported in browsers, Electron, REPL/eval sessions, bundled executables and entries controlled by a test runner; use an explicit built Worker URL."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-thread/dist/threads/child.d.ts:isThreadChild:export declare function isThreadChild(): Promise<boolean>;",
-          "guidance": [
-            {
-              "id": "调用策略与生命周期",
-              "heading": "调用策略与生命周期",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "单次调用传 `signal`，以及完整的 `timeout({ ms })`、`retry({ attempts })` 实例或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`notify` 等物理写出，`request` 等业务结果。原生监管负责重启与替换；连接恢复不代表业务可安全重放。原生错误、调用错误和远端错误保留自己的 source/code/cause，跨线程传递的错误图保留 name/message/stack 与聚合成员。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "根入口公开 `threadPlugin`、`isThreadChild`、选项与错误身份。自定义原始载体使用 `@migaia/rpc-host/sdk`；只读观察使用 `@migaia/rpc-host/plugins/probe`。关闭流、取消调用、关闭 namespace、关闭 Host 和终止 Worker 是不同操作。资源与恢复示例见使用指南。"
-                }
-              ]
-            }
-          ],
-          "usageScore": 12,
-          "configuration": [],
-          "fragment": "rpc-plugin-thread-index--isThreadChild"
-        },
-        {
-          "name": "IThreadCommonOptions",
-          "kind": "type",
-          "signature": "export type IThreadCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature)[]; report?(error: unknown): void; }>;",
-          "declarationLine": 12,
-          "source": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts",
-          "purpose": "Cold native registration and scope; Host owns identity, providers and protocol execution.",
-          "core": "name: Local native registration name, separate from accepted remote identity.\nOmitted: the native registration default.\nnamespace: Unique Host property exposing this transport calls and extensions.\nOmitted: the factory namespace.\nexpose: Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.\nOmitted: no ordinary Feature output selected.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nfeatures: Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.\nOmitted: no optional policy installed by this field.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "name",
-              "kind": "property",
-              "optional": true,
-              "signature": "name?: string;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "string"
-            },
-            {
-              "name": "namespace",
-              "kind": "property",
-              "optional": true,
-              "signature": "namespace?: string;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "string"
-            },
-            {
-              "name": "expose",
-              "kind": "property",
-              "optional": true,
-              "signature": "expose?: readonly string[];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "readonly string[]"
-            },
-            {
-              "name": "features",
-              "kind": "property",
-              "optional": true,
-              "signature": "features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature)[];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "readonly (IRpcCallFeature | IRpcNativeTransportFeature)[]"
-            },
-            {
-              "name": "report",
-              "kind": "method",
-              "optional": true,
-              "signature": "report?(error: unknown): void;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "error",
-                  "type": "unknown",
-                  "optional": false
-                }
-              ],
-              "returns": "void"
-            }
-          ],
-          "composes": [],
-          "aliasOf": "IThreadCommonOptions",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IThreadCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature)[]; report?(error: unknown): void; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Cold native registration and scope; Host owns identity, providers and protocol execution."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IThreadCommonOptions from @migaia/rpc-plugin-thread, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IThreadCommonOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadCommonOptions does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "name: Local native registration name, separate from accepted remote identity.\nOmitted: the native registration default.\nnamespace: Unique Host property exposing this transport calls and extensions.\nOmitted: the factory namespace.\nexpose: Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.\nOmitted: no ordinary Feature output selected.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nfeatures: Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.\nOmitted: no optional policy installed by this field."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts:IThreadCommonOptions:export type IThreadCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature)[]; report?(error: unknown): void; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-plugin-thread-index--IThreadCommonOptions"
-        },
-        {
-          "name": "IThreadNamespaceExtensions",
-          "kind": "type",
-          "signature": "export type IThreadNamespaceExtensions = Readonly<{ members: IRpcNativeMemberControls<'thread'>; }>;",
-          "declarationLine": 22,
-          "source": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts",
-          "purpose": "Native controls contributed by this actual source installation.",
-          "core": "members: SDK member controls borrow the original source supervisor and generation.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "members",
-              "kind": "property",
-              "optional": false,
-              "signature": "members: IRpcNativeMemberControls<'thread'>;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IRpcNativeMemberControls<'thread'>"
-            }
-          ],
-          "composes": [],
-          "aliasOf": "IThreadNamespaceExtensions",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IThreadNamespaceExtensions = Readonly<{ members: IRpcNativeMemberControls<'thread'>; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Native controls contributed by this actual source installation."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IThreadNamespaceExtensions from @migaia/rpc-plugin-thread, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IThreadNamespaceExtensions when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadNamespaceExtensions does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "members: SDK member controls borrow the original source supervisor and generation."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts:IThreadNamespaceExtensions:export type IThreadNamespaceExtensions = Readonly<{ members: IRpcNativeMemberControls<'thread'>; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-plugin-thread-index--IThreadNamespaceExtensions"
-        },
-        {
-          "name": "IThreadPluginOptions",
-          "kind": "type",
-          "signature": "export type IThreadPluginOptions = IThreadCommonOptions & (Readonly<{ spawn: IThreadSpawnSource; connectToParent?: never; }> | Readonly<{ connectToParent: true; spawn?: never; }>);",
-          "declarationLine": 26,
-          "source": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts",
-          "purpose": "Exactly one source plus shared options; invalid or conflicting sources reject before native acquisition.",
-          "core": "name: Local native registration name, separate from accepted remote identity.\nOmitted: the native registration default.\nnamespace: Unique Host property exposing this transport calls and extensions.\nOmitted: the factory namespace.\nexpose: Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.\nOmitted: no ordinary Feature output selected.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nfeatures: Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.\nOmitted: no optional policy installed by this field.\nspawn: Current entry, explicit entry, short options, or original full native source. No complete callable object is a raw source.\nAbsent in parent/connect/listen modes.\nconnectToParent: true only in the genuine native child, using actual first-frame authority.\nAbsent outside parent connection mode.\nAdopt the actual parent bootstrap source.\nChoose this only inside the genuine Worker launched by threadPlugin; the native bootstrap supplies the parent identity and channel. Use spawn in the parent.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "spawn",
-              "kind": "property",
-              "optional": false,
-              "signature": "spawn: IThreadSpawnSource;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSpawnSource"
-            },
-            {
-              "name": "connectToParent",
-              "kind": "property",
-              "optional": true,
-              "signature": "connectToParent?: never;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "never"
-            },
-            {
-              "name": "connectToParent",
-              "kind": "property",
-              "optional": false,
-              "signature": "connectToParent: true;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "true"
-            },
-            {
-              "name": "spawn",
-              "kind": "property",
-              "optional": true,
-              "signature": "spawn?: never;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "never"
-            }
-          ],
-          "composes": ["IThreadCommonOptions"],
-          "aliasOf": "IThreadPluginOptions",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IThreadPluginOptions = IThreadCommonOptions & (Readonly<{ spawn: IThreadSpawnSource; connectToParent?: never; }> | Readonly<{ connectToParent: true; spawn?: never; }>);"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Exactly one source plus shared options; invalid or conflicting sources reject before native acquisition."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IThreadPluginOptions from @migaia/rpc-plugin-thread, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IThreadPluginOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadPluginOptions does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "name: Local native registration name, separate from accepted remote identity.\nOmitted: the native registration default.\nnamespace: Unique Host property exposing this transport calls and extensions.\nOmitted: the factory namespace.\nexpose: Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.\nOmitted: no ordinary Feature output selected.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nfeatures: Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.\nOmitted: no optional policy installed by this field.\nspawn: Current entry, explicit entry, short options, or original full native source. No complete callable object is a raw source.\nAbsent in parent/connect/listen modes.\nconnectToParent: true only in the genuine native child, using actual first-frame authority.\nAbsent outside parent connection mode.\nAdopt the actual parent bootstrap source.\nChoose this only inside the genuine Worker launched by threadPlugin; the native bootstrap supplies the parent identity and channel. Use spawn in the parent."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts:IThreadPluginOptions:export type IThreadPluginOptions = IThreadCommonOptions & (Readonly<{ spawn: IThreadSpawnSource; connectToParent?: never; }> | Readonly<{ connectToParent: true; spawn?: never; }>);",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-plugin-thread-index--IThreadPluginOptions"
-        },
-        {
-          "name": "IThreadShortSpawn",
-          "kind": "type",
-          "signature": "export type IThreadShortSpawn = Readonly<{ entry: true | IUrlLike; base?: IUrlLike; name?: IThreadSpawn['spec']['name']; data?: IThreadSpawn['spec']['data']; limits?: IThreadSpawn['spec']['limits']; }> & Partial<Omit<IThreadSpawn, 'spec'>>;",
-          "declarationLine": 9,
-          "source": "packages/rpc-plugin-thread/dist/threads/short-spawn.d.ts",
-          "purpose": "Entry shorthand supplies only missing native source fields and preserves explicitly supplied policy objects.",
-          "core": "launcher: Actual supervision launcher preserving its original launch context and native exit receipt.\nbudget: Original supervision budget for native acquisition and retained execution.\nscheduler: Scheduler borrowed by the selected native supervision profile.\nchannelFactory: Open a real carrier from the native handle and signal; Host alone creates Sessions.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nhealth: Optional native supervision health policy using the accepted Session ping.\nsupervisor: Original id, readiness, startup, restart, terminal, stop and isolation overrides.\nentry: Actual Worker entry URL/path or true for a supported main module.\nbase: Base for resolving a relative entry.\nname: Native specification name, distinct from the top-level registration name.\ndata: Portable application input captured before native acquisition.\nlimits: Native supervision limits for this execution unit.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "entry",
-              "kind": "property",
-              "optional": false,
-              "signature": "entry: true | IUrlLike;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "true | IUrlLike"
-            },
-            {
-              "name": "base",
-              "kind": "property",
-              "optional": true,
-              "signature": "base?: IUrlLike;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IUrlLike"
-            },
-            {
-              "name": "name",
-              "kind": "property",
-              "optional": true,
-              "signature": "name?: IThreadSpawn['spec']['name'];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSpawn['spec']['name']"
-            },
-            {
-              "name": "data",
-              "kind": "property",
-              "optional": true,
-              "signature": "data?: IThreadSpawn['spec']['data'];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSpawn['spec']['data']"
-            },
-            {
-              "name": "limits",
-              "kind": "property",
-              "optional": true,
-              "signature": "limits?: IThreadSpawn['spec']['limits'];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSpawn['spec']['limits']"
-            },
-            {
-              "name": "launcher",
-              "kind": "property",
-              "optional": true,
-              "signature": "launcher?: IThreadSupervisorOptions<THandle>['launcher'];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSupervisorOptions<THandle>['launcher']"
-            },
-            {
-              "name": "budget",
-              "kind": "property",
-              "optional": true,
-              "signature": "budget?: IThreadSupervisorOptions<THandle>['budget'];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSupervisorOptions<THandle>['budget']"
-            },
-            {
-              "name": "scheduler",
-              "kind": "property",
-              "optional": true,
-              "signature": "scheduler?: IScheduler;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IScheduler"
-            },
-            {
-              "name": "channelFactory",
-              "kind": "property",
-              "optional": true,
-              "signature": "channelFactory?: IThreadChannelFactory<THandle>;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadChannelFactory<THandle>"
-            },
-            {
-              "name": "report",
-              "kind": "method",
-              "optional": true,
-              "signature": "report?(error: unknown): void;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "error",
-                  "type": "unknown",
-                  "optional": false
-                }
-              ],
-              "returns": "void"
-            },
-            {
-              "name": "health",
-              "kind": "property",
-              "optional": true,
-              "signature": "health?: IThreadSupervisorOptions<THandle>['health'];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSupervisorOptions<THandle>['health']"
-            },
-            {
-              "name": "supervisor",
-              "kind": "property",
-              "optional": true,
-              "signature": "supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>"
-            }
-          ],
-          "composes": [],
-          "aliasOf": "IThreadShortSpawn",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IThreadShortSpawn = Readonly<{ entry: true | IUrlLike; base?: IUrlLike; name?: IThreadSpawn['spec']['name']; data?: IThreadSpawn['spec']['data']; limits?: IThreadSpawn['spec']['limits']; }> & Partial<Omit<IThreadSpawn, 'spec'>>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Entry shorthand supplies only missing native source fields and preserves explicitly supplied policy objects."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IThreadShortSpawn from @migaia/rpc-plugin-thread, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IThreadShortSpawn when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadShortSpawn does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "launcher: Actual supervision launcher preserving its original launch context and native exit receipt.\nbudget: Original supervision budget for native acquisition and retained execution.\nscheduler: Scheduler borrowed by the selected native supervision profile.\nchannelFactory: Open a real carrier from the native handle and signal; Host alone creates Sessions.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nhealth: Optional native supervision health policy using the accepted Session ping.\nsupervisor: Original id, readiness, startup, restart, terminal, stop and isolation overrides.\nentry: Actual Worker entry URL/path or true for a supported main module.\nbase: Base for resolving a relative entry.\nname: Native specification name, distinct from the top-level registration name.\ndata: Portable application input captured before native acquisition.\nlimits: Native supervision limits for this execution unit."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-thread/dist/threads/short-spawn.d.ts:IThreadShortSpawn:export type IThreadShortSpawn = Readonly<{ entry: true | IUrlLike; base?: IUrlLike; name?: IThreadSpawn['spec']['name']; data?: IThreadSpawn['spec']['data']; limits?: IThreadSpawn['spec']['limits']; }> & Partial<Omit<IThreadSpawn, 'spec'>>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-plugin-thread-index--IThreadShortSpawn"
-        },
-        {
-          "name": "IThreadSpawn",
-          "kind": "type",
-          "signature": "export type IThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{ spec: IThreadSpec; launcher: IThreadSupervisorOptions<THandle>['launcher']; budget: IThreadSupervisorOptions<THandle>['budget']; scheduler: IScheduler; channelFactory: IThreadChannelFactory<THandle>; report(error: unknown): void; health?: IThreadSupervisorOptions<THandle>['health']; supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>; }>;",
-          "declarationLine": 11,
-          "source": "packages/rpc-plugin-thread/dist/threads/source.d.ts",
-          "purpose": "Full native source recipe; original launcher, budget, scheduler and carrier factory remain the owners.",
-          "core": "spec: Native thread name, portable data and resource limits passed to supervision.\nlauncher: Actual supervision launcher preserving its original launch context and native exit receipt.\nbudget: Original supervision budget for native acquisition and retained execution.\nscheduler: Scheduler borrowed by the selected native supervision profile.\nchannelFactory: Open a real carrier from the native handle and signal; Host alone creates Sessions.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nhealth: Optional native supervision health policy using the accepted Session ping.\nsupervisor: Original id, readiness, startup, restart, terminal, stop and isolation overrides.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "spec",
-              "kind": "property",
-              "optional": false,
-              "signature": "spec: IThreadSpec;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSpec"
-            },
-            {
-              "name": "launcher",
-              "kind": "property",
-              "optional": false,
-              "signature": "launcher: IThreadSupervisorOptions<THandle>['launcher'];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSupervisorOptions<THandle>['launcher']"
-            },
-            {
-              "name": "budget",
-              "kind": "property",
-              "optional": false,
-              "signature": "budget: IThreadSupervisorOptions<THandle>['budget'];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSupervisorOptions<THandle>['budget']"
-            },
-            {
-              "name": "scheduler",
-              "kind": "property",
-              "optional": false,
-              "signature": "scheduler: IScheduler;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IScheduler"
-            },
-            {
-              "name": "channelFactory",
-              "kind": "property",
-              "optional": false,
-              "signature": "channelFactory: IThreadChannelFactory<THandle>;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadChannelFactory<THandle>"
-            },
-            {
-              "name": "report",
-              "kind": "method",
-              "optional": false,
-              "signature": "report(error: unknown): void;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "error",
-                  "type": "unknown",
-                  "optional": false
-                }
-              ],
-              "returns": "void"
-            },
-            {
-              "name": "health",
-              "kind": "property",
-              "optional": true,
-              "signature": "health?: IThreadSupervisorOptions<THandle>['health'];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IThreadSupervisorOptions<THandle>['health']"
-            },
-            {
-              "name": "supervisor",
-              "kind": "property",
-              "optional": true,
-              "signature": "supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>"
-            }
-          ],
-          "composes": [],
-          "aliasOf": "IThreadSpawn",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{ spec: IThreadSpec; launcher: IThreadSupervisorOptions<THandle>['launcher']; budget: IThreadSupervisorOptions<THandle>['budget']; scheduler: IScheduler; channelFactory: IThreadChannelFactory<THandle>; report(error: unknown): void; health?: IThreadSupervisorOptions<THandle>['health']; supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Full native source recipe; original launcher, budget, scheduler and carrier factory remain the owners."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IThreadSpawn from @migaia/rpc-plugin-thread, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IThreadSpawn when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadSpawn does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "spec: Native thread name, portable data and resource limits passed to supervision.\nlauncher: Actual supervision launcher preserving its original launch context and native exit receipt.\nbudget: Original supervision budget for native acquisition and retained execution.\nscheduler: Scheduler borrowed by the selected native supervision profile.\nchannelFactory: Open a real carrier from the native handle and signal; Host alone creates Sessions.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nhealth: Optional native supervision health policy using the accepted Session ping.\nsupervisor: Original id, readiness, startup, restart, terminal, stop and isolation overrides."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-thread/dist/threads/source.d.ts:IThreadSpawn:export type IThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{ spec: IThreadSpec; launcher: IThreadSupervisorOptions<THandle>['launcher']; budget: IThreadSupervisorOptions<THandle>['budget']; scheduler: IScheduler; channelFactory: IThreadChannelFactory<THandle>; report(error: unknown): void; health?: IThreadSupervisorOptions<THandle>['health']; supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>; }>;",
-          "guidance": [],
-          "usageScore": 6,
-          "configuration": [],
-          "fragment": "rpc-plugin-thread-index--IThreadSpawn"
-        },
-        {
-          "name": "IThreadSpawnSource",
-          "kind": "type",
-          "signature": "export type IThreadSpawnSource = IThreadSpawn | IThreadShortSpawn | true | IUrlLike;",
-          "declarationLine": 20,
-          "source": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts",
-          "purpose": "Actual explicit plugin source union; short forms normalize through the original native owner.",
-          "core": "report: Report original native background and cleanup failures through the application diagnostic sink.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": ["IThreadSpawn", "IThreadShortSpawn", "true", "IUrlLike"],
-          "aliasOf": "IThreadSpawnSource",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IThreadSpawnSource = IThreadSpawn | IThreadShortSpawn | true | IUrlLike;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Actual explicit plugin source union; short forms normalize through the original native owner."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IThreadSpawnSource from @migaia/rpc-plugin-thread, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IThreadSpawnSource when its type contract and declared inputs match the result you need. Choose a different public symbol when IThreadSpawnSource does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "report: Report original native background and cleanup failures through the application diagnostic sink.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts:IThreadSpawnSource:export type IThreadSpawnSource = IThreadSpawn | IThreadShortSpawn | true | IUrlLike;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "rpc-plugin-thread-index--IThreadSpawnSource"
-        },
-        {
           "name": "RPC_THREAD_ERROR_SOURCE",
           "kind": "const",
           "signature": "export declare const RPC_THREAD_ERROR_SOURCE = \"rpc.transport.thread\";",
-          "declarationLine": 400,
+          "declarationLine": 368,
           "source": "packages/rpc-contract/dist/error-code.d.ts",
           "purpose": "Stable rpc.transport.thread source declared by @migaia/rpc-contract/error-code and re-exported here. Other RPC/native families retain their own source and code.",
           "core": "Stable rpc.transport.thread source declared by @migaia/rpc-contract/error-code and re-exported here. Other RPC/native families retain their own source and code.",
@@ -1315,7 +580,7 @@
           "name": "RpcThreadErrorCode",
           "kind": "const",
           "signature": "export declare const RpcThreadErrorCode: { /** Native Worker sampling failed; retain its cause and display unavailable. */ readonly usageSampleFailed: 'THREAD_USAGE_SAMPLE_FAILED'; };",
-          "declarationLine": 406,
+          "declarationLine": 374,
           "source": "packages/rpc-contract/dist/error-code.d.ts",
           "purpose": "Error codes owned by this package; currently only `THREAD_USAGE_SAMPLE_FAILED`.",
           "core": "usageSampleFailed: `THREAD_USAGE_SAMPLE_FAILED`: sampling Worker CPU or memory failed; show the value as unavailable, the Worker keeps running.",
@@ -1385,210 +650,6 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-plugin-thread-index--RpcThreadErrorCode"
-        },
-        {
-          "name": "threadPlugin",
-          "kind": "function",
-          "signature": "export declare function threadPlugin<const N extends string = typeof THREAD_NAMESPACE, E extends object = Record<never, never>>(options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature<E>)[]; }>): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E>;",
-          "declarationLine": 34,
-          "source": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts",
-          "purpose": "One cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint.",
-          "core": "Cold SDK transport definition. Installation publishes host.thread calls and actual native extensions; construction alone acquires no resource.\nname: Local native registration name, separate from accepted remote identity.\nOmitted: the native registration default.\nnamespace: Unique Host property exposing this transport calls and extensions.\nOmitted: the factory namespace.\nexpose: Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.\nOmitted: no ordinary Feature output selected.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nfeatures: Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.\nOmitted: no optional policy installed by this field.\nspawn: Current entry, explicit entry, short options, or original full native source. No complete callable object is a raw source.\nAbsent in parent/connect/listen modes.\nconnectToParent: true only in the genuine native child, using actual first-frame authority.\nAbsent outside parent connection mode.\nAdopt the actual parent bootstrap source.\nChoose this only inside the genuine Worker launched by threadPlugin; the native bootstrap supplies the parent identity and channel. Use spawn in the parent.\nOne cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint.",
-          "advanced": "Original source ownership retains native control, generation, replacement and cleanup.\nUse the actual native runtime selected by the application.",
-          "parameters": [
-            "options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature<E>)[]; }>"
-          ],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "IThreadPluginOptions & Readonly<{ namespace?: N; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature<E>)[]; }>",
-              "optional": false
-            }
-          ],
-          "returns": "IRpcTransportPlugin<N, IThreadNamespaceExtensions & E>",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [
-            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeout, retry } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeout({ ms: 1500 }), retry({ attempts: 2 })]\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeout({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}",
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\n\nawait createRpcHost({\n  plugins: [threadPlugin({ connectToParent: true })],\n  provide: {\n    values: async function* (end: number) {\n      for (let value = 0; value < end; value += 1) yield value\n    },\n    wait: (value: number) => value,\n    bytes: (value: Uint8Array) => value.byteLength\n  }\n})",
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [threadPlugin({ spawn: true })] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-          ],
-          "members": [],
-          "composes": [],
-          "aliasOf": "threadPlugin",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare function threadPlugin<const N extends string = typeof THREAD_NAMESPACE, E extends object = Record<never, never>>(options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature<E>)[]; }>): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E>;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "IThreadPluginOptions & Readonly<{ namespace?: N; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature<E>)[]; }>",
-                "optional": false
-              }
-            ]
-          ],
-          "overloadReturns": ["IRpcTransportPlugin<N, IThreadNamespaceExtensions & E>"],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "One cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import threadPlugin from @migaia/rpc-plugin-thread, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use threadPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when threadPlugin does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Cold SDK transport definition. Installation publishes host.thread calls and actual native extensions; construction alone acquires no resource.\nname: Local native registration name, separate from accepted remote identity.\nOmitted: the native registration default.\nnamespace: Unique Host property exposing this transport calls and extensions.\nOmitted: the factory namespace.\nexpose: Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.\nOmitted: no ordinary Feature output selected.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nfeatures: Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.\nOmitted: no optional policy installed by this field.\nspawn: Current entry, explicit entry, short options, or original full native source. No complete callable object is a raw source.\nAbsent in parent/connect/listen modes.\nconnectToParent: true only in the genuine native child, using actual first-frame authority.\nAbsent outside parent connection mode.\nAdopt the actual parent bootstrap source.\nChoose this only inside the genuine Worker launched by threadPlugin; the native bootstrap supplies the parent identity and channel. Use spawn in the parent.\nOne cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "Original source ownership retains native control, generation, replacement and cleanup.\nUse the actual native runtime selected by the application."
-            }
-          ],
-          "declaredConfiguration": [
-            {
-              "name": "namespace",
-              "type": "string",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "features",
-              "type": "readonly (IRpcCallFeature | IRpcNativeTransportFeature)[]",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "spawn",
-              "type": "IThreadSpawnSource",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "connectToParent",
-              "type": "true",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "name",
-              "type": "string",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "expose",
-              "type": "readonly string[]",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "report",
-              "type": "(error: unknown) => void",
-              "optional": true,
-              "description": ""
-            }
-          ],
-          "identity": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts:threadPlugin:export declare function threadPlugin<const N extends string = typeof THREAD_NAMESPACE, E extends object = Record<never, never>>(options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature<E>)[]; }>): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E>;",
-          "guidance": [
-            {
-              "id": "调用策略与生命周期",
-              "heading": "调用策略与生命周期",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "单次调用传 `signal`，以及完整的 `timeout({ ms })`、`retry({ attempts })` 实例或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`notify` 等物理写出，`request` 等业务结果。原生监管负责重启与替换；连接恢复不代表业务可安全重放。原生错误、调用错误和远端错误保留自己的 source/code/cause，跨线程传递的错误图保留 name/message/stack 与聚合成员。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "根入口公开 `threadPlugin`、`isThreadChild`、选项与错误身份。自定义原始载体使用 `@migaia/rpc-host/sdk`；只读观察使用 `@migaia/rpc-host/plugins/probe`。关闭流、取消调用、关闭 namespace、关闭 Host 和终止 Worker 是不同操作。资源与恢复示例见使用指南。"
-                }
-              ]
-            }
-          ],
-          "usageScore": 36,
-          "configuration": [
-            {
-              "name": "namespace",
-              "type": "string",
-              "optional": true,
-              "description": "`spawn` 与 `connectToParent` 必须恰选一个。短配置支持 `entry/name/data/limits` 和调用方提供的原生 launcher、budget、scheduler；完整 `IThreadSpawn` 保留所选原生监管配方。`name` 是注册名，`namespace` 决定 `host.<ns>`。父子身份与 generation 来自真实 bootstrap；显式 `self` 必须与实际来源一致。",
-              "descriptionEn": "",
-              "descriptionZh": "`spawn` 与 `connectToParent` 必须恰选一个。短配置支持 `entry/name/data/limits` 和调用方提供的原生 launcher、budget、scheduler；完整 `IThreadSpawn` 保留所选原生监管配方。`name` 是注册名，`namespace` 决定 `host.<ns>`。父子身份与 generation 来自真实 bootstrap；显式 `self` 必须与实际来源一致。"
-            },
-            {
-              "name": "features",
-              "type": "readonly (IRpcCallFeature | IRpcNativeTransportFeature)[]",
-              "optional": true,
-              "description": "父入口使用真实 `worker.js`，并将完整策略实例装在 transport 的 `features`。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。",
-              "descriptionEn": "",
-              "descriptionZh": "父入口使用真实 `worker.js`，并将完整策略实例装在 transport 的 `features`。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。"
-            },
-            {
-              "name": "spawn",
-              "type": "IThreadSpawnSource",
-              "optional": true,
-              "description": "`spawn` 与 `connectToParent` 必须恰选一个。短配置支持 `entry/name/data/limits` 和调用方提供的原生 launcher、budget、scheduler；完整 `IThreadSpawn` 保留所选原生监管配方。`name` 是注册名，`namespace` 决定 `host.<ns>`。父子身份与 generation 来自真实 bootstrap；显式 `self` 必须与实际来源一致。",
-              "descriptionEn": "",
-              "descriptionZh": "`spawn` 与 `connectToParent` 必须恰选一个。短配置支持 `entry/name/data/limits` 和调用方提供的原生 launcher、budget、scheduler；完整 `IThreadSpawn` 保留所选原生监管配方。`name` 是注册名，`namespace` 决定 `host.<ns>`。父子身份与 generation 来自真实 bootstrap；显式 `self` 必须与实际来源一致。"
-            },
-            {
-              "name": "connectToParent",
-              "type": "true",
-              "optional": true,
-              "description": "`spawn` 与 `connectToParent` 必须恰选一个。短配置支持 `entry/name/data/limits` 和调用方提供的原生 launcher、budget、scheduler；完整 `IThreadSpawn` 保留所选原生监管配方。`name` 是注册名，`namespace` 决定 `host.<ns>`。父子身份与 generation 来自真实 bootstrap；显式 `self` 必须与实际来源一致。",
-              "descriptionEn": "",
-              "descriptionZh": "`spawn` 与 `connectToParent` 必须恰选一个。短配置支持 `entry/name/data/limits` 和调用方提供的原生 launcher、budget、scheduler；完整 `IThreadSpawn` 保留所选原生监管配方。`name` 是注册名，`namespace` 决定 `host.<ns>`。父子身份与 generation 来自真实 bootstrap；显式 `self` 必须与实际来源一致。"
-            },
-            {
-              "name": "name",
-              "type": "string",
-              "optional": true,
-              "description": "`spawn` 与 `connectToParent` 必须恰选一个。短配置支持 `entry/name/data/limits` 和调用方提供的原生 launcher、budget、scheduler；完整 `IThreadSpawn` 保留所选原生监管配方。`name` 是注册名，`namespace` 决定 `host.<ns>`。父子身份与 generation 来自真实 bootstrap；显式 `self` 必须与实际来源一致。",
-              "descriptionEn": "",
-              "descriptionZh": "`spawn` 与 `connectToParent` 必须恰选一个。短配置支持 `entry/name/data/limits` 和调用方提供的原生 launcher、budget、scheduler；完整 `IThreadSpawn` 保留所选原生监管配方。`name` 是注册名，`namespace` 决定 `host.<ns>`。父子身份与 generation 来自真实 bootstrap；显式 `self` 必须与实际来源一致。"
-            },
-            {
-              "name": "expose",
-              "type": "readonly string[]",
-              "optional": true,
-              "description": "",
-              "descriptionEn": "",
-              "descriptionZh": ""
-            },
-            {
-              "name": "report",
-              "type": "(error: unknown) => void",
-              "optional": true,
-              "description": "",
-              "descriptionEn": "",
-              "descriptionZh": ""
-            }
-          ],
-          "fragment": "rpc-plugin-thread-index--threadPlugin"
         }
       ],
       "aliases": []

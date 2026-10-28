@@ -17,7 +17,7 @@ Contract 定义纯协议和接口，Host 拥有会话与调用生命周期，Cor
 ```ts doc-test=check
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
-import { timeout, retry } from '@migaia/rpc-host/features'
+import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
 import { pool } from '@migaia/rpc-plugin-pool'
 
 type IWorkerApi = { echo(value: string): string; values(end: number): AsyncIterable<number> }
@@ -26,7 +26,7 @@ function taskPlugins(task: ICoroutineUserTask) {
   return [
     coroutinePlugin({
       spawn: task,
-      features: [timeout({ ms: 1000 }), retry({ attempts: 2 })],
+      features: [timeoutFeature({ ms: 1000 }), retryFeature({ attempts: 2 })],
       supervisor: { startupTimeoutMs: 1500 }
     })
   ] as const
@@ -42,7 +42,7 @@ export function open(task: ICoroutineUserTask) {
 export function call(host: ITaskHost, target: string, signal: AbortSignal) {
   return host.coroutine.send(target, 'echo', 'hello', {
     signal,
-    timeout: timeout({ ms: 500 }),
+    timeout: timeoutFeature({ ms: 500 }),
     retry: false
   })
 }

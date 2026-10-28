@@ -149,7 +149,7 @@ export async function callReliableSession(session: IWebTransportPluginOptions['s
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
 import { windowPlugin } from '@migaia/rpc-plugin-browser'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 
 export async function observeFrame(target: Window, origin: string) {
@@ -160,12 +160,15 @@ export async function observeFrame(target: Window, origin: string) {
     }
   })
   return createRpcHost({
-    plugins: [observer, windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] })]
+    plugins: [
+      observer,
+      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] })
+    ]
   })
 }
 ```
 
-调用者负责关闭返回的 Host。`timeout`/`retry` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。
+调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。
 
 `outcome` 等可选扩展需要相应实际 plugin；完整自动 claim、身份 scope 和跨重连重放仍有未闭合项。不要配置根 Host 的旧策略字段、部署 assembler、手工 profile/ACK 或强制转换不支持的选项。
 

@@ -10,8 +10,8 @@ export const storagePluginSqliteCases: Readonly<Record<string, readonly ICaseDoc
         'Restore a committed value with complete revision checks and the existing WAL.',
         '经完整修订校验与既有 WAL 恢复已提交值。'
       ),
-      example: `import { Logger } from '@migaia/logger'
-import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
+      example: `import { createLogHost } from '@migaia/log-host'
+import { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'
 import { createStorageHost } from '@migaia/storage-host'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
@@ -20,9 +20,9 @@ await using connection = nodeSqliteDriver(':memory:')
 await using changes = memoryLogStore()
 await using intents = memoryLogStore()
 await using images = memoryLogStore()
-const logger = new Logger({
+const logger = createLogHost({
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-  plugins: [binlog({ store: changes }), wal({ store: intents }), undoLog({ store: images })]
+  plugins: [binlogPlugin({ store: changes }), walPlugin({ store: intents }), undoLogPlugin({ store: images })]
 })
 try {
   await using host = await createStorageHost({

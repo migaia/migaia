@@ -1,0 +1,417 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "log-plugin-file",
+    "description": "Composable file logging plugin.",
+    "version": "0.0.11",
+    "exports": ["."],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-log-plugin-file",
+            "heading": "@migaia/log-plugin-file",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "为 `@migaia/log-host` 提供文件输出。默认将条目写成 NDJSON；批量、格式、重试和超时由 host feature 负责。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** host 排空已接纳的日志后释放文件输出插件。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: './application.ndjson', features: [batchFeature({ maxSize: 20 })] })\n  ]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.shutdown('manual')"
+              },
+              {
+                "type": "paragraph",
+                "text": "Node 与 Bun 默认通过各自的 `node:fs/promises` 追加文件；Deno 使用 `Deno.writeTextFile(..., { append: true })`。browser/default 入口必须显式注入 `writer`，不加载原生文件模块。目标目录由应用准备。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`filePlugin({ path, writer?, rotate?, features? })` 在创建时检查配置。默认 writer 不提供轮转；配置 `rotate.maxBytes` 或 `rotate.maxEntries` 时，注入的 writer 必须实现 `rotate(path)`。阈值按每次交付的批次计算。"
+              },
+              {
+                "type": "paragraph",
+                "text": "交付失败进入 host 的 `onFailure` 通道，错误为 `logging.file / DELIVERY_FAILED`，原始 writer 错误保留在 `cause`。非法配置与缺少 writer 可在创建时同步抛出。包与 host 的 peer 版本必须一致。"
+              },
+              {
+                "type": "paragraph",
+                "text": "完整选项与注入示例见 USEGUIDE.md。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "安装与默认输出",
+            "heading": "安装与默认输出",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "安装 `@migaia/log-host` 与相同版本的 `@migaia/log-plugin-file`，把 `filePlugin({ path })` 放入 `createLogHost` 的 plugins。使用级别方法时再安装 `levelPlugin()`。默认 JSON 格式采用 host 的统一错误投影，保留公开错误链，不写入原始 Error 的私有字段。"
+              },
+              {
+                "type": "paragraph",
+                "text": "每次交付把各条已格式化文本用换行连接，末尾再追加一个换行，并调用一次 `writer.append(path, text)`。默认 JSON 因而形成 NDJSON；显式自定义格式会改变行内容，插件不再执行第二次序列化。`flush()` 排空已接纳工作，应用退出时应等待 `shutdown()`。"
+              }
+            ]
+          },
+          {
+            "id": "注入-writer",
+            "heading": "注入 writer",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** 示例 writer 由应用拥有，插件卸载不会关闭它。 */\nclass MemoryWriter {\n  /** 保留每次 append 的完整批次，便于应用转交实际存储。 */\n  readonly writes: { path: string; text: string }[] = []\n  /** append 的兑现表示本批内容已由 writer 接纳。 */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n\n/** 显式 writer 使同一配置可用于浏览器与服务端。 */\nconst writer = new MemoryWriter()\n/** 输出级批量策略由 host 维护缓冲与排空。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: 'application.ndjson', writer, features: [batchFeature({ maxSize: 2 })] })\n  ]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nawait log.shutdown('manual')"
+              },
+              {
+                "type": "paragraph",
+                "text": "writer 结构为 `append(path, text): Promise<void>` 与可选的 `rotate(path): Promise<void>`。应用负责 writer 的资源和目标目录，插件只借用方法。"
+              }
+            ]
+          },
+          {
+            "id": "选项与轮转",
+            "heading": "选项与轮转",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["选项", "行为"],
+                "rows": [
+                  ["`path`", "必填非空字符串，原样传给 writer"],
+                  ["`writer`", "显式能力优先于原生默认值"],
+                  ["`features`", "输出级 host 策略，可设置格式、批量、重试与超时"],
+                  ["`rotate.maxEntries`", "正整数；本次交付条目数达到阈值后轮转"],
+                  ["`rotate.maxBytes`", "正整数；本次交付文本的 UTF-8 字节数达到阈值后轮转"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "两个轮转阈值任意一个达到即触发；先 await append 成功，再 await rotate。计数不跨批次累加。原生默认 writer 没有 rotate；配置阈值但缺少 `writer.rotate` 会在创建时失败。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Node/Bun 默认动态使用 `node:fs/promises.appendFile`；Deno 默认使用原生 `Deno.writeTextFile` 并设置 append。browser/default 条件入口不引入这些原生模块，必须注入 writer。"
+              }
+            ]
+          },
+          {
+            "id": "错误与关闭",
+            "heading": "错误与关闭",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "错误 source 为 `LOG_FILE_ERROR_SOURCE`（`logging.file`）。`INVALID_OPTION` 表示 path/轮转配置不合法；`FILE_SINK_UNAVAILABLE` 表示当前入口没有 writer；两者在创建时同步抛出。`DELIVERY_FAILED` 表示 append 或 rotate 失败，`cause` 保留原异常，失败经 host 的 `onFailure` 观察，日志方法不因此抛出。卸载不会关闭应用的 writer。"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-log-plugin-file",
+              "heading": "@migaia/log-plugin-file",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "File output for `@migaia/log-host`. Entries use NDJSON by default. Host features own batching, formatting, retry and timeout policy."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** The host drains admitted work before releasing the output plugin. */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: './application.ndjson', features: [batchFeature({ maxSize: 20 })] })\n  ]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.shutdown('manual')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Node and Bun append through their native `node:fs/promises` implementation. Deno uses `Deno.writeTextFile(..., { append: true })`. The browser/default entry requires an injected `writer` and imports no native filesystem module. The application prepares the destination directory."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`filePlugin({ path, writer?, rotate?, features? })` validates its options during creation. Native writers do not implement rotation. Setting `rotate.maxBytes` or `rotate.maxEntries` requires an injected `rotate(path)` method. Thresholds apply to each delivered batch."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Delivery failures reach the host's `onFailure` channel as `logging.file / DELIVERY_FAILED`, with the original writer error on `cause`. Invalid configuration and missing writers can throw synchronously during creation. The module's peer version must match the host version."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "See USEGUIDE.en.md for options and writer injection."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "installation-and-defaults",
+              "heading": "Installation and defaults",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Install matching versions of `@migaia/log-host` and `@migaia/log-plugin-file`. Add `filePlugin({ path })` to `createLogHost` plugins, together with `levelPlugin()` when level methods are needed. Default JSON uses the host's canonical error projection, retaining public error chains without serializing private fields on the raw Error."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Each delivery joins the formatted records with newlines, appends a final newline and calls `writer.append(path, text)` once. Default JSON therefore produces NDJSON. An explicit custom format changes the line contents; the plugin does not serialize them again. `flush()` drains admitted work. Await `shutdown()` when the application finishes."
+                }
+              ]
+            },
+            {
+              "id": "injecting-a-writer",
+              "heading": "Injecting a writer",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** The application owns this writer; uninstall never closes it. */\nclass MemoryWriter {\n  /** Retain complete append batches for the application's chosen storage. */\n  readonly writes: { path: string; text: string }[] = []\n  /** Resolution acknowledges that the writer accepted this batch. */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n\n/** An explicit capability works in both browser and server conditions. */\nconst writer = new MemoryWriter()\n/** The host owns buffering and draining for this output's batch policy. */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: 'application.ndjson', writer, features: [batchFeature({ maxSize: 2 })] })\n  ]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nawait log.shutdown('manual')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Writers provide `append(path, text): Promise<void>` and optionally `rotate(path): Promise<void>`. The application owns their resources and prepares destination directories. The plugin only borrows the methods."
+                }
+              ]
+            },
+            {
+              "id": "options-and-rotation",
+              "heading": "Options and rotation",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Option", "Behavior"],
+                  "rows": [
+                    ["`path`", "Required nonempty string, passed unchanged to the writer"],
+                    ["`writer`", "Explicit capability takes precedence over native defaults"],
+                    [
+                      "`features`",
+                      "Output-level host policies for format, batching, retry and timeout"
+                    ],
+                    [
+                      "`rotate.maxEntries`",
+                      "Positive integer; rotate when this delivery reaches the entry count"
+                    ],
+                    [
+                      "`rotate.maxBytes`",
+                      "Positive integer; rotate when this delivery reaches the UTF-8 byte count"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Either threshold triggers rotation. Append must succeed before rotate is called. Counts do not accumulate across batches. Native writers have no rotate method; configuring a threshold without `writer.rotate` fails during creation."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Node/Bun load `node:fs/promises.appendFile` dynamically. Deno uses native `Deno.writeTextFile` with append enabled. Browser/default condition entries import none of these native modules and require an injected writer."
+                }
+              ]
+            },
+            {
+              "id": "errors-and-shutdown",
+              "heading": "Errors and shutdown",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The source is `LOG_FILE_ERROR_SOURCE` (`logging.file`). `INVALID_OPTION` identifies invalid path or rotation options. `FILE_SINK_UNAVAILABLE` identifies a missing writer. Both can throw synchronously during creation. `DELIVERY_FAILED` identifies append or rotation failure and retains the original error on `cause`. Observe it through the host's `onFailure` channel; logging calls do not throw delivery failures. Uninstall leaves application-owned writers open."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "log-plugin-file:index",
+      "library": "log-plugin-file",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-plugin-file/getting-started",
+      "architecturePath": "/en/docs/log-plugin-file",
+      "symbols": [
+        {
+          "name": "filePlugin",
+          "kind": "function",
+          "signature": "export declare function filePlugin(options: IFilePluginConfig): import(\"@migaia/log-host/plugin\").ILogPlugin;",
+          "declarationLine": 3,
+          "source": "packages/log-plugin-file/dist/index.d.ts",
+          "purpose": "Append one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer.",
+          "core": "options: Required file path with optional writer, rotation limits and delivery features.\nA text output plugin whose accepted writes drain through the host; an injected writer remains caller-owned.\npath: Nonempty file path passed unchanged to append and rotate.\nwriter: Borrow append(path,text) and optional rotate(path); the plugin never closes it.\nRuntime-native append; unavailable in browser.\nrotate: Positive entry/byte thresholds; writer.rotate must exist at creation.\nNo rotation.\nfeatures: Select host batching and formatting for this output.\nJSON formatting without implicit batching.\nAppend one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer.",
+          "advanced": "Append one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer.",
+          "parameters": ["options: IFilePluginConfig"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IFilePluginConfig",
+              "optional": false
+            }
+          ],
+          "returns": "import(\"@migaia/log-host/plugin\").ILogPlugin",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** 示例 writer 由应用拥有，插件卸载不会关闭它。 */\nclass MemoryWriter {\n  /** 保留每次 append 的完整批次，便于应用转交实际存储。 */\n  readonly writes: { path: string; text: string }[] = []\n  /** append 的兑现表示本批内容已由 writer 接纳。 */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n\n/** 显式 writer 使同一配置可用于浏览器与服务端。 */\nconst writer = new MemoryWriter()\n/** 输出级批量策略由 host 维护缓冲与排空。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: 'application.ndjson', writer, features: [batchFeature({ maxSize: 2 })] })\n  ]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** host 排空已接纳的日志后释放文件输出插件。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: './application.ndjson', features: [batchFeature({ maxSize: 20 })] })\n  ]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function filePlugin(options: IFilePluginConfig): import(\"@migaia/log-host/plugin\").ILogPlugin;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IFilePluginConfig",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["import(\"@migaia/log-host/plugin\").ILogPlugin"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Append one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import filePlugin from @migaia/log-plugin-file, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use filePlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when filePlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Required file path with optional writer, rotation limits and delivery features.\nA text output plugin whose accepted writes drain through the host; an injected writer remains caller-owned.\npath: Nonempty file path passed unchanged to append and rotate.\nwriter: Borrow append(path,text) and optional rotate(path); the plugin never closes it.\nRuntime-native append; unavailable in browser.\nrotate: Positive entry/byte thresholds; writer.rotate must exist at creation.\nNo rotation.\nfeatures: Select host batching and formatting for this output.\nJSON formatting without implicit batching.\nAppend one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Append one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "path",
+              "type": "string",
+              "optional": false,
+              "description": "Required nonempty destination passed unchanged to the borrowed append capability."
+            },
+            {
+              "name": "writer",
+              "type": "IFileWriter",
+              "optional": true,
+              "description": "Defaults to a supported runtime's native append writer in server conditions only."
+            },
+            {
+              "name": "rotate",
+              "type": "{ /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }",
+              "optional": true,
+              "description": "Optional per-delivered-batch thresholds require an explicit rotate capability."
+            },
+            {
+              "name": "rotate.maxBytes",
+              "type": "number",
+              "optional": true,
+              "description": "Rotate after a batch reaches the specified UTF-8 byte count."
+            },
+            {
+              "name": "rotate.maxEntries",
+              "type": "number",
+              "optional": true,
+              "description": "Rotate after a batch reaches the specified entry count."
+            },
+            {
+              "name": "features",
+              "type": "readonly ILogFeature[]",
+              "optional": true,
+              "description": "Host-owned output policies override host defaults without creating a private queue."
+            }
+          ],
+          "identity": "packages/log-plugin-file/dist/index.d.ts:filePlugin:export declare function filePlugin(options: IFilePluginConfig): import(\"@migaia/log-host/plugin\").ILogPlugin;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [
+            {
+              "name": "path",
+              "type": "string",
+              "optional": false,
+              "description": "安装 `@migaia/log-host` 与相同版本的 `@migaia/log-plugin-file`，把 `filePlugin({ path })` 放入 `createLogHost` 的 plugins。使用级别方法时再安装 `levelPlugin()`。默认 JSON 格式采用 host 的统一错误投影，保留公开错误链，不写入原始 Error 的私有字段。",
+              "descriptionEn": "Required nonempty destination passed unchanged to the borrowed append capability.",
+              "descriptionZh": "安装 `@migaia/log-host` 与相同版本的 `@migaia/log-plugin-file`，把 `filePlugin({ path })` 放入 `createLogHost` 的 plugins。使用级别方法时再安装 `levelPlugin()`。默认 JSON 格式采用 host 的统一错误投影，保留公开错误链，不写入原始 Error 的私有字段。"
+            },
+            {
+              "name": "writer",
+              "type": "IFileWriter",
+              "optional": true,
+              "description": "每次交付把各条已格式化文本用换行连接，末尾再追加一个换行，并调用一次 `writer.append(path, text)`。默认 JSON 因而形成 NDJSON；显式自定义格式会改变行内容，插件不再执行第二次序列化。`flush()` 排空已接纳工作，应用退出时应等待 `shutdown()`。",
+              "descriptionEn": "Defaults to a supported runtime's native append writer in server conditions only.",
+              "descriptionZh": "每次交付把各条已格式化文本用换行连接，末尾再追加一个换行，并调用一次 `writer.append(path, text)`。默认 JSON 因而形成 NDJSON；显式自定义格式会改变行内容，插件不再执行第二次序列化。`flush()` 排空已接纳工作，应用退出时应等待 `shutdown()`。"
+            },
+            {
+              "name": "rotate",
+              "type": "{ /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }",
+              "optional": true,
+              "description": "writer 结构为 `append(path, text): Promise<void>` 与可选的 `rotate(path): Promise<void>`。应用负责 writer 的资源和目标目录，插件只借用方法。",
+              "descriptionEn": "Optional per-delivered-batch thresholds require an explicit rotate capability.",
+              "descriptionZh": "writer 结构为 `append(path, text): Promise<void>` 与可选的 `rotate(path): Promise<void>`。应用负责 writer 的资源和目标目录，插件只借用方法。"
+            },
+            {
+              "name": "rotate.maxBytes",
+              "type": "number",
+              "optional": true,
+              "description": "`filePlugin({ path, writer?, rotate?, features? })` 在创建时检查配置。默认 writer 不提供轮转；配置 `rotate.maxBytes` 或 `rotate.maxEntries` 时，注入的 writer 必须实现 `rotate(path)`。阈值按每次交付的批次计算。",
+              "descriptionEn": "Rotate after a batch reaches the specified UTF-8 byte count.",
+              "descriptionZh": "`filePlugin({ path, writer?, rotate?, features? })` 在创建时检查配置。默认 writer 不提供轮转；配置 `rotate.maxBytes` 或 `rotate.maxEntries` 时，注入的 writer 必须实现 `rotate(path)`。阈值按每次交付的批次计算。"
+            },
+            {
+              "name": "rotate.maxEntries",
+              "type": "number",
+              "optional": true,
+              "description": "`filePlugin({ path, writer?, rotate?, features? })` 在创建时检查配置。默认 writer 不提供轮转；配置 `rotate.maxBytes` 或 `rotate.maxEntries` 时，注入的 writer 必须实现 `rotate(path)`。阈值按每次交付的批次计算。",
+              "descriptionEn": "Rotate after a batch reaches the specified entry count.",
+              "descriptionZh": "`filePlugin({ path, writer?, rotate?, features? })` 在创建时检查配置。默认 writer 不提供轮转；配置 `rotate.maxBytes` 或 `rotate.maxEntries` 时，注入的 writer 必须实现 `rotate(path)`。阈值按每次交付的批次计算。"
+            },
+            {
+              "name": "features",
+              "type": "readonly ILogFeature[]",
+              "optional": true,
+              "description": "`filePlugin({ path, writer?, rotate?, features? })` 在创建时检查配置。默认 writer 不提供轮转；配置 `rotate.maxBytes` 或 `rotate.maxEntries` 时，注入的 writer 必须实现 `rotate(path)`。阈值按每次交付的批次计算。",
+              "descriptionEn": "Host-owned output policies override host defaults without creating a private queue.",
+              "descriptionZh": "`filePlugin({ path, writer?, rotate?, features? })` 在创建时检查配置。默认 writer 不提供轮转；配置 `rotate.maxBytes` 或 `rotate.maxEntries` 时，注入的 writer 必须实现 `rotate(path)`。阈值按每次交付的批次计算。"
+            }
+          ],
+          "fragment": "log-plugin-file-index--filePlugin"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

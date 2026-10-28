@@ -1163,9 +1163,9 @@ function LibraryModuleLinks({
                       {link.name}
                     </Link>
                   ))}
-                {librarySlug === 'logger' && candidate.module === 'plugins' ? (
-                  <Link to={guidePath(locale, 'logger', 'custom-plugin')}>
-                    {locale === 'zh' ? '编写自定义插件 →' : 'Author a custom plugin →'}
+                {librarySlug === 'log-host' && candidate.module === 'plugin' ? (
+                  <Link to={docsModulePath(locale, 'log-host', 'plugin', 'defineOutputPlugin')}>
+                    {locale === 'zh' ? '编写输出插件 →' : 'Define an output plugin →'}
                   </Link>
                 ) : null}
               </div>
@@ -4739,8 +4739,20 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
     '用于进程内的一对多事件通知，以及一次性、截止时间、对象订阅者和并行/串行发布等场景。它用显式订阅句柄管理退订和监听器失败，解决手写 listener 数组容易泄漏、重入和错误相互污染的问题；它不是持久化消息队列或跨进程总线。',
   lifecycle:
     '用于让关闭、取消和替换在并发下也不出错：一组资源随同一个作用域按登记的相反顺序释放，一项失败不影响其余资源；新请求开始时旧请求自动失效；进行中的工作可以在截止时间前等待完成；初始化失败时自动回收已创建的资源。它不负责事件分发、业务排队或依赖图。',
-  logger:
-    '用于生产环境的结构化日志、稳定级别、上下文字段、批量写出和最终 flush。核心设计把日志记录、过滤、传输和故障上报分开，使调用方不依赖具体控制台或后端；它不是指标系统，也不替代业务错误处理。',
+  'log-host':
+    '创建异步日志宿主，由同一 host 持有条目处理、插件安装、输出策略与关闭；级别方法和输出端按需组合，日志失败不会打断业务代码。',
+  'log-plugin-console':
+    '向借用的 console/stdout 交付日志，pretty 保留原生对象和 Error 参数；颜色与可读格式由本包的 prettyFeature 提供。',
+  'log-plugin-file':
+    '把格式化日志按批追加为 NDJSON；应用拥有 writer 与目录，host 负责批量、重试、超时和关闭前排空。',
+  'log-plugin-http':
+    '把规范 entries 请求体 POST 到日志收集器；本包执行一次传输尝试，host feature 负责批量、重试与超时。',
+  'log-plugin-process':
+    '借用 process 对象处理信号、崩溃捕获和有界优雅关闭；共享进程的 host 共用监听器，最后移除时释放登记。',
+  'log-plugin-reasoning':
+    '向借用 writer 写出 thinking/response 原始片段，并在阶段完成时生成完整结构化条目；不依赖控制台插件。',
+  'log-plugin-durable':
+    '通过 binlog、WAL 与 undo 插件借用独立的持久日志存储；存储创建者负责关闭，原始追加、事务状态和错误 cause 保留。',
   'middleware-pipeline':
     '用于多个阶段必须按确定顺序包裹一次调用，并在阶段间传值、短路或传播错误的场景。它分别提供 sync、async、generator 执行契约，约束 next 的调用时机和次数，解决手写嵌套链难以验证顺序与重复调用的问题；插件注册和生命周期由上层 Host 负责。',
   'plugin-host':

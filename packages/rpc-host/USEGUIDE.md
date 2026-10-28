@@ -78,17 +78,19 @@ stream 在第一次 `next()` 才启动。调用 `return()` 结束消费并等待
 下例只创建冷定义；把 `policy` 与 `transport` 交给 `createRpcHost({ plugins: [...] })`，并在 worker 入口安装对应子端来源。
 
 ```ts doc-test=check
-import { timeout, retry } from '@migaia/rpc-host/features'
+import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
 import { linkPolicy } from '@migaia/rpc-host/plugins'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-export const policy = linkPolicy({ features: [timeout({ ms: 3000 }), retry({ attempts: 2 })] })
+export const policy = linkPolicy({
+  features: [timeoutFeature({ ms: 3000 }), retryFeature({ attempts: 2 })]
+})
 export const transport = threadPlugin({
   spawn: new URL('./worker.ts', import.meta.url),
-  features: [timeout({ ms: 1500 })]
+  features: [timeoutFeature({ ms: 1500 })]
 })
 
-export const callOptions = { timeout: timeout({ ms: 100 }), retry: false } as const
+export const callOptions = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const
 ```
 
 解析顺序唯一：单次调用完整实例或 `false`，然后传输 plugin 的 feature，最后链路策略 plugin。把 `callOptions` 传给 `host.thread.request(method, payload, callOptions)` 即可覆盖本次调用。不能写 `{ timeout: 100 }`、`timeoutMs` 或 `defaultTimeoutMs`。
@@ -103,10 +105,10 @@ export const callOptions = { timeout: timeout({ ms: 100 }), retry: false } as co
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
-import { limits } from '@migaia/rpc-host/plugins'
+import { limitsFeature } from '@migaia/rpc-host/plugins'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-const host = await createRpcHost({ plugins: [limits({ maxGlobal: 256 })] })
+const host = await createRpcHost({ plugins: [limitsFeature({ maxGlobal: 256 })] })
 try {
   const extended = await host.use(threadPlugin({ spawn: new URL('./worker.ts', import.meta.url) }))
   await extended.thread.notify('refresh')
@@ -159,7 +161,7 @@ export async function installRpc(
 }
 ```
 
-`rpcFlowPlugin(features)` 是普通原生宿主安装共享信息流 Feature 的封装，实际 setup 与清理由原生注册持有；不能把 `auth()` 等 Feature 直接当原生 plugin 交给 `host.use`。先提交这个封装和只读观察插件，再装传输，确保首次握手已经有完整策略。
+`rpcFlowPlugin(features)` 是普通原生宿主安装共享信息流 Feature 的封装，实际 setup 与清理由原生注册持有；不能把 `authFeature()` 等 Feature 直接当原生 plugin 交给 `host.use`。先提交这个封装和只读观察插件，再装传输，确保首次握手已经有完整策略。
 
 class 宿主同样通过 helper 延迟读取 `this`。`createPluginDomainCore` 必须转交本次构造请求；无需公开原本受保护的 `pipeline`。构造完成后按上面的顺序安装 plugin。
 
@@ -202,19 +204,19 @@ export class NativeRpcHost extends PluginHost<IRpcCore, unknown, readonly []> {
 
 frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当前 stage：捕获并 report 后可以继续下一个成员；stage 不观察失败的 Promise 时，管道在所有已启动遍历结算后拒绝，多个未观察失败按提交顺序汇总。观察回调不负责执行或推进这些 stage。
 
-`batch` 中取消的成员不再向下游提交，原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`；同批其他成员继续完成。入站某个成员失败只 report 该成员，不阻止后续成员。
+`batchFeature` 中取消的成员不再向下游提交，原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`；同批其他成员继续完成。入站某个成员失败只 report 该成员，不阻止后续成员。
 
 内置位置固定：出站 plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire；入站反向。数组书写顺序不改变这些位置。第三方 stage 默认在 plaintext，高阶 SDK 作者可显式指定受支持的 `layer`。
 
-`auth` 对完整消息执行保护，再由 `chunk` 拆成物理帧；接收端先重组，再还原保护。probe 的 `protected` 事件对应整条消息，`frame` 事件保留实际 `chunkIndex`、`chunkCount` 和 `members`。物理 batch 的成员数在 batch frame 上观察；`envelope` 事件仍对每条逻辑消息观察一次。
+`authFeature` 对完整消息执行保护，再由 `chunkFeature` 拆成物理帧；接收端先重组，再还原保护。probe 的 `protected` 事件对应整条消息，`frame` 事件保留实际 `chunkIndex`、`chunkCount` 和 `members`。物理 batch 的成员数在 batch frame 上观察；`envelope` 事件仍对每条逻辑消息观察一次。
 
-`chunk({ maxConcurrentMessagesPerSource, maxBufferedBytesPerSource })` 为每个物理来源设置子配额。默认分别为 64 条未完成消息和 16 MiB，低于默认全局 256 条和 64 MiB；默认来源并发取 `min(64, max(1, floor(maxConcurrentMessages / 4)))`，默认来源字节取 `max(maxMessageBytes, min(16777216, floor(maxBufferedBytes / 4)))`，保证一条允许的完整消息能获得预留。显式 `maxBufferedBytesPerSource` 小于 `maxMessageBytes` 时，构造会按既有配置错误拒绝。首片按完整声明长度预留来源字节额度，完成、过期或来源关闭时归还。超出来源配额只拒绝该来源的新分片消息，已接纳消息继续使用其预留额度；其他来源仍受各自子配额和原全局实际保留字节预算约束。字符串额度单位为 UTF-16 code unit，二进制为字节。
+`chunkFeature({ maxConcurrentMessagesPerSource, maxBufferedBytesPerSource })` 为每个物理来源设置子配额。默认分别为 64 条未完成消息和 16 MiB，低于默认全局 256 条和 64 MiB；默认来源并发取 `min(64, max(1, floor(maxConcurrentMessages / 4)))`，默认来源字节取 `max(maxMessageBytes, min(16777216, floor(maxBufferedBytes / 4)))`，保证一条允许的完整消息能获得预留。显式 `maxBufferedBytesPerSource` 小于 `maxMessageBytes` 时，构造会按既有配置错误拒绝。首片按完整声明长度预留来源字节额度，完成、过期或来源关闭时归还。超出来源配额只拒绝该来源的新分片消息，已接纳消息继续使用其预留额度；其他来源仍受各自子配额和原全局实际保留字节预算约束。字符串额度单位为 UTF-16 code unit，二进制为字节。
 
 本地 codec capture 在原遍历中按节点累计常数时间 JSON 字节下界，不对字符串、键、二进制标签或元数据调用 `JSON.stringify`。下界超过当前 `maxFrameBytes` 时立即以 `FRAME_LIMIT_EXCEEDED` 拒绝，避免共享引用的指数展开；下界未超限时，唯一的实际编码出口仍按真实 UTF-8 长度检查同一上限。下界不会大于真实 JSON 字节数；正常共享引用仍按 JSON 逐次展开，线上表示保持不变。
 
 载体可选实现 `reserveWrite(options)`，借用原有流控 owner，返回带 `release()` 的容量凭据。Session 在编码之后为一次逻辑写出预留一次，等这次 frame 管道实际结算后释放；chunk 的所有分片借用同一凭据，batch 各成员保留各自凭据，合并的物理写出借用仍存活成员的凭据。载体的 `write` 仍在实际物理接纳后完成，不应再把分片或 batch 重复计为新的逻辑调用。凭据不进入线上数据。
 
-同一组 `auth`、`chunk`、`batch`、`idempotency`、`limits`、`errorMap`、`schema` 工厂支持 host 的 `plugins` 与传输的 `features`；传输配置只覆盖本命名空间。host 级 `limits` 共用额度，传输级各自独立。`probe`、`typegen`、Devtools 只装在 host 级。删除原 `namespaces` 作用范围选项，改为把 feature 放在对应传输上。
+同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂支持 host 的 `plugins` 与传输的 `features`；传输配置只覆盖本命名空间。host 级 `limitsFeature` 共用额度，传输级各自独立。`probe`、`typegen`、Devtools 只装在 host 级。删除原 `namespaces` 作用范围选项，改为把 feature 放在对应传输上。
 
 ## 认证、签名与重复请求
 
@@ -222,7 +224,7 @@ frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当
 
 ```ts doc-test=check
 import { createHmac } from 'node:crypto'
-import { auth } from '@migaia/rpc-host/plugins'
+import { authFeature } from '@migaia/rpc-host/plugins'
 
 /** Both peers use the same application-owned key and binding representation. */
 function mac(value: unknown, key: string): string {
@@ -231,7 +233,7 @@ function mac(value: unknown, key: string): string {
 
 /** The application supplies its key; callbacks cover the entire replay binding. */
 export function signedAuthentication(key: string) {
-  return auth({
+  return authFeature({
     sign: (value) => ({ value, mac: mac(value, key) }),
     verify: (envelope) => {
       const signed = envelope as { value: unknown; mac: string }
@@ -252,17 +254,17 @@ auth 始终挡住还在执行的同一请求 ID，直到实际业务及 stream �
 | `'window'`       | 原签名计数器被 64 位窗口越过时 | 必须配置签名，否则为 `INVALID_CONFIG`；窗口前进不释放仍在执行的请求 |
 | 正安全整数毫秒数 | 完成后保留指定时长             | 非法数字以 `INVALID_CONFIG` 拒绝；数值模式受容量限制                |
 
-可以在 `auth({ retain })` 设置默认值，也可以在传输连接选项 `connect: { retain }` 中覆盖；只有未指定连接值时才回退，所以连接级 `false` 也会覆盖宿主设置。需要旧的 310 秒行为时显式配置 `retain: 310_000`。
+可以在 `authFeature({ retain })` 设置默认值，也可以在传输连接选项 `connect: { retain }` 中覆盖；只有未指定连接值时才回退，所以连接级 `false` 也会覆盖宿主设置。需要旧的 310 秒行为时显式配置 `retain: 310_000`。
 
-`maxReplayEntriesPerPeer` 默认 `1024`，只限制数字模式中的活动与保留身份，必须是正安全整数；满额以 `OVERLOADED` 拒绝。`false` 和 `'window'` 不受这个数值容量限制。`onRejected` 接收冻结的 `replayLedgerFull` 或 `groupReplayFull` 通知，回调失败仍按原错误及原因报告。重复请求静默丢弃，不再次执行，也不补发终态；需要把已完成结果回放给重发方时，安装 `idempotency()`。
+`maxReplayEntriesPerPeer` 默认 `1024`，只限制数字模式中的活动与保留身份，必须是正安全整数；满额以 `OVERLOADED` 拒绝。`false` 和 `'window'` 不受这个数值容量限制。`onRejected` 接收冻结的 `replayLedgerFull` 或 `groupReplayFull` 通知，回调失败仍按原错误及原因报告。重复请求静默丢弃，不再次执行，也不补发终态；需要把已完成结果回放给重发方时，安装 `idempotencyFeature()`。
 
 ## 映射发往对端的错误
 
-verifier 或凭据解析器抛出、拒绝时，auth 在本地错误的 `cause` 上保留原始错误。用 `errorMap(map)` 决定对端能看到哪些错误信息，例如把含凭据的细节换成公开提示。本地抛出的错误、`report`、警告和只读观察插件看到的仍是原始错误，与插件安装先后无关。它可放在宿主 `plugins` 或传输 `features`，传输级覆盖宿主级。
+verifier 或凭据解析器抛出、拒绝时，auth 在本地错误的 `cause` 上保留原始错误。用 `errorMapFeature(map)` 决定对端能看到哪些错误信息，例如把含凭据的细节换成公开提示。本地抛出的错误、`report`、警告和只读观察插件看到的仍是原始错误，与插件安装先后无关。它可放在宿主 `plugins` 或传输 `features`，传输级覆盖宿主级。
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
-import { errorMap, type IRpcErrorMap } from '@migaia/rpc-host/plugins'
+import { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/plugins'
 
 /** Decide what remote callers may learn while preserving local diagnostic causes. */
 const redact: IRpcErrorMap = (error) =>
@@ -272,12 +274,12 @@ const redact: IRpcErrorMap = (error) =>
       : 'request failed'
   )
 
-export const host = await createRpcHost({ plugins: [errorMap(redact)] })
+export const host = await createRpcHost({ plugins: [errorMapFeature(redact)] })
 ```
 
 `map(error, context)` 必须同步返回 `Error`、可移植值或 `undefined`。返回值就是发给对端的错误内容，不自动附加原错的原因链。回调抛错或返回值无法序列化时，报告映射失败，并按未映射时的规则发送原错误。返回 Promise/thenable 时报告 `INVALID_CONFIG`，立即按原规则发送，不等待它，因此同一会话的后续消息不会被它卡住；迟到的 Promise 拒绝仍会单独报告。
 
-没有 `errorMap` 时，未认证对端收到的握手拒绝默认隐藏细节；其他错误保留完整的原因链。跨进程或线程会还原成新对象，不保证与发送方原错 `===`。需要隐藏对端可见信息时配置映射，本地日志和原因链仍可用于排查。
+没有 `errorMapFeature` 时，未认证对端收到的握手拒绝默认隐藏细节；其他错误保留完整的原因链。跨进程或线程会还原成新对象，不保证与发送方原错 `===`。需要隐藏对端可见信息时配置映射，本地日志和原因链仍可用于排查。
 
 连接或 Auth 安装在验签中途关闭时，这次入站处理按取消结束，不再报告为认证失败；原始取消原因仍保留，真正的验签失败照常报告。直接执行 Auth SDK 阶段的调用者，在安装关闭后会得到现有的 `UtilsAbortError` 及原始 `cause`，而不是 `AUTHENTICATION_FAILED`。
 
@@ -306,7 +308,7 @@ export async function sendUpdates(host: IRpcHost<IApi>) {
 
 `notify` 的 Promise 只表示物理发送，不表示业务确认。普通 `notify`（没有 `cancel: 'before-start'`、没有 `orderKey`，且非转发）发送完成后解除调用方 signal 监听；之后 abort 不再发送远端取消。`dispatch(target, method, payload, options)` 同步返回 `void`，失败交给原 reporter。每个目标按顺序执行自己的 group，没有跨目标事务。
 
-安装 `idempotency()` 信息流 Feature 后，才有 `host.<ns>.outcome(key)` 查询保留的结果。省略时不启用按幂等键保存和查询结果的存储。auth 的请求 ID 去重与它独立，三种保留方式见[认证说明](#认证签名与重复请求)。推荐安装 `limits()`；不安装就不启用相应并发、速率或 payload 配额。
+安装 `idempotencyFeature()` 信息流 Feature 后，才有 `host.<ns>.outcome(key)` 查询保留的结果。省略时不启用按幂等键保存和查询结果的存储。auth 的请求 ID 去重与它独立，三种保留方式见[认证说明](#认证签名与重复请求)。推荐安装 `limitsFeature()`；不安装就不启用相应并发、速率或 payload 配额。
 
 ## 转发与持有能力
 
@@ -411,7 +413,7 @@ export const host = await createRpcHost({
 
 原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。
 
-auth 默认以对象交给 sign/verify；依赖旧文本输入时自行规范化或选择 `encodedType: 'string'`。完成的请求 ID 默认立即释放，需要旧保留时长时设置 `retain: 310_000`。本地 verifier/凭据解析错误保留原 cause，对端脱敏改用同步 `errorMap`。
+auth 默认以对象交给 sign/verify；依赖旧文本输入时自行规范化或选择 `encodedType: 'string'`。完成的请求 ID 默认立即释放，需要旧保留时长时设置 `retain: 310_000`。本地 verifier/凭据解析错误保留原 cause，对端脱敏改用同步 `errorMapFeature`。
 
 配置 sign/verify 时，auth 在既有签名握手中交换并验证每个来源的新挑战；应用回调仍须签名和验证收到的完整输入。此过程不增加公开 discovery 或握手配置。
 

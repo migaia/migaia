@@ -33,7 +33,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeout({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeoutFeature({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
               }
             ]
           }
@@ -68,7 +68,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeout({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeoutFeature({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
               }
             ]
           }
@@ -109,7 +109,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeout({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeoutFeature({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
               }
             ]
           }
@@ -148,7 +148,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeout({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeoutFeature({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
               }
             ]
           }
@@ -1053,7 +1053,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nconst host = await createRpcHost({\n  plugins: [\n    linkPolicy({ features: [timeout({ ms: 1500 })] }),\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted) await new Promise<void>((resolve) =>\n            signal.addEventListener('abort', () => resolve(), { once: true }))\n        } finally { await child.close() }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21, {\n    timeout: timeout({ ms: 100 }), retry: false\n  }))\n} finally { await host.close() }"
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nconst host = await createRpcHost({\n  plugins: [\n    linkPolicy({ features: [timeoutFeature({ ms: 1500 })] }),\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted) await new Promise<void>((resolve) =>\n            signal.addEventListener('abort', () => resolve(), { once: true }))\n        } finally { await child.close() }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21, {\n    timeout: timeoutFeature({ ms: 100 }), retry: false\n  }))\n} finally { await host.close() }"
               }
             ]
           }
@@ -1092,7 +1092,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nconst host = await createRpcHost({\n  plugins: [\n    linkPolicy({ features: [timeout({ ms: 1500 })] }),\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted) await new Promise<void>((resolve) =>\n            signal.addEventListener('abort', () => resolve(), { once: true }))\n        } finally { await child.close() }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21, {\n    timeout: timeout({ ms: 100 }), retry: false\n  }))\n} finally { await host.close() }"
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nconst host = await createRpcHost({\n  plugins: [\n    linkPolicy({ features: [timeoutFeature({ ms: 1500 })] }),\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted) await new Promise<void>((resolve) =>\n            signal.addEventListener('abort', () => resolve(), { once: true }))\n        } finally { await child.close() }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21, {\n    timeout: timeoutFeature({ ms: 100 }), retry: false\n  }))\n} finally { await host.close() }"
               }
             ]
           }
@@ -1225,7 +1225,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { timeout } from '@migaia/rpc-host/features'\nimport type { IRpcNamespace } from '@migaia/rpc-host'\n\nexport function call(remote: IRpcNamespace<{ double(value: number): number }>, signal: AbortSignal) {\n  return remote.request('double', 21, { signal, timeout: timeout({ ms: 1500 }) })\n}"
+                code: "import { timeoutFeature } from '@migaia/rpc-host/features'\nimport type { IRpcNamespace } from '@migaia/rpc-host'\n\nexport function call(remote: IRpcNamespace<{ double(value: number): number }>, signal: AbortSignal) {\n  return remote.request('double', 21, { signal, timeout: timeoutFeature({ ms: 1500 }) })\n}"
               }
             ]
           }
@@ -1268,7 +1268,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { timeout } from '@migaia/rpc-host/features'\nimport type { IRpcNamespace } from '@migaia/rpc-host'\n\nexport function call(remote: IRpcNamespace<{ double(value: number): number }>, signal: AbortSignal) {\n  return remote.request('double', 21, { signal, timeout: timeout({ ms: 1500 }) })\n}"
+                code: "import { timeoutFeature } from '@migaia/rpc-host/features'\nimport type { IRpcNamespace } from '@migaia/rpc-host'\n\nexport function call(remote: IRpcNamespace<{ double(value: number): number }>, signal: AbortSignal) {\n  return remote.request('double', 21, { signal, timeout: timeoutFeature({ ms: 1500 }) })\n}"
               }
             ]
           }
@@ -43940,898 +43940,44 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     }
   },
-  'logger:index': {
-    zh: {
-      title: 'Logger：把结构化日志交给明确的输出端',
-      lede: '核心负责生成条目、交给输出端并追踪异步完成；级别过滤与控制台格式按需安装插件。',
-      document: {
-        sections: [
-          {
-            id: 'pain',
-            heading: '你可能遇到过',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  '请求标识混在消息参数里，收集器无法按字段读取：[显式记录结构化字段](/zh/docs/logger/api/Logger#logger-index--Logger--case-1)。',
-                  '日志调用已返回，异步输出却还没保存便开始退出：[等待输出端完成](/zh/docs/logger/api/Logger#logger-index--Logger--case-3)。',
-                  '多个所有者同时关闭日志器，最终日志被重复写入或过早丢弃：[共享同一次关闭](/zh/docs/logger/api/Logger#logger-index--Logger--case-4)。',
-                  '临时保密规则撤销后，级别门槛也被意外改变：[分别管理门槛与过滤](/zh/docs/logger/api/plugins/level#logger-plugins--level--case-1)。',
-                  '错误被直接序列化为空对象，收集器看不到消息和堆栈：[输出 JSON 错误投影](/zh/docs/logger/api/plugins/color#logger-plugins--color--case-1)。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'why',
-            heading: '为什么选它',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  '每个输出端获得独立的浅层容器，表层注释不会污染另一个输出端的条目：[查看准确隔离边界](/zh/docs/logger/api/Logger#logger-index--Logger--case-2)。',
-                  '输出端返回的 Promise 纳入 `flush()` 等待，调用者可在预算内等保存完成：[查看异步完成顺序](/zh/docs/logger/api/Logger#logger-index--Logger--case-3)。',
-                  '关闭回调仍能写最终结构化日志，`shutdown()` 与 `dispose()` 共享同一终结 Promise：[查看最终条目与关闭结果](/zh/docs/logger/api/Logger#logger-index--Logger--case-4)。',
-                  '级别门槛与过滤规则分别生效，可撤销临时过滤器而不改变门槛：[查看过滤与门槛切换](/zh/docs/logger/api/plugins/level#logger-plugins--level--case-1)。',
-                  'JSON 渲染保留错误名称、消息及堆栈字符串，同时省略本地 `raw` 对象：[查看结构化错误输出](/zh/docs/logger/api/plugins/color#logger-plugins--color--case-1)。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'start',
-            heading: '从这里开始',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '先运行 `pnpm add @migaia/logger`，将下例保存到 ESM 项目并用 Node 24 执行；本例只向内存输出端登记回调，由回调打印所选字段。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['checkout']\n})\nlog.useSink((entry) => {\n  console.log(entry.context.join('.'), entry.message, entry.meta?.orderId)\n})\nlog.dispatchRaw({ tag: 'audit', message: '订单已保存', meta: { orderId: 'A-17' } })\nawait log.shutdown('manual')"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'checkout 订单已保存 A-17'
-              }
-            ]
-          },
-          {
-            id: 'api-map',
-            heading: '按问题找 API',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['你的问题', 'API、默认值及结果'],
-                rows: [
-                  [
-                    '收集结构化字段、等待异步输出并关闭',
-                    '[Logger](/zh/docs/logger/api/Logger#logger-index--Logger--case-1)：`execution` 两项预算必填，核心默认没有输出端，先登记 `useSink()`。'
-                  ],
-                  [
-                    '按严重程度和临时规则筛选条目',
-                    '[level](/zh/docs/logger/api/plugins/level#logger-plugins--level--case-1)：默认 `debug`、无过滤器、同步输出，添加五种级别方法。'
-                  ],
-                  [
-                    '输出可读文本或收集器可读 JSON',
-                    '[color](/zh/docs/logger/api/plugins/color#logger-plugins--color--case-1)：默认 `format: auto`，使用已捕获的宿主控制台。'
-                  ]
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        {
-          label: '快速开始',
-          path: 'getting-started'
-        },
-        {
-          label: 'Entry、Hook 与 Sink',
-          path: 'entries-hooks-and-sinks'
-        },
-        {
-          label: '内置插件与批量上报',
-          path: 'plugins-and-batching'
-        }
-      ]
-    },
+  'log-host:index': {
     en: {
-      title: 'Logger: send structured entries to explicit outputs',
-      lede: 'The core creates entries, delivers them to sinks, and tracks asynchronous completion; install level filtering and console formatting as needed.',
+      title: 'Asynchronous logging with explicit outputs',
+      lede: 'Create entries synchronously, then process and deliver them asynchronously. levelPlugin adds methods; thresholdFeature controls filtering. Runtime delivery failures reach onFailure or report; flush and shutdown fulfill.',
       document: {
         sections: [
           {
-            id: 'pain',
-            heading: 'You may have run into',
+            id: 'boundary',
+            heading: 'Ownership and availability',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'Request identifiers remain mixed with message arguments instead of readable fields: [record explicit structured metadata](/en/docs/logger/api/Logger#logger-index--Logger--case-1).',
-                  'A log call returns and shutdown starts before its asynchronous sink saves the entry: [wait for sink completion](/en/docs/logger/api/Logger#logger-index--Logger--case-3).',
-                  'Several owners close a logger and duplicate or discard its final entry: [share one shutdown completion](/en/docs/logger/api/Logger#logger-index--Logger--case-4).',
-                  'Removing a temporary privacy rule accidentally changes the level threshold: [manage filters and thresholds separately](/en/docs/logger/api/plugins/level#logger-plugins--level--case-1).',
-                  'An Error becomes an empty JSON object and loses its message and stack: [render a structured error projection](/en/docs/logger/api/plugins/color#logger-plugins--color--case-1).'
-                ]
+                type: 'paragraph',
+                text: 'These examples describe the target public API. The packages remain private until the program release; use matching host/plugin versions.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Host policies are defaults for every output. Output-local policies replace the same kind. One format per scope is allowed; output format overrides host format. Entry enrichment runs once at host scope.'
               }
             ]
           },
-          {
-            id: 'why',
-            heading: 'Why choose it',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  'Each sink gets separate shallow containers so display annotations do not rewrite another sink’s entry: [see the isolation boundary](/en/docs/logger/api/Logger#logger-index--Logger--case-2).',
-                  'A returned sink Promise participates in flush() so callers can await saving within its budget: [see asynchronous completion order](/en/docs/logger/api/Logger#logger-index--Logger--case-3).',
-                  'Shutdown callbacks can still write final structured entries while shutdown() and dispose() share one terminal Promise: [see the final entry and completion](/en/docs/logger/api/Logger#logger-index--Logger--case-4).',
-                  'Thresholds and filters apply independently, so removing a temporary filter leaves the threshold intact: [see filter removal and threshold changes](/en/docs/logger/api/plugins/level#logger-plugins--level--case-1).',
-                  'JSON rendering keeps the error name, message and stack string while excluding the local raw object: [see structured error output](/en/docs/logger/api/plugins/color#logger-plugins--color--case-1).'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'start',
-            heading: 'Start here',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Run `pnpm add @migaia/logger`, save this example in an ESM project, and execute it with Node 24; this example registers a sink callback that prints selected fields.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['checkout']\n})\nlog.useSink((entry) => {\n  console.log(entry.context.join('.'), entry.message, entry.meta?.orderId)\n})\nlog.dispatchRaw({ tag: 'audit', message: 'order saved', meta: { orderId: 'A-17' } })\nawait log.shutdown('manual')"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'checkout order saved A-17'
-              }
-            ]
-          },
-          {
-            id: 'api-map',
-            heading: 'Find an API for your task',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Your task', 'API, defaults, and result'],
-                rows: [
-                  [
-                    'Collect structured fields, wait for output, and close',
-                    '[Logger](/en/docs/logger/api/Logger#logger-index--Logger--case-1): both execution budgets are required and the core has no default sink, so register useSink().'
-                  ],
-                  [
-                    'Select entries by severity and temporary rules',
-                    '[level](/en/docs/logger/api/plugins/level#logger-plugins--level--case-1): defaults to debug, no filters, and synchronous output, adding five level methods.'
-                  ],
-                  [
-                    'Render readable lines or JSON for a collector',
-                    '[color](/en/docs/logger/api/plugins/color#logger-plugins--color--case-1): defaults to format: auto and uses the captured host console.'
-                  ]
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        {
-          label: 'Quick start',
-          path: 'getting-started'
-        },
-        {
-          label: 'Entries, hooks, and sinks',
-          path: 'entries-hooks-and-sinks'
-        },
-        {
-          label: 'Built-in plugins and batching',
-          path: 'plugins-and-batching'
-        }
-      ]
-    }
-  },
-  'logger:getting-started': {
-    zh: {
-      title: '快速开始：第一个 Logger',
-      lede: '安装包，创建一个带级别过滤和控制台输出的 Logger，并弄清构造选项。',
-      document: {
-        sections: [
-          {
-            id: 'install',
-            heading: '安装',
-            blocks: [
-              {
-                type: 'code',
-                language: 'bash',
-                code: 'pnpm add @migaia/logger'
-              },
-              {
-                type: 'paragraph',
-                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
-              }
-            ]
-          },
-          {
-            id: 'first',
-            heading: '第一个例子',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty', color: 'never', timestamp: false })\n  ] as const\n})\n\nlog.debug('连接池已创建') // 低于 info，不输出\nlog.info('服务监听端口 %d', 3000)\nlog.warn('慢请求', { path: '/orders', ms: 1200 })\n\nawait log.flush()"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: "[INFO] (api) 服务监听端口 3000\n[WARN] (api) 慢请求 { path: '/orders', ms: 1200 }"
-              },
-              {
-                type: 'paragraph',
-                text: "level({ level: 'info' }) 给 Logger 增加 info、warn 等方法，并丢弃低于 info 的日志，所以 debug 那条没有输出。color(...) 是一个输出端，把日志打印到控制台；示例关闭了时间戳和颜色，让输出稳定可读。context: ['api'] 是每条日志默认的来源标记，显示为 (api)。"
-              },
-              {
-                type: 'paragraph',
-                text: '消息里的 %d、%s 是 console 风格的占位符，后面的参数依次填入；最后一个对象参数也只是普通参数。await log.flush() 等待所有输出写完，程序退出前应该调用它。plugins 后面的 as const 让 TypeScript 知道装了哪些插件，从而认识 log.info 这些方法。'
-              }
-            ]
-          },
-          {
-            id: 'options',
-            heading: '构造选项',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['选项', '必填', '作用'],
-                rows: [
-                  [
-                    'execution',
-                    '是',
-                    '{ mutationTimeoutMs, pipelineDrainTimeoutMs }：安装/卸载插件和卸载时等待处理步骤的超时，false 表示不限时'
-                  ],
-                  [
-                    'plugins',
-                    '否',
-                    '构造时按顺序安装的插件。只能是同步安装的插件；需要异步安装的用 await log.use(plugin)'
-                  ],
-                  ['context', '否', "每条日志默认的来源路径，如 ['app', 'api']"],
-                  ['pipeline.mode', '否', "处理步骤的模式，默认 'sync'，创建后不能更改"],
-                  ['topic', '否', '用 extends 转发时显示的节点名'],
-                  ['options', '否', '给插件读取的只读业务配置'],
-                  ['on', '否', '构造时注册 hook 的简写']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'methods',
-            heading: '常用方法',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['方法', '作用'],
-                rows: [
-                  [
-                    'log.info(...) / warn / error ...',
-                    '由 level 插件提供；没装 level 时用 log.log(tag, message, ...args)'
-                  ],
-                  [
-                    'log.dispatchRaw({ tag, message, meta?, data?, context? })',
-                    '一次给出全部字段，适合结构化日志'
-                  ],
-                  ['log.useSink(fn)', '增加一个输出端，返回移除函数'],
-                  ['log.onFailure(fn)', '观察日志系统自身的错误'],
-                  ['log.flush() / log.shutdown(reason)', '等待写完 / 收尾并关闭'],
-                  ['log.use(plugin) / log.unUse(name)', '运行时安装 / 卸载插件']
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        {
-          label: 'Entry、Hook 与 Sink',
-          path: 'entries-hooks-and-sinks'
-        },
-        {
-          label: '内置插件与批量上报',
-          path: 'plugins-and-batching'
-        },
-        {
-          label: 'Logger API',
-          path: 'docs/logger/Logger'
-        }
-      ]
-    },
-    en: {
-      title: 'Quick start: your first Logger',
-      lede: 'Install the package, create a Logger with level filtering and console output, and learn the constructor options.',
-      document: {
-        sections: [
-          {
-            id: 'install',
-            heading: 'Install',
-            blocks: [
-              {
-                type: 'code',
-                language: 'bash',
-                code: 'pnpm add @migaia/logger'
-              },
-              {
-                type: 'paragraph',
-                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
-              }
-            ]
-          },
-          {
-            id: 'first',
-            heading: 'First example',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty', color: 'never', timestamp: false })\n  ] as const\n})\n\nlog.debug('pool created') // below info, not printed\nlog.info('listening on port %d', 3000)\nlog.warn('slow request', { path: '/orders', ms: 1200 })\n\nawait log.flush()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: "[INFO] (api) listening on port 3000\n[WARN] (api) slow request { path: '/orders', ms: 1200 }"
-              },
-              {
-                type: 'paragraph',
-                text: "level({ level: 'info' }) adds info, warn, and friends and drops entries below info, so the debug line does not print. color(...) is an output that prints to the console; the example disables timestamps and colors for stable output. context: ['api'] is each entry’s default origin label, shown as (api)."
-              },
-              {
-                type: 'paragraph',
-                text: '%d and %s are console-style placeholders filled by the following arguments; a trailing object is just another argument. await log.flush() waits until every output has written, so call it before exiting. as const after plugins lets TypeScript know which plugins are installed and therefore that log.info exists.'
-              }
-            ]
-          },
-          {
-            id: 'options',
-            heading: 'Constructor options',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Option', 'Required', 'Purpose'],
-                rows: [
-                  [
-                    'execution',
-                    'yes',
-                    '{ mutationTimeoutMs, pipelineDrainTimeoutMs }: timeouts for installing or removing plugins and for draining stages; false means no limit'
-                  ],
-                  [
-                    'plugins',
-                    'no',
-                    'Plugins installed in order at construction; only synchronous ones. Use await log.use(plugin) for async installation'
-                  ],
-                  ['context', 'no', "Default origin path of each entry, such as ['app', 'api']"],
-                  [
-                    'pipeline.mode',
-                    'no',
-                    "Pipeline mode, 'sync' by default and fixed after creation"
-                  ],
-                  ['topic', 'no', 'Node name shown when forwarding with extends'],
-                  ['options', 'no', 'Read-only business settings plugins can read'],
-                  ['on', 'no', 'Shorthand for registering hooks at construction']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'methods',
-            heading: 'Common methods',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Method', 'Purpose'],
-                rows: [
-                  [
-                    'log.info(...) / warn / error ...',
-                    'Provided by level; without it use log.log(tag, message, ...args)'
-                  ],
-                  [
-                    'log.dispatchRaw({ tag, message, meta?, data?, context? })',
-                    'Supplies every field at once for structured logs'
-                  ],
-                  ['log.useSink(fn)', 'Adds an output and returns a remover'],
-                  ['log.onFailure(fn)', 'Observes failures inside logging'],
-                  ['log.flush() / log.shutdown(reason)', 'Wait for writes / clean up and close'],
-                  ['log.use(plugin) / log.unUse(name)', 'Install / remove a plugin at runtime']
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        {
-          label: 'Entries, hooks, and sinks',
-          path: 'entries-hooks-and-sinks'
-        },
-        {
-          label: 'Built-in plugins and batching',
-          path: 'plugins-and-batching'
-        },
-        {
-          label: 'Logger API',
-          path: 'docs/logger/Logger'
-        }
-      ]
-    }
-  },
-  'logger:entries-hooks-and-sinks': {
-    zh: {
-      title: 'Entry、Hook 与 Sink',
-      lede: '一条日志是什么样的对象，怎样把它写到自己的输出端，以及输出端出错时会发生什么。',
-      document: {
-        sections: [
-          {
-            id: 'entry',
-            heading: 'Entry 的字段和自定义输出端',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger, type ILogEntry } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\n// sink 是日志的输出端：这里把每条日志收集到数组里\nconst received: ILogEntry[] = []\nlog.useSink((entry) => {\n  received.push(entry)\n})\n\nlog.log('info', '用户 %s 登录', 'ada')\nlog.dispatchRaw({\n  tag: 'audit',\n  message: '退款已批准',\n  meta: { orderId: 'A-1001' },\n  data: { amount: 120 },\n  context: ['billing']\n})\n\nawait log.flush()\nfor (const entry of received) {\n  console.log(entry.tag, '|', entry.message, '|', entry.args, entry.meta, entry.data, entry.context)\n}"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: "info | 用户 %s 登录 | [ 'ada' ] undefined {} []\naudit | 退款已批准 | [] { orderId: 'A-1001' } { amount: 120 } [ 'billing' ]"
-              },
-              {
-                type: 'paragraph',
-                text: 'log.useSink(fn) 增加一个输出端，每条通过处理步骤的日志都会交给它。log.log(tag, message, ...args) 是 console 风格的入口：message 里的 %s 保留原样，参数放在 args 里，由输出端决定怎么格式化。log.dispatchRaw(...) 一次给出全部字段：meta 放索引类信息（如订单号），data 放附加数据，context 标记来源。'
-              },
-              {
-                type: 'paragraph',
-                text: '传给不同输出端的 Entry 是各自浅拷贝的一份，一个输出端修改它不会影响另一个。'
-              }
-            ]
-          },
-          {
-            id: 'hooks',
-            heading: 'Hook',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: "log.hook(name, fn) 在日志生命周期的特定时刻运行 fn：'before' 和 'after' 对所有日志生效，'before:error' 只对 error 级别生效，也可以用自定义名字配合 log.fireHook(name, entry) 手动触发。hook 拿到的是同一个 Entry 对象，可以修改它；返回值是取消注册的函数。"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '输出端出错时',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\nlog.useSink(() => {\n  throw new Error('日志服务不可用')\n})\nlog.onFailure(({ source, error }) => {\n  console.log('日志系统出错:', source, (error as Error).message)\n})\n\nlog.log('info', '下单成功') // 不会从这里抛出错误\nconsole.log('业务代码继续执行')\nawait log.flush()"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '日志系统出错: sink 日志服务不可用\n// 日志库另外用 console.error 打印一份诊断（到 stderr）：\n// [logger] sink 抛出异步异常: Error: 日志服务不可用 ...\n业务代码继续执行'
-              },
-              {
-                type: 'paragraph',
-                text: '输出端、处理步骤、hook、flush 出错都不会从 log 调用处抛出，业务代码照常执行。错误交给 log.onFailure(fn)，source 说明出错的环节（sink、pipeline、hook、flush 等）。注意：即使注册了 onFailure，日志库仍会用 console.error 另外打印一行诊断。生产环境请务必注册 onFailure，把这些错误接入监控。'
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        {
-          label: '处理步骤',
-          path: 'pipelines'
-        },
-        {
-          label: 'Flush 与关闭',
-          path: 'flush-and-shutdown'
-        },
-        {
-          label: 'ILogEntry',
-          path: 'docs/logger/ILogEntry'
-        }
-      ]
-    },
-    en: {
-      title: 'Entries, hooks, and sinks',
-      lede: 'What an entry looks like, how to write it to your own output, and what happens when an output fails.',
-      document: {
-        sections: [
-          {
-            id: 'entry',
-            heading: 'Entry fields and a custom sink',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger, type ILogEntry } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\n// A sink is an output: here it collects every entry into an array\nconst received: ILogEntry[] = []\nlog.useSink((entry) => {\n  received.push(entry)\n})\n\nlog.log('info', 'user %s signed in', 'ada')\nlog.dispatchRaw({\n  tag: 'audit',\n  message: 'refund approved',\n  meta: { orderId: 'A-1001' },\n  data: { amount: 120 },\n  context: ['billing']\n})\n\nawait log.flush()\nfor (const entry of received) {\n  console.log(entry.tag, '|', entry.message, '|', entry.args, entry.meta, entry.data, entry.context)\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: "info | user %s signed in | [ 'ada' ] undefined {} []\naudit | refund approved | [] { orderId: 'A-1001' } { amount: 120 } [ 'billing' ]"
-              },
-              {
-                type: 'paragraph',
-                text: 'log.useSink(fn) adds an output that receives every entry passing the stages. log.log(tag, message, ...args) is the console-style entry point: %s stays in message and the arguments go to args for the output to format. log.dispatchRaw(...) supplies every field: meta for indexable facts such as an order id, data for extra payload, context for the origin.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Each sink receives its own shallow copy of the entry, so one sink’s changes never reach another.'
-              }
-            ]
-          },
-          {
-            id: 'hooks',
-            heading: 'Hooks',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: "log.hook(name, fn) runs fn at a point in an entry’s life: 'before' and 'after' apply to all entries, 'before:error' only to errors, and custom names can be fired with log.fireHook(name, entry). Hooks receive the live entry and may modify it; the return value unregisters the hook."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'When an output fails',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\nlog.useSink(() => {\n  throw new Error('log service unavailable')\n})\nlog.onFailure(({ source, error }) => {\n  console.log('logging failed:', source, (error as Error).message)\n})\n\nlog.log('info', 'order placed') // never throws here\nconsole.log('business code continues')\nawait log.flush()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'logging failed: sink log service unavailable\n// the logger also prints a diagnostic with console.error (to stderr):\n// [logger] sink 抛出异步异常: Error: log service unavailable ...\nbusiness code continues'
-              },
-              {
-                type: 'paragraph',
-                text: 'Failures in sinks, stages, hooks, or flush never throw from the log call, so business code continues. They go to log.onFailure(fn), whose source names the stage (sink, pipeline, hook, flush, and so on). Note that the logger still prints a diagnostic with console.error even when onFailure is registered. In production always register onFailure and connect it to monitoring.'
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        {
-          label: 'Pipelines',
-          path: 'pipelines'
-        },
-        {
-          label: 'Flush and shutdown',
-          path: 'flush-and-shutdown'
-        },
-        {
-          label: 'ILogEntry',
-          path: 'docs/logger/ILogEntry'
-        }
-      ]
-    }
-  },
-  'logger:plugins-and-batching': {
-    zh: {
-      title: '内置插件与批量上报',
-      lede: '用 level 控制输出哪些日志，用 color 配置控制台格式，用 batch + http 把日志攒批上报。',
-      document: {
-        sections: [
-          {
-            id: 'level',
-            heading: '级别和过滤器',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level({ level: 'warn' }), color({ format: 'pretty', color: 'never', timestamp: false })] as const\n})\n\nlog.info('不会输出')\nlog.setLevel('debug') // 运行时调整级别，例如排查问题时临时打开调试日志\nlog.info('现在会输出')\n\n// 过滤器：返回 false 的日志被丢弃\nconst hideHealthChecks = (entry: { message: string }) => !entry.message.includes('/health')\nlog.addFilter(hideHealthChecks)\nlog.info('GET /health 200')\nlog.info('GET /orders 200')\n\nawait log.flush()"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '[INFO] 现在会输出\n// GET /health 被过滤器丢弃\n[INFO] GET /orders 200'
-              },
-              {
-                type: 'paragraph',
-                text: 'level 插件的选项：level 是最低输出级别（debug < info < warn < error < fatal，默认 debug），filters 是过滤函数数组。安装后 Logger 多出 setLevel(level)、addFilter(fn)、removeFilter(fn)，可以在运行时调整。'
-              }
-            ]
-          },
-          {
-            id: 'color',
-            heading: '控制台输出',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['color 选项', '默认值', '作用'],
-                rows: [
-                  [
-                    'format',
-                    "'auto'",
-                    "'pretty' 适合人看，'json' 每条一行 JSON，适合日志采集；auto 按运行环境选择"
-                  ],
-                  ['color', "'auto'", "'always'、'never' 或按终端是否支持自动选择"],
-                  ['timestamp', 'true', 'pretty 格式是否显示时间'],
-                  ['colorMessage', "'none'", '消息正文的着色范围']
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Entry 的 data.silent 为 true 时，color 不打印它，但其他输出端（如 HTTP）照常接收。'
-              }
-            ]
-          },
-          {
-            id: 'http',
-            heading: '批量 HTTP 上报',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { getLoggerRuntimeManager, Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\n// 演示用：替换 Logger 使用的 fetch，打印 http 插件发出的请求\nsetLoggerRuntimeManager({\n  ...getLoggerRuntimeManager(),\n  fetch: async (url, init) => {\n    const body = JSON.parse(String(init?.body)) as { entries: { message: string }[] }\n    console.log('POST', String(url), body.entries.map((entry) => entry.message))\n    return new Response(null, { status: 204 })\n  }\n})\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 2, maxWaitMs: 1000 }), // 必须在 http 之前\n    http({ url: 'https://logs.example/v1/entries' })\n  ] as const\n})\n\nlog.info('第 1 条')\nlog.info('第 2 条') // 攒满 2 条，发送一批\nlog.info('第 3 条')\nawait log.flush() // 把剩下不满一批的也发出去\nawait log.shutdown('manual')"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: "POST https://logs.example/v1/entries [ '第 1 条', '第 2 条' ]\n// flush 发送剩下的一条\nPOST https://logs.example/v1/entries [ '第 3 条' ]"
-              },
-              {
-                type: 'paragraph',
-                text: 'batch 负责攒批：maxSize 条攒满或第一条进入后 maxWaitMs 毫秒到期，就发送一批。http 把每批以 POST { entries } 发到 url，网络错误、429 和 5xx 会重试（默认 2 次），429 优先遵守 Retry-After。batch 必须写在 http 前面，否则不会攒批。flush 会把未满的一批也发出去。'
-              },
-              {
-                type: 'paragraph',
-                text: '批次队列有上限（maxPendingBatches，默认 1024）。下游长期不可用导致队列满时，会以 BATCH_OVERFLOW 报告失败，而不是悄悄丢掉日志。'
-              }
-            ]
-          },
-          {
-            id: 'others',
-            heading: '其他插件',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  'file({ path })：从 @migaia/logger/plugins/file 导入，逐行写 JSON；在浏览器里需要通过 setLoggerRuntimeManager 提供写文件的能力。',
-                  'process()：收到退出信号或未捕获异常时先 flush 再退出，shutdownTimeoutMs 默认 3000 毫秒；没有 process 全局对象的环境里自动不起作用。',
-                  'reasoning()：增加 startThinking、thinking、endThinking 等方法，逐字输出 AI 生成内容。',
-                  'uuid()：给每条日志写入 data.uuid。',
-                  '每次安装都要重新调用插件工厂，不要把同一个插件对象装到多个 Logger。'
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        {
-          label: '编写自定义插件',
-          path: 'custom-plugin'
-        },
-        {
-          label: 'Flush 与关闭',
-          path: 'flush-and-shutdown'
-        },
-        {
-          label: 'http API',
-          path: 'docs/logger/plugins/http'
-        }
-      ]
-    },
-    en: {
-      title: 'Built-in plugins and batching',
-      lede: 'Control which entries print with level, configure console output with color, and ship batches with batch + http.',
-      document: {
-        sections: [
-          {
-            id: 'level',
-            heading: 'Levels and filters',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level({ level: 'warn' }), color({ format: 'pretty', color: 'never', timestamp: false })] as const\n})\n\nlog.info('not printed')\nlog.setLevel('debug') // change the level at runtime, e.g. enable debug while investigating\nlog.info('printed now')\n\n// filter: entries returning false are dropped\nconst hideHealthChecks = (entry: { message: string }) => !entry.message.includes('/health')\nlog.addFilter(hideHealthChecks)\nlog.info('GET /health 200')\nlog.info('GET /orders 200')\n\nawait log.flush()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '[INFO] printed now\n// GET /health is dropped by the filter\n[INFO] GET /orders 200'
-              },
-              {
-                type: 'paragraph',
-                text: 'level options: level is the minimum (debug < info < warn < error < fatal, default debug) and filters is an array of filter functions. The Logger gains setLevel(level), addFilter(fn), and removeFilter(fn) for runtime changes.'
-              }
-            ]
-          },
-          {
-            id: 'color',
-            heading: 'Console output',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['color option', 'Default', 'Purpose'],
-                rows: [
-                  [
-                    'format',
-                    "'auto'",
-                    "'pretty' for people, 'json' for one JSON line per entry for collectors; auto picks by environment"
-                  ],
-                  ['color', "'auto'", "'always', 'never', or chosen by terminal support"],
-                  ['timestamp', 'true', 'Whether pretty output shows the time'],
-                  ['colorMessage', "'none'", 'How much of the message is colored']
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'When an entry has data.silent set to true, color skips it while other outputs such as HTTP still receive it.'
-              }
-            ]
-          },
-          {
-            id: 'http',
-            heading: 'Batched HTTP delivery',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { getLoggerRuntimeManager, Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\n// Demo only: replace the fetch Logger uses and print what the http plugin sends\nsetLoggerRuntimeManager({\n  ...getLoggerRuntimeManager(),\n  fetch: async (url, init) => {\n    const body = JSON.parse(String(init?.body)) as { entries: { message: string }[] }\n    console.log('POST', String(url), body.entries.map((entry) => entry.message))\n    return new Response(null, { status: 204 })\n  }\n})\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 2, maxWaitMs: 1000 }), // must come before http\n    http({ url: 'https://logs.example/v1/entries' })\n  ] as const\n})\n\nlog.info('entry 1')\nlog.info('entry 2') // two entries fill a batch, which is sent\nlog.info('entry 3')\nawait log.flush() // send the partial batch too\nawait log.shutdown('manual')"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: "POST https://logs.example/v1/entries [ 'entry 1', 'entry 2' ]\n// flush sends the remaining entry\nPOST https://logs.example/v1/entries [ 'entry 3' ]"
-              },
-              {
-                type: 'paragraph',
-                text: 'batch collects entries and sends a batch when maxSize fill it or maxWaitMs pass after the first entry. http POSTs each batch as { entries } to url and retries network errors, 429, and 5xx (twice by default), honoring Retry-After on 429. batch must come before http or nothing is batched. flush sends a partial batch too.'
-              },
-              {
-                type: 'paragraph',
-                text: 'The batch queue is bounded (maxPendingBatches, default 1024). If a long outage fills it, a BATCH_OVERFLOW failure is reported rather than silently dropping entries.'
-              }
-            ]
-          },
-          {
-            id: 'others',
-            heading: 'Other plugins',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  'file({ path }): import from @migaia/logger/plugins/file; writes JSON lines, and in browsers needs a file capability supplied through setLoggerRuntimeManager.',
-                  'process(): on exit signals or uncaught errors flushes before exiting; shutdownTimeoutMs defaults to 3000 ms, and it does nothing where no process global exists.',
-                  'reasoning(): adds startThinking, thinking, endThinking, and friends to stream AI output token by token.',
-                  'uuid(): writes data.uuid into each entry.',
-                  'Call the plugin factory for every installation; never install one plugin object into several Loggers.'
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        {
-          label: 'Write a custom plugin',
-          path: 'custom-plugin'
-        },
-        {
-          label: 'Flush and shutdown',
-          path: 'flush-and-shutdown'
-        },
-        {
-          label: 'http API',
-          path: 'docs/logger/plugins/http'
-        }
-      ]
-    }
-  },
-  'logger:custom-plugin': {
-    zh: {
-      title: '编写自定义插件',
-      lede: '插件是一个带 name 和 install 的对象；install 可以给 Logger 增加方法、注册处理步骤和输出端，并登记需要清理的资源。',
-      document: {
-        sections: [
           {
             id: 'example',
-            heading: '例子：增加一个 audit() 方法',
+            heading: 'Use the public factory',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger, type ILogEntry, type ILoggerPlugin } from '@migaia/logger'\n\ntype IAuditConfig = { service: string }\ntype IDeliver = (entry: Readonly<ILogEntry>) => void | Promise<void>\ntype IAuditMethods = { audit(event: string, data: Record<string, unknown>): void }\n\n/** 插件工厂：每次调用返回新的插件对象，不要把同一个对象装到多个 Logger。 */\nfunction auditPlugin(\n  config: IAuditConfig,\n  deliver: IDeliver\n): ILoggerPlugin<IAuditMethods, IAuditConfig> {\n  return {\n    name: 'audit',\n    config,\n    install(core) {\n      const { service } = core.config.get()\n      // 插件自己的输出端：只投递 audit 日志；返回 Promise 时 flush 会等待它\n      const stopSink = core.useSink((entry) => (entry.tag === 'audit' ? deliver(entry) : undefined))\n      core.onDispose(stopSink) // 卸载插件或关闭 Logger 时移除这个输出端\n      return {\n        audit(event, data) {\n          core.dispatchRaw({ tag: 'audit', message: event, data: { ...data, service } })\n        }\n      }\n    }\n  }\n}\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    auditPlugin({ service: 'checkout' }, async (entry) => {\n      await new Promise((resolve) => setTimeout(resolve, 10)) // 模拟发送到审计系统\n      console.log('已投递:', entry.message, entry.data)\n    })\n  ] as const\n})\n\nlogger.audit('refund-approved', { orderId: 'A-1001' }) // 插件给 Logger 增加的方法\nawait logger.flush() // 等待投递完成\nawait logger.shutdown('manual')"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: "已投递: refund-approved { orderId: 'A-1001', service: 'checkout' }"
-              },
-              {
-                type: 'paragraph',
-                text: 'ILoggerPlugin<方法类型, 配置类型> 描述一个插件。install(core) 返回的对象会成为 Logger 上的新方法，这里是 logger.audit。core 的类型是 ILoggerPluginCore，提供 core.config.get()（读取本插件的配置）、core.dispatchRaw、core.usePipeline、core.useSink、core.onDispose 等能力。'
-              },
-              {
-                type: 'paragraph',
-                text: "这个插件用 core.useSink 注册了自己的输出端，只投递 audit 日志；deliver 返回 Promise，所以 await logger.flush() 会等投递完成。useSink 返回的移除函数交给 core.onDispose，卸载插件或 await logger.shutdown('manual') 时自动移除。deliver 是函数，通过工厂参数传入而不是放进 config，因为插件配置只能是普通数据。构造时 plugins 写 as const，TypeScript 才知道 logger.audit 存在。"
+                code: "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** The host owns entry scheduling, plugin installation and terminal cleanup. */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')"
               }
             ]
           },
           {
-            id: 'rules',
-            heading: '编写插件时注意',
+            id: 'completion',
+            heading: 'Completion and errors',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  '用工厂函数返回插件对象，每次安装都调用一次，避免多个 Logger 共享内部状态。',
-                  'name 在同一个 Logger 内必须唯一。',
-                  '需要修改或拦截日志时，在 install 里用 core.usePipeline / useAsyncPipeline 注册处理步骤，方法要和 Logger 的 pipeline.mode 匹配。',
-                  '在 install 里创建的监听器、定时器、连接，用 core.onDispose(清理函数) 登记，卸载插件或关闭 Logger 时会自动清理。',
-                  '异步输出端直接返回 Promise，Logger 会在 flush 时等待它，并把失败交给 onFailure；不要自己 catch 后吞掉。',
-                  '插件之间共享能力使用 plugin-host 的 Feature（defineFeature / getFeature），旧的 shared 写法已经移除。'
-                ]
+                type: 'paragraph',
+                text: 'Await flush before observing admitted asynchronous delivery, then await shutdown to release plugins. Observe runtime failures through onFailure/report. Durable operations retain their separate rejection contract.'
               }
             ]
           }
@@ -44839,66 +43985,48 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '处理步骤',
-          path: 'pipelines'
-        },
-        {
-          label: 'Plugin Host 指南',
-          path: '../plugin-host'
-        },
-        {
-          label: 'ILoggerPlugin',
-          path: 'docs/logger/ILoggerPlugin'
+          label: 'createLogHost',
+          path: 'api/createLogHost'
         }
       ]
     },
-    en: {
-      title: 'Write a custom plugin',
-      lede: 'A plugin is an object with name and install; install can add methods, register stages and outputs, and record resources to clean up.',
+    zh: {
+      title: '用明确的输出端交付异步日志',
+      lede: '同步创建条目后异步处理和交付；levelPlugin 提供方法，thresholdFeature 单独控制门槛。运行时交付错误进入 onFailure 或 report，flush 与 shutdown 兑现。',
       document: {
         sections: [
           {
-            id: 'example',
-            heading: 'Example: add an audit() method',
+            id: 'boundary',
+            heading: '所有权与可用性',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger, type ILogEntry, type ILoggerPlugin } from '@migaia/logger'\n\ntype IAuditConfig = { service: string }\ntype IDeliver = (entry: Readonly<ILogEntry>) => void | Promise<void>\ntype IAuditMethods = { audit(event: string, data: Record<string, unknown>): void }\n\n/** Plugin factory: return a new plugin object per call; never install one object into several Loggers. */\nfunction auditPlugin(\n  config: IAuditConfig,\n  deliver: IDeliver\n): ILoggerPlugin<IAuditMethods, IAuditConfig> {\n  return {\n    name: 'audit',\n    config,\n    install(core) {\n      const { service } = core.config.get()\n      // The plugin’s own sink delivers only audit entries; flush waits for its Promise\n      const stopSink = core.useSink((entry) => (entry.tag === 'audit' ? deliver(entry) : undefined))\n      core.onDispose(stopSink) // remove the sink when the plugin is removed or the Logger closes\n      return {\n        audit(event, data) {\n          core.dispatchRaw({ tag: 'audit', message: event, data: { ...data, service } })\n        }\n      }\n    }\n  }\n}\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    auditPlugin({ service: 'checkout' }, async (entry) => {\n      await new Promise((resolve) => setTimeout(resolve, 10)) // simulate sending to the audit system\n      console.log('delivered:', entry.message, entry.data)\n    })\n  ] as const\n})\n\nlogger.audit('refund-approved', { orderId: 'A-1001' }) // a method the plugin adds to the Logger\nawait logger.flush() // wait for delivery\nawait logger.shutdown('manual')"
+                type: 'paragraph',
+                text: '这些示例展示目标公开 API。包在本程序发布前仍为 private；使用时须匹配 host 与插件版本。'
               },
               {
                 type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: "delivered: refund-approved { orderId: 'A-1001', service: 'checkout' }"
-              },
-              {
-                type: 'paragraph',
-                text: 'ILoggerPlugin<Methods, Config> describes a plugin. The object install(core) returns becomes new Logger methods, here logger.audit. core is an ILoggerPluginCore offering core.config.get() for this plugin’s configuration, core.dispatchRaw, core.usePipeline, core.useSink, core.onDispose, and more.'
-              },
-              {
-                type: 'paragraph',
-                text: "The plugin registers its own output with core.useSink and delivers only audit entries; deliver returns a Promise, so await logger.flush() waits for delivery. The remover returned by useSink goes to core.onDispose, so removing the plugin or await logger.shutdown('manual') takes it away. deliver is a function, so it comes through the factory argument rather than config, which only holds plain data. Write plugins as const so TypeScript knows logger.audit exists."
+                text: 'host feature 是各输出端的默认策略；输出级同 kind 覆盖默认值。每个作用域只允许一个 format，输出 format 覆盖 host format；entry 增强只在 host 级执行一次。'
               }
             ]
           },
           {
-            id: 'rules',
-            heading: 'Rules for plugins',
+            id: 'example',
+            heading: '使用公开工厂',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'Return plugin objects from a factory called once per installation so Loggers never share internal state.',
-                  'name must be unique within a Logger.',
-                  'To modify or drop entries, register stages in install with core.usePipeline / useAsyncPipeline, matching the Logger’s pipeline.mode.',
-                  'Register listeners, timers, and connections created in install with core.onDispose(cleanup); they are cleaned up when the plugin is removed or the Logger closes.',
-                  'Let async outputs return their Promise so flush waits and failures reach onFailure; do not catch and swallow them.',
-                  'Share capabilities between plugins with plugin-host Features (defineFeature / getFeature); the old shared mechanism is gone.'
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** The host owns entry scheduling, plugin installation and terminal cleanup. */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: '完成与错误',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '观察已准入异步交付前等待 flush，结束时等待 shutdown 释放插件。运行时失败通过 onFailure/report 观察；durable 操作保留独立的拒绝契约。'
               }
             ]
           }
@@ -44906,71 +44034,50 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Pipelines',
-          path: 'pipelines'
-        },
-        {
-          label: 'Plugin Host guide',
-          path: '../plugin-host'
-        },
-        {
-          label: 'ILoggerPlugin',
-          path: 'docs/logger/ILoggerPlugin'
+          label: 'createLogHost',
+          path: 'api/createLogHost'
         }
       ]
     }
   },
-  'logger:pipelines': {
-    zh: {
-      title: '处理步骤：在输出之前修改或拦截日志',
-      lede: '处理步骤在日志到达任何输出端之前运行，适合脱敏、补充字段和过滤。',
+  'log-plugin-console:index': {
+    en: {
+      title: 'Preserve native console arguments',
+      lede: 'Borrow console/stdout capabilities and select pretty rendering with prettyFeature. Objects and Errors remain original native arguments.',
       document: {
         sections: [
           {
-            id: 'example',
-            heading: '例子：遮盖敏感信息',
+            id: 'boundary',
+            heading: 'Ownership and availability',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level(), color({ format: 'pretty', color: 'never', timestamp: false })] as const\n})\n\n// 处理步骤：在日志到达任何输出端之前，遮盖消息中的令牌\nlog.usePipeline((entry, next) => {\n  next({ ...entry, message: entry.message.replace(/token=\\w+/g, 'token=***') })\n})\n\nlog.info('回调地址 /callback?token=abc123')\nawait log.flush()"
+                type: 'paragraph',
+                text: 'These examples describe the target public API. The packages remain private until the program release; use matching host/plugin versions.'
               },
               {
                 type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '[INFO] 回调地址 /callback?token=***'
-              },
-              {
-                type: 'paragraph',
-                text: 'log.usePipeline((entry, next) => ...) 注册一个同步步骤。调用 next(新 entry) 把修改后的日志交给下一步；不调用 next 就丢弃这条日志。步骤按注册顺序执行，规则和 middleware-pipeline 相同：每个步骤最多调用一次 next。'
+                text: 'warn routes to console.warn; error/fatal route to console.error. JSON/plain output uses host text. Removing the output never closes borrowed capabilities.'
               }
             ]
           },
           {
-            id: 'modes',
-            heading: '选择模式',
+            id: 'example',
+            heading: 'Use the public factory',
             blocks: [
               {
-                type: 'table',
-                headers: ['pipeline.mode', '注册方法', '适用'],
-                rows: [
-                  ["'sync'（默认）", 'usePipeline', '只做同步转换，开销最小'],
-                  ["'async'", 'useAsyncPipeline', '步骤需要 await（例如查询用户名）'],
-                  ["'generator'", 'useGeneratorPipeline', '用 yield/return 控制流程'],
-                  ["'async-generator'", 'useAsyncGeneratorPipeline', '同上，但需要 await']
-                ]
-              },
+                type: 'code',
+                language: 'ts',
+                code: "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\n/** The console output preserves native argument and Error identities in pretty mode. */\nconst log = createLogHost({\n  features: [prettyFeature({ color: 'auto' })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.warn('inventory is low', { sku: 'sku-42', remaining: 3 })\nawait log.flush()\nawait log.shutdown('manual')"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: 'Completion and errors',
+            blocks: [
               {
                 type: 'paragraph',
-                text: '模式在构造时确定，之后不能更改。level、uuid 等内置插件会自动适配任何模式；你自己注册步骤时，注册方法必须和模式匹配，否则抛 PIPELINE_MODE_MISMATCH。'
-              },
-              {
-                type: 'paragraph',
-                text: '流水线替换日志条目时，time 必须是当前运行环境创建的 Date。无效替换会通过 onFailure 报告 PIPELINE_ENTRY_INVALID，并继续递交原始条目；log 调用不会因此抛出。'
+                text: 'Await flush before observing admitted asynchronous delivery, then await shutdown to release plugins. Observe runtime failures through onFailure/report. Durable operations retain their separate rejection contract.'
               }
             ]
           }
@@ -44978,77 +44085,48 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Flush 与关闭',
-          path: 'flush-and-shutdown'
-        },
-        {
-          label: 'middleware-pipeline 指南',
-          path: '../middleware-pipeline'
-        },
-        {
-          label: 'Logger API',
-          path: 'docs/logger/Logger'
+          label: 'consolePlugin',
+          path: 'api/consolePlugin'
         }
       ]
     },
-    en: {
-      title: 'Pipelines: modify or drop entries before output',
-      lede: 'Stages run before an entry reaches any output, which suits masking, enrichment, and filtering.',
+    zh: {
+      title: '保留控制台原生参数',
+      lede: '借用 console/stdout 能力，通过 prettyFeature 选择可读输出；对象与 Error 保持原生参数身份。',
       document: {
         sections: [
           {
-            id: 'example',
-            heading: 'Example: mask sensitive data',
+            id: 'boundary',
+            heading: '所有权与可用性',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level(), color({ format: 'pretty', color: 'never', timestamp: false })] as const\n})\n\n// A stage masks tokens before the entry reaches any sink\nlog.usePipeline((entry, next) => {\n  next({ ...entry, message: entry.message.replace(/token=\\w+/g, 'token=***') })\n})\n\nlog.info('callback /callback?token=abc123')\nawait log.flush()"
+                type: 'paragraph',
+                text: '这些示例展示目标公开 API。包在本程序发布前仍为 private；使用时须匹配 host 与插件版本。'
               },
               {
                 type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '[INFO] callback /callback?token=***'
-              },
-              {
-                type: 'paragraph',
-                text: 'log.usePipeline((entry, next) => ...) registers a synchronous stage. next(newEntry) passes the modified entry on; not calling next drops it. Stages run in registration order with the middleware-pipeline rule that each calls next at most once.'
+                text: 'warn 路由到 console.warn，error/fatal 路由到 console.error；JSON/plain 使用 host 文本。移除输出端不关闭借用能力。'
               }
             ]
           },
           {
-            id: 'modes',
-            heading: 'Choose a mode',
+            id: 'example',
+            heading: '使用公开工厂',
             blocks: [
               {
-                type: 'table',
-                headers: ['pipeline.mode', 'Registration', 'Use it for'],
-                rows: [
-                  [
-                    "'sync' (default)",
-                    'usePipeline',
-                    'synchronous transforms with the least overhead'
-                  ],
-                  [
-                    "'async'",
-                    'useAsyncPipeline',
-                    'stages that await, such as looking up a user name'
-                  ],
-                  ["'generator'", 'useGeneratorPipeline', 'yield/return control flow'],
-                  ["'async-generator'", 'useAsyncGeneratorPipeline', 'the same, with await']
-                ]
-              },
+                type: 'code',
+                language: 'ts',
+                code: "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\n/** The console output preserves native argument and Error identities in pretty mode. */\nconst log = createLogHost({\n  features: [prettyFeature({ color: 'auto' })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.warn('inventory is low', { sku: 'sku-42', remaining: 3 })\nawait log.flush()\nawait log.shutdown('manual')"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: '完成与错误',
+            blocks: [
               {
                 type: 'paragraph',
-                text: 'The mode is fixed at construction. Built-in plugins such as level and uuid adapt to any mode; your own registration method must match the mode or it throws PIPELINE_MODE_MISMATCH.'
-              },
-              {
-                type: 'paragraph',
-                text: 'When a pipeline replaces an entry, time must be a Date from the current realm. An invalid replacement reports PIPELINE_ENTRY_INVALID through onFailure and delivers the original entry; the log call does not throw for that failure.'
+                text: '观察已准入异步交付前等待 flush，结束时等待 shutdown 释放插件。运行时失败通过 onFailure/report 观察；durable 操作保留独立的拒绝契约。'
               }
             ]
           }
@@ -45056,51 +44134,50 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Flush and shutdown',
-          path: 'flush-and-shutdown'
-        },
-        {
-          label: 'middleware-pipeline guide',
-          path: '../middleware-pipeline'
-        },
-        {
-          label: 'Logger API',
-          path: 'docs/logger/Logger'
+          label: 'consolePlugin',
+          path: 'api/consolePlugin'
         }
       ]
     }
   },
-  'logger:flush-and-shutdown': {
-    zh: {
-      title: 'Flush 与关闭：退出前确认日志都写完',
-      lede: 'flush 等待异步输出写完；shutdown 先运行收尾钩子，再等待写完，最后卸载所有插件。',
+  'log-plugin-file:index': {
+    en: {
+      title: 'Write NDJSON through a borrowed writer',
+      lede: 'Append formatted records as one newline-terminated batch. Host features own format, batching, retries and deadlines.',
       document: {
         sections: [
           {
+            id: 'boundary',
+            heading: 'Ownership and availability',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'These examples describe the target public API. The packages remain private until the program release; use matching host/plugin versions.'
+              },
+              {
+                type: 'paragraph',
+                text: 'An injected writer works in all conditions. Native Node/Bun/Deno writers append only. Rotation requires an injected rotate method and applies to each delivery, after append succeeds.'
+              }
+            ]
+          },
+          {
             id: 'example',
-            heading: '例子',
+            heading: 'Use the public factory',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\n// 一个需要 50 毫秒才能写完的异步输出端，例如网络上报\nlog.useSink(async (entry) => {\n  await new Promise((resolve) => setTimeout(resolve, 50))\n  console.log('已写入:', entry.message)\n})\nlog.onShutdown((reason) => {\n  console.log('收尾，原因:', reason)\n  log.log('info', '服务即将退出') // 收尾钩子里写的日志也会被等待\n})\n\nlog.log('info', '处理完成')\nawait log.flush() // 等待异步输出端写完\nconsole.log('flush 完成')\n\nawait log.shutdown('manual')\nlog.log('info', '关闭之后的日志') // 被静默忽略\nconsole.log('shutdown 完成')"
-              },
+                code: "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** An application-owned writer works in browser and server conditions. */\nclass MemoryWriter {\n  /** Complete append batches remain observable without touching a real file. */\n  readonly writes: { path: string; text: string }[] = []\n  /** Resolving acknowledges the original batch. */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n/** Uninstall borrows this writer without closing it. */\nconst writer = new MemoryWriter()\n/** Delivery policy belongs to the host, including partial-batch draining. */\nconst log = createLogHost({\n  plugins: [levelPlugin(), filePlugin({\n    path: 'application.ndjson', writer,\n    features: [batchFeature({ maxSize: 2 })]\n  })]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nconsole.log(writer.writes)\nawait log.shutdown('manual')"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: 'Completion and errors',
+            blocks: [
               {
                 type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '已写入: 处理完成\nflush 完成\n收尾，原因: manual\n已写入: 服务即将退出\nshutdown 完成\n// 关闭之后的日志没有输出'
-              },
-              {
-                type: 'paragraph',
-                text: 'log.flush() 等待所有已知的异步工作完成：异步输出端返回的 Promise、批次、转发到其他 Logger 的日志。多个地方同时调用 flush 共享同一个 Promise。为了不被一个永远不完成的请求卡住，每次 flush 最多等待约 3 秒，超时时把情况报告给 onFailure，剩下的工作留给下一次 flush。'
-              },
-              {
-                type: 'paragraph',
-                text: "log.shutdown(reason) 依次执行：运行 onShutdown 注册的收尾函数（收尾函数里仍可写日志）→ flush → 卸载全部插件。之后的日志被静默忽略，不报错。reason 是 'manual'、'signal'、'uncaughtException' 或 'unhandledRejection'。重复调用 shutdown 得到同一个 Promise；关闭后的 Logger 不能重新启用，需要新建一个。log.dispose() 等同于 shutdown('manual')。"
+                text: 'Await flush before observing admitted asynchronous delivery, then await shutdown to release plugins. Observe runtime failures through onFailure/report. Durable operations retain their separate rejection contract.'
               }
             ]
           }
@@ -45108,49 +44185,48 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '转发与运行环境',
-          path: 'runtime-and-forwarding'
-        },
-        {
-          label: '排错',
-          path: 'troubleshooting'
-        },
-        {
-          label: 'Logger API',
-          path: 'docs/logger/Logger'
+          label: 'filePlugin',
+          path: 'api/filePlugin'
         }
       ]
     },
-    en: {
-      title: 'Flush and shutdown: confirm logs are written before exit',
-      lede: 'flush waits for async outputs; shutdown runs cleanup hooks, waits, then removes every plugin.',
+    zh: {
+      title: '通过借用 writer 追加 NDJSON',
+      lede: '把已格式化记录组成以换行结束的一批再追加；format、batch、retry 与 timeout 由 host feature 负责。',
       document: {
         sections: [
           {
+            id: 'boundary',
+            heading: '所有权与可用性',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '这些示例展示目标公开 API。包在本程序发布前仍为 private；使用时须匹配 host 与插件版本。'
+              },
+              {
+                type: 'paragraph',
+                text: '注入 writer 可用于所有条件入口；Node/Bun/Deno 原生 writer 只追加。轮转必须注入 rotate，阈值按每次交付计算，append 成功后才轮转。'
+              }
+            ]
+          },
+          {
             id: 'example',
-            heading: 'Example',
+            heading: '使用公开工厂',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\n\nconst log = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })\n\n// An async sink that takes 50 ms, such as network delivery\nlog.useSink(async (entry) => {\n  await new Promise((resolve) => setTimeout(resolve, 50))\n  console.log('written:', entry.message)\n})\nlog.onShutdown((reason) => {\n  console.log('cleanup, reason:', reason)\n  log.log('info', 'service shutting down') // logs written in the hook are awaited too\n})\n\nlog.log('info', 'job done')\nawait log.flush() // wait for the async sink\nconsole.log('flush done')\n\nawait log.shutdown('manual')\nlog.log('info', 'after shutdown') // silently ignored\nconsole.log('shutdown done')"
-              },
+                code: "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** An application-owned writer works in browser and server conditions. */\nclass MemoryWriter {\n  /** Complete append batches remain observable without touching a real file. */\n  readonly writes: { path: string; text: string }[] = []\n  /** Resolving acknowledges the original batch. */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n/** Uninstall borrows this writer without closing it. */\nconst writer = new MemoryWriter()\n/** Delivery policy belongs to the host, including partial-batch draining. */\nconst log = createLogHost({\n  plugins: [levelPlugin(), filePlugin({\n    path: 'application.ndjson', writer,\n    features: [batchFeature({ maxSize: 2 })]\n  })]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nconsole.log(writer.writes)\nawait log.shutdown('manual')"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: '完成与错误',
+            blocks: [
               {
                 type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'written: job done\nflush done\ncleanup, reason: manual\nwritten: service shutting down\nshutdown done\n// the entry logged after shutdown prints nothing'
-              },
-              {
-                type: 'paragraph',
-                text: 'log.flush() waits for every known async task: Promises returned by async outputs, batches, and entries forwarded to other Loggers. Concurrent flush calls share one Promise. To avoid hanging on a request that never ends, each flush waits about 3 seconds at most, reports the timeout to onFailure, and leaves the rest to the next flush.'
-              },
-              {
-                type: 'paragraph',
-                text: "log.shutdown(reason) runs onShutdown hooks (which may still log), then flush, then removes every plugin; later entries are ignored silently. reason is 'manual', 'signal', 'uncaughtException', or 'unhandledRejection'. Repeated calls return the same Promise, a closed Logger cannot be reopened, and log.dispose() equals shutdown('manual')."
+                text: '观察已准入异步交付前等待 flush，结束时等待 shutdown 释放插件。运行时失败通过 onFailure/report 观察；durable 操作保留独立的拒绝契约。'
               }
             ]
           }
@@ -45158,94 +44234,50 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Forwarding and runtime',
-          path: 'runtime-and-forwarding'
-        },
-        {
-          label: 'Troubleshooting',
-          path: 'troubleshooting'
-        },
-        {
-          label: 'Logger API',
-          path: 'docs/logger/Logger'
+          label: 'filePlugin',
+          path: 'api/filePlugin'
         }
       ]
     }
   },
-  'logger:runtime-and-forwarding': {
-    zh: {
-      title: '转发与运行环境',
-      lede: '用 extends 转发日志；在创建 Logger 时选择底层运行能力。',
+  'log-plugin-http:index': {
+    en: {
+      title: 'POST the canonical entries envelope',
+      lede: 'Send one HTTP attempt with the unchanged { entries } envelope and canonical error-chain projection. HTTP skips text formatting.',
       document: {
         sections: [
           {
-            id: 'extends',
-            heading: '把日志转发给另一个 Logger',
+            id: 'boundary',
+            heading: 'Ownership and availability',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\n\nconst options = { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } as const\n\nconst audit = new Logger({ ...options, topic: 'audit' })\naudit.useSink((entry) => console.log('[审计系统]', entry.message))\n\nconst api = new Logger({ ...options, topic: 'api' })\napi.useSink((entry) => console.log('[控制台]', entry.message))\napi.extends(audit) // api 的每条日志也会完整经过 audit 的处理链和输出端\n\napi.log('info', '用户 ada 修改了密码')\nawait api.flush()\n\napi.unextend(audit)\napi.log('info', '解除转发后只在 api 输出')\nawait api.flush()"
+                type: 'paragraph',
+                text: 'These examples describe the target public API. The packages remain private until the program release; use matching host/plugin versions.'
               },
               {
                 type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '[控制台] 用户 ada 修改了密码\n[审计系统] 用户 ada 修改了密码\n[控制台] 解除转发后只在 api 输出'
-              },
-              {
-                type: 'paragraph',
-                text: 'api.extends(audit) 让 api 的每条日志在自己输出之后，再完整经过 audit 的处理步骤和输出端，audit 自己的级别和过滤器同样生效。这比单纯抄送更可靠：审计 Logger 的规则不会被绕过。api.unextend(audit) 解除转发。'
-              },
-              {
-                type: 'list',
-                items: [
-                  '转发关系不能成环：a.extends(b) 之后 b.extends(a) 会立即报错。',
-                  'flush 会沿转发关系等待下游 Logger 也写完。',
-                  'extends 只转发日志，不会让 api 在类型上获得 audit 插件提供的方法。'
-                ]
+                text: 'Use retryFeature for eligible network/429/5xx failures. attempts includes the first call. HTTP-local format is rejected at creation; delivery failures retain their original causes.'
               }
             ]
           },
           {
-            id: 'runtime',
-            heading: '替换底层能力',
+            id: 'example',
+            heading: 'Use the public factory',
             blocks: [
-              {
-                type: 'paragraph',
-                text: '每个 Logger 在构造时保存 options.runtimeManager，省略时保存当时的默认管理器引用。之后调用 setLoggerRuntimeManager 只影响新创建的 Logger，不会切换已有实例；返回的恢复函数也只恢复后续实例的默认值。管理器对象按引用保存，应把它当作只读配置。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger, getLoggerRuntimeManager } from '@migaia/logger'\n\nconst runtimeManager = getLoggerRuntimeManager()\nconst execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const\nconst log = new Logger({ execution, runtimeManager })\nlog.useSink((entry) => console.log('操作日志:', entry.message))\ntry {\n  log.log('info', '用户资料已保存')\n  await log.flush()\n} finally {\n  await log.shutdown('manual')\n}"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '操作日志: 用户资料已保存'
-              },
-              {
-                type: 'table',
-                headers: ['入口', '用途'],
-                rows: [
-                  [
-                    'new Logger({ execution, runtimeManager })',
-                    '为这个实例和它的插件选择 fetch、UUID、defer 与输出等宿主能力；时钟另由 options.scheduler 提供。'
-                  ],
-                  ['getLoggerRuntimeManager()', '取得当前默认管理器，按需复制后传给构造函数。'],
-                  [
-                    'setLoggerRuntimeManager(manager)',
-                    '设置后续实例的默认值，返回恢复默认值的函数。'
-                  ]
-                ]
-              },
+                code: "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\n/** Capture the unchanged HTTP wire body without sending a real network request. */\nconst requests: unknown[] = []\n/** HTTP owns one attempt; the host owns batching, retry and timeout policy. */\nconst log = createLogHost({\n  plugins: [levelPlugin(), httpPlugin({\n    url: 'https://example.test/logs',\n    fetcher: async (_url, init) => {\n      requests.push(JSON.parse(String(init?.body)))\n      return new Response(null, { status: 204 })\n    },\n    features: [batchFeature({ maxSize: 20 }), retryFeature({ attempts: 3, backoff: 200 }), timeoutFeature({ ms: 1000 })]\n  })]\n})\nlog.info('request completed', { requestId: 'one' })\nawait log.flush()\nconsole.log(requests) // Each body contains an entries array.\nawait log.shutdown('manual')"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: 'Completion and errors',
+            blocks: [
               {
                 type: 'paragraph',
-                text: '上一页批量上报的示例先设置管理器，再创建 Logger。HTTP 插件也使用该实例保存的管理器；只替换全局 fetch 不会修改已经保存的 fetch。自定义管理器可提供 createAbortController，省略时 HTTP 插件使用原生 AbortController。'
+                text: 'Await flush before observing admitted asynchronous delivery, then await shutdown to release plugins. Observe runtime failures through onFailure/report. Durable operations retain their separate rejection contract.'
               }
             ]
           }
@@ -45253,95 +44285,48 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '排错',
-          path: 'troubleshooting'
-        },
-        {
-          label: '快速开始',
-          path: 'getting-started'
-        },
-        {
-          label: 'setLoggerRuntimeManager',
-          path: 'docs/logger/setLoggerRuntimeManager'
+          label: 'httpPlugin',
+          path: 'api/httpPlugin'
         }
       ]
     },
-    en: {
-      title: 'Forwarding and runtime',
-      lede: 'Forward entries with extends and choose low-level runtime capabilities when creating a Logger.',
+    zh: {
+      title: 'POST 规范的 entries 请求体',
+      lede: '以不变的 { entries } 请求体与规范错误链投影发送一次 HTTP 尝试；HTTP 跳过文本格式化。',
       document: {
         sections: [
           {
-            id: 'extends',
-            heading: 'Forward entries to another Logger',
+            id: 'boundary',
+            heading: '所有权与可用性',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { Logger } from '@migaia/logger'\n\nconst options = { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } as const\n\nconst audit = new Logger({ ...options, topic: 'audit' })\naudit.useSink((entry) => console.log('[audit system]', entry.message))\n\nconst api = new Logger({ ...options, topic: 'api' })\napi.useSink((entry) => console.log('[console]', entry.message))\napi.extends(audit) // every api entry also runs through audit's pipeline and sinks\n\napi.log('info', 'user ada changed the password')\nawait api.flush()\n\napi.unextend(audit)\napi.log('info', 'after unextend only api prints')\nawait api.flush()"
+                type: 'paragraph',
+                text: '这些示例展示目标公开 API。包在本程序发布前仍为 private；使用时须匹配 host 与插件版本。'
               },
               {
                 type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '[console] user ada changed the password\n[audit system] user ada changed the password\n[console] after unextend only api prints'
-              },
-              {
-                type: 'paragraph',
-                text: 'api.extends(audit) sends every api entry, after api’s own outputs, through audit’s stages and outputs, with audit’s levels and filters applied. That is safer than copying, because the audit Logger’s rules cannot be bypassed. api.unextend(audit) removes the link.'
-              },
-              {
-                type: 'list',
-                items: [
-                  'Forwarding cannot form a cycle: b.extends(a) after a.extends(b) throws at once.',
-                  'flush waits for downstream Loggers along forwarding links.',
-                  'extends forwards entries only; api does not gain methods from audit’s plugins in its type.'
-                ]
+                text: '用 retryFeature 处理可重试的网络、429 与 5xx 失败，attempts 包含首次调用。HTTP 输出级 format 在创建时被拒绝；交付失败保留原 cause。'
               }
             ]
           },
           {
-            id: 'runtime',
-            heading: 'Replace low-level capabilities',
+            id: 'example',
+            heading: '使用公开工厂',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'Each Logger captures options.runtimeManager at construction, or the current default manager reference when omitted. Later setLoggerRuntimeManager calls affect only future Loggers; the restore function also restores only that default. The object is held by reference, so treat it as readonly configuration.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Logger, getLoggerRuntimeManager } from '@migaia/logger'\n\nconst runtimeManager = getLoggerRuntimeManager()\nconst execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const\nconst log = new Logger({ execution, runtimeManager })\nlog.useSink((entry) => console.log('Activity:', entry.message))\ntry {\n  log.log('info', 'User profile saved')\n  await log.flush()\n} finally {\n  await log.shutdown('manual')\n}"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Activity: User profile saved'
-              },
-              {
-                type: 'table',
-                headers: ['Entry', 'Purpose'],
-                rows: [
-                  [
-                    'new Logger({ execution, runtimeManager })',
-                    'Select fetch, UUID, defer, and outputs for this instance and its plugins; options.scheduler separately provides the clock.'
-                  ],
-                  [
-                    'getLoggerRuntimeManager()',
-                    'Read the current default, then optionally copy it for a constructor option.'
-                  ],
-                  [
-                    'setLoggerRuntimeManager(manager)',
-                    'Set the default for future instances and return a function that restores it.'
-                  ]
-                ]
-              },
+                code: "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\n/** Capture the unchanged HTTP wire body without sending a real network request. */\nconst requests: unknown[] = []\n/** HTTP owns one attempt; the host owns batching, retry and timeout policy. */\nconst log = createLogHost({\n  plugins: [levelPlugin(), httpPlugin({\n    url: 'https://example.test/logs',\n    fetcher: async (_url, init) => {\n      requests.push(JSON.parse(String(init?.body)))\n      return new Response(null, { status: 204 })\n    },\n    features: [batchFeature({ maxSize: 20 }), retryFeature({ attempts: 3, backoff: 200 }), timeoutFeature({ ms: 1000 })]\n  })]\n})\nlog.info('request completed', { requestId: 'one' })\nawait log.flush()\nconsole.log(requests) // Each body contains an entries array.\nawait log.shutdown('manual')"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: '完成与错误',
+            blocks: [
               {
                 type: 'paragraph',
-                text: 'The batching example sets the manager before creating its Logger. The HTTP plugin uses the manager captured by that instance; replacing global fetch does not change a captured fetch. A custom manager may provide createAbortController; when omitted, HTTP uses native AbortController.'
+                text: '观察已准入异步交付前等待 flush，结束时等待 shutdown 释放插件。运行时失败通过 onFailure/report 观察；durable 操作保留独立的拒绝契约。'
               }
             ]
           }
@@ -45349,89 +44334,50 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Troubleshooting',
-          path: 'troubleshooting'
-        },
-        {
-          label: 'Quick start',
-          path: 'getting-started'
-        },
-        {
-          label: 'setLoggerRuntimeManager',
-          path: 'docs/logger/setLoggerRuntimeManager'
+          label: 'httpPlugin',
+          path: 'api/httpPlugin'
         }
       ]
     }
   },
-  'logger:troubleshooting': {
-    zh: {
-      title: '排错与常见问题',
-      lede: '按现象查找原因和解决办法。',
+  'log-plugin-process:index': {
+    en: {
+      title: 'Coordinate process shutdown without owning process',
+      lede: 'Borrow a process capability to coordinate signals, crash capture and bounded graceful shutdown with the same host lifecycle.',
       document: {
         sections: [
           {
-            id: 'no-output',
-            heading: '日志没有输出',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  '没有安装任何输出端：只装 level 不会打印，需要 color 或自定义 useSink。',
-                  '级别过滤：低于 level 的日志被丢弃，用 setLevel 调低。',
-                  '程序退出前没有 await log.flush()，异步输出还没写完。',
-                  'Logger 已经 shutdown，之后的日志被静默忽略。',
-                  '输出端出错：注册 onFailure 查看原因。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'types',
-            heading: 'log.info 在 TypeScript 里不存在',
+            id: 'boundary',
+            heading: 'Ownership and availability',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'info 等方法由插件提供。构造时把插件数组写成 plugins: [level(), ...] as const，TypeScript 才能推断出这些方法。运行时用 log.use(plugin) 安装的插件，方法在 use 返回的对象上：const extended = await log.use(level())。'
-              }
-            ]
-          },
-          {
-            id: 'batch',
-            heading: 'http 没有批量发送',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '插件顺序必须是 [batch(), http(...)]。顺序反了时 http 找不到批处理能力，会逐条发送。'
-              }
-            ]
-          },
-          {
-            id: 'async-install',
-            heading: '构造时插件安装报错',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '构造函数只能同步安装插件。插件的 install 返回 Promise 时，构造直接报错，不会返回少了插件的 Logger。先构造，再 await log.use(plugin)。'
-              }
-            ]
-          },
-          {
-            id: 'codes',
-            heading: '常见错误代码',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['error.code', '什么时候出现'],
-                rows: [
-                  ['DELIVERY_FAILED', 'http 等输出端发送失败，原始错误在 cause'],
-                  ['BATCH_OVERFLOW', '批次队列已满'],
-                  ['PIPELINE_MODE_MISMATCH', '注册步骤的方法和 pipeline.mode 不匹配'],
-                  ['FILE_SINK_UNAVAILABLE', '当前环境不能写文件']
-                ]
+                text: 'These examples describe the target public API. The packages remain private until the program release; use matching host/plugin versions.'
               },
               {
                 type: 'paragraph',
-                text: "错误带有 error.source（'logging'）和 error.code，请用 LoggerErrorCode 常量比较。onFailure 收到的 failure.source 说明出错的环节。"
+                text: 'Hosts sharing a process object share listeners and must use compatible policy and scheduler source. Removing the last member releases listeners; manual host shutdown leaves the process capability owned by the application.'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: 'Use the public factory',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\n/** The process plugin borrows one runtime process object and removes its listeners on shutdown. */\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin(), processPlugin({\n    captureCrashes: true, shutdownTimeoutMs: 3000, interceptProcessExit: false\n  })]\n})\nlog.onShutdown(() => { log.info('shutdown started') })\nlog.info('worker ready')\nawait log.shutdown('manual')"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: 'Completion and errors',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Await flush before observing admitted asynchronous delivery, then await shutdown to release plugins. Observe runtime failures through onFailure/report. Durable operations retain their separate rejection contract.'
               }
             ]
           }
@@ -45439,93 +44385,48 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '快速开始',
-          path: 'getting-started'
-        },
-        {
-          label: 'Entry、Hook 与 Sink',
-          path: 'entries-hooks-and-sinks'
-        },
-        {
-          label: 'LoggerErrorCode',
-          path: 'docs/logger/LoggerErrorCode'
+          label: 'processPlugin',
+          path: 'api/processPlugin'
         }
       ]
     },
-    en: {
-      title: 'Troubleshooting and FAQ',
-      lede: 'Find the cause and the fix by symptom.',
+    zh: {
+      title: '协调进程关闭而不接管进程所有权',
+      lede: '借用 process 能力，把信号、崩溃捕获及有界优雅关闭接入同一 host 生命周期。',
       document: {
         sections: [
           {
-            id: 'no-output',
-            heading: 'Nothing prints',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  'No output installed: level alone prints nothing; add color or a useSink.',
-                  'Level filtering drops entries below level; lower it with setLevel.',
-                  'The program exited without await log.flush(), before async outputs finished.',
-                  'The Logger was shut down, so later entries are ignored silently.',
-                  'An output failed; register onFailure to see why.'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'types',
-            heading: 'log.info does not exist in TypeScript',
+            id: 'boundary',
+            heading: '所有权与可用性',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Methods such as info come from plugins. Write plugins: [level(), ...] as const so TypeScript infers them. For plugins installed at runtime, the methods live on the object use returns: const extended = await log.use(level()).'
-              }
-            ]
-          },
-          {
-            id: 'batch',
-            heading: 'http does not batch',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'The order must be [batch(), http(...)]. Reversed, http cannot find the batching capability and sends one entry at a time.'
-              }
-            ]
-          },
-          {
-            id: 'async-install',
-            heading: 'A plugin fails during construction',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'The constructor installs plugins synchronously only. If an install returns a Promise, construction throws instead of returning a Logger missing plugins. Construct first, then await log.use(plugin).'
-              }
-            ]
-          },
-          {
-            id: 'codes',
-            heading: 'Common error codes',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['error.code', 'When it appears'],
-                rows: [
-                  [
-                    'DELIVERY_FAILED',
-                    'An output such as http failed to deliver; the cause holds the original error'
-                  ],
-                  ['BATCH_OVERFLOW', 'The batch queue is full'],
-                  [
-                    'PIPELINE_MODE_MISMATCH',
-                    'The stage registration method does not match pipeline.mode'
-                  ],
-                  ['FILE_SINK_UNAVAILABLE', 'The environment cannot write files']
-                ]
+                text: '这些示例展示目标公开 API。包在本程序发布前仍为 private；使用时须匹配 host 与插件版本。'
               },
               {
                 type: 'paragraph',
-                text: "Errors carry error.source ('logging') and error.code; compare against LoggerErrorCode constants. failure.source in onFailure names the failing stage."
+                text: '共享同一个 process 对象的 host 共用监听器，策略和 scheduler 来源必须兼容。最后成员移除后释放监听器；手动关闭 host 不改变应用对 process 能力的所有权。'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: '使用公开工厂',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\n/** The process plugin borrows one runtime process object and removes its listeners on shutdown. */\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin(), processPlugin({\n    captureCrashes: true, shutdownTimeoutMs: 3000, interceptProcessExit: false\n  })]\n})\nlog.onShutdown(() => { log.info('shutdown started') })\nlog.info('worker ready')\nawait log.shutdown('manual')"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: '完成与错误',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '观察已准入异步交付前等待 flush，结束时等待 shutdown 释放插件。运行时失败通过 onFailure/report 观察；durable 操作保留独立的拒绝契约。'
               }
             ]
           }
@@ -45533,16 +44434,208 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Quick start',
-          path: 'getting-started'
-        },
+          label: 'processPlugin',
+          path: 'api/processPlugin'
+        }
+      ]
+    }
+  },
+  'log-plugin-reasoning:index': {
+    en: {
+      title: 'Stream thinking and response phases',
+      lede: 'Write original fragments to an injected writer. Ending a phase also submits one structured entry containing the complete text.',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: 'Ownership and availability',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'These examples describe the target public API. The packages remain private until the program release; use matching host/plugin versions.'
+              },
+              {
+                type: 'paragraph',
+                text: 'No console package or host raw API is required. Completed entries use reasoningPhase and silent metadata; uninstall discards unfinished text without publishing a completed entry.'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: 'Use the public factory',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createLogHost } from '@migaia/log-host'\nimport { reasoningPlugin } from '@migaia/log-plugin-reasoning'\n\n/** The application retains the original text of every stream fragment. */\nconst fragments: string[] = []\n/** Each installation owns its phase state; no console or host raw method is required. */\nconst log = createLogHost({ plugins: [reasoningPlugin({ write: (text) => { fragments.push(text) } })] })\nlog.startThinking('Thinking')\nlog.thinking('inspect ')\nlog.thinking('the request')\nlog.endThinking()\nlog.startResponse()\nlog.response('Done.')\nlog.endResponse()\nawait log.shutdown('manual')\nconsole.log(fragments)"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: 'Completion and errors',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Await flush before observing admitted asynchronous delivery, then await shutdown to release plugins. Observe runtime failures through onFailure/report. Durable operations retain their separate rejection contract.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
         {
-          label: 'Entries, hooks, and sinks',
-          path: 'entries-hooks-and-sinks'
-        },
+          label: 'reasoningPlugin',
+          path: 'api/reasoningPlugin'
+        }
+      ]
+    },
+    zh: {
+      title: '流式输出 thinking 与 response 阶段',
+      lede: '向注入 writer 写出原始片段；结束阶段时另提交一条包含完整文本的结构化日志。',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: '所有权与可用性',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '这些示例展示目标公开 API。包在本程序发布前仍为 private；使用时须匹配 host 与插件版本。'
+              },
+              {
+                type: 'paragraph',
+                text: '不依赖 console 包或 host raw API。完成条目使用 reasoningPhase 与 silent 元数据；卸载时丢弃未完成文本，不发布完成条目。'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: '使用公开工厂',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createLogHost } from '@migaia/log-host'\nimport { reasoningPlugin } from '@migaia/log-plugin-reasoning'\n\n/** The application retains the original text of every stream fragment. */\nconst fragments: string[] = []\n/** Each installation owns its phase state; no console or host raw method is required. */\nconst log = createLogHost({ plugins: [reasoningPlugin({ write: (text) => { fragments.push(text) } })] })\nlog.startThinking('Thinking')\nlog.thinking('inspect ')\nlog.thinking('the request')\nlog.endThinking()\nlog.startResponse()\nlog.response('Done.')\nlog.endResponse()\nawait log.shutdown('manual')\nconsole.log(fragments)"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: '完成与错误',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '观察已准入异步交付前等待 flush，结束时等待 shutdown 释放插件。运行时失败通过 onFailure/report 观察；durable 操作保留独立的拒绝契约。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
         {
-          label: 'LoggerErrorCode',
-          path: 'docs/logger/LoggerErrorCode'
+          label: 'reasoningPlugin',
+          path: 'api/reasoningPlugin'
+        }
+      ]
+    }
+  },
+  'log-plugin-durable:index': {
+    en: {
+      title: 'Borrow durable binlog, WAL and undo stores',
+      lede: 'Install binlogPlugin, walPlugin and undoLogPlugin on the host with separate original stores. Preserve append, pending-state and undo-image semantics.',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: 'Ownership and availability',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'These examples describe the target public API. The packages remain private until the program release; use matching host/plugin versions.'
+              },
+              {
+                type: 'paragraph',
+                text: 'The creator disposes stores after plugin borrows are released. Durable readiness, append/read and revoked handles may reject with logging.durable codes and original causes; ordinary logging containment does not mask storage failures.'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: 'Use the public factory',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\n/** Each plugin borrows a distinct creator-owned store. */\nconst events = memoryLogStore()\n/** WAL keeps original pending intent sequence identity. */\nconst intents = memoryLogStore()\n/** Undo stores JSON images without applying them to business data. */\nconst images = memoryLogStore()\n/** The host releases plugin borrows before the creator disposes these stores. */\nconst log = createLogHost({ plugins: [\n  binlogPlugin({ store: events }), walPlugin({ store: intents }), undoLogPlugin({ store: images })\n] })\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  await log.binlog.append('created', { id: 'order-1' })\n  /** This sequence belongs to an actually persisted intent. */\n  const intent = await log.wal.begin('save-order', { id: 'order-1' })\n  await log.undo.record('tx-1', [{ target: 'order-1', before: null, after: { total: 12 } }])\n  await log.wal.complete(intent)\n  await log.undo.forget('tx-1')\n} finally {\n  await log.shutdown('manual')\n  await Promise.all([events.dispose(), intents.dispose(), images.dispose()])\n}"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: 'Completion and errors',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Await flush before observing admitted asynchronous delivery, then await shutdown to release plugins. Observe runtime failures through onFailure/report. Durable operations retain their separate rejection contract.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'binlogPlugin',
+          path: 'api/binlogPlugin'
+        }
+      ]
+    },
+    zh: {
+      title: '借用 durable binlog、WAL 与 undo 存储',
+      lede: '给 host 安装 binlogPlugin、walPlugin 与 undoLogPlugin，分别借用原始 store，保留追加、pending 状态与 undo image 语义。',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: '所有权与可用性',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '这些示例展示目标公开 API。包在本程序发布前仍为 private；使用时须匹配 host 与插件版本。'
+              },
+              {
+                type: 'paragraph',
+                text: '插件释放借用后由创建者 dispose store。durable ready、append/read 和失效句柄仍可用 logging.durable 码与原 cause 拒绝；普通日志的错误隔离不掩盖存储失败。'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: '使用公开工厂',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\n/** Each plugin borrows a distinct creator-owned store. */\nconst events = memoryLogStore()\n/** WAL keeps original pending intent sequence identity. */\nconst intents = memoryLogStore()\n/** Undo stores JSON images without applying them to business data. */\nconst images = memoryLogStore()\n/** The host releases plugin borrows before the creator disposes these stores. */\nconst log = createLogHost({ plugins: [\n  binlogPlugin({ store: events }), walPlugin({ store: intents }), undoLogPlugin({ store: images })\n] })\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  await log.binlog.append('created', { id: 'order-1' })\n  /** This sequence belongs to an actually persisted intent. */\n  const intent = await log.wal.begin('save-order', { id: 'order-1' })\n  await log.undo.record('tx-1', [{ target: 'order-1', before: null, after: { total: 12 } }])\n  await log.wal.complete(intent)\n  await log.undo.forget('tx-1')\n} finally {\n  await log.shutdown('manual')\n  await Promise.all([events.dispose(), intents.dispose(), images.dispose()])\n}"
+              }
+            ]
+          },
+          {
+            id: 'completion',
+            heading: '完成与错误',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '观察已准入异步交付前等待 flush，结束时等待 shutdown 释放插件。运行时失败通过 onFailure/report 观察；durable 操作保留独立的拒绝契约。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'binlogPlugin',
+          path: 'api/binlogPlugin'
         }
       ]
     }

@@ -42,20 +42,27 @@ const PACKAGES = [
   'rpc-plugin-coroutines',
   'rpc-plugin-pool',
   'rpc-plugin-devtools',
-  'logger',
+  'log-host',
+  'log-plugin-console',
+  'log-plugin-http',
+  'log-plugin-file',
+  'log-plugin-process',
+  'log-plugin-reasoning',
+  'log-plugin-durable',
   'store-persist',
   'store-wasm',
   'storage-web'
 ]
 
 /** These retired documentation owners have no routes, aliases, or successful-generation shards. */
-const RETIRED_RPC_LIBRARIES = [
+const RETIRED_LIBRARIES = [
   'rpc-core',
   'rpc-process',
   'rpc-threads',
   'rpc-browser',
   'rpc-pool',
-  'rpc-devtools'
+  'rpc-devtools',
+  'logger'
 ]
 
 /** Validates optional direct-entry arguments before any generator path can write projections. */
@@ -452,14 +459,31 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'removal-and-rollback',
     'troubleshooting'
   ],
-  logger: [
-    'entries-hooks-and-sinks',
-    'plugins-and-batching',
-    'custom-plugin',
-    'pipelines',
-    'flush-and-shutdown',
-    'runtime-and-forwarding',
-    'troubleshooting'
+  'log-host': [
+    'create-a-host',
+    'levels-and-entry-policies',
+    'output-scopes-and-delivery',
+    'define-an-output',
+    'errors-and-lifecycle',
+    'forwarding-and-configuration'
+  ],
+  'log-plugin-file': [
+    'installation-and-defaults',
+    'injecting-a-writer',
+    'options-and-rotation',
+    'errors-and-shutdown'
+  ],
+  'log-plugin-reasoning': [
+    'creation-and-phase-methods',
+    'writer-and-scheduling',
+    'completed-entries-and-outputs',
+    'failures-and-release'
+  ],
+  'log-plugin-durable': [
+    'standalone-stores-and-ownership',
+    'files-and-runtimes',
+    'plugins',
+    'native-adapters-and-diagnostics'
   ],
   'rpc-host': ['host-and-plugins', 'transports-and-security', 'calls-and-cancellation'],
   'rpc-contract': [
@@ -631,6 +655,18 @@ function maintainedSectionText(section: IMaintainedSection): string {
       return block.code
     })
     .join(' ')}`
+}
+
+/** Keep the repository-only retired-package comparison out of current website API projections. */
+function publicMaintainedGuide(filePath: string, library: string) {
+  /** The canonical parser still owns Markdown parsing and every current task section. */
+  const document = maintainedDocument(filePath)
+  if (!document || library !== 'log-host') return document
+  return {
+    sections: document.sections.filter(
+      (section) => !/^(?:Migrating from |从 ).*@migaia\/logger/.test(section.heading)
+    )
+  }
 }
 
 /** Binds source-maintained task and configuration sections to the API they explain. */
@@ -2672,11 +2708,11 @@ function buildLibraryEntries() {
         readmeLocales: ['zh', ...(existsSync(join(directory, 'README.en.md')) ? ['en'] : [])],
         documentation: {
           readme: maintainedDocument(join(directory, 'README.md')),
-          guide: maintainedDocument(join(directory, 'USEGUIDE.md')),
+          guide: publicMaintainedGuide(join(directory, 'USEGUIDE.md'), entry.name),
           /** English READMEs and usage guides live beside the Chinese files as `*.en.md`. */
           en: {
             readme: maintainedDocument(join(directory, 'README.en.md')),
-            guide: maintainedDocument(join(directory, 'USEGUIDE.en.md'))
+            guide: publicMaintainedGuide(join(directory, 'USEGUIDE.en.md'), entry.name)
           }
         },
         ...(() => {
@@ -3201,7 +3237,7 @@ async function generateSignatures() {
   await generateManifests(libraries)
   formatGeneratedJson()
   if (selectedLibrary === null)
-    for (const retired of RETIRED_RPC_LIBRARIES)
+    for (const retired of RETIRED_LIBRARIES)
       for (const path of [
         resolve('src/generated/signatures', `${retired}.json`),
         resolve('src/generated/manifests/libraries', `${retired}.json`)

@@ -44,12 +44,16 @@ Native capacities, FIFO and logging belong to Process. This installs one flow an
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import {
+  flowControlFeature,
+  sendQueueFeature,
+  ipcLogFeature
+} from '@migaia/rpc-plugin-process/features'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 
 export async function openWorker(entry: URL) {
-  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })
+  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })
   const observer = probe({
     stages: ['peer'],
     emit(view) {
@@ -63,13 +67,13 @@ export async function openWorker(entry: URL) {
         spawn: entry,
         features: [
           flow,
-          sendQueue({ flow }),
-          ipcLog({
+          sendQueueFeature({ flow }),
+          ipcLogFeature({
             report(record) {
               console.error(record)
             }
           }),
-          timeout({ ms: 1500 })
+          timeoutFeature({ ms: 1500 })
         ]
       })
     ]
@@ -77,13 +81,13 @@ export async function openWorker(entry: URL) {
 }
 ```
 
-The caller eventually awaits `host.close()`. A standalone `flowControl` is supported, and `sendQueue` may own a default flow. Supplying an explicit flow alongside duplicate capacity fields fails during cold configuration. These are not host-root configuration switches; the old `ipc.log` fallback field is removed. Logging alone does not enable throttling.
+The caller eventually awaits `host.close()`. A standalone `flowControlFeature` is supported, and `sendQueueFeature` may own a default flow. Supplying an explicit flow alongside duplicate capacity fields fails during cold configuration. These are not host-root configuration switches; the old `ipc.log` fallback field is removed. Logging alone does not enable throttling.
 
 `/features/send-queue`, `/features/flow-control` and `/features/log` expose their corresponding factories. Cancellation and capacity use actual installed owners. Per-logical-call accounting with batch remains unverified. Capacity rejection retains `OVERLOADED`; actual physical I/O failure uses `TRANSPORT` with its original cause.
 
 ## Options and deadlines
 
-`connect: { target, timeoutMs? }` selects an existing service; timeout-only connect also decorates spawn/listen/parent. Negotiation defaults to 10,000 ms; name admission then uses `connect.timeoutMs`, also 10,000 ms by default. `pending` carries the unspent negotiation time plus this one name-probe budget; only the first notice extends the deadline, and repeated notices never refresh it. `connectTimeoutMs` bounds named-local discovery. Business calls use a complete `timeout(...)` feature or `timeout: false`, with an optional `signal`; these deadlines remain independent.
+`connect: { target, timeoutMs? }` selects an existing service; timeout-only connect also decorates spawn/listen/parent. Negotiation defaults to 10,000 ms; name admission then uses `connect.timeoutMs`, also 10,000 ms by default. `pending` carries the unspent negotiation time plus this one name-probe budget; only the first notice extends the deadline, and repeated notices never refresh it. `connectTimeoutMs` bounds named-local discovery. Business calls use a complete `timeoutFeature(...)` feature or `timeout: false`, with an optional `signal`; these deadlines remain independent.
 
 Spawn accepts the main entry, a path/URL, short options or a complete native recipe. See README for self-spawn. Native `supervision` retains restart, health and stop policy; reconnection does not replay unconfirmed work. stdout belongs to stdio RPC; application logs use stderr.
 

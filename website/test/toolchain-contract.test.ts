@@ -99,7 +99,7 @@ test('preserves unselected order through shrink, equal, and grow', () => {
     { library: 'plugin-host', id: 'old-a' },
     { library: 'rpc', id: 'middle' },
     { library: 'plugin-host', id: 'old-b' },
-    { library: 'logger', id: 'after' }
+    { library: 'log-host', id: 'after' }
   ]
   const ownsPluginHost = (entry: unknown) =>
     (entry as { readonly library?: unknown }).library === 'plugin-host'
@@ -268,10 +268,26 @@ test('generated projections contain no volatile metadata', () => {
             'rpc-plugin-coroutines',
             'rpc-plugin-pool',
             'rpc-plugin-devtools',
-            'logger',
+            'log-host',
+            'log-plugin-console',
+            'log-plugin-file',
+            'log-plugin-http',
+            'log-plugin-process',
+            'log-plugin-reasoning',
+            'log-plugin-durable',
             'storage-web'
           ]
-        : ['middleware-pipeline', 'plugin-host', 'logger']
+        : [
+            'middleware-pipeline',
+            'plugin-host',
+            'log-host',
+            'log-plugin-console',
+            'log-plugin-file',
+            'log-plugin-http',
+            'log-plugin-process',
+            'log-plugin-reasoning',
+            'log-plugin-durable'
+          ]
     return names.map((name) => join(websiteRoot, 'src/generated', directory, `${name}.json`))
   })
   const manifestFiles = ['content', 'libraries', 'apis', 'routes', 'relationships'].map((name) =>
@@ -856,57 +872,45 @@ test('documents its complete constructor and ownership contract', () => {
   }
 })
 
-test('documents host replacement and restoration', () => {
-  /** Host capability fields that a runtime replacement must explain explicitly. */
-  const expectedOptions = [
-    'process',
-    'createAbortController',
-    'randomUUID',
-    'defer',
-    'write',
-    'console',
-    'fs',
-    'fetch'
-  ]
+test('documents explicit log host capabilities and plugin injection', () => {
   for (const locale of ['en', 'zh'] as const) {
-    const guide = findApiGuide('logger', 'index', 'setLoggerRuntimeManager', locale)
-    assert.ok(guide, `logger:index#setLoggerRuntimeManager has no ${locale} guide`)
-    assert.ok(guide.quickStart?.includes('try {'))
-    assert.ok(guide.quickStart?.includes('finally {'))
-    assert.ok(guide.quickStart?.includes('restore()'))
-    assert.ok(guide.purpose.includes(locale === 'zh' ? '幂等' : 'idempotent'))
-    assert.deepEqual(
-      guide.options.map((option) => option.name),
-      expectedOptions
-    )
-    for (const option of guide.options) {
-      assert.ok(option.description.trim())
-      assert.ok(option.defaultValue?.trim())
-      assert.ok(option.type?.trim())
-      assert.ok(option.whenToUse.trim())
-      assert.ok(option.example?.trim())
-    }
+    /** The current host guide retains asynchronous completion and failure observation. */
+    const host = findApiGuide('log-host', 'index', 'createLogHost', locale)
+    assert.ok(host)
+    assert.match(host.quickStart ?? '', /createLogHost/)
+    assert.match(host.quickStart ?? '', /await log\.flush\(\)/)
+    assert.match(host.quickStart ?? '', /await log\.shutdown\('manual'\)/)
+    assert.match(host.purpose, /onFailure.*report/)
+    /** Each output borrows its explicit capability rather than replacing a process-wide manager. */
+    const file = findApiGuide('log-plugin-file', 'index', 'filePlugin', locale)
+    const http = findApiGuide('log-plugin-http', 'index', 'httpPlugin', locale)
+    const reasoning = findApiGuide('log-plugin-reasoning', 'index', 'reasoningPlugin', locale)
+    const durable = findApiGuide('log-plugin-durable', 'index', 'binlogPlugin', locale)
+    assert.ok(file && http && reasoning && durable)
+    assert.match(file.quickStart ?? '', /writer/)
+    assert.match(file.quickStart ?? '', /append/)
+    assert.match(http.quickStart ?? '', /fetcher/)
+    assert.match(reasoning.quickStart ?? '', /write:/)
+    assert.match(durable.quickStart ?? '', /finally/)
+    assert.match(durable.quickStart ?? '', /dispose\(\)/)
   }
 })
 
-test('documents the Logger and every user-facing plugin', () => {
+test('documents the logging host and every user-facing output owner', () => {
+  /** These seven public factories replace the retired aggregate package entries. */
   const targets = [
-    ['index', 'Logger'],
-    ['index', 'getLoggerRuntimeManager'],
-    ['plugins', 'batch'],
-    ['plugins', 'color'],
-    ['plugins/file', 'file'],
-    ['plugins', 'http'],
-    ['plugins', 'level'],
-    ['plugins', 'process'],
-    ['plugins', 'reasoning'],
-    ['plugins', 'uuid']
+    ['log-host', 'createLogHost'],
+    ['log-plugin-console', 'consolePlugin'],
+    ['log-plugin-file', 'filePlugin'],
+    ['log-plugin-http', 'httpPlugin'],
+    ['log-plugin-process', 'processPlugin'],
+    ['log-plugin-reasoning', 'reasoningPlugin'],
+    ['log-plugin-durable', 'binlogPlugin']
   ] as const
-
-  for (const [moduleName, symbolName] of targets)
+  for (const [library, symbolName] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('logger', moduleName, symbolName, locale)
-      assert.ok(guide, `logger:${moduleName}#${symbolName} has no ${locale} primary guide`)
+      const guide = findApiGuide(library, 'index', symbolName, locale)
+      assert.ok(guide, `${library}:index#${symbolName} has no ${locale} primary guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.purpose.trim().length >= 40)
       assert.ok(guide.scenarios.length >= 2)

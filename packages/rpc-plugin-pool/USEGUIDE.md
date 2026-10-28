@@ -12,14 +12,18 @@ Contract 定义纯协议与接口，Host 拥有会话、provider 和调用结算
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { pool, RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'
-import { timeout, retry } from '@migaia/rpc-host/features'
+import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
 
 type IWorkerApi = { work(value: number): number; values(end: number): AsyncIterable<number> }
 
 const plugins = [
   threadPlugin({
     spawn: new URL('./worker.js', import.meta.url),
-    features: [pool({ size: 3, maxQueue: 32 }), timeout({ ms: 1500 }), retry({ attempts: 2 })]
+    features: [
+      pool({ size: 3, maxQueue: 32 }),
+      timeoutFeature({ ms: 1500 }),
+      retryFeature({ attempts: 2 })
+    ]
   })
 ] as const
 
@@ -32,7 +36,7 @@ export function open() {
 export function work(host: IPoolHost, signal: AbortSignal) {
   return host.thread.send(RPC_POOL_PEER_ID, 'work', 21, {
     signal,
-    timeout: timeout({ ms: 1000 }),
+    timeout: timeoutFeature({ ms: 1000 }),
     retry: false
   })
 }

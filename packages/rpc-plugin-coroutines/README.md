@@ -75,7 +75,7 @@ spawn 与 connectToParent 恰选一个。句柄只属于当前实际任务，不
 
 ## 策略与组合
 
-调用选项使用完整 `timeout({ ms })`、`retry({ attempts })` 或 `false`。优先级是单次调用、transport feature、链路策略 plugin；没有选中的策略时不自动启用。业务超时不替代原生启动或停止预算。
+调用选项使用完整 `timeoutFeature({ ms })`、`retryFeature({ attempts })` 或 `false`。优先级是单次调用、transport feature、链路策略 plugin；没有选中的策略时不自动启用。业务超时不替代原生启动或停止预算。
 
 同载体多任务使用 `coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })`，pool 来自独立 [rpc-plugin-pool](../rpc-plugin-pool/README.md)。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 [Devtools](../rpc-plugin-devtools/README.md)。
 

@@ -103,14 +103,20 @@ Not sure where to start? Begin with the problem you have:
 <details open>
 <summary><strong>Shutdown, cancellation and error tracing</strong></summary>
 
-| Package                                                              | What it does                                                                                                                                                                    |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`utils`](./packages/utils/README.en.md)                             | Add deadlines, cancellation, and error tracing to code and handle common data conversions and object updates.                                                                   |
-| [`lifecycle`](./packages/lifecycle/README.en.md)                     | Keep shutdown, cancellation and replacement correct under concurrency: release resources in order, accept only the latest result, and wait for work in flight with a deadline.  |
-| [`supervision`](./packages/supervision/README.en.md)                 | Watch background tasks, child processes and threads: restart crashes with a growing delay, give up when failures pile up, stop on time, and free a slot only after a real exit. |
-| [`event-subscriber`](./packages/event-subscriber/README.en.md)       | Subscribe to and broadcast events between local modules and coordinate synchronous or asynchronous listeners.                                                                   |
-| [`middleware-pipeline`](./packages/middleware-pipeline/README.en.md) | Combine processing steps into synchronous, asynchronous, or generator middleware pipelines and stop or cancel processing when needed.                                           |
-| [`logger`](./packages/logger/README.en.md)                           | Send logs to a console or service, filter and format them as needed, and wait for asynchronous output to finish.                                                                |
+| Package                                                                | What it does                                                                                                                                                                    |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`utils`](./packages/utils/README.en.md)                               | Add deadlines, cancellation, and error tracing to code and handle common data conversions and object updates.                                                                   |
+| [`lifecycle`](./packages/lifecycle/README.en.md)                       | Keep shutdown, cancellation and replacement correct under concurrency: release resources in order, accept only the latest result, and wait for work in flight with a deadline.  |
+| [`supervision`](./packages/supervision/README.en.md)                   | Watch background tasks, child processes and threads: restart crashes with a growing delay, give up when failures pile up, stop on time, and free a slot only after a real exit. |
+| [`event-subscriber`](./packages/event-subscriber/README.en.md)         | Subscribe to and broadcast events between local modules and coordinate synchronous or asynchronous listeners.                                                                   |
+| [`middleware-pipeline`](./packages/middleware-pipeline/README.en.md)   | Combine processing steps into synchronous, asynchronous, or generator middleware pipelines and stop or cancel processing when needed.                                           |
+| [`log-host`](./packages/log-host/README.en.md)                         | Compose log plugins and features with asynchronous delivery, draining, shutdown, and failure reporting.                                                                         |
+| [`log-plugin-console`](./packages/log-plugin-console/README.en.md)     | Write native console arguments with optional pretty, JSON, or plain formatting.                                                                                                 |
+| [`log-plugin-http`](./packages/log-plugin-http/README.en.md)           | Send structured logs through an injectable fetcher with host batching, retry, and timeout policy.                                                                               |
+| [`log-plugin-file`](./packages/log-plugin-file/README.en.md)           | Append logs through an injected or native file capability and optional rotation.                                                                                                |
+| [`log-plugin-process`](./packages/log-plugin-process/README.en.md)     | Share signal listeners by process object and coordinate crash reporting, draining, and shutdown.                                                                                |
+| [`log-plugin-reasoning`](./packages/log-plugin-reasoning/README.en.md) | Stream original reasoning text and retain complete phases as silent audit entries.                                                                                              |
+| [`log-plugin-durable`](./packages/log-plugin-durable/README.en.md)     | Provide binlog, WAL, undo, and log-store plugins with borrowable contracts.                                                                                                     |
 
 </details>
 
@@ -149,12 +155,12 @@ Not sure where to start? Begin with the problem you have:
 <details open>
 <summary><strong>Storage and encoding</strong></summary>
 
-| Package                                                        | What it does                                                                                          |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| [`storage-contract`](./packages/storage-contract/README.en.md) | Define common interfaces for key-value and record storage so applications can use different backends. |
-| [`storage-plugin-browser`](./packages/storage-plugin-browser/README.en.md)           | Read and write data in Web Storage, cookies, IndexedDB, and memory through a common interface.        |
-| [`serialize`](./packages/serialize/README.en.md)               | Encode application data for storage or transmission and decode it when reading.                       |
-| [`wasm`](./packages/wasm/README.en.md)                         | Allocate reusable byte buffers and transcode between JSON and MessagePack.                            |
+| Package                                                                    | What it does                                                                                          |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| [`storage-contract`](./packages/storage-contract/README.en.md)             | Define common interfaces for key-value and record storage so applications can use different backends. |
+| [`storage-plugin-browser`](./packages/storage-plugin-browser/README.en.md) | Read and write data in Web Storage, cookies, IndexedDB, and memory through a common interface.        |
+| [`serialize`](./packages/serialize/README.en.md)                           | Encode application data for storage or transmission and decode it when reading.                       |
+| [`wasm`](./packages/wasm/README.en.md)                                     | Allocate reusable byte buffers and transcode between JSON and MessagePack.                            |
 
 </details>
 

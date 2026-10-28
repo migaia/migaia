@@ -1,0 +1,17 @@
+{
+  "package": "log-plugin-file",
+  "codes": {
+    "DELIVERY_FAILED": {
+      "source": "logging.file",
+      "scenario": "Append or rotation failed; cause retains the exact writer failure."
+    },
+    "FILE_SINK_UNAVAILABLE": {
+      "source": "logging.file",
+      "scenario": "No injected or supported native writer exists; provide an explicit append capability."
+    },
+    "INVALID_OPTION": {
+      "source": "logging.file",
+      "scenario": "Path or rotation configuration is invalid; fix options before installing the output."
+    }
+  }
+}

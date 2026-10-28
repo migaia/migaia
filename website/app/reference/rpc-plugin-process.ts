@@ -7,7 +7,7 @@ const example1 =
 
 /** Concrete public package example with actual namespace and resource ownership. */
 const example2 =
-  "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    }\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            }\n          }),\n          timeout({ ms: 1500 })\n        ]\n      })\n    ]\n  })\n}"
+  "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    }\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            }\n          }),\n          timeoutFeature({ ms: 1500 })\n        ]\n      })\n    ]\n  })\n}"
 
 /** Concrete public package example with actual namespace and resource ownership. */
 const example3 =
@@ -19,11 +19,11 @@ const example4 =
 
 /** Concrete public package example with actual namespace and resource ownership. */
 const example5 =
-  "import { IpcFlowControl } from '@migaia/rpc-plugin-process/features/flow-control'\nimport { flowControl, type IProcessFeatureContext } from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcFlowControl({ maxPendingData: 32 }, context)\n}"
+  "import { IpcFlowControl } from '@migaia/rpc-plugin-process/features/flow-control'\nimport { flowControlFeature, type IProcessFeatureContext } from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcFlowControl({ maxPendingData: 32 }, context)\n}"
 
 /** Concrete public package example with actual namespace and resource ownership. */
 const example6 =
-  "import { IpcSendQueue } from '@migaia/rpc-plugin-process/features/send-queue'\nimport { flowControl, type IProcessFeatureContext } from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcSendQueue(flowControl({ maxPendingData: 32 }), context)\n}"
+  "import { IpcSendQueue } from '@migaia/rpc-plugin-process/features/send-queue'\nimport { flowControlFeature, type IProcessFeatureContext } from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcSendQueue(flowControlFeature({ maxPendingData: 32 }), context)\n}"
 
 /** Concrete public package example with actual namespace and resource ownership. */
 const example7 =
@@ -174,7 +174,7 @@ export const rpcProcessReference: ILibraryReference = {
         zh: '本地连接准入及日志诊断名称，不是协议消息或远端执行确认，记录由原所有者签发。从 `@migaia/rpc-plugin-process/features/flow-control` 导入。'
       }
     },
-    sendQueue: {
+    sendQueueFeature: {
       role: 'enhancer',
       purpose: {
         en: 'Create a complete connection-local FIFO feature. The queue waits for each original native write Promise and borrows one flow capacity owner.',
@@ -187,7 +187,7 @@ export const rpcProcessReference: ILibraryReference = {
       },
       example: example2
     },
-    ipcLog: {
+    ipcLogFeature: {
       role: 'enhancer',
       purpose: {
         en: 'Create a complete local log feature for actual backlog, send failures and captured stderr. Logging alone does not install flow control.',
@@ -200,7 +200,7 @@ export const rpcProcessReference: ILibraryReference = {
       },
       example: example2
     },
-    flowControl: {
+    flowControlFeature: {
       role: 'enhancer',
       purpose: {
         en: 'Create one complete two-lane native-write admission feature. A sendQueue may share this exact definition.',
@@ -2576,7 +2576,7 @@ export const rpcProcessReference: ILibraryReference = {
       ],
       example: example1
     },
-    sendQueue: {
+    sendQueueFeature: {
       kind: 'feature',
       target: 'processPlugin.features',
       summary: {
@@ -2599,7 +2599,7 @@ export const rpcProcessReference: ILibraryReference = {
       ],
       example: example2
     },
-    ipcLog: {
+    ipcLogFeature: {
       kind: 'feature',
       target: 'processPlugin.features',
       summary: {
@@ -2622,7 +2622,7 @@ export const rpcProcessReference: ILibraryReference = {
       ],
       example: example2
     },
-    flowControl: {
+    flowControlFeature: {
       kind: 'feature',
       target: 'processPlugin.features',
       summary: {

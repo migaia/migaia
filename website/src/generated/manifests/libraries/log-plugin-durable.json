@@ -1,0 +1,296 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "log-plugin-durable",
+    "description": "Borrowed durable binlog, write-ahead and undo log stores.",
+    "version": "0.0.11",
+    "exports": [".", "./file"],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-log-plugin-durable",
+            "heading": "@migaia/log-plugin-durable",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "为 `@migaia/log-host` 提供 binlog、WAL 和 undo 插件，以及可独立使用的原子日志存储。宿主是精确同版本 peer；当前两个包均为 `0.0.11`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst store = memoryLogStore()\nconst log = createLogHost({ plugins: [binlogPlugin({ store })] })\ntry {\n  await log.binlog.ready()\n  const seq = await log.binlog.append('order.created', { id: 'order-1' })\n  console.log(await log.binlog.read(seq, { limit: 1 }))\n} finally {\n  await log.shutdown('manual')\n  await store.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`binlogPlugin` 安装 `host.binlog`，`walPlugin` 安装 `host.wal`，`undoLogPlugin` 安装 `host.undo`。插件借用原始 store，卸载后归还；creator 始终负责 store 的销毁。同一 store 只能有一个已安装的 durable 插件借用。"
+              },
+              {
+                "type": "paragraph",
+                "text": "根入口还导出 `memoryLogStore`、`snapshotLogRecords`、`assertLogInteger`、`prepareLogAppend`、`snapshotLogStoreState`、`createLogStoreIndex`、`LogRecordState`、`LogStage` 和相应记录、存储、观察及扩展类型。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`@migaia/log-plugin-durable/file` 提供 `fileLogStore(path, options?)`。Node、Bun、Deno 条件使用实际 SQLite builtin；browser/default 入口可安全加载，打开文件以 `LOG_STORE_UNAVAILABLE` 拒绝。文件连接保留独占锁，关闭后才能由其它 owner 打开。"
+              },
+              {
+                "type": "paragraph",
+                "text": "日志方法与宿主 flush/shutdown 的失败由宿主收口；存储 append/read、事务状态变化、ready 和失效的 durable 句柄仍可拒绝。检查 `LOG_DURABLE_ERROR_SOURCE`（`logging.durable`）与 `LogDurableErrorCode`，并沿 `cause` 读取原始故障。"
+              },
+              {
+                "type": "paragraph",
+                "text": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。"
+              },
+              {
+                "type": "paragraph",
+                "text": "详见 USEGUIDE；English。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "独立存储与资源归属",
+            "heading": "独立存储与资源归属",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { memoryLogStore, LogRecordState } from '@migaia/log-plugin-durable'\n\nawait using store = memoryLogStore({ report: (error) => console.error(error) })\nconst [seq] = await store.append([{ kind: 'created', payload: { id: 'order-1' } }])\nawait store.setState(seq, LogRecordState.done)\nconsole.log(await store.read(1, 100))"
+              },
+              {
+                "type": "paragraph",
+                "text": "一次 append 原子提交整个批次，随后发出一次冻结的 `onAppend` 通知；空批次不分配序号、不发通知。JSON payload 只允许有限数字、字符串、布尔值、null、无空洞数组和普通对象，不执行 getter、toJSON 或类方法。序号从 1 递增，完整截断后仍保留高水位。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`dispose()` 立即停止接纳新操作，排空已接纳工作后关闭资源；重复调用返回同一 Promise，清理失败仍拒绝。`Symbol.asyncDispose` 有自己独立且稳定的 Promise；清理失败上报后兑现。插件 shutdown/uninstall 只归还借用，不调用 creator-owned store 的 dispose。"
+              }
+            ]
+          },
+          {
+            "id": "文件与运行环境",
+            "heading": "文件与运行环境",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { fileLogStore } from '@migaia/log-plugin-durable/file'\n\nawait using store = await fileLogStore('./records.sqlite')\nawait store.append([{ kind: 'persisted', payload: null }])"
+              },
+              {
+                "type": "paragraph",
+                "text": "Node/Deno 使用 `node:sqlite`，Bun 使用 `bun:sqlite`；运行环境必须实际提供相应 builtin。存储使用原生 SQLite 事务、原有记录格式与独占连接锁。损坏数据拒绝恢复；COMMIT 结果不确定时，该实例停止接纳操作，调用方检查原始 cause 后重新打开，不能自行重放同一批次。browser/default 入口不加载 Node 文件模块，打开以 `LOG_STORE_UNAVAILABLE` 拒绝。"
+              }
+            ]
+          },
+          {
+            "id": "插件",
+            "heading": "插件",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst events = memoryLogStore()\nconst intents = memoryLogStore()\nconst images = memoryLogStore()\nconst host = createLogHost({\n  plugins: [\n    binlogPlugin({ store: events }),\n    walPlugin({ store: intents }),\n    undoLogPlugin({ store: images })\n  ]\n})\ntry {\n  await Promise.all([host.binlog.ready(), host.wal.ready(), host.undo.ready()])\n  await host.binlog.append('created', { id: 'order-1' })\n  const intent = await host.wal.begin('save-order', { id: 'order-1' })\n  await host.undo.record('tx-1', [{ target: 'order-1', before: null, after: { total: 12 } }])\n  await host.wal.complete(intent)\n  await host.undo.forget('tx-1')\n} finally {\n  await host.shutdown('manual')\n  await Promise.all([events.dispose(), intents.dispose(), images.dispose()])\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`binlog` 支持 append、appendBatch、read、lastSeq、truncate 与 subscribe。订阅先交付保留历史，再追随真实 store 通知；每个订阅者最多一个 listener 在执行，慢 listener 不阻塞其它订阅者。截断越过游标时，上报 `LOG_SUBSCRIPTION_TRUNCATED` 并停止该订阅。`echo: true` 仅通过普通日志管线输出 seq/time 元数据，不携带业务 payload。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`wal.begin` 返回实际已持久化的 intent 序号；`complete`/`abort` 只允许 pending 记录单向转为 done/aborted，`pending` 保持原序号顺序。`undo.record` 保存 JSON images；活动 txId 不可重复，`get` 返回独立快照，`list` 按逆追加顺序并支持 sinceTime/limit，`forget` 幂等释放已提交身份。插件不代替业务应用 undo images。"
+              },
+              {
+                "type": "paragraph",
+                "text": "binlog/undo 的可选 `transaction` 是实际存储 owner 提供的 `ILogAppendPort`。必须先 await ready。append 在当前调用栈开始，不排在普通 FIFO 任务之后；结果是暂定序号，只有 owner 的真实 commit/store 通知发布可见记录。插件不开始、不提交、不回滚该事务。`whenIdle` 覆盖原始 append 完成，不能把结果当成业务提交确认。"
+              }
+            ]
+          },
+          {
+            "id": "原生-adapter-与诊断",
+            "heading": "原生 adapter 与诊断",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`snapshotLogRecords` 同步捕获批次，`prepareLogAppend` 从已提交 head 分配序号/时间但不修改 index；`createLogStoreIndex` 只拥有已提交数据，不拥有资源、队列或清理权。adapter 在自己的真实原子提交成功后调用 index.applyAppend/applyState/applyTruncate。`snapshotLogStoreState` 验证恢复 head、行和 payload，`assertLogInteger` 保留原生 RangeError 与序号耗尽的区别。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`observe` 只有固定 LogStage 元数据，不含记录内容或原生资源。回调同步抛错或异步拒绝仅进入 reporter，不改变已提交结果。显式 report 覆盖默认；reporter 再失败交给同一个 host 默认 reporter，终端自身失败停止。原始存储 I/O 失败仍向操作调用方拒绝，并保留 code、原生类型及 cause/errors 的原始身份。"
+              },
+              {
+                "type": "paragraph",
+                "text": "错误域为 `logging.durable`；十二个稳定 code 由 `LogDurableErrorCode` 定义。`LOG_STORE_IN_USE` 表示 store 已被另一个插件借用；`RUNTIME_SHUTTING_DOWN` 表示 resource 或旧安装已停止接纳；不要使用新安装恢复旧句柄。"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-log-plugin-durable",
+              "heading": "@migaia/log-plugin-durable",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Binlog, write-ahead and undo plugins for `@migaia/log-host`, plus standalone atomic log stores. The host is an exact-version peer; both module currently use `0.0.11`."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst store = memoryLogStore()\nconst log = createLogHost({ plugins: [binlogPlugin({ store })] })\ntry {\n  await log.binlog.ready()\n  const seq = await log.binlog.append('order.created', { id: 'order-1' })\n  console.log(await log.binlog.read(seq, { limit: 1 }))\n} finally {\n  await log.shutdown('manual')\n  await store.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`binlogPlugin` installs `host.binlog`, `walPlugin` installs `host.wal`, and `undoLogPlugin` installs `host.undo`. Plugins borrow the original store and release that borrow on uninstall. Its creator always owns disposal. Only one installed durable plugin may borrow a given store."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The root also exports `memoryLogStore`, `snapshotLogRecords`, `assertLogInteger`, `prepareLogAppend`, `snapshotLogStoreState`, `createLogStoreIndex`, `LogRecordState`, `LogStage`, and their record, storage, observation and extension types."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/log-plugin-durable/file` exports `fileLogStore(path, options?)`. Node, Bun and Deno conditions use the actual SQLite builtin. The browser/default entry loads safely and rejects opening with `LOG_STORE_UNAVAILABLE`. A file connection retains an exclusive lock until its owner closes it."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The host contains failures from ordinary logging and flush/shutdown. Durable append/read, transaction state changes, readiness and revoked handles still reject. Inspect `LOG_DURABLE_ERROR_SOURCE` (`logging.durable`) with `LogDurableErrorCode`; the original failure remains reachable through `cause`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Standalone store `observe`/`report` callbacks are diagnostic only. The default is the host's single `defaultLogFailureReporter`. A failed custom reporter falls back to that default; failure of the default ends reporting without changing the storage result."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "See USEGUIDE; 中文."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "standalone-stores-and-ownership",
+              "heading": "Standalone stores and ownership",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { memoryLogStore, LogRecordState } from '@migaia/log-plugin-durable'\n\nawait using store = memoryLogStore({ report: (error) => console.error(error) })\nconst [seq] = await store.append([{ kind: 'created', payload: { id: 'order-1' } }])\nawait store.setState(seq, LogRecordState.done)\nconsole.log(await store.read(1, 100))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Each append atomically commits its entire batch, then publishes one frozen `onAppend` notice. Empty batches assign no sequence and publish no notice. Payloads accept finite numbers, strings, booleans, null, dense arrays and plain objects. Admission never executes getters, toJSON or class methods. Sequences start at 1 and retain their high watermark after complete truncation."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`dispose()` immediately closes admission, drains accepted work and releases the resource. Repeated calls share one Promise, including a cleanup rejection. `Symbol.asyncDispose` has a distinct stable Promise; it reports cleanup failure and fulfills. Plugin shutdown/uninstall returns the borrow and never disposes the creator-owned store."
+                }
+              ]
+            },
+            {
+              "id": "files-and-runtimes",
+              "heading": "Files and runtimes",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { fileLogStore } from '@migaia/log-plugin-durable/file'\n\nawait using store = await fileLogStore('./records.sqlite')\nawait store.append([{ kind: 'persisted', payload: null }])"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Node/Deno use `node:sqlite`; Bun uses `bun:sqlite`. The runtime must actually provide its builtin. File stores keep the original SQLite transactions, record format and exclusive connection lock. Corrupt committed data rejects recovery. An uncertain COMMIT stops admission on that instance; inspect the native cause and reopen rather than replaying the batch. The browser/default entry loads safely and rejects opening with `LOG_STORE_UNAVAILABLE`."
+                }
+              ]
+            },
+            {
+              "id": "plugins",
+              "heading": "Plugins",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst events = memoryLogStore()\nconst intents = memoryLogStore()\nconst images = memoryLogStore()\nconst host = createLogHost({\n  plugins: [\n    binlogPlugin({ store: events }),\n    walPlugin({ store: intents }),\n    undoLogPlugin({ store: images })\n  ]\n})\ntry {\n  await Promise.all([host.binlog.ready(), host.wal.ready(), host.undo.ready()])\n  await host.binlog.append('created', { id: 'order-1' })\n  const intent = await host.wal.begin('save-order', { id: 'order-1' })\n  await host.undo.record('tx-1', [{ target: 'order-1', before: null, after: { total: 12 } }])\n  await host.wal.complete(intent)\n  await host.undo.forget('tx-1')\n} finally {\n  await host.shutdown('manual')\n  await Promise.all([events.dispose(), intents.dispose(), images.dispose()])\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`binlog` supports append, appendBatch, read, lastSeq, truncate and subscribe. Subscribers receive retained history before following real store notices. Each cursor has at most one running listener; a slow listener does not block another cursor. Truncation past a cursor reports `LOG_SUBSCRIPTION_TRUNCATED` and stops that subscription. `echo: true` sends only seq/time metadata through ordinary host logging, never the business payload."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`wal.begin` returns an actually persisted intent sequence. `complete`/`abort` make only pending-to-done/aborted transitions; `pending` keeps sequence order. `undo.record` stores JSON images and rejects duplicate active txIds. `get` returns an independent snapshot; `list` uses reverse append order and accepts sinceTime/limit; `forget` is idempotent. Plugins never apply undo images to business data."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The optional binlog/undo `transaction` is an `ILogAppendPort` supplied by the actual storage owner. Await ready first. Append starts in the current stack without waiting behind ordinary FIFO work. Its provisional sequence result does not publish a committed record; the actual owner's commit and store notice do. The plugin never begins, commits or rolls back that native transaction. `whenIdle` includes the real append completion and is not a business commit acknowledgement."
+                }
+              ]
+            },
+            {
+              "id": "native-adapters-and-diagnostics",
+              "heading": "Native adapters and diagnostics",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`snapshotLogRecords` captures input synchronously. `prepareLogAppend` assigns sequence/time from an already committed head without mutating indexes. `createLogStoreIndex` owns only committed data, with no resource, queue or cleanup authority. Adapters invoke index.applyAppend/applyState/applyTruncate only after their own real atomic commit. `snapshotLogStoreState` validates recovered metadata, rows and payloads. `assertLogInteger` preserves native RangeError and distinguishes sequence exhaustion."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`observe` receives fixed LogStage metadata without business records or native resources. A synchronous throw or rejected completion reaches only diagnostics and cannot change a committed result. Explicit report overrides the default. Its failure falls back to the same host-owned default; failure of that terminal reporter stops reporting. Actual storage I/O still rejects the operation with its original code, native type and cause/errors identity."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The error domain is `logging.durable`; `LogDurableErrorCode` declares twelve stable codes. `LOG_STORE_IN_USE` means another installed plugin already borrows the store. `RUNTIME_SHUTTING_DOWN` means resource or old-installation admission is revoked; a replacement installation does not revive an old handle."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "log-plugin-durable:index",
+      "library": "log-plugin-durable",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-plugin-durable/getting-started",
+      "architecturePath": "/en/docs/log-plugin-durable",
+      "symbols": [],
+      "aliases": []
+    },
+    {
+      "id": "log-plugin-durable:file",
+      "library": "log-plugin-durable",
+      "module": "file",
+      "exportPath": "./file",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-plugin-durable/getting-started",
+      "architecturePath": "/en/docs/log-plugin-durable",
+      "symbols": [],
+      "aliases": []
+    }
+  ]
+}

@@ -44,12 +44,16 @@ try {
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import {
+  flowControlFeature,
+  sendQueueFeature,
+  ipcLogFeature
+} from '@migaia/rpc-plugin-process/features'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 
 export async function openWorker(entry: URL) {
-  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })
+  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })
   const observer = probe({
     stages: ['peer'],
     emit(view) {
@@ -63,13 +67,13 @@ export async function openWorker(entry: URL) {
         spawn: entry,
         features: [
           flow,
-          sendQueue({ flow }),
-          ipcLog({
+          sendQueueFeature({ flow }),
+          ipcLogFeature({
             report(record) {
               console.error(record)
             }
           }),
-          timeout({ ms: 1500 })
+          timeoutFeature({ ms: 1500 })
         ]
       })
     ]
@@ -77,13 +81,13 @@ export async function openWorker(entry: URL) {
 }
 ```
 
-调用者负责最终 `await host.close()`。也可单装 `flowControl`，或让 `sendQueue` 自建默认 flow；显式 `flow` 和重复的容量字段会在冷配置拒绝。不要把这些实例当作 host 根配置开关，也不要再提供已删除的 `ipc.log` fallback 字段。仅装 `ipcLog` 不会自动启用限流。
+调用者负责最终 `await host.close()`。也可单装 `flowControlFeature`，或让 `sendQueueFeature` 自建默认 flow；显式 `flow` 和重复的容量字段会在冷配置拒绝。不要把这些实例当作 host 根配置开关，也不要再提供已删除的 `ipc.log` fallback 字段。仅装 `ipcLogFeature` 不会自动启用限流。
 
 `/features/send-queue`、`/features/flow-control`、`/features/log` 也提供对应工厂。排队取消和容量计数使用真实安装；与 batch 合用时的每逻辑调用计费仍未完成验收。容量拒绝保留 `OVERLOADED`，真实物理 I/O 失败使用 `TRANSPORT` 并保留原 cause。
 
 ## 选项与期限
 
-`connect: { target, timeoutMs? }` 选择已有服务；timeout-only 的 `connect` 可修饰 spawn/listen/parent。协商阶段默认 10,000 ms；随后名字准入用 `connect.timeoutMs`，默认也为 10,000 ms，`pending` 传递尚未用完的协商时间与本次名字探测预算之和；只在首次通知延长期限，重复通知不会刷新。`connectTimeoutMs` 则是命名本机来源的查找等待。单次业务调用使用完整 `timeout(...)` feature 或 `timeout: false`，并可传 `signal`；这些期限相互独立。
+`connect: { target, timeoutMs? }` 选择已有服务；timeout-only 的 `connect` 可修饰 spawn/listen/parent。协商阶段默认 10,000 ms；随后名字准入用 `connect.timeoutMs`，默认也为 10,000 ms，`pending` 传递尚未用完的协商时间与本次名字探测预算之和；只在首次通知延长期限，重复通知不会刷新。`connectTimeoutMs` 则是命名本机来源的查找等待。单次业务调用使用完整 `timeoutFeature(...)` feature 或 `timeout: false`，并可传 `signal`；这些期限相互独立。
 
 `spawn` 可选主入口、路径/URL、短启动配置或完整原生 recipe。主入口自派生写法见 README。原生 `supervision` 保留重启、健康检查和停止策略；恢复连接不重放未确认业务。stdio 的 stdout 属于 RPC，应用日志使用 stderr。
 

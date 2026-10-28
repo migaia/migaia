@@ -31,7 +31,7 @@ const example7 =
 
 /** Concrete public package example with actual namespace and resource ownership. */
 const example8 =
-  "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    }\n  })\n  return createRpcHost({\n    plugins: [observer, windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] })]\n  })\n}"
+  "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    }\n  })\n  return createRpcHost({\n    plugins: [observer, windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] })]\n  })\n}"
 
 /** Public configuration example for this native capability. */
 const windowPluginScopeExample =

@@ -1,0 +1,254 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "log-plugin-reasoning",
+    "description": "Composable reasoning logging plugin.",
+    "version": "0.0.11",
+    "exports": ["."],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-log-plugin-reasoning",
+            "heading": "@migaia/log-plugin-reasoning",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "为 `@migaia/log-host` 增加 thinking/response 流式阶段。文本片段直接写入借用的 writer；结束阶段时另派发一条完整的结构化日志。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost } from '@migaia/log-host'\nimport { reasoningPlugin } from '@migaia/log-plugin-reasoning'\n\n/** 应用借用该数组观察每次流式写入的原始文本。 */\nconst fragments: string[] = []\n/** 每次安装独立持有阶段与缓冲区。 */\nconst log = createLogHost({\n  plugins: [\n    reasoningPlugin({\n      write: (text) => {\n        fragments.push(text)\n      }\n    })\n  ]\n})\nlog.startThinking('Thinking')\nlog.thinking('inspect ')\nlog.thinking('the request')\nlog.endThinking()\nlog.startResponse()\nlog.response('Done.')\nlog.endResponse()\nawait log.shutdown('manual')"
+              },
+              {
+                "type": "paragraph",
+                "text": "插件提供 `startThinking`、`thinking`、`endThinking`、`startResponse`、`response`、`endResponse` 六个方法。`write` 不增加 ANSI；未注入时借用已识别宿主的 stdout，无 stdout 时降级到 `console.log`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "完成条目的 tag 为 `thinking` 或 `response`，data 包含 `reasoningPhase` 与 `silent: true`。console 输出跳过 silent 条目，HTTP/file 仍可收到完整文本。插件不依赖 console 包，也不要求 host 提供 raw。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`asyncOutput` 默认 false；开启后流式写入与完成派发由 host 调度跟踪。writer 的同步异常进入 host 失败通道。卸载丢弃未完成缓冲，不自动生成完成条目。包与 host 的 peer 版本必须一致。"
+              },
+              {
+                "type": "paragraph",
+                "text": "阶段规则与选项见 USEGUIDE.md。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "创建与六个方法",
+            "heading": "创建与六个方法",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "安装 `@migaia/log-host` 与同版本的 `@migaia/log-plugin-reasoning`。`createLogHost({ plugins: [reasoningPlugin(options)] })` 推导六个阶段方法，不需要额外安装 level 或 console 插件。"
+              },
+              {
+                "type": "table",
+                "headers": ["方法", "行为"],
+                "rows": [
+                  ["`startThinking(label?)`", "进入 thinking；若正在 response，先完成它"],
+                  ["`thinking(delta)`", "原样追加片段；未处于 thinking 时自动开始"],
+                  ["`endThinking()`", "输出两个换行并完成当前 thinking"],
+                  ["`startResponse(label?)`", "进入 response；若正在 thinking，先完成它"],
+                  ["`response(delta)`", "原样追加片段；未处于 response 时自动开始"],
+                  ["`endResponse()`", "输出一个换行并完成当前 response"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "显式再次开始同一阶段会重置该阶段的缓冲。空缓冲不生成完成条目。标签优先采用调用参数，其次 `labels.thinking` / `labels.response`；thinking 的默认标题是 `Thinking...`，response 默认无标题。标题输出后带两个换行，片段本身不增加换行或 ANSI。"
+              }
+            ]
+          },
+          {
+            "id": "writer-与调度",
+            "heading": "Writer 与调度",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost } from '@migaia/log-host'\nimport { reasoningPlugin } from '@migaia/log-plugin-reasoning'\n\n/** 应用接收每次原样流式写入，保留片段边界。 */\nconst fragments: string[] = []\n/** 明确开启 host 跟踪的异步流式调度。 */\nconst log = createLogHost({\n  plugins: [\n    reasoningPlugin({\n      labels: { thinking: 'Plan', response: 'Answer' },\n      asyncOutput: true,\n      write: (text) => {\n        fragments.push(text)\n      }\n    })\n  ]\n})\nlog.thinking('inspect')\nlog.response('ready')\nlog.endResponse()\nawait log.flush()\nawait log.shutdown('manual')"
+              },
+              {
+                "type": "paragraph",
+                "text": "`write(text): void` 是借用的同步能力，卸载不关闭它。未提供时，已识别的服务端宿主借用 `process.stdout.write`；没有 stdout 时使用 `globalThis.console?.log(text)`。`asyncOutput` 默认 false：流式写入立即发生，完成条目仍进入 host 异步日志管线。设为 true 时，流式写入与完成派发都通过 host 跟踪调度，`flush()` 可等待这些已接纳工作。"
+              }
+            ]
+          },
+          {
+            "id": "完成条目与输出端",
+            "heading": "完成条目与输出端",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "结束或切换阶段时，非空缓冲产生一条完整 message。thinking 的 tag/data.reasoningPhase 都为 `thinking`；response 的 tag 为 `response`，data.reasoningPhase 为 `responding`。两者均有 `data.silent: true`。console 插件跳过这些完成条目；HTTP/file 输出仍接收它们，便于保存完整文本。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`ReasoningPhase` 提供 `idle`、`thinking`、`responding` 三个稳定状态值。插件不依赖 console、不取得颜色能力，也不调用 host/core 的 raw。其它普通条目的格式仍由各输出端配置决定。"
+              }
+            ]
+          },
+          {
+            "id": "失败与释放",
+            "heading": "失败与释放",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "write 的同步异常以原错误进入 host 失败通道，不离开阶段方法。插件自身没有新增错误码，`LogReasoningErrorCode` 为空表。卸载后六个旧方法成为无操作，未完成缓冲被丢弃；不会自动派发未结束的段落。需要保留完整段落时先调用对应 end 方法，再等待 flush/shutdown。"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-log-plugin-reasoning",
+              "heading": "@migaia/log-plugin-reasoning",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Thinking and response streaming phases for `@migaia/log-host`. Fragments go directly to a borrowed writer. Completing a phase also dispatches one structured entry containing its full text."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { reasoningPlugin } from '@migaia/log-plugin-reasoning'\n\n/** The application records the original text of each stream write. */\nconst fragments: string[] = []\n/** Each installation owns independent phase and buffer state. */\nconst log = createLogHost({\n  plugins: [\n    reasoningPlugin({\n      write: (text) => {\n        fragments.push(text)\n      }\n    })\n  ]\n})\nlog.startThinking('Thinking')\nlog.thinking('inspect ')\nlog.thinking('the request')\nlog.endThinking()\nlog.startResponse()\nlog.response('Done.')\nlog.endResponse()\nawait log.shutdown('manual')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The six methods are `startThinking`, `thinking`, `endThinking`, `startResponse`, `response` and `endResponse`. The writer receives text without plugin-generated ANSI. By default, a recognized server runtime lends its stdout; without stdout, output falls back to `console.log`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Completed entries have a `thinking` or `response` tag and data containing `reasoningPhase` and `silent: true`. Console output skips these entries while HTTP/file outputs can retain the complete text. This module depends on no console module and requires no host raw method."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`asyncOutput` defaults to false. Enabling it schedules stream writes and completed-entry dispatch through the host. Synchronous writer failures enter the host failure channel. Uninstall discards unfinished text without publishing a completed entry. The module's peer version must match the host version."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "See USEGUIDE.en.md for phase behavior and options."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "creation-and-phase-methods",
+              "heading": "Creation and phase methods",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Install matching versions of `@migaia/log-host` and `@migaia/log-plugin-reasoning`. `createLogHost({ plugins: [reasoningPlugin(options)] })` infers six phase methods without requiring a level or console plugin."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Method", "Behavior"],
+                  "rows": [
+                    [
+                      "`startThinking(label?)`",
+                      "Enter thinking, first completing an active response"
+                    ],
+                    [
+                      "`thinking(delta)`",
+                      "Append the original fragment, starting thinking automatically when needed"
+                    ],
+                    [
+                      "`endThinking()`",
+                      "Write two newlines and complete the current thinking phase"
+                    ],
+                    ["`startResponse(label?)`", "Enter response, first completing active thinking"],
+                    [
+                      "`response(delta)`",
+                      "Append the original fragment, starting response automatically when needed"
+                    ],
+                    ["`endResponse()`", "Write one newline and complete the current response"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Explicitly starting the same phase again resets its buffer. Empty buffers produce no completed entry. A call-level label takes precedence over `labels.thinking` / `labels.response`. Thinking defaults to `Thinking...`; response has no default heading. Headings end with two newlines. Fragments receive no extra newlines or ANSI."
+                }
+              ]
+            },
+            {
+              "id": "writer-and-scheduling",
+              "heading": "Writer and scheduling",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { reasoningPlugin } from '@migaia/log-plugin-reasoning'\n\n/** Preserve each original stream write and its fragment boundary. */\nconst fragments: string[] = []\n/** Explicitly enable asynchronous stream scheduling tracked by the host. */\nconst log = createLogHost({\n  plugins: [\n    reasoningPlugin({\n      labels: { thinking: 'Plan', response: 'Answer' },\n      asyncOutput: true,\n      write: (text) => {\n        fragments.push(text)\n      }\n    })\n  ]\n})\nlog.thinking('inspect')\nlog.response('ready')\nlog.endResponse()\nawait log.flush()\nawait log.shutdown('manual')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`write(text): void` is a borrowed synchronous capability. Uninstall does not close it. Without an injected writer, recognized server runtimes lend `process.stdout.write`; without stdout, the fallback is `globalThis.console?.log(text)`. `asyncOutput` defaults to false: stream writes happen immediately while completed entries still enter the asynchronous host pipeline. When enabled, both writes and completed-entry dispatch use host-tracked scheduling. `flush()` waits for admitted work."
+                }
+              ]
+            },
+            {
+              "id": "completed-entries-and-outputs",
+              "heading": "Completed entries and outputs",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Ending or switching a nonempty phase publishes its full text as one message. Thinking uses `thinking` for both tag and data.reasoningPhase. Response uses the `response` tag and `responding` for data.reasoningPhase. Both set `data.silent: true`. The console plugin skips these entries. HTTP/file outputs still receive them for complete-text storage."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ReasoningPhase` provides the stable values `idle`, `thinking` and `responding`. The plugin depends on no console module, acquires no color capability and calls no host/core raw method. Output format features still control other ordinary entries."
+                }
+              ]
+            },
+            {
+              "id": "failures-and-release",
+              "heading": "Failures and release",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Synchronous writer failures reach the host failure channel with the original error and do not leave phase methods. The plugin introduces no error codes; `LogReasoningErrorCode` is empty. After uninstall, retained phase methods become no-ops. Unfinished text is discarded without publishing a completed entry. Call the relevant end method before flush/shutdown when the full phase must be retained."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "log-plugin-reasoning:index",
+      "library": "log-plugin-reasoning",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-plugin-reasoning/getting-started",
+      "architecturePath": "/en/docs/log-plugin-reasoning",
+      "symbols": [],
+      "aliases": []
+    }
+  ]
+}

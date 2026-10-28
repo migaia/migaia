@@ -149,7 +149,7 @@ The plugin awaits the borrowed session's ready and creates one reliable bidirect
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
 import { windowPlugin } from '@migaia/rpc-plugin-browser'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 
 export async function observeFrame(target: Window, origin: string) {
@@ -160,7 +160,10 @@ export async function observeFrame(target: Window, origin: string) {
     }
   })
   return createRpcHost({
-    plugins: [observer, windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] })]
+    plugins: [
+      observer,
+      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] })
+    ]
   })
 }
 ```

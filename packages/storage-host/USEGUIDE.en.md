@@ -191,13 +191,13 @@ A non-default organization receives the capabilities its backend actually provid
 
 ## Open a log store
 
-Install the optional `@migaia/logger` peer first. `storageLogStore()` is asynchronous and accepts a host or organization view, a backend ID and a nonempty `prefix`. A plain KV object is not accepted. Append one record, then inspect its sequence and pending state:
+Install the optional `@migaia/log-host` and `@migaia/log-plugin-durable` peers first. `storageLogStore()` is asynchronous and accepts a host or organization view, a backend ID and a nonempty `prefix`. A plain KV object is not accepted. Append one record, then inspect its sequence and pending state:
 
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
-import { LogRecordState } from '@migaia/logger/plugins/durable'
+import { LogRecordState } from '@migaia/log-plugin-durable'
 
 const host = await createStorageHost({ plugins: [storageJournalPlugin(), memoryBackendPlugin()] })
 try {

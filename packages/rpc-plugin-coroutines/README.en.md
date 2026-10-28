@@ -75,7 +75,7 @@ Choose exactly one of spawn and connectToParent. A handle belongs to the actual 
 
 ## Policies and composition
 
-Call options use complete `timeout({ ms })` and `retry({ attempts })` instances, or `false`. Precedence is per-call, transport feature, then link-policy plugin. No selected policy means no automatic policy. Business timeout does not configure native startup or stop budgets.
+Call options use complete `timeoutFeature({ ms })` and `retryFeature({ attempts })` instances, or `false`. Precedence is per-call, transport feature, then link-policy plugin. No selected policy means no automatic policy. Business timeout does not configure native startup or stop budgets.
 
 For several same-carrier tasks, use `coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })` with [rpc-plugin-pool](../rpc-plugin-pool/README.en.md). Flow plugins go in Host `plugins`; [Devtools](../rpc-plugin-devtools/README.en.md) observes messages through the canonical probe implementation.
 

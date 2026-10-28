@@ -103,14 +103,20 @@ close database
 <details open>
 <summary><strong>收尾、取消与错误追踪</strong></summary>
 
-| 包                                                                | 用来做什么                                                                                           |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| [`utils`](./packages/utils/README.md)                             | 为代码添加超时、取消与错误追踪，并处理常见的数据转换和对象更新。                                     |
-| [`lifecycle`](./packages/lifecycle/README.md)                     | 让关闭、取消和替换在并发下也不出错：按顺序释放资源、只采用最新请求的结果、限时等待进行中的工作。     |
-| [`supervision`](./packages/supervision/README.md)                 | 看管后台任务、子进程和线程：崩溃后间隔递增地重启，失败太多就停下，停止有时限，真正退出后才释放名额。 |
-| [`event-subscriber`](./packages/event-subscriber/README.md)       | 在本地模块间订阅和广播事件，并协调同步或异步监听器的执行。                                           |
-| [`middleware-pipeline`](./packages/middleware-pipeline/README.md) | 把处理步骤组合为同步、异步或生成器中间件管线，并在需要时提前结束或取消处理。                         |
-| [`logger`](./packages/logger/README.md)                           | 将日志输出到控制台或服务，按需要过滤和格式化，并等待异步输出完成。                                   |
+| 包                                                                  | 用来做什么                                                                                           |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [`utils`](./packages/utils/README.md)                               | 为代码添加超时、取消与错误追踪，并处理常见的数据转换和对象更新。                                     |
+| [`lifecycle`](./packages/lifecycle/README.md)                       | 让关闭、取消和替换在并发下也不出错：按顺序释放资源、只采用最新请求的结果、限时等待进行中的工作。     |
+| [`supervision`](./packages/supervision/README.md)                   | 看管后台任务、子进程和线程：崩溃后间隔递增地重启，失败太多就停下，停止有时限，真正退出后才释放名额。 |
+| [`event-subscriber`](./packages/event-subscriber/README.md)         | 在本地模块间订阅和广播事件，并协调同步或异步监听器的执行。                                           |
+| [`middleware-pipeline`](./packages/middleware-pipeline/README.md)   | 把处理步骤组合为同步、异步或生成器中间件管线，并在需要时提前结束或取消处理。                         |
+| [`log-host`](./packages/log-host/README.md)                         | 组合日志插件与 feature，异步交付并统一排空、关闭和失败报告。                                         |
+| [`log-plugin-console`](./packages/log-plugin-console/README.md)     | 使用原生控制台参数输出日志，并按需选择 pretty、JSON 或 plain 格式。                                  |
+| [`log-plugin-http`](./packages/log-plugin-http/README.md)           | 通过可注入的 fetcher 发送结构化日志，复用 host 的批量、重试与超时策略。                              |
+| [`log-plugin-file`](./packages/log-plugin-file/README.md)           | 通过注入或宿主文件能力追加日志，并调用可选的轮转能力。                                               |
+| [`log-plugin-process`](./packages/log-plugin-process/README.md)     | 按进程对象共享信号监听，协调崩溃报告、排空和优雅关闭。                                               |
+| [`log-plugin-reasoning`](./packages/log-plugin-reasoning/README.md) | 原样输出推理文本片段，并保留完整阶段的静默审计条目。                                                 |
+| [`log-plugin-durable`](./packages/log-plugin-durable/README.md)     | 为 binlog、WAL、undo 与日志存储提供独立插件和可借用接口。                                            |
 
 </details>
 
@@ -149,12 +155,12 @@ close database
 <details open>
 <summary><strong>存储与编码</strong></summary>
 
-| 包                                                          | 用来做什么                                                       |
-| ----------------------------------------------------------- | ---------------------------------------------------------------- |
-| [`storage-contract`](./packages/storage-contract/README.md) | 为键值和记录存储定义统一接口，让应用可以接入不同存储后端。       |
-| [`storage-plugin-browser`](./packages/storage-plugin-browser/README.md)           | 通过统一接口读写 Web Storage、cookie、IndexedDB 和内存中的数据。 |
-| [`serialize`](./packages/serialize/README.md)               | 把应用数据编码为可存储或传输的格式，并在读取时解码。             |
-| [`wasm`](./packages/wasm/README.md)                         | 分配可复用的字节缓冲区，并在 JSON 与 MessagePack 之间转码。      |
+| 包                                                                      | 用来做什么                                                       |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [`storage-contract`](./packages/storage-contract/README.md)             | 为键值和记录存储定义统一接口，让应用可以接入不同存储后端。       |
+| [`storage-plugin-browser`](./packages/storage-plugin-browser/README.md) | 通过统一接口读写 Web Storage、cookie、IndexedDB 和内存中的数据。 |
+| [`serialize`](./packages/serialize/README.md)                           | 把应用数据编码为可存储或传输的格式，并在读取时解码。             |
+| [`wasm`](./packages/wasm/README.md)                                     | 分配可复用的字节缓冲区，并在 JSON 与 MessagePack 之间转码。      |
 
 </details>
 

@@ -1,0 +1,21 @@
+{
+  "package": "log-plugin-http",
+  "codes": {
+    "DELIVERY_FAILED": {
+      "source": "logging.http",
+      "scenario": "A POST rejected or returned a failed status; retry only according to the transport hint."
+    },
+    "INVALID_OPTION": {
+      "source": "logging.http",
+      "scenario": "Retry-After's admitted bound is negative or nonfinite; correct the factory option."
+    },
+    "SERIALIZE_FAILED": {
+      "source": "logging.http",
+      "scenario": "JSON projection failed before any POST; inspect the original payload through cause."
+    },
+    "TRANSPORT_UNAVAILABLE": {
+      "source": "logging.http",
+      "scenario": "No injected or host fetch capability exists; inject a fetcher before creating this output."
+    }
+  }
+}

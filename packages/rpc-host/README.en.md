@@ -21,12 +21,12 @@ This creates two real hosts in one event loop. The parent installs its timeout f
 ```ts doc-test=run
 import { createRpcHost } from '@migaia/rpc-host'
 import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
-import { timeout } from '@migaia/rpc-host/features'
+import { timeoutFeature } from '@migaia/rpc-host/features'
 
 const host = await createRpcHost<{ double(value: number): number }>({
   plugins: [
     coroutinePlugin({
-      features: [timeout({ ms: 1500 })],
+      features: [timeoutFeature({ ms: 1500 })],
       spawn: async ({ connect, signal }) => {
         const child = await createRpcHost({
           plugins: [coroutinePlugin({ connectToParent: connect })],
@@ -90,15 +90,17 @@ Configure each forwarding host with `forward: { maxHops: 3 }` in `createRpcHost`
 
 ## Optional capabilities
 
-The same `auth`, `chunk`, `batch`, `idempotency`, `limits`, `errorMap`, and `schema` factories work in host `plugins` and transport `features`. Host placement supplies every namespace; transport placement overrides that capability only in its namespace. Each namespace has one implementation of each capability. Host `limits` shares quotas across namespaces; transport `limits` owns separate quotas. `probe`, `typegen`, and Devtools are host-only plugins. The former `namespaces` scope option is removed; select a transport with `features`.
+The same `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, and `schemaFeature` factories work in host `plugins` and transport `features`. Host placement supplies every namespace; transport placement overrides that capability only in its namespace. Each namespace has one implementation of each capability. Host `limitsFeature` shares quotas across namespaces; transport `limitsFeature` owns separate quotas. `probe`, `typegen`, and Devtools are host-only plugins. The former `namespaces` scope option is removed; select a transport with `features`.
 
 ```ts doc-test=check
-import { timeout, retry } from '@migaia/rpc-host/features'
-import { linkPolicy, limits, probe } from '@migaia/rpc-host/plugins'
+import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
+import { linkPolicy, limitsFeature, probe } from '@migaia/rpc-host/plugins'
 import timeoutFromSubpath from '@migaia/rpc-host/features/timeout'
 
-export const defaults = linkPolicy({ features: [timeout({ ms: 1500 }), retry({ attempts: 2 })] })
-export const capacity = limits({ maxGlobal: 256, maxPerPeer: 64 })
+export const defaults = linkPolicy({
+  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })]
+})
+export const capacity = limitsFeature({ maxGlobal: 256, maxPerPeer: 64 })
 export const observation = probe({
   stages: ['message', 'peer'],
   emit: (view) => console.log({ ...view })
@@ -106,15 +108,15 @@ export const observation = probe({
 export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 ```
 
-Aggregate and default subpath imports support tree-shaking. Installing `limits` is recommended; omitting it enables no such quotas. `host.<ns>.outcome(key)` exists only with `idempotency` installed. Auth passes the signing binding object to `sign/verify` by default; text and byte modes encode one binding layer. Its request-ID deduplication releases completed IDs immediately by default, with signed-window or millisecond `retain` alternatives. `maxReplayEntriesPerPeer` bounds only numeric retention mode, and `onRejected` receives capacity refusal reasons. See [authentication](./USEGUIDE.en.md#authentication-signing-and-duplicate-requests) for configuration and HMAC examples.
+Aggregate and default subpath imports support tree-shaking. Installing `limitsFeature` is recommended; omitting it enables no such quotas. `host.<ns>.outcome(key)` exists only with `idempotencyFeature` installed. Auth passes the signing binding object to `sign/verify` by default; text and byte modes encode one binding layer. Its request-ID deduplication releases completed IDs immediately by default, with signed-window or millisecond `retain` alternatives. `maxReplayEntriesPerPeer` bounds only numeric retention mode, and `onRejected` receives capacity refusal reasons. See [authentication](./USEGUIDE.en.md#authentication-signing-and-duplicate-requests) for configuration and HMAC examples.
 
-`errorMap` synchronously controls the error information a peer receives without changing local originals, reports, warnings, or log observation. A throw, returned Promise, or unserializable result reports the mapping failure and sends the original error under the rules used without a mapper. Without a mapper, handshake refusals still hide details from unauthenticated peers. See [error mapping](./USEGUIDE.en.md#map-errors-sent-to-the-peer).
+`errorMapFeature` synchronously controls the error information a peer receives without changing local originals, reports, warnings, or log observation. A throw, returned Promise, or unserializable result reports the mapping failure and sends the original error under the rules used without a mapper. Without a mapper, handshake refusals still hide details from unauthenticated peers. See [error mapping](./USEGUIDE.en.md#map-errors-sent-to-the-peer).
 
 A custom flow returns `stages` from `defineFlowFeature` setup; place the feature in host `plugins` or in one transport's `features`. Each stage receives its pipeline payload and native `next(payload)`; readonly events belong in the separate `observe` field. Frame pipelines allow independent submissions: after catching and reporting one member's failure, a stage can submit another. Ignoring a failed `next()` Promise rejects the pipeline. The original call settles a cancelled batch member with `CANCELLED` and its original reason on `cause`; other members complete normally.
 
 Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound reverses the direction. Array order does not change these positions. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly.
 
-`auth` protects each complete message before `chunk` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
+`authFeature` protects each complete message before `chunkFeature` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
 
 A custom carrier may implement optional `reserveWrite` by borrowing its existing flow-control capacity. Reserve once per logical write: chunk fragments share its receipt, while a batch retains each member's receipt until completion. `write` still completes at actual physical acceptance, and `close` must settle carrier-owned queued writes.
 
@@ -152,7 +154,7 @@ Idempotency fingerprints follow the object's own key order. Changing key order c
 
 Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection.
 
-Auth changes its default signing input from text to an object. Normalize it in callbacks or set `encodedType: 'string'` when text is required. Completed request IDs release immediately by default; set `retain: 310_000` for the former behavior. Local verifier and credential resolver errors retain their original causes; synchronous `errorMap` controls remote redaction.
+Auth changes its default signing input from text to an object. Normalize it in callbacks or set `encodedType: 'string'` when text is required. Completed request IDs release immediately by default; set `retain: 310_000` for the former behavior. Local verifier and credential resolver errors retain their original causes; synchronous `errorMapFeature` controls remote redaction.
 
 With sign/verify configured, auth exchanges and validates a fresh source challenge inside the existing signed handshake. Application callbacks must still sign and verify the complete input they receive. No public discovery or handshake option is added.
 

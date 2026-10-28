@@ -1,0 +1,174 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "log-plugin-process",
+    "description": "Composable process logging plugin.",
+    "version": "0.0.11",
+    "exports": ["."],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-log-plugin-process",
+            "heading": "@migaia/log-plugin-process",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "为日志 host 安装进程信号、崩溃捕获与优雅关闭集成。与相同版本的 `@migaia/log-host` 配合使用，进程能力可按插件注入。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin(), processPlugin()]\n})\nlog.onShutdown(() => {\n  log.info('shutdown started')\n})\nlog.info('ready')"
+              },
+              {
+                "type": "paragraph",
+                "text": "相同 process 对象上的多个 host 共享一组监听器；不同对象分别拥有自己的组。最后一个使用者卸载后移除该组监听器。借用的 process 不会被关闭。"
+              },
+              {
+                "type": "paragraph",
+                "text": "默认捕获崩溃、关闭等待预算为 3000ms、默认不拦截 `process.exit`。`SIGINT`/`SIGTERM` 触发共享 shutdown，`beforeExit` 仅等待 flush。没有宿主 process 且未注入时不安装监听器。"
+              },
+              {
+                "type": "paragraph",
+                "text": "同一个 process 组要求一致的配置与 scheduler 来源。失败的安装会回滚已经尝试的监听注册；清理失败保留原始错误与顺序。完整选项及错误码见 使用指南。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "process-使用指南",
+            "heading": "Process 使用指南",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "本包将宿主 process 作为借用能力接入日志生命周期，与相同版本的 `@migaia/log-host` 使用。默认从 utils 识别到的服务端宿主读取 process；没有宿主能力时安装为空操作。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost } from '@migaia/log-host'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\nconst log = createLogHost({\n  plugins: [\n    processPlugin({ captureCrashes: true, shutdownTimeoutMs: 3000, interceptProcessExit: false })\n  ]\n})\nlog.onShutdown(() => {\n  log.log('info', 'closing')\n})"
+              },
+              {
+                "type": "paragraph",
+                "text": "`IProcessPluginConfig` 还接受 process：具有 env、on、removeListener、exit 的对象。on/removeListener 必须针对同一事件与函数身份注册/移除，exit 保留该对象作为 receiver。注入对象与原始 exit 方法都由调用方拥有，本插件不会替换成另一进程对象。"
+              },
+              {
+                "type": "paragraph",
+                "text": "默认 captureCrashes=true、shutdownTimeoutMs=3000、interceptProcessExit=false。SIGINT/SIGTERM 启动关闭；uncaughtException/unhandledRejection 在启用崩溃捕获时先产生 fatal 条目再关闭。beforeExit 只做受预算限制的 flush，不强制 exit。信号路径在关闭与 core 清理后调用捕获的 exit(0)。应用的 onShutdown 可以提交最终日志。"
+              },
+              {
+                "type": "paragraph",
+                "text": "相同 process 对象共享一组监听器，要求 captureCrashes、shutdownTimeoutMs、interceptProcessExit 和 scheduler 来源一致。不同 process 对象互不冲突。最后一个使用者移除后撤销监听，之后可重新安装。显式拦截 exit 时，插件等待受限 flush 后以捕获的原函数与原 receiver 调用；最后移除恢复原函数身份。"
+              },
+              {
+                "type": "paragraph",
+                "text": "安装与清理按资源所有权管理：部分注册失败会逆序回滚所有已尝试的监听；一个清理错误不会跳过其它资源。primary 错误保持首位，原 Error、非 Error 值、cause 和 AggregateError.errors 的身份/顺序保持可追溯。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`LOG_PROCESS_ERROR_SOURCE` 为 logging.process；`LogProcessErrorCode` 包含 RUNTIME_SHUTTING_DOWN、PLUGIN_CONFIG_CONFLICT、PROCESS_INSTALL_ROLLBACK_FAILED、PLUGIN_UNINSTALL_CLEANUP_FAILED、PLUGIN_SHUTDOWN_CLEANUP_FAILED。安装冲突/失败同步抛出；运行期失败进入 host 的 onFailure，终端报告由 host 统一处理。并发同类关闭或 flush 共用进行中的工作。"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-log-plugin-process",
+              "heading": "@migaia/log-plugin-process",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Process signals, crash capture and graceful shutdown for the matching `@migaia/log-host` version. The process capability can be injected per plugin."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin(), processPlugin()]\n})\nlog.onShutdown(() => {\n  log.info('shutdown started')\n})\nlog.info('ready')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Hosts sharing the same process object share one listener set. Different objects have independent groups. Removing the last member releases the group's listeners without closing the borrowed process capability."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Defaults enable crash capture, allow 3000ms for graceful work, and leave `process.exit` unchanged. `SIGINT`/`SIGTERM` start a shared shutdown; `beforeExit` only waits for flushing. A host without a process capability installs no listeners."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Members of the same process group must use compatible configuration and the same scheduler source. Failed installation rolls back attempted listener registrations, and cleanup failures retain original error identity and order. See the usage guide for options and error codes."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "process-guide",
+              "heading": "Process guide",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "This module borrows a process capability for the logging lifecycle and requires the same version of `@migaia/log-host`. By default it uses the server process recognized by utils. Installation is inert when no process is available."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\nconst log = createLogHost({\n  plugins: [\n    processPlugin({ captureCrashes: true, shutdownTimeoutMs: 3000, interceptProcessExit: false })\n  ]\n})\nlog.onShutdown(() => {\n  log.log('info', 'closing')\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IProcessPluginConfig` also accepts process: an object with env, on, removeListener, and exit. Registration/removal uses the same event and listener identity. Exit retains the original object as its receiver. The caller owns the injected object and its original exit function."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Defaults are captureCrashes=true, shutdownTimeoutMs=3000, and interceptProcessExit=false. SIGINT/SIGTERM begin shutdown. With crash capture enabled, uncaughtException/unhandledRejection produce a fatal entry before shutdown. BeforeExit only waits for a bounded flush and never forces exit. Signal shutdown calls captured exit(0) after shutdown and core cleanup. Application onShutdown handlers may submit final logs."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Hosts sharing one process object share one listener group and must use matching captureCrashes, shutdownTimeoutMs, interceptProcessExit, and scheduler source. Different process objects remain isolated. Removing the last member removes listeners and permits reinstall. With exit interception enabled, the plugin waits for bounded flush, then calls the captured original function with its original receiver. Final removal restores exact function identity."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Partial installation rolls back every attempted registration in reverse order. One cleanup failure does not prevent remaining cleanup. The primary failure remains first; original Error/non-Error values, causes, and AggregateError.errors retain identity and order."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`LOG_PROCESS_ERROR_SOURCE` is logging.process. `LogProcessErrorCode` contains RUNTIME_SHUTTING_DOWN, PLUGIN_CONFIG_CONFLICT, PROCESS_INSTALL_ROLLBACK_FAILED, PLUGIN_UNINSTALL_CLEANUP_FAILED, and PLUGIN_SHUTDOWN_CLEANUP_FAILED. Installation conflicts and failures throw synchronously. Runtime failures reach host onFailure, and the host owns terminal reporting. Concurrent shutdown or flush events share in-flight work."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "log-plugin-process:index",
+      "library": "log-plugin-process",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-plugin-process/getting-started",
+      "architecturePath": "/en/docs/log-plugin-process",
+      "symbols": [],
+      "aliases": []
+    }
+  ]
+}

@@ -697,34 +697,29 @@ test('keeps use cases and direct-await tradeoffs above the example', () => {
   assert.ok(decisionIndex >= 0 && decisionIndex < exampleIndex)
 })
 
-test('renders the process-wide layer contract and every host capability', () => {
-  const loggerHtml = readFileSync(
-    join(buildRoot, 'zh/docs/logger/api/setLoggerRuntimeManager/index.html'),
+test('renders explicit log host and output capability boundaries', () => {
+  /** Ordinary logging keeps asynchronous drain and supported error observation visible. */
+  const hostHtml = readFileSync(
+    join(buildRoot, artifactPath('/zh/docs/log-host/api/createLogHost')),
     'utf8'
   )
-  assert.match(
-    renderedText(loggerHtml),
-    /为之后创建的 logger 设置默认运行时管理器（已存在的 logger 保持原样）/
-  )
-  assert.match(renderedText(loggerHtml), /恢复时按后进先出撤销/)
-  /** The manager is a positional argument, so its fields belong to its own type reference. */
-  const managerHtml = readFileSync(
-    join(buildRoot, 'zh/docs/logger/api/ILoggerRuntimeManager/index.html'),
-    'utf8'
-  )
-  assert.match(loggerHtml, /finally/)
-  assert.match(loggerHtml, /restore\(\)/)
-  for (const option of [
-    'process',
-    'createAbortController',
-    'randomUUID',
-    'defer',
-    'write',
-    'console',
-    'fs',
-    'fetch'
+  const hostText = renderedText(hostHtml)
+  assert.match(hostText, /createLogHost/)
+  assert.match(hostText, /flush/)
+  assert.match(hostText, /shutdown/)
+  assert.match(hostText, /onFailure/)
+  /** Capabilities belong to the actual output factory rather than a global runtime manager. */
+  for (const [library, factory, capability] of [
+    ['log-plugin-file', 'filePlugin', 'writer'],
+    ['log-plugin-http', 'httpPlugin', 'fetcher'],
+    ['log-plugin-reasoning', 'reasoningPlugin', 'write']
   ]) {
-    assert.match(managerHtml, new RegExp(`--member-${option}-[0-9]+"`))
+    const html = readFileSync(
+      join(buildRoot, artifactPath(`/zh/docs/${library}/api/${factory}`)),
+      'utf8'
+    )
+    assert.match(renderedText(html), new RegExp(capability))
+    assert.match(html, new RegExp(factory))
   }
 })
 
@@ -1434,16 +1429,16 @@ test('uses concrete responsibilities instead of slogans', () => {
     'utf8'
   )
   /** English library descriptions appear on the docs home library index. */
-  const loggerEnglish = readFileSync(join(buildRoot, artifactPath('/en')), 'utf8')
+  const loggingEnglish = readFileSync(join(buildRoot, artifactPath('/en')), 'utf8')
 
   assert.match(renderedText(docsIndex), /utils.*添加超时、取消与错误追踪.*数据转换和对象更新/s)
   assert.match(utilsArchitecture, /多个包共同需要、且不应绑定 Store、DOM 或具体运行时/)
   assert.match(utilsArchitecture, /不是无边界的杂物箱/)
   assert.match(
-    renderedText(loggerEnglish),
-    /Send logs to a console or service.*filter and format.*asynchronous output/s
+    renderedText(loggingEnglish),
+    /Create an asynchronous logging host.*observe failures.*drain admitted work/s
   )
-  for (const html of [docsIndex, utilsArchitecture, loggerEnglish]) {
+  for (const html of [docsIndex, utilsArchitecture, loggingEnglish]) {
     assert.doesNotMatch(html, /归属与边界模型/)
     assert.doesNotMatch(html, /源码契约、能力边界与使用入口/)
     assert.doesNotMatch(html, /Source-backed entry with maintained boundary facts/)
@@ -3308,40 +3303,36 @@ test('gives primary tasks independent bilingual pages', () => {
       'Cancellation, errors, and shutdown',
       'Close the accessor and keep persisted data'
     ],
-    ['/zh/docs/logger', 'Logger：把结构化日志交给明确的输出端', '内置插件'],
-    ['/en/docs/logger', 'Logger: send structured entries to explicit outputs', 'Built-in plugins'],
-    ['/zh/docs/logger/getting-started', '快速开始：第一个 Logger', '常用方法'],
-    ['/en/docs/logger/getting-started', 'Quick start: your first Logger', 'Common methods'],
-    ['/zh/docs/logger/entries-hooks-and-sinks', 'Entry、Hook 与 Sink', '输出端出错时'],
+    ['/zh/docs/log-host', '用明确的输出端交付异步日志', '使用公开工厂'],
+    ['/en/docs/log-host', 'Asynchronous logging with explicit outputs', 'Use the public factory'],
+    ['/zh/docs/log-plugin-console', '保留控制台原生参数', '使用公开工厂'],
+    ['/en/docs/log-plugin-console', 'Preserve native console arguments', 'Use the public factory'],
+    ['/zh/docs/log-plugin-file', '通过借用 writer 追加 NDJSON', '使用公开工厂'],
     [
-      '/en/docs/logger/entries-hooks-and-sinks',
-      'Entries, hooks, and sinks',
-      'When an output fails'
+      '/en/docs/log-plugin-file',
+      'Write NDJSON through a borrowed writer',
+      'Use the public factory'
     ],
-    ['/zh/docs/logger/plugins-and-batching', '内置插件与批量上报', '其他插件'],
-    ['/en/docs/logger/plugins-and-batching', 'Built-in plugins and batching', 'Other plugins'],
-    ['/zh/docs/logger/custom-plugin', '编写自定义插件', '编写插件时注意'],
-    ['/en/docs/logger/custom-plugin', 'Write a custom plugin', 'Rules for plugins'],
-    ['/zh/docs/logger/pipelines', '处理步骤：在输出之前修改或拦截日志', '选择模式'],
+    ['/zh/docs/log-plugin-http', 'POST 规范的 entries 请求体', '使用公开工厂'],
+    ['/en/docs/log-plugin-http', 'POST the canonical entries envelope', 'Use the public factory'],
+    ['/zh/docs/log-plugin-process', '协调进程关闭而不接管进程所有权', '使用公开工厂'],
     [
-      '/en/docs/logger/pipelines',
-      'Pipelines: modify or drop entries before output',
-      'Choose a mode'
+      '/en/docs/log-plugin-process',
+      'Coordinate process shutdown without owning process',
+      'Use the public factory'
     ],
-    ['/zh/docs/logger/flush-and-shutdown', 'Flush 与关闭：退出前确认日志都写完', '例子'],
+    ['/zh/docs/log-plugin-reasoning', '流式输出 thinking 与 response 阶段', '使用公开工厂'],
     [
-      '/en/docs/logger/flush-and-shutdown',
-      'Flush and shutdown: confirm logs are written before exit',
-      'Example'
+      '/en/docs/log-plugin-reasoning',
+      'Stream thinking and response phases',
+      'Use the public factory'
     ],
-    ['/zh/docs/logger/runtime-and-forwarding', '转发与运行环境', '替换底层能力'],
+    ['/zh/docs/log-plugin-durable', '借用 durable binlog、WAL 与 undo 存储', '使用公开工厂'],
     [
-      '/en/docs/logger/runtime-and-forwarding',
-      'Forwarding and runtime',
-      'Replace low-level capabilities'
+      '/en/docs/log-plugin-durable',
+      'Borrow durable binlog, WAL and undo stores',
+      'Use the public factory'
     ],
-    ['/zh/docs/logger/troubleshooting', '排错与常见问题', '常见错误代码'],
-    ['/en/docs/logger/troubleshooting', 'Troubleshooting and FAQ', 'Common error codes'],
     ['/zh/docs/plugin-host', 'Plugin Host：把安装、依赖和清理交给宿主', '为什么选它'],
     [
       '/en/docs/plugin-host',
@@ -4178,30 +4169,43 @@ test('gives primary tasks independent bilingual pages', () => {
   assert.match(guideSource, /core\.useAsyncPipeline\(async \(request, next\)/)
   assert.match(guideSource, /dependencies\.casing\.upper\(name\)/)
 
-  const loggerTopics = [
-    'getting-started',
-    'entries-hooks-and-sinks',
-    'plugins-and-batching',
-    'custom-plugin',
-    'pipelines',
-    'flush-and-shutdown',
-    'runtime-and-forwarding',
-    'troubleshooting'
+  /** Every logging owner keeps a resolvable public factory and asynchronous completion example. */
+  const loggingTopics = [
+    'log-host',
+    'log-plugin-console',
+    'log-plugin-file',
+    'log-plugin-http',
+    'log-plugin-process',
+    'log-plugin-reasoning',
+    'log-plugin-durable'
   ]
-    .map((topic) => readFileSync(join(buildRoot, artifactPath(`/en/docs/logger/${topic}`)), 'utf8'))
+    .map((library) => readFileSync(join(buildRoot, artifactPath(`/en/docs/${library}`)), 'utf8'))
     .join('\n')
-  const loggerText = renderedText(loggerTopics)
-  assert.match(loggerText, /onFailure/)
-  assert.match(loggerText, /dispatchRaw/)
-  assert.match(loggerText, /batch must come before http/)
-  assert.match(loggerText, /BATCH_OVERFLOW/)
-  assert.match(loggerText, /PIPELINE_MODE_MISMATCH/)
-  assert.match(loggerText, /a closed Logger cannot be reopened/)
-  assert.match(loggerText, /setLoggerRuntimeManager/)
-  assert.match(guideSource, /level\(\{ level: 'info' \}\)/)
-  assert.match(guideSource, /log\.usePipeline\(\(entry, next\)/)
-  assert.match(guideSource, /setLoggerRuntimeManager\(\{/)
-  assert.match(guideSource, /api\.extends\(audit\)/)
+  const loggingText = renderedText(loggingTopics)
+  assert.match(loggingText, /onFailure/)
+  assert.match(loggingText, /flush/)
+  assert.match(loggingText, /shutdown/)
+  for (const factory of [
+    'createLogHost',
+    'consolePlugin',
+    'filePlugin',
+    'httpPlugin',
+    'processPlugin',
+    'reasoningPlugin',
+    'binlogPlugin',
+    'walPlugin',
+    'undoLogPlugin'
+  ])
+    assert.match(loggingText, new RegExp(factory))
+  /** Batch overflow remains a host-owned code rather than a synchronous pipeline-mode contract. */
+  const logCodes = readFileSync(
+    join(buildRoot, artifactPath('/en/docs/log-host/api/LogHostErrorCode')),
+    'utf8'
+  )
+  assert.match(renderedText(logCodes), /BATCH_OVERFLOW/)
+  assert.match(guideSource, /thresholdFeature\(\{ level: 'info' \}\)/)
+  assert.match(guideSource, /fetcher:/)
+  assert.match(guideSource, /writer/)
 
   const storageWebStart = readFileSync(
     join(buildRoot, artifactPath('/en/docs/storage-web/getting-started')),
@@ -5310,32 +5314,29 @@ test('keeps every maintained Resource continuation resolvable', () => {
   }
 })
 
-test('keeps every maintained Logger continuation resolvable', () => {
+test('keeps every maintained logging owner continuation resolvable', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
-  const topics = [
-    '',
-    'getting-started',
-    'entries-hooks-and-sinks',
-    'plugins-and-batching',
-    'custom-plugin',
-    'pipelines',
-    'flush-and-shutdown',
-    'runtime-and-forwarding'
+  /** Seven current owners replace the removed aggregate package's continuation list. */
+  const libraries = [
+    'log-host',
+    'log-plugin-console',
+    'log-plugin-file',
+    'log-plugin-http',
+    'log-plugin-process',
+    'log-plugin-reasoning',
+    'log-plugin-durable'
   ]
-
   for (const locale of ['en', 'zh']) {
-    for (const topic of topics) {
-      const path = `/${locale}/docs/logger${topic ? `/${topic}` : ''}`
+    for (const library of libraries) {
+      const path = `/${locale}/docs/${library}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
       ]
         .map((match) => match[1])
         .filter((link): link is string => link !== undefined)
-
-      for (const link of internalLinks) {
-        assert.ok(routes.has(link), `broken maintained Logger link: ${path} -> ${link}`)
-      }
+      for (const link of internalLinks)
+        assert.ok(routes.has(link), `broken maintained logging link: ${path} -> ${link}`)
     }
   }
 })

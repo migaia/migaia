@@ -87,10 +87,10 @@ Map 适合局部数据；需要多后端、事务或统一释放时，再使用�
 pnpm add --workspace @migaia/storage-host @migaia/storage-contract
 ```
 
-内置 memory 不需要数据库客户端。其它后端由各自的插件提供。只有导入 `/plugins/journal`（使用 `storageJournalPlugin`）时才需要可选 peer：
+内置 memory 不需要数据库客户端。其它后端由各自的插件提供。只有导入 `/plugins/journal`（使用 `storageJournalPlugin`）时才需要以下可选 peer：
 
 ```bash
-pnpm add --workspace @migaia/logger
+pnpm add --workspace @migaia/log-host @migaia/log-plugin-durable
 ```
 
 ## 常用 API

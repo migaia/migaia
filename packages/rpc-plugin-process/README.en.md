@@ -56,7 +56,7 @@ Runtime root exports are `processPlugin`, `isProcessChild`, `RpcProcessErrorCode
 
 Use `host.process.request/notify/stream/group` and targeted `host.process.send`. The root retains `self`, `provide` and `close`, without those call methods. Native member queries, controls and events live under `host.process.members`: `list/get/stop/kill/restart/replace/on/watch`. Borrowing a connection does not authorize terminating its external process.
 
-`/features` exports complete-instance factories `sendQueue`, `flowControl` and `ipcLog`; pass instances to `processPlugin({ features })`. `sendQueue({ flow })` can borrow that same flow instance without another capacity policy. Business timeout/retry are also selected through transport `features`. Host intervention plugins use `@migaia/rpc-host/plugins/*` and install before transports.
+`/features` exports complete-instance factories `sendQueueFeature`, `flowControlFeature` and `ipcLogFeature`; pass instances to `processPlugin({ features })`. `sendQueueFeature({ flow })` can borrow that same flow instance without another capacity policy. Business timeout/retry are also selected through transport `features`. Host intervention plugins use `@migaia/rpc-host/plugins/*` and install before transports.
 
 ## Protocol and extension ownership
 

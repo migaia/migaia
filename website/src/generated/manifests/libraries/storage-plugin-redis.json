@@ -254,7 +254,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool) })] as const\n  })\n  const store = host.org('10000000-0000-4000-8000-000000000001').backend('redis')\n  await store\n    .tx()\n    .lock(lockKey.text('example:session'))\n    .run(async (tx) => {\n      await tx.use(kv).setMany([{ key: 'example:session', value: 'active' }])\n      await tx.use(ttl).expire(lockKey.text('example:session'), 60000)\n      await tx.set('example:visits', '0')\n      await tx.use(counter).increment('example:visits')\n    })\n  console.log(await store.get('example:session'))\n  console.log(await store.get('example:visits'))\n} finally {\n  await pool.close()\n}"
+                "code": "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/sdk'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool) })] as const\n  })\n  const store = host.org('10000000-0000-4000-8000-000000000001').backend('redis')\n  await store\n    .tx()\n    .lock(lockKey.text('example:session'))\n    .run(async (tx) => {\n      await tx.use(kv).setMany([{ key: 'example:session', value: 'active' }])\n      await tx.use(ttl).expire(lockKey.text('example:session'), 60000)\n      await tx.set('example:visits', '0')\n      await tx.use(counter).increment('example:visits')\n    })\n  console.log(await store.get('example:session'))\n  console.log(await store.get('example:visits'))\n} finally {\n  await pool.close()\n}"
               },
               {
                 "type": "paragraph",
@@ -340,7 +340,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "maxLen 必须是正安全整数，使用原生近似 MAXLEN 裁剪。readChanges({after,limit}) 默认limit100，从排他游标读起。处理效果和检查点应在回调成功前完成；tail 只在 onChange 成功后推进，失败报告并关闭，不越过失败项。游标是原生 Stream ID，按原样保存，不转成不精确的 JS number。"
+                "text": "每次提交同时追加到两条 Stream：共享的一条和本组织自己的一条。根 store 读共享 Stream，能看到所有组织；组织 store 只读自己的 Stream，所以一个写得很多的组织不会把安静组织的历史挤出保留窗口，也不会让它的读取扫过别的组织的条目。游标只属于返回它的那个 store 所读的 Stream，不要把根 store 的游标交给组织 store，反过来也一样。dropOrg 保留该组织的变更历史。maxLen 必须是正安全整数，对每条 Stream 分别生效，使用原生近似 MAXLEN 裁剪。readChanges({after,limit}) 默认limit100，从排他游标读起。处理效果和检查点应在回调成功前完成；tail 只在 onChange 成功后推进，失败报告并关闭，不越过失败项。游标是原生 Stream ID，按原样保存，不转成不精确的 JS number。"
               },
               {
                 "type": "paragraph",
@@ -411,7 +411,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "此后端明确nativeAtomic:false。要求同EXEC强原子binlog、WAL intent/marker或undo的组合当前拒绝，不得当作已支持能力。storageLogStore单独从`@migaia/storage-host/journal`导入，每次在原生命名空间读当前索引；多个实例可共用namespace和连续序号，不跨操作缓存索引。原生Feature API不冒充标准业务通道的日志来源。遥测显式启用，根操作和完整事务跨重试各记一次；logger及载体仍由调用方在host之后释放。"
+                "text": "此后端明确nativeAtomic:false。要求同EXEC强原子binlog、WAL intent/marker或undo的组合当前拒绝，不得当作已支持能力。storageLogStore单独从`@migaia/storage-host/plugins/journal`导入，每次在原生命名空间读当前索引；多个实例可共用namespace和连续序号，不跨操作缓存索引。原生Feature API不冒充标准业务通道的日志来源。遥测显式启用，根操作和完整事务跨重试各记一次；logger及载体仍由调用方在host之后释放。"
               }
             ]
           }
@@ -699,7 +699,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool) })] as const\n  })\n  const store = host.org('10000000-0000-4000-8000-000000000001').backend('redis')\n  await store\n    .tx()\n    .lock(lockKey.text('example:session'))\n    .run(async (tx) => {\n      await tx.use(kv).setMany([{ key: 'example:session', value: 'active' }])\n      await tx.use(ttl).expire(lockKey.text('example:session'), 60000)\n      await tx.set('example:visits', '0')\n      await tx.use(counter).increment('example:visits')\n    })\n  console.log(await store.get('example:session'))\n  console.log(await store.get('example:visits'))\n} finally {\n  await pool.close()\n}"
+                  "code": "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/sdk'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool) })] as const\n  })\n  const store = host.org('10000000-0000-4000-8000-000000000001').backend('redis')\n  await store\n    .tx()\n    .lock(lockKey.text('example:session'))\n    .run(async (tx) => {\n      await tx.use(kv).setMany([{ key: 'example:session', value: 'active' }])\n      await tx.use(ttl).expire(lockKey.text('example:session'), 60000)\n      await tx.set('example:visits', '0')\n      await tx.use(counter).increment('example:visits')\n    })\n  console.log(await store.get('example:session'))\n  console.log(await store.get('example:visits'))\n} finally {\n  await pool.close()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -785,7 +785,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "maxLen is a positive safe integer and uses native approximate MAXLEN trimming. readChanges({after,limit}) defaults to 100 and reads after the exclusive cursor. Finish derived effects and checkpoint persistence before a tail callback succeeds. Tail advances only after onChange succeeds; rejection reports and closes without skipping the failed item. Cursors are native Stream IDs; preserve strings rather than converting them into imprecise numbers."
+                  "text": "Each commit is appended to two Streams: the shared one and its organization's own. The root store reads the shared Stream and sees every organization; an organization store reads only its own Stream, so a busy organization cannot push a quiet organization's history out of retention or make its reads scan foreign entries. A cursor belongs to the Stream of the store that returned it; do not pass a root cursor to an organization store or the reverse. dropOrg keeps the organization's change history. maxLen is a positive safe integer, applies to each Stream separately and uses native approximate MAXLEN trimming. readChanges({after,limit}) defaults to 100 and reads after the exclusive cursor. Finish derived effects and checkpoint persistence before a tail callback succeeds. Tail advances only after onChange succeeds; rejection reports and closes without skipping the failed item. Cursors are native Stream IDs; preserve strings rather than converting them into imprecise numbers."
                 },
                 {
                   "type": "paragraph",
@@ -856,7 +856,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The backend declares nativeAtomic:false. Combinations requiring strongly atomic binlog in the same EXEC, WAL intent/marker or undo currently reject and must not be treated as supported. Import storageLogStore separately from `@migaia/storage-host/journal`; it reads the current private index for every operation. Multiple instances may share a namespace and sequence without a cross-operation index cache. Native Feature APIs are not standard business-channel journal sources. Telemetry is opt-in and records each root operation or whole transaction once across retries. The application releases its logger and log storage after the host."
+                  "text": "The backend declares nativeAtomic:false. Combinations requiring strongly atomic binlog in the same EXEC, WAL intent/marker or undo currently reject and must not be treated as supported. Import storageLogStore separately from `@migaia/storage-host/plugins/journal`; it reads the current private index for every operation. Multiple instances may share a namespace and sequence without a cross-operation index cache. Native Feature APIs are not standard business-channel journal sources. Telemetry is opt-in and records each root operation or whole transaction once across retries. The application releases its logger and log storage after the host."
                 }
               ]
             }
@@ -881,1551 +881,8 @@
       ],
       "guidePath": "/en/docs/storage-plugin-redis/getting-started",
       "architecturePath": "/en/docs/storage-plugin-redis",
-      "symbols": [
-        {
-          "name": "ERROR_SOURCE",
-          "kind": "const",
-          "signature": "export declare const ERROR_SOURCE: 'storage.backend.redis';",
-          "declarationLine": 2,
-          "source": "packages/storage-plugin-redis/dist/error-code.d.ts",
-          "purpose": "Identify the registered storage.backend.redis domain on errors crossing this package boundary.",
-          "core": "Identify the registered storage.backend.redis domain on errors crossing this package boundary.",
-          "advanced": "",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "aliasOf": "ERROR_SOURCE",
-          "exportPath": ".",
-          "overloadSignatures": ["export declare const ERROR_SOURCE: 'storage.backend.redis';"],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Identify the registered storage.backend.redis domain on errors crossing this package boundary."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import ERROR_SOURCE from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when ERROR_SOURCE does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Identify the registered storage.backend.redis domain on errors crossing this package boundary."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/error-code.d.ts:ERROR_SOURCE:export declare const ERROR_SOURCE: 'storage.backend.redis';",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--ERROR_SOURCE"
-        },
-        {
-          "name": "IRedisBorrowedClient",
-          "kind": "type",
-          "signature": "export type IRedisBorrowedClient<TClient extends object> = Omit<TClient, 'connect' | 'close' | 'destroy' | 'disconnect' | 'quit' | 'end' | 'duplicate' | 'createPool' | typeof Symbol.asyncDispose>;",
-          "declarationLine": 13,
-          "source": "packages/storage-plugin-redis/dist/driver.d.ts",
-          "purpose": "The actual native client type with connection ownership methods omitted.",
-          "core": "The actual native client type with connection ownership methods omitted.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "aliasOf": "IRedisBorrowedClient",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisBorrowedClient<TClient extends object> = Omit<TClient, 'connect' | 'close' | 'destroy' | 'disconnect' | 'quit' | 'end' | 'duplicate' | 'createPool' | typeof Symbol.asyncDispose>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "The actual native client type with connection ownership methods omitted."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisBorrowedClient from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisBorrowedClient when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisBorrowedClient does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The actual native client type with connection ownership methods omitted."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/driver.d.ts:IRedisBorrowedClient:export type IRedisBorrowedClient<TClient extends object> = Omit<TClient, 'connect' | 'close' | 'destroy' | 'disconnect' | 'quit' | 'end' | 'duplicate' | 'createPool' | typeof Symbol.asyncDispose>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisBorrowedClient"
-        },
-        {
-          "name": "IRedisCapabilities",
-          "kind": "type",
-          "signature": "export type IRedisCapabilities = typeof kv | typeof records | typeof ttl | typeof counter;",
-          "declarationLine": 4,
-          "source": "packages/storage-plugin-redis/dist/types.d.ts",
-          "purpose": "Native KV, records, TTL and counter tokens supplied before any selected Feature.",
-          "core": "Native KV, records, TTL and counter tokens supplied before any selected Feature.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "aliasOf": "IRedisCapabilities",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisCapabilities = typeof kv | typeof records | typeof ttl | typeof counter;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Native KV, records, TTL and counter tokens supplied before any selected Feature."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisCapabilities from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisCapabilities when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisCapabilities does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Native KV, records, TTL and counter tokens supplied before any selected Feature."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/types.d.ts:IRedisCapabilities:export type IRedisCapabilities = typeof kv | typeof records | typeof ttl | typeof counter;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisCapabilities"
-        },
-        {
-          "name": "IRedisCommandHookPayload",
-          "kind": "type",
-          "signature": "export type IRedisCommandHookPayload = IStorageHookIdentity & Readonly<{ command: string; elapsedMs: number; }>;",
-          "declarationLine": 3,
-          "source": "packages/storage-plugin-redis/dist/hooks.d.ts",
-          "purpose": "Command name and elapsed time without arguments or payloads.",
-          "core": "command: Native command name only; arguments and business payloads are omitted.\nelapsedMs: Observed native command settlement time in milliseconds.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "command",
-              "kind": "property",
-              "optional": false,
-              "signature": "command: string;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "string"
-            },
-            {
-              "name": "elapsedMs",
-              "kind": "property",
-              "optional": false,
-              "signature": "elapsedMs: number;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "number"
-            }
-          ],
-          "composes": ["IStorageHookIdentity"],
-          "aliasOf": "IRedisCommandHookPayload",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisCommandHookPayload = IStorageHookIdentity & Readonly<{ command: string; elapsedMs: number; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Command name and elapsed time without arguments or payloads."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisCommandHookPayload from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisCommandHookPayload when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisCommandHookPayload does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "command: Native command name only; arguments and business payloads are omitted.\nelapsedMs: Observed native command settlement time in milliseconds."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/hooks.d.ts:IRedisCommandHookPayload:export type IRedisCommandHookPayload = IStorageHookIdentity & Readonly<{ command: string; elapsedMs: number; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisCommandHookPayload"
-        },
-        {
-          "name": "IRedisConnection",
-          "kind": "type",
-          "signature": "export type IRedisConnection<TClient extends object = object> = { getClient(): IRedisBorrowedClient<TClient>; command(args: readonly string[]): Promise<IRedisReply>; exec(commands: readonly (readonly (string | Uint8Array)[])[]): Promise<readonly IRedisExecEntry[] | null>; readonly binaryCommand?: (args: readonly (string | Uint8Array)[]) => Promise<IRedisReply>; };",
-          "declarationLine": 15,
-          "source": "packages/storage-plugin-redis/dist/driver.d.ts",
-          "purpose": "One genuine leased connection, valid throughout its original callback.",
-          "core": "getClient: Borrow the genuine native client without close or duplicate authority.\nThe original SDK type with ownership methods omitted.\ncommand: Send a text-argument native command on this same connection.\ncommand.args: Command name followed by string arguments.\nThe original native reply; native failures use REDIS_FAILED.\nbinaryCommand: Use the native byte-preserving raw command API when provided.\nbinaryCommand.args: String command name, then strings or detached bytes.\nA native reply with arbitrary bulk bytes intact.\nAbsent on Bun; no binary port is fabricated.\nexec: Execute one validated native batch without replaying unknown writes.\nexec.commands: Captured command arrays; empty input performs no Redis I/O.\nNative null for WATCH abort, otherwise every original command result. Item errors may follow partial execution.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "getClient",
-              "kind": "method",
-              "optional": false,
-              "signature": "getClient(): IRedisBorrowedClient<TClient>;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IRedisBorrowedClient<TClient>"
-            },
-            {
-              "name": "command",
-              "kind": "method",
-              "optional": false,
-              "signature": "command(args: readonly string[]): Promise<IRedisReply>;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "args",
-                  "type": "readonly string[]",
-                  "optional": false
-                }
-              ],
-              "returns": "Promise<IRedisReply>"
-            },
-            {
-              "name": "exec",
-              "kind": "method",
-              "optional": false,
-              "signature": "exec(commands: readonly (readonly (string | Uint8Array)[])[]): Promise<readonly IRedisExecEntry[] | null>;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "commands",
-                  "type": "readonly (readonly (string | Uint8Array)[])[]",
-                  "optional": false
-                }
-              ],
-              "returns": "Promise<readonly IRedisExecEntry[] | null>"
-            },
-            {
-              "name": "binaryCommand",
-              "kind": "property",
-              "optional": true,
-              "signature": "readonly binaryCommand?: (args: readonly (string | Uint8Array)[]) => Promise<IRedisReply>;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "(args: readonly (string | Uint8Array)[]) => Promise<IRedisReply>"
-            }
-          ],
-          "composes": [],
-          "aliasOf": "IRedisConnection",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisConnection<TClient extends object = object> = { getClient(): IRedisBorrowedClient<TClient>; command(args: readonly string[]): Promise<IRedisReply>; exec(commands: readonly (readonly (string | Uint8Array)[])[]): Promise<readonly IRedisExecEntry[] | null>; readonly binaryCommand?: (args: readonly (string | Uint8Array)[]) => Promise<IRedisReply>; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "One genuine leased connection, valid throughout its original callback."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisConnection from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisConnection when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisConnection does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "getClient: Borrow the genuine native client without close or duplicate authority.\nThe original SDK type with ownership methods omitted.\ncommand: Send a text-argument native command on this same connection.\ncommand.args: Command name followed by string arguments.\nThe original native reply; native failures use REDIS_FAILED.\nbinaryCommand: Use the native byte-preserving raw command API when provided.\nbinaryCommand.args: String command name, then strings or detached bytes.\nA native reply with arbitrary bulk bytes intact.\nAbsent on Bun; no binary port is fabricated.\nexec: Execute one validated native batch without replaying unknown writes.\nexec.commands: Captured command arrays; empty input performs no Redis I/O.\nNative null for WATCH abort, otherwise every original command result. Item errors may follow partial execution."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/driver.d.ts:IRedisConnection:export type IRedisConnection<TClient extends object = object> = { getClient(): IRedisBorrowedClient<TClient>; command(args: readonly string[]): Promise<IRedisReply>; exec(commands: readonly (readonly (string | Uint8Array)[])[]): Promise<readonly IRedisExecEntry[] | null>; readonly binaryCommand?: (args: readonly (string | Uint8Array)[]) => Promise<IRedisReply>; };",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisConnection"
-        },
-        {
-          "name": "IRedisDriver",
-          "kind": "type",
-          "signature": "export type IRedisDriver<TClient extends object = object> = { command(args: readonly string[]): Promise<IRedisReply>; withConnection<TResult>(run: (connection: IRedisConnection<TClient>) => Promise<TResult>): Promise<TResult>; subscribe(channel: string, listener: (message: string) => void): Promise<IStorageResource>; };",
-          "declarationLine": 22,
-          "source": "packages/storage-plugin-redis/dist/driver.d.ts",
-          "purpose": "Native commands, complete connection callbacks and original subscription resources.",
-          "core": "command: Borrow a native connection for one string-argument command.\ncommand.args: Command name and string arguments.\nThe validated consumer receives the original unknown native reply.\nwithConnection: Keep the real lease or duplicate until the complete callback settles.\nwithConnection.run: Callback borrowing the genuine connection and its native methods.\nThe original callback value; unknown business failures use TRANSACTION_FAILED.\nsubscribe: Subscribe on a dedicated genuine connection without closing the injected root.\nsubscribe.channel: Native channel string.\nsubscribe.listener: Text-message observer; thrown or rejected failures are reported.\nAn original resource with cached primary and symbolic disposal Promises.",
-          "advanced": "Share one caller-owned connection pool between storage installation and native commands.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "command",
-              "kind": "method",
-              "optional": false,
-              "signature": "command(args: readonly string[]): Promise<IRedisReply>;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "args",
-                  "type": "readonly string[]",
-                  "optional": false
-                }
-              ],
-              "returns": "Promise<IRedisReply>"
-            },
-            {
-              "name": "withConnection",
-              "kind": "method",
-              "optional": false,
-              "signature": "withConnection<TResult>(run: (connection: IRedisConnection<TClient>) => Promise<TResult>): Promise<TResult>;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "run",
-                  "type": "(connection: IRedisConnection<TClient>) => Promise<TResult>",
-                  "optional": false
-                }
-              ],
-              "returns": "Promise<TResult>"
-            },
-            {
-              "name": "subscribe",
-              "kind": "method",
-              "optional": false,
-              "signature": "subscribe(channel: string, listener: (message: string) => void): Promise<IStorageResource>;",
-              "description": null,
-              "parameterDetails": [
-                {
-                  "name": "channel",
-                  "type": "string",
-                  "optional": false
-                },
-                {
-                  "name": "listener",
-                  "type": "(message: string) => void",
-                  "optional": false
-                }
-              ],
-              "returns": "Promise<IStorageResource>"
-            }
-          ],
-          "composes": [],
-          "aliasOf": "IRedisDriver",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisDriver<TClient extends object = object> = { command(args: readonly string[]): Promise<IRedisReply>; withConnection<TResult>(run: (connection: IRedisConnection<TClient>) => Promise<TResult>): Promise<TResult>; subscribe(channel: string, listener: (message: string) => void): Promise<IStorageResource>; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Share one caller-owned connection pool between storage installation and native commands.",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Native commands, complete connection callbacks and original subscription resources."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisDriver from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisDriver when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisDriver does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "command: Borrow a native connection for one string-argument command.\ncommand.args: Command name and string arguments.\nThe validated consumer receives the original unknown native reply.\nwithConnection: Keep the real lease or duplicate until the complete callback settles.\nwithConnection.run: Callback borrowing the genuine connection and its native methods.\nThe original callback value; unknown business failures use TRANSACTION_FAILED.\nsubscribe: Subscribe on a dedicated genuine connection without closing the injected root.\nsubscribe.channel: Native channel string.\nsubscribe.listener: Text-message observer; thrown or rejected failures are reported.\nAn original resource with cached primary and symbolic disposal Promises."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "Share one caller-owned connection pool between storage installation and native commands."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/driver.d.ts:IRedisDriver:export type IRedisDriver<TClient extends object = object> = { command(args: readonly string[]): Promise<IRedisReply>; withConnection<TResult>(run: (connection: IRedisConnection<TClient>) => Promise<TResult>): Promise<TResult>; subscribe(channel: string, listener: (message: string) => void): Promise<IStorageResource>; };",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisDriver"
-        },
-        {
-          "name": "IRedisErrorCode",
-          "kind": "type",
-          "signature": "export type IRedisErrorCode = (typeof RedisErrorCode)[keyof typeof RedisErrorCode];",
-          "declarationLine": 15,
-          "source": "packages/storage-plugin-redis/dist/error-code.d.ts",
-          "purpose": "Registered values from the Redis-owned semantic error table.",
-          "core": "Registered values from the Redis-owned semantic error table.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "aliasOf": "IRedisErrorCode",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisErrorCode = (typeof RedisErrorCode)[keyof typeof RedisErrorCode];"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Registered values from the Redis-owned semantic error table."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisErrorCode from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisErrorCode does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Registered values from the Redis-owned semantic error table."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/error-code.d.ts:IRedisErrorCode:export type IRedisErrorCode = (typeof RedisErrorCode)[keyof typeof RedisErrorCode];",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisErrorCode"
-        },
-        {
-          "name": "IRedisExecEntry",
-          "kind": "type",
-          "signature": "export type IRedisExecEntry = { readonly ok: true; readonly value: IRedisReply; } | { readonly ok: false; readonly error: Error; };",
-          "declarationLine": 5,
-          "source": "packages/storage-plugin-redis/dist/driver.d.ts",
-          "purpose": "One native success or original Error; failures do not imply rollback.",
-          "core": "ok: Discriminates a native successful command from an executed command error.\nvalue: Present on success; arbitrary bulk bytes remain Uint8Array-compatible.\nerror: Present on failure, retaining the exact original SDK Error.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "ok",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly ok: true;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "true"
-            },
-            {
-              "name": "value",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly value: IRedisReply;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IRedisReply"
-            },
-            {
-              "name": "ok",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly ok: false;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "false"
-            },
-            {
-              "name": "error",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly error: Error;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "Error"
-            }
-          ],
-          "composes": [],
-          "aliasOf": "IRedisExecEntry",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisExecEntry = { readonly ok: true; readonly value: IRedisReply; } | { readonly ok: false; readonly error: Error; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "One native success or original Error; failures do not imply rollback."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisExecEntry from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisExecEntry when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisExecEntry does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "ok: Discriminates a native successful command from an executed command error.\nvalue: Present on success; arbitrary bulk bytes remain Uint8Array-compatible.\nerror: Present on failure, retaining the exact original SDK Error."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/driver.d.ts:IRedisExecEntry:export type IRedisExecEntry = { readonly ok: true; readonly value: IRedisReply; } | { readonly ok: false; readonly error: Error; };",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisExecEntry"
-        },
-        {
-          "name": "IRedisOptions",
-          "kind": "type",
-          "signature": "export type IRedisOptions = { readonly driver: IRedisDriver; readonly prefix?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; };",
-          "declarationLine": 39,
-          "source": "packages/storage-plugin-redis/dist/types.d.ts",
-          "purpose": "Borrowed driver and namespace, original concurrency policy and native lock lease.",
-          "core": "id: Application-assigned backend identifier used by host.backend.\nredis, the default installed backend identifier.\ndriver: Caller-owned native driver from a public adapter or custom implementation.\nprefix: Physical namespace prefix; all owned channels retain the same Redis hash tag.\nmigaia isolates the default managed namespace.\nconcurrency: Authentic shared concurrency policy applied by the original operation owner.\nUse the shared owner default policy.\nowner: Optional diagnostic owner identity without exposing business values.\nNo application owner label is attached.\nowner.label: Application-assigned label displayed by original lock diagnostics.\nNo application label is attached.\nmaxLockMs: Positive native lock lease bound measured with Redis server time.\n30000 milliseconds for each native lock lease.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "driver",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly driver: IRedisDriver;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IRedisDriver"
-            },
-            {
-              "name": "prefix",
-              "kind": "property",
-              "optional": true,
-              "signature": "readonly prefix?: string;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "string"
-            },
-            {
-              "name": "concurrency",
-              "kind": "property",
-              "optional": true,
-              "signature": "readonly concurrency?: IConcurrencyPolicy;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "IConcurrencyPolicy"
-            },
-            {
-              "name": "owner",
-              "kind": "property",
-              "optional": true,
-              "signature": "readonly owner?: { readonly label?: string; };",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "{ readonly label?: string; }"
-            },
-            {
-              "name": "maxLockMs",
-              "kind": "property",
-              "optional": true,
-              "signature": "readonly maxLockMs?: number;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "number"
-            }
-          ],
-          "composes": [],
-          "aliasOf": "IRedisOptions",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisOptions = { readonly driver: IRedisDriver; readonly prefix?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Borrowed driver and namespace, original concurrency policy and native lock lease."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisOptions from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisOptions does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "id: Application-assigned backend identifier used by host.backend.\nredis, the default installed backend identifier.\ndriver: Caller-owned native driver from a public adapter or custom implementation.\nprefix: Physical namespace prefix; all owned channels retain the same Redis hash tag.\nmigaia isolates the default managed namespace.\nconcurrency: Authentic shared concurrency policy applied by the original operation owner.\nUse the shared owner default policy.\nowner: Optional diagnostic owner identity without exposing business values.\nNo application owner label is attached.\nowner.label: Application-assigned label displayed by original lock diagnostics.\nNo application label is attached.\nmaxLockMs: Positive native lock lease bound measured with Redis server time.\n30000 milliseconds for each native lock lease."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/types.d.ts:IRedisOptions:export type IRedisOptions = { readonly driver: IRedisDriver; readonly prefix?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; };",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisOptions"
-        },
-        {
-          "name": "IRedisReply",
-          "kind": "type",
-          "signature": "export type IRedisReply = unknown;",
-          "declarationLine": 3,
-          "source": "packages/storage-plugin-redis/dist/driver.d.ts",
-          "purpose": "Unknown native replies are validated by each fixed command consumer.",
-          "core": "Unknown native replies are validated by each fixed command consumer.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": ["unknown"],
-          "aliasOf": "IRedisReply",
-          "exportPath": ".",
-          "overloadSignatures": ["export type IRedisReply = unknown;"],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Unknown native replies are validated by each fixed command consumer."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisReply from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisReply when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisReply does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Unknown native replies are validated by each fixed command consumer."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/driver.d.ts:IRedisReply:export type IRedisReply = unknown;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisReply"
-        },
-        {
-          "name": "IRedisStore",
-          "kind": "type",
-          "signature": "export type IRedisStore = ICapabilityStore<IRedisNativeStore, IRedisCapabilities, readonly [ ICapabilityImpl<typeof kv>, ICapabilityImpl<typeof records, IRecordsApi<unknown, true>>, ICapabilityImpl<typeof ttl>, ICapabilityImpl<typeof counter> ]>;",
-          "declarationLine": 32,
-          "source": "packages/storage-plugin-redis/dist/types.d.ts",
-          "purpose": "Full asynchronous record store with original capabilities, native transactions and change hints.",
-          "core": "Full asynchronous record store with original capabilities, native transactions and change hints.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": ["ICapabilityStore"],
-          "aliasOf": "IRedisStore",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisStore = ICapabilityStore<IRedisNativeStore, IRedisCapabilities, readonly [ ICapabilityImpl<typeof kv>, ICapabilityImpl<typeof records, IRecordsApi<unknown, true>>, ICapabilityImpl<typeof ttl>, ICapabilityImpl<typeof counter> ]>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Full asynchronous record store with original capabilities, native transactions and change hints."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisStore from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisStore when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisStore does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Full asynchronous record store with original capabilities, native transactions and change hints."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/types.d.ts:IRedisStore:export type IRedisStore = ICapabilityStore<IRedisNativeStore, IRedisCapabilities, readonly [ ICapabilityImpl<typeof kv>, ICapabilityImpl<typeof records, IRecordsApi<unknown, true>>, ICapabilityImpl<typeof ttl>, ICapabilityImpl<typeof counter> ]>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisStore"
-        },
-        {
-          "name": "IRedisTransactionScope",
-          "kind": "type",
-          "signature": "export type IRedisTransactionScope = ITransactionScope<unknown, IRedisCapabilities>;",
-          "declarationLine": 9,
-          "source": "packages/storage-plugin-redis/dist/types.d.ts",
-          "purpose": "Authentic original transaction view; native Feature APIs are absent.",
-          "core": "Authentic original transaction view; native Feature APIs are absent.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": ["ITransactionScope"],
-          "aliasOf": "IRedisTransactionScope",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisTransactionScope = ITransactionScope<unknown, IRedisCapabilities>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Authentic original transaction view; native Feature APIs are absent."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisTransactionScope from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisTransactionScope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisTransactionScope does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Authentic original transaction view; native Feature APIs are absent."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/types.d.ts:IRedisTransactionScope:export type IRedisTransactionScope = ITransactionScope<unknown, IRedisCapabilities>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisTransactionScope"
-        },
-        {
-          "name": "IRedisWatchConflictHookPayload",
-          "kind": "type",
-          "signature": "export type IRedisWatchConflictHookPayload = IStorageHookIdentity & Readonly<{ keyCount: number; }>;",
-          "declarationLine": 8,
-          "source": "packages/storage-plugin-redis/dist/hooks.d.ts",
-          "purpose": "Logical native WATCH key count without business key copies.",
-          "core": "keyCount: Number of canonical logical identities involved in the original WATCH attempt.",
-          "advanced": "",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "keyCount",
-              "kind": "property",
-              "optional": false,
-              "signature": "keyCount: number;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "number"
-            }
-          ],
-          "composes": ["IStorageHookIdentity"],
-          "aliasOf": "IRedisWatchConflictHookPayload",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IRedisWatchConflictHookPayload = IStorageHookIdentity & Readonly<{ keyCount: number; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Logical native WATCH key count without business key copies."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IRedisWatchConflictHookPayload from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IRedisWatchConflictHookPayload when its type contract and declared inputs match the result you need. Choose a different public symbol when IRedisWatchConflictHookPayload does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "keyCount: Number of canonical logical identities involved in the original WATCH attempt."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/hooks.d.ts:IRedisWatchConflictHookPayload:export type IRedisWatchConflictHookPayload = IStorageHookIdentity & Readonly<{ keyCount: number; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--IRedisWatchConflictHookPayload"
-        },
-        {
-          "name": "redisBackendKind",
-          "kind": "const",
-          "signature": "export declare const redisBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, IRedisDriver, {}>;",
-          "declarationLine": 5,
-          "source": "packages/storage-plugin-redis/dist/plugin.d.ts",
-          "purpose": "Identify the exact Redis backend when authenticating native Feature installation.",
-          "core": "Identify the exact Redis backend when authenticating native Feature installation.",
-          "advanced": "",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "aliasOf": "redisBackendKind",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const redisBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, IRedisDriver, {}>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Identify the exact Redis backend when authenticating native Feature installation."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import redisBackendKind from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use redisBackendKind when its const contract and declared inputs match the result you need. Choose a different public symbol when redisBackendKind does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Identify the exact Redis backend when authenticating native Feature installation."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/plugin.d.ts:redisBackendKind:export declare const redisBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, IRedisDriver, {}>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--redisBackendKind"
-        },
-        {
-          "name": "redisBackendPlugin",
-          "kind": "function",
-          "signature": "export declare function redisBackendPlugin<const TId extends string = 'redis', const F extends IStorageFeatureRecord = {}>(options: IRedisOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof redisBackendKind, NoInfer<F>, IRedisStore>): IStorageBackendPlugin<typeof redisBackendKind, NoInfer<TId>, F, IRedisStore>;",
-          "declarationLine": 7,
-          "source": "packages/storage-plugin-redis/dist/plugin.d.ts",
-          "purpose": "Install native storage and WATCH transactions. Private storageLogStore operations read current native state on each call; strong journal composition remains unavailable.",
-          "core": "options: Caller configuration selecting the original driver and namespace.\nfeatures: Explicit native Feature factories for this exact backend kind.\nA lazy exact-id plugin descriptor; the caller retains driver and connection ownership.\nid: Application-assigned backend identifier used by host.backend.\nredis, the default installed backend identifier.\ndriver: Caller-owned native driver from a public adapter or custom implementation.\nprefix: Physical namespace prefix; all owned channels retain the same Redis hash tag.\nmigaia isolates the default managed namespace.\nconcurrency: Authentic shared concurrency policy applied by the original operation owner.\nUse the shared owner default policy.\nowner: Optional diagnostic owner identity without exposing business values.\nNo application owner label is attached.\nowner.label: Application-assigned label displayed by original lock diagnostics.\nNo application label is attached.\nmaxLockMs: Positive native lock lease bound measured with Redis server time.\n30000 milliseconds for each native lock lease.",
-          "advanced": "",
-          "parameters": [
-            "options: IRedisOptions & { readonly id?: TId; }",
-            "features: F & IStorageFeatureStoreCompatibility<typeof redisBackendKind, NoInfer<F>, IRedisStore> (optional)"
-          ],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "IRedisOptions & { readonly id?: TId; }",
-              "optional": false
-            },
-            {
-              "name": "features",
-              "type": "F & IStorageFeatureStoreCompatibility<typeof redisBackendKind, NoInfer<F>, IRedisStore>",
-              "optional": true
-            }
-          ],
-          "returns": "IStorageBackendPlugin<typeof redisBackendKind, NoInfer<TId>, F, IRedisStore>",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [
-            "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool) })] as const\n  })\n  const store = host.org('10000000-0000-4000-8000-000000000001').backend('redis')\n  await store\n    .tx()\n    .lock(lockKey.text('example:session'))\n    .run(async (tx) => {\n      await tx.use(kv).setMany([{ key: 'example:session', value: 'active' }])\n      await tx.use(ttl).expire(lockKey.text('example:session'), 60000)\n      await tx.set('example:visits', '0')\n      await tx.use(counter).increment('example:visits')\n    })\n  console.log(await store.get('example:session'))\n  console.log(await store.get('example:visits'))\n} finally {\n  await pool.close()\n}",
-            "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { redisStreamsFeature } from '@migaia/storage-plugin-redis/features/streams'\nimport { redisPubSubFeature } from '@migaia/storage-plugin-redis/features/pubsub'\nimport { redisSortedSetsFeature } from '@migaia/storage-plugin-redis/features/sorted-sets'\nimport { redisRateLimitFeature } from '@migaia/storage-plugin-redis/features/rate-limit'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      redisBackendPlugin(\n        { driver: nodeRedisDriver(pool), prefix: 'example-features' },\n        {\n          streams: redisStreamsFeature(),\n          pubsub: redisPubSubFeature(),\n          scores: redisSortedSetsFeature(),\n          rate: redisRateLimitFeature({ limit: 3, windowMs: 1000 })\n        }\n      )\n    ] as const\n  })\n  const store = host.backend('redis')\n  const id = await store.api.streams.add('jobs', { body: new Uint8Array([1, 2]) })\n  console.log((await store.api.streams.range('jobs')).some((entry) => entry.id === id))\n  await store.api.sortedSets.add('scores', [{ member: 'Ada', score: 1 }])\n  console.log((await store.api.sortedSets.top('scores'))[0]?.member)\n  console.log((await store.api.rateLimit.consume('quota')).allowed)\n  const message = Promise.withResolvers<Uint8Array>()\n  await using subscription = await store.api.pubsub.subscribe('events', message.resolve)\n  await store.api.pubsub.publish('events', new Uint8Array([3]))\n  console.log((await message.promise)[0])\n} finally {\n  await pool.close()\n}",
-            "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { redisChangeStreamFeature } from '@migaia/storage-plugin-redis/features/change-stream'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      redisBackendPlugin(\n        { driver: nodeRedisDriver(pool), prefix: 'example-history' },\n        { history: redisChangeStreamFeature({ maxLen: 1000 }) }\n      )\n    ] as const\n  })\n  const store = host.backend('redis')\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      console.log(change.cursor)\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:checkpoint', 'ready')\n  await received.promise\n} finally {\n  await pool.close()\n}",
-            "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector, ttl } from '@migaia/storage-contract'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/search'\nconst pool = createClientPool({ url: process.env.REDIS_SEARCH_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      redisBackendPlugin(\n        { driver: nodeRedisDriver(pool), prefix: 'example-vectors' },\n        { search: rediSearchVectorFeature() }\n      )\n    ] as const\n  })\n  const store = host.backend('redis')\n  const items = store\n    .use(vector)\n    .collection<{ category: string }>('documents', { dimensions: 2, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0], payload: { category: 'guide' } }])\n  const hits = await items.near([1, 0], { exact: true }).where({ category: 'guide' }).topK(1).all()\n  console.log(hits[0]?.id)\n  await store.use(ttl).expire({ channel: 'vector', collection: 'documents', id: 'guide' }, 60000)\n} finally {\n  await pool.close()\n}",
-            "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool) })] as const\n  })\n  const store = host.backend('redis')\n  await store.set('example:status', 'ready')\n  console.log(await store.get('example:status'))\n} finally {\n  await pool.close()\n}"
-          ],
-          "members": [],
-          "composes": [],
-          "aliasOf": "redisBackendPlugin",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare function redisBackendPlugin<const TId extends string = 'redis', const F extends IStorageFeatureRecord = {}>(options: IRedisOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof redisBackendKind, NoInfer<F>, IRedisStore>): IStorageBackendPlugin<typeof redisBackendKind, NoInfer<TId>, F, IRedisStore>;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "IRedisOptions & { readonly id?: TId; }",
-                "optional": false
-              },
-              {
-                "name": "features",
-                "type": "F & IStorageFeatureStoreCompatibility<typeof redisBackendKind, NoInfer<F>, IRedisStore>",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": [
-            "IStorageBackendPlugin<typeof redisBackendKind, NoInfer<TId>, F, IRedisStore>"
-          ],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Install native storage and WATCH transactions. Private storageLogStore operations read current native state on each call; strong journal composition remains unavailable."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import redisBackendPlugin from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use redisBackendPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when redisBackendPlugin does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "options: Caller configuration selecting the original driver and namespace.\nfeatures: Explicit native Feature factories for this exact backend kind.\nA lazy exact-id plugin descriptor; the caller retains driver and connection ownership.\nid: Application-assigned backend identifier used by host.backend.\nredis, the default installed backend identifier.\ndriver: Caller-owned native driver from a public adapter or custom implementation.\nprefix: Physical namespace prefix; all owned channels retain the same Redis hash tag.\nmigaia isolates the default managed namespace.\nconcurrency: Authentic shared concurrency policy applied by the original operation owner.\nUse the shared owner default policy.\nowner: Optional diagnostic owner identity without exposing business values.\nNo application owner label is attached.\nowner.label: Application-assigned label displayed by original lock diagnostics.\nNo application label is attached.\nmaxLockMs: Positive native lock lease bound measured with Redis server time.\n30000 milliseconds for each native lock lease."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [
-            {
-              "name": "id",
-              "type": "TId",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "driver",
-              "type": "IRedisDriver",
-              "optional": false,
-              "description": ""
-            },
-            {
-              "name": "prefix",
-              "type": "string",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "concurrency",
-              "type": "IConcurrencyPolicy",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "owner",
-              "type": "{ readonly label?: string; }",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "owner.label",
-              "type": "string",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "maxLockMs",
-              "type": "number",
-              "optional": true,
-              "description": ""
-            }
-          ],
-          "identity": "packages/storage-plugin-redis/dist/plugin.d.ts:redisBackendPlugin:export declare function redisBackendPlugin<const TId extends string = 'redis', const F extends IStorageFeatureRecord = {}>(options: IRedisOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof redisBackendKind, NoInfer<F>, IRedisStore>): IStorageBackendPlugin<typeof redisBackendKind, NoInfer<TId>, F, IRedisStore>;",
-          "guidance": [],
-          "usageScore": 68,
-          "configuration": [
-            {
-              "name": "id",
-              "type": "TId",
-              "optional": true,
-              "description": "`host.org(id).backend('redis')` — 固定组织的数据",
-              "descriptionEn": "",
-              "descriptionZh": "`host.org(id).backend('redis')` — 固定组织的数据"
-            },
-            {
-              "name": "driver",
-              "type": "IRedisDriver",
-              "optional": false,
-              "description": "`redisBackendPlugin({ driver, prefix? }, features?)` — 安装 Redis 存储",
-              "descriptionEn": "",
-              "descriptionZh": "`redisBackendPlugin({ driver, prefix? }, features?)` — 安装 Redis 存储"
-            },
-            {
-              "name": "prefix",
-              "type": "string",
-              "optional": true,
-              "description": "`redisBackendPlugin({ driver, prefix? }, features?)` — 安装 Redis 存储",
-              "descriptionEn": "",
-              "descriptionZh": "`redisBackendPlugin({ driver, prefix? }, features?)` — 安装 Redis 存储"
-            },
-            {
-              "name": "concurrency",
-              "type": "IConcurrencyPolicy",
-              "optional": true,
-              "description": "",
-              "descriptionEn": "",
-              "descriptionZh": ""
-            },
-            {
-              "name": "owner",
-              "type": "{ readonly label?: string; }",
-              "optional": true,
-              "description": "Groups `owner.label`; configure the nested fields below.",
-              "descriptionEn": "Groups `owner.label`; configure the nested fields below.",
-              "descriptionZh": ""
-            },
-            {
-              "name": "owner.label",
-              "type": "string",
-              "optional": true,
-              "description": "",
-              "descriptionEn": "",
-              "descriptionZh": ""
-            },
-            {
-              "name": "maxLockMs",
-              "type": "number",
-              "optional": true,
-              "description": "",
-              "descriptionEn": "",
-              "descriptionZh": ""
-            }
-          ],
-          "fragment": "storage-plugin-redis-index--redisBackendPlugin"
-        },
-        {
-          "name": "RedisErrorCode",
-          "kind": "const",
-          "signature": "export declare const RedisErrorCode: { /** Native command, connection or EXEC failure; unknown writes must never be replayed. */ readonly failed: 'REDIS_FAILED'; /** Fixed protocol replies or persisted values cannot be decoded; inspect the original cause. */ readonly decodeFailed: 'DECODE_FAILED'; /** * User callback, draft or finalizer failed without a native protocol failure; inspect the * original error. */ readonly transactionFailed: 'TRANSACTION_FAILED'; };",
-          "declarationLine": 4,
-          "source": "packages/storage-plugin-redis/dist/error-code.d.ts",
-          "purpose": "Distinguish native protocol failures, invalid persisted data and unknown business callback failures.",
-          "core": "failed: Native command, connection or EXEC failure; unknown writes are never replayed.\ndecodeFailed: A fixed reply or persisted value cannot be decoded.\ntransactionFailed: Unknown callback, draft or finalizer business failure retains its original cause.",
-          "advanced": "",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [
-            {
-              "name": "failed",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly failed: 'REDIS_FAILED';",
-              "description": "Native command, connection or EXEC failure; unknown writes must never be replayed.",
-              "parameterDetails": [],
-              "returns": "'REDIS_FAILED'"
-            },
-            {
-              "name": "decodeFailed",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly decodeFailed: 'DECODE_FAILED';",
-              "description": "Fixed protocol replies or persisted values cannot be decoded; inspect the original cause.",
-              "parameterDetails": [],
-              "returns": "'DECODE_FAILED'"
-            },
-            {
-              "name": "transactionFailed",
-              "kind": "property",
-              "optional": false,
-              "signature": "readonly transactionFailed: 'TRANSACTION_FAILED';",
-              "description": "User callback, draft or finalizer failed without a native protocol failure; inspect the * original error.",
-              "parameterDetails": [],
-              "returns": "'TRANSACTION_FAILED'"
-            }
-          ],
-          "composes": [],
-          "aliasOf": "RedisErrorCode",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const RedisErrorCode: { /** Native command, connection or EXEC failure; unknown writes must never be replayed. */ readonly failed: 'REDIS_FAILED'; /** Fixed protocol replies or persisted values cannot be decoded; inspect the original cause. */ readonly decodeFailed: 'DECODE_FAILED'; /** * User callback, draft or finalizer failed without a native protocol failure; inspect the * original error. */ readonly transactionFailed: 'TRANSACTION_FAILED'; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Distinguish native protocol failures, invalid persisted data and unknown business callback failures."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import RedisErrorCode from @migaia/storage-plugin-redis, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use RedisErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when RedisErrorCode does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "failed: Native command, connection or EXEC failure; unknown writes are never replayed.\ndecodeFailed: A fixed reply or persisted value cannot be decoded.\ntransactionFailed: Unknown callback, draft or finalizer business failure retains its original cause."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/error-code.d.ts:RedisErrorCode:export declare const RedisErrorCode: { /** Native command, connection or EXEC failure; unknown writes must never be replayed. */ readonly failed: 'REDIS_FAILED'; /** Fixed protocol replies or persisted values cannot be decoded; inspect the original cause. */ readonly decodeFailed: 'DECODE_FAILED'; /** * User callback, draft or finalizer failed without a native protocol failure; inspect the * original error. */ readonly transactionFailed: 'TRANSACTION_FAILED'; };",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-redis-index--RedisErrorCode"
-        }
-      ],
-      "aliases": [
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/change-stream.d.ts:IRedisChangeStreamOutput:export type IRedisChangeStreamOutput = IStorageFeatureOutput<readonly [ICapabilityImpl<typeof durableChangeFeed, IDurableChangeFeedApi>], {}, { readonly store: {}; readonly transaction: {}; }>;",
-          "name": "IRedisChangeStreamOutput",
-          "signature": "export type IRedisChangeStreamOutput = IStorageFeatureOutput<readonly [ICapabilityImpl<typeof durableChangeFeed, IDurableChangeFeedApi>], {}, { readonly store: {}; readonly transaction: {}; }>;",
-          "source": "packages/storage-plugin-redis/dist/features/change-stream.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/change-stream",
-          "ownerModule": "features/change-stream",
-          "ownerFragment": "storage-plugin-redis-features/change-stream--IRedisChangeStreamOutput"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/pubsub.d.ts:IRedisPubSubApi:export type IRedisPubSubApi = { readonly pubsub: { publish(channel: string, payload: Uint8Array, ctx?: IOperationContext): Promise<number>; subscribe(channel: string, listener: (payload: Uint8Array) => void, ctx?: IOperationContext): Promise<IStorageResource>; keyspace(database: number, event: 'expired' | 'del' | 'set', listener: (key: Uint8Array) => void, ctx?: IOperationContext): Promise<IStorageResource>; }; };",
-          "name": "IRedisPubSubApi",
-          "signature": "export type IRedisPubSubApi = { readonly pubsub: { publish(channel: string, payload: Uint8Array, ctx?: IOperationContext): Promise<number>; subscribe(channel: string, listener: (payload: Uint8Array) => void, ctx?: IOperationContext): Promise<IStorageResource>; keyspace(database: number, event: 'expired' | 'del' | 'set', listener: (key: Uint8Array) => void, ctx?: IOperationContext): Promise<IStorageResource>; }; };",
-          "source": "packages/storage-plugin-redis/dist/features/pubsub.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/pubsub",
-          "ownerModule": "features/pubsub",
-          "ownerFragment": "storage-plugin-redis-features/pubsub--IRedisPubSubApi"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/pubsub.d.ts:IRedisPubSubOutput:export type IRedisPubSubOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisPubSubApi; readonly transaction: {}; }>;",
-          "name": "IRedisPubSubOutput",
-          "signature": "export type IRedisPubSubOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisPubSubApi; readonly transaction: {}; }>;",
-          "source": "packages/storage-plugin-redis/dist/features/pubsub.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/pubsub",
-          "ownerModule": "features/pubsub",
-          "ownerFragment": "storage-plugin-redis-features/pubsub--IRedisPubSubOutput"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts:IRedisRateLimitApi:export type IRedisRateLimitApi = { readonly rateLimit: { consume(key: string, cost?: number, ctx?: IOperationContext): Promise<IRedisRateLimitResult>; }; };",
-          "name": "IRedisRateLimitApi",
-          "signature": "export type IRedisRateLimitApi = { readonly rateLimit: { consume(key: string, cost?: number, ctx?: IOperationContext): Promise<IRedisRateLimitResult>; }; };",
-          "source": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/rate-limit",
-          "ownerModule": "features/rate-limit",
-          "ownerFragment": "storage-plugin-redis-features/rate-limit--IRedisRateLimitApi"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts:IRedisRateLimitOptions:export type IRedisRateLimitOptions = { readonly limit: number; readonly windowMs: number; };",
-          "name": "IRedisRateLimitOptions",
-          "signature": "export type IRedisRateLimitOptions = { readonly limit: number; readonly windowMs: number; };",
-          "source": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/rate-limit",
-          "ownerModule": "features/rate-limit",
-          "ownerFragment": "storage-plugin-redis-features/rate-limit--IRedisRateLimitOptions"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts:IRedisRateLimitOutput:export type IRedisRateLimitOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisRateLimitApi; readonly transaction: {}; }>;",
-          "name": "IRedisRateLimitOutput",
-          "signature": "export type IRedisRateLimitOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisRateLimitApi; readonly transaction: {}; }>;",
-          "source": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/rate-limit",
-          "ownerModule": "features/rate-limit",
-          "ownerFragment": "storage-plugin-redis-features/rate-limit--IRedisRateLimitOutput"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts:IRedisRateLimitResult:export type IRedisRateLimitResult = { readonly allowed: boolean; readonly remaining: number; readonly resetAfterMs: number; };",
-          "name": "IRedisRateLimitResult",
-          "signature": "export type IRedisRateLimitResult = { readonly allowed: boolean; readonly remaining: number; readonly resetAfterMs: number; };",
-          "source": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/rate-limit",
-          "ownerModule": "features/rate-limit",
-          "ownerFragment": "storage-plugin-redis-features/rate-limit--IRedisRateLimitResult"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/sorted-sets.d.ts:IRedisSortedSetsApi:export type IRedisSortedSetsApi = { readonly sortedSets: { add(key: string, entries: readonly { readonly member: string; readonly score: number; }[], ctx?: IOperationContext): Promise<number>; rank(key: string, member: string, ctx?: IOperationContext): Promise<number | undefined>; top(key: string, options?: { readonly count?: number; }, ctx?: IOperationContext): Promise<readonly { readonly member: string; readonly score: number; }[]>; }; };",
-          "name": "IRedisSortedSetsApi",
-          "signature": "export type IRedisSortedSetsApi = { readonly sortedSets: { add(key: string, entries: readonly { readonly member: string; readonly score: number; }[], ctx?: IOperationContext): Promise<number>; rank(key: string, member: string, ctx?: IOperationContext): Promise<number | undefined>; top(key: string, options?: { readonly count?: number; }, ctx?: IOperationContext): Promise<readonly { readonly member: string; readonly score: number; }[]>; }; };",
-          "source": "packages/storage-plugin-redis/dist/features/sorted-sets.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/sorted-sets",
-          "ownerModule": "features/sorted-sets",
-          "ownerFragment": "storage-plugin-redis-features/sorted-sets--IRedisSortedSetsApi"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/sorted-sets.d.ts:IRedisSortedSetsOutput:export type IRedisSortedSetsOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisSortedSetsApi; readonly transaction: {}; }>;",
-          "name": "IRedisSortedSetsOutput",
-          "signature": "export type IRedisSortedSetsOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisSortedSetsApi; readonly transaction: {}; }>;",
-          "source": "packages/storage-plugin-redis/dist/features/sorted-sets.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/sorted-sets",
-          "ownerModule": "features/sorted-sets",
-          "ownerFragment": "storage-plugin-redis-features/sorted-sets--IRedisSortedSetsOutput"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/streams.d.ts:IRedisStreamEntry:export type IRedisStreamEntry = { readonly id: string; readonly fields: Readonly<Record<string, Uint8Array>>; };",
-          "name": "IRedisStreamEntry",
-          "signature": "export type IRedisStreamEntry = { readonly id: string; readonly fields: Readonly<Record<string, Uint8Array>>; };",
-          "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/streams",
-          "ownerModule": "features/streams",
-          "ownerFragment": "storage-plugin-redis-features/streams--IRedisStreamEntry"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/streams.d.ts:IRedisStreamsApi:export type IRedisStreamsApi = { readonly streams: { add(stream: string, fields: Readonly<Record<string, Uint8Array>>, ctx?: IOperationContext): Promise<string>; range(stream: string, options?: { readonly start?: string; readonly end?: string; readonly count?: number; }, ctx?: IOperationContext): Promise<readonly IRedisStreamEntry[]>; createGroup(stream: string, group: string, options?: { readonly start?: string; readonly createStream?: boolean; }, ctx?: IOperationContext): Promise<void>; readGroup(stream: string, options: { readonly group: string; readonly consumer: string; readonly count?: number; readonly blockMs?: number; }, ctx?: IOperationContext): Promise<readonly IRedisStreamEntry[]>; ack(stream: string, group: string, ids: readonly string[], ctx?: IOperationContext): Promise<number>; autoClaim(stream: string, options: { readonly group: string; readonly consumer: string; readonly minIdleMs: number; readonly start?: string; readonly count?: number; }, ctx?: IOperationContext): Promise<{ readonly next: string; readonly entries: readonly IRedisStreamEntry[]; readonly deletedIds: readonly string[]; }>; }; };",
-          "name": "IRedisStreamsApi",
-          "signature": "export type IRedisStreamsApi = { readonly streams: { add(stream: string, fields: Readonly<Record<string, Uint8Array>>, ctx?: IOperationContext): Promise<string>; range(stream: string, options?: { readonly start?: string; readonly end?: string; readonly count?: number; }, ctx?: IOperationContext): Promise<readonly IRedisStreamEntry[]>; createGroup(stream: string, group: string, options?: { readonly start?: string; readonly createStream?: boolean; }, ctx?: IOperationContext): Promise<void>; readGroup(stream: string, options: { readonly group: string; readonly consumer: string; readonly count?: number; readonly blockMs?: number; }, ctx?: IOperationContext): Promise<readonly IRedisStreamEntry[]>; ack(stream: string, group: string, ids: readonly string[], ctx?: IOperationContext): Promise<number>; autoClaim(stream: string, options: { readonly group: string; readonly consumer: string; readonly minIdleMs: number; readonly start?: string; readonly count?: number; }, ctx?: IOperationContext): Promise<{ readonly next: string; readonly entries: readonly IRedisStreamEntry[]; readonly deletedIds: readonly string[]; }>; }; };",
-          "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/streams",
-          "ownerModule": "features/streams",
-          "ownerFragment": "storage-plugin-redis-features/streams--IRedisStreamsApi"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/streams.d.ts:IRedisStreamsOutput:export type IRedisStreamsOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisStreamsApi; readonly transaction: {}; }>;",
-          "name": "IRedisStreamsOutput",
-          "signature": "export type IRedisStreamsOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisStreamsApi; readonly transaction: {}; }>;",
-          "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/streams",
-          "ownerModule": "features/streams",
-          "ownerFragment": "storage-plugin-redis-features/streams--IRedisStreamsOutput"
-        },
-        {
-          "identity": "packages/storage-plugin-redis/dist/features/search.d.ts:IRedisVectorFeatureOutput:export type IRedisVectorFeatureOutput = IStorageFeatureOutput<readonly [ICapabilityImpl<typeof vector, IVectorApi<false, true>>], {}, { readonly store: {}; readonly transaction: {}; }>;",
-          "name": "IRedisVectorFeatureOutput",
-          "signature": "export type IRedisVectorFeatureOutput = IStorageFeatureOutput<readonly [ICapabilityImpl<typeof vector, IVectorApi<false, true>>], {}, { readonly store: {}; readonly transaction: {}; }>;",
-          "source": "packages/storage-plugin-redis/dist/features/search.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./features/search",
-          "ownerModule": "features/search",
-          "ownerFragment": "storage-plugin-redis-features/search--IRedisVectorFeatureOutput"
-        }
-      ]
+      "symbols": [],
+      "aliases": []
     },
     {
       "id": "storage-plugin-redis:bun",
@@ -2630,7 +1087,7 @@
         {
           "name": "redisChangeStreamFeature",
           "kind": "function",
-          "signature": "export declare function redisChangeStreamFeature(options: { readonly maxLen: number; }): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>;",
+          "signature": "export declare function redisChangeStreamFeature(options: { readonly maxLen: number; }): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>;",
           "declarationLine": 12,
           "source": "packages/storage-plugin-redis/dist/features/change-stream.d.ts",
           "purpose": "Publish durableChangeFeed from the original committed EXEC and native stream cursor owner.",
@@ -2644,7 +1101,7 @@
               "optional": false
             }
           ],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -2654,7 +1111,7 @@
           "composes": [],
           "exportPath": "./features/change-stream",
           "overloadSignatures": [
-            "export declare function redisChangeStreamFeature(options: { readonly maxLen: number; }): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>;"
+            "export declare function redisChangeStreamFeature(options: { readonly maxLen: number; }): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>;"
           ],
           "overloadParameterDetails": [
             [
@@ -2666,7 +1123,7 @@
             ]
           ],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2710,7 +1167,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-plugin-redis/dist/features/change-stream.d.ts:redisChangeStreamFeature:export declare function redisChangeStreamFeature(options: { readonly maxLen: number; }): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>;",
+          "identity": "packages/storage-plugin-redis/dist/features/change-stream.d.ts:redisChangeStreamFeature:export declare function redisChangeStreamFeature(options: { readonly maxLen: number; }): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [
@@ -2718,9 +1175,9 @@
               "name": "maxLen",
               "type": "number",
               "optional": false,
-              "description": "maxLen 必须是正安全整数，使用原生近似 MAXLEN 裁剪。readChanges({after,limit}) 默认limit100，从排他游标读起。处理效果和检查点应在回调成功前完成；tail 只在 onChange 成功后推进，失败报告并关闭，不越过失败项。游标是原生 Stream ID，按原样保存，不转成不精确的 JS number。",
+              "description": "",
               "descriptionEn": "",
-              "descriptionZh": "maxLen 必须是正安全整数，使用原生近似 MAXLEN 裁剪。readChanges({after,limit}) 默认limit100，从排他游标读起。处理效果和检查点应在回调成功前完成；tail 只在 onChange 成功后推进，失败报告并关闭，不越过失败项。游标是原生 Stream ID，按原样保存，不转成不精确的 JS number。"
+              "descriptionZh": ""
             }
           ],
           "fragment": "storage-plugin-redis-features/change-stream--redisChangeStreamFeature"
@@ -2885,7 +1342,7 @@
         {
           "name": "redisPubSubFeature",
           "kind": "function",
-          "signature": "export declare function redisPubSubFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisPubSubOutput, {}>;",
+          "signature": "export declare function redisPubSubFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisPubSubOutput, {}>;",
           "declarationLine": 17,
           "source": "packages/storage-plugin-redis/dist/features/pubsub.d.ts",
           "purpose": "Expose native Pub/Sub with owned subscription resources and no automatic reconnect replay.",
@@ -2893,7 +1350,7 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisPubSubOutput, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisPubSubOutput, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -2903,11 +1360,11 @@
           "composes": [],
           "exportPath": "./features/pubsub",
           "overloadSignatures": [
-            "export declare function redisPubSubFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisPubSubOutput, {}>;"
+            "export declare function redisPubSubFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisPubSubOutput, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisPubSubOutput, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisPubSubOutput, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2944,7 +1401,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/features/pubsub.d.ts:redisPubSubFeature:export declare function redisPubSubFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisPubSubOutput, {}>;",
+          "identity": "packages/storage-plugin-redis/dist/features/pubsub.d.ts:redisPubSubFeature:export declare function redisPubSubFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisPubSubOutput, {}>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -3285,7 +1742,7 @@
         {
           "name": "redisRateLimitFeature",
           "kind": "function",
-          "signature": "export declare function redisRateLimitFeature(options: IRedisRateLimitOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>;",
+          "signature": "export declare function redisRateLimitFeature(options: IRedisRateLimitOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>;",
           "declarationLine": 26,
           "source": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts",
           "purpose": "Expose native fixed-window admission; rejected requests leave the accepted counter unchanged.",
@@ -3299,7 +1756,7 @@
               "optional": false
             }
           ],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -3309,7 +1766,7 @@
           "composes": [],
           "exportPath": "./features/rate-limit",
           "overloadSignatures": [
-            "export declare function redisRateLimitFeature(options: IRedisRateLimitOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>;"
+            "export declare function redisRateLimitFeature(options: IRedisRateLimitOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>;"
           ],
           "overloadParameterDetails": [
             [
@@ -3321,7 +1778,7 @@
             ]
           ],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3371,7 +1828,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts:redisRateLimitFeature:export declare function redisRateLimitFeature(options: IRedisRateLimitOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>;",
+          "identity": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts:redisRateLimitFeature:export declare function redisRateLimitFeature(options: IRedisRateLimitOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [
@@ -3480,7 +1937,7 @@
         {
           "name": "rediSearchVectorFeature",
           "kind": "function",
-          "signature": "export declare function rediSearchVectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>;",
+          "signature": "export declare function rediSearchVectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>;",
           "declarationLine": 13,
           "source": "packages/storage-plugin-redis/dist/features/search.d.ts",
           "purpose": "Publish standard vectors only after detecting the actual Search module and byte-preserving driver port.",
@@ -3488,7 +1945,7 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -3498,11 +1955,11 @@
           "composes": [],
           "exportPath": "./features/search",
           "overloadSignatures": [
-            "export declare function rediSearchVectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>;"
+            "export declare function rediSearchVectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3539,7 +1996,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/features/search.d.ts:rediSearchVectorFeature:export declare function rediSearchVectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>;",
+          "identity": "packages/storage-plugin-redis/dist/features/search.d.ts:rediSearchVectorFeature:export declare function rediSearchVectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -3705,7 +2162,7 @@
         {
           "name": "redisSortedSetsFeature",
           "kind": "function",
-          "signature": "export declare function redisSortedSetsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>;",
+          "signature": "export declare function redisSortedSetsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>;",
           "declarationLine": 25,
           "source": "packages/storage-plugin-redis/dist/features/sorted-sets.d.ts",
           "purpose": "Expose ascending native sorted sets with finite scores and deterministic equal-score members.",
@@ -3713,7 +2170,7 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -3723,11 +2180,11 @@
           "composes": [],
           "exportPath": "./features/sorted-sets",
           "overloadSignatures": [
-            "export declare function redisSortedSetsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>;"
+            "export declare function redisSortedSetsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3764,7 +2221,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/features/sorted-sets.d.ts:redisSortedSetsFeature:export declare function redisSortedSetsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>;",
+          "identity": "packages/storage-plugin-redis/dist/features/sorted-sets.d.ts:redisSortedSetsFeature:export declare function redisSortedSetsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.ts\").IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -3793,7 +2250,7 @@
           "name": "IRedisStreamEntry",
           "kind": "type",
           "signature": "export type IRedisStreamEntry = { readonly id: string; readonly fields: Readonly<Record<string, Uint8Array>>; };",
-          "declarationLine": 4,
+          "declarationLine": 5,
           "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
           "purpose": "One native stream entry retains its original ID and decoded byte-valued fields.",
           "core": "id: Original stream ID returned by Redis XADD or stream reads.\nfields: Decoded field bytes detached from the native wire reply.",
@@ -3876,7 +2333,7 @@
           "name": "IRedisStreamsApi",
           "kind": "type",
           "signature": "export type IRedisStreamsApi = { readonly streams: { add(stream: string, fields: Readonly<Record<string, Uint8Array>>, ctx?: IOperationContext): Promise<string>; range(stream: string, options?: { readonly start?: string; readonly end?: string; readonly count?: number; }, ctx?: IOperationContext): Promise<readonly IRedisStreamEntry[]>; createGroup(stream: string, group: string, options?: { readonly start?: string; readonly createStream?: boolean; }, ctx?: IOperationContext): Promise<void>; readGroup(stream: string, options: { readonly group: string; readonly consumer: string; readonly count?: number; readonly blockMs?: number; }, ctx?: IOperationContext): Promise<readonly IRedisStreamEntry[]>; ack(stream: string, group: string, ids: readonly string[], ctx?: IOperationContext): Promise<number>; autoClaim(stream: string, options: { readonly group: string; readonly consumer: string; readonly minIdleMs: number; readonly start?: string; readonly count?: number; }, ctx?: IOperationContext): Promise<{ readonly next: string; readonly entries: readonly IRedisStreamEntry[]; readonly deletedIds: readonly string[]; }>; }; };",
-          "declarationLine": 9,
+          "declarationLine": 10,
           "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
           "purpose": "Root stream entry and consumer-group methods, absent from generic transaction views.",
           "core": "streams: Root-only native stream and consumer-group method group.",
@@ -3950,7 +2407,7 @@
           "name": "IRedisStreamsOutput",
           "kind": "type",
           "signature": "export type IRedisStreamsOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisStreamsApi; readonly transaction: {}; }>;",
-          "declarationLine": 42,
+          "declarationLine": 43,
           "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
           "purpose": "Feature output publishes the root streams API with no capability or transaction additions.",
           "core": "Feature output publishes the root streams API with no capability or transaction additions.",
@@ -4013,15 +2470,15 @@
         {
           "name": "redisStreamsFeature",
           "kind": "function",
-          "signature": "export declare function redisStreamsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisStreamsOutput, {}>;",
-          "declarationLine": 47,
+          "signature": "export declare function redisStreamsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisStreamsOutput, {}>;",
+          "declarationLine": 48,
           "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
           "purpose": "Expose native Streams and consumer groups on the root store without fabricating transaction APIs.",
           "core": "An exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added.",
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisStreamsOutput, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisStreamsOutput, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -4031,11 +2488,11 @@
           "composes": [],
           "exportPath": "./features/streams",
           "overloadSignatures": [
-            "export declare function redisStreamsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisStreamsOutput, {}>;"
+            "export declare function redisStreamsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisStreamsOutput, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisStreamsOutput, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisStreamsOutput, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -4072,7 +2529,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-redis/dist/features/streams.d.ts:redisStreamsFeature:export declare function redisStreamsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisStreamsOutput, {}>;",
+          "identity": "packages/storage-plugin-redis/dist/features/streams.d.ts:redisStreamsFeature:export declare function redisStreamsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.ts\").IRedisDriver, {}>, IRedisStreamsOutput, {}>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -4238,7 +2695,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool) })] as const\n  })\n  const store = host.org('10000000-0000-4000-8000-000000000001').backend('redis')\n  await store\n    .tx()\n    .lock(lockKey.text('example:session'))\n    .run(async (tx) => {\n      await tx.use(kv).setMany([{ key: 'example:session', value: 'active' }])\n      await tx.use(ttl).expire(lockKey.text('example:session'), 60000)\n      await tx.set('example:visits', '0')\n      await tx.use(counter).increment('example:visits')\n    })\n  console.log(await store.get('example:session'))\n  console.log(await store.get('example:visits'))\n} finally {\n  await pool.close()\n}",
+            "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/sdk'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool) })] as const\n  })\n  const store = host.org('10000000-0000-4000-8000-000000000001').backend('redis')\n  await store\n    .tx()\n    .lock(lockKey.text('example:session'))\n    .run(async (tx) => {\n      await tx.use(kv).setMany([{ key: 'example:session', value: 'active' }])\n      await tx.use(ttl).expire(lockKey.text('example:session'), 60000)\n      await tx.set('example:visits', '0')\n      await tx.use(counter).increment('example:visits')\n    })\n  console.log(await store.get('example:session'))\n  console.log(await store.get('example:visits'))\n} finally {\n  await pool.close()\n}",
             "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { redisStreamsFeature } from '@migaia/storage-plugin-redis/features/streams'\nimport { redisPubSubFeature } from '@migaia/storage-plugin-redis/features/pubsub'\nimport { redisSortedSetsFeature } from '@migaia/storage-plugin-redis/features/sorted-sets'\nimport { redisRateLimitFeature } from '@migaia/storage-plugin-redis/features/rate-limit'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      redisBackendPlugin(\n        { driver: nodeRedisDriver(pool), prefix: 'example-features' },\n        {\n          streams: redisStreamsFeature(),\n          pubsub: redisPubSubFeature(),\n          scores: redisSortedSetsFeature(),\n          rate: redisRateLimitFeature({ limit: 3, windowMs: 1000 })\n        }\n      )\n    ] as const\n  })\n  const store = host.backend('redis')\n  const id = await store.api.streams.add('jobs', { body: new Uint8Array([1, 2]) })\n  console.log((await store.api.streams.range('jobs')).some((entry) => entry.id === id))\n  await store.api.sortedSets.add('scores', [{ member: 'Ada', score: 1 }])\n  console.log((await store.api.sortedSets.top('scores'))[0]?.member)\n  console.log((await store.api.rateLimit.consume('quota')).allowed)\n  const message = Promise.withResolvers<Uint8Array>()\n  await using subscription = await store.api.pubsub.subscribe('events', message.resolve)\n  await store.api.pubsub.publish('events', new Uint8Array([3]))\n  console.log((await message.promise)[0])\n} finally {\n  await pool.close()\n}",
             "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { redisChangeStreamFeature } from '@migaia/storage-plugin-redis/features/change-stream'\nconst pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      redisBackendPlugin(\n        { driver: nodeRedisDriver(pool), prefix: 'example-history' },\n        { history: redisChangeStreamFeature({ maxLen: 1000 }) }\n      )\n    ] as const\n  })\n  const store = host.backend('redis')\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      console.log(change.cursor)\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:checkpoint', 'ready')\n  await received.promise\n} finally {\n  await pool.close()\n}",
             "import { createClientPool } from 'redis'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector, ttl } from '@migaia/storage-contract'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/search'\nconst pool = createClientPool({ url: process.env.REDIS_SEARCH_URL }, { maximum: 8 })\nawait pool.connect()\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      redisBackendPlugin(\n        { driver: nodeRedisDriver(pool), prefix: 'example-vectors' },\n        { search: rediSearchVectorFeature() }\n      )\n    ] as const\n  })\n  const store = host.backend('redis')\n  const items = store\n    .use(vector)\n    .collection<{ category: string }>('documents', { dimensions: 2, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0], payload: { category: 'guide' } }])\n  const hits = await items.near([1, 0], { exact: true }).where({ category: 'guide' }).topK(1).all()\n  console.log(hits[0]?.id)\n  await store.use(ttl).expire({ channel: 'vector', collection: 'documents', id: 'guide' }, 60000)\n} finally {\n  await pool.close()\n}",

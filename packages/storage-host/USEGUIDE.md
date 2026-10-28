@@ -191,13 +191,13 @@ try {
 
 ## 打开日志存储
 
-先安装可选 peer `@migaia/logger`。`storageLogStore()` 是异步工厂，接受宿主或组织视图、后端 ID 和非空 `prefix`，不能传普通 KV 对象。下面追加一条记录，再读取序号与待处理状态。
+先安装可选 peer `@migaia/log-host` 和 `@migaia/log-plugin-durable`。`storageLogStore()` 是异步工厂，接受宿主或组织视图、后端 ID 和非空 `prefix`，不能传普通 KV 对象。下面追加一条记录，再读取序号与待处理状态。
 
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
-import { LogRecordState } from '@migaia/logger/plugins/durable'
+import { LogRecordState } from '@migaia/log-plugin-durable'
 
 const host = await createStorageHost({ plugins: [storageJournalPlugin(), memoryBackendPlugin()] })
 try {

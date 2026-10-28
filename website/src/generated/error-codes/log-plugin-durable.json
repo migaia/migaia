@@ -1,0 +1,53 @@
+{
+  "package": "log-plugin-durable",
+  "codes": {
+    "INVALID_OPTION": {
+      "source": "logging.durable",
+      "scenario": "An argument or accessor violates durable admission; correct it and inspect its original cause."
+    },
+    "LOG_PAYLOAD_INVALID": {
+      "source": "logging.durable",
+      "scenario": "JSON admission rejects unsupported payloads; callers must correct the record."
+    },
+    "LOG_SEQUENCE_EXHAUSTED": {
+      "source": "logging.durable",
+      "scenario": "A sequence exceeds safe integer representation; continue in a fresh store."
+    },
+    "LOG_STORE_CORRUPT": {
+      "source": "logging.durable",
+      "scenario": "Recovery found inconsistent committed data; do not overwrite the recovery evidence."
+    },
+    "LOG_STORE_IN_USE": {
+      "source": "logging.durable",
+      "scenario": "A store already has an installed borrower; uninstall that borrower before reusing it."
+    },
+    "LOG_STORE_IO_FAILED": {
+      "source": "logging.durable",
+      "scenario": "Native storage or cleanup failed; inspect cause before reopening an uncertain commit."
+    },
+    "LOG_STORE_LOCKED": {
+      "source": "logging.durable",
+      "scenario": "Another connection owns the SQLite lock; wait for its owner or choose another path."
+    },
+    "LOG_STORE_UNAVAILABLE": {
+      "source": "logging.durable",
+      "scenario": "The current runtime lacks a supported SQLite builtin; select a supported carrier."
+    },
+    "LOG_SUBSCRIPTION_TRUNCATED": {
+      "source": "logging.durable",
+      "scenario": "Truncation passed a subscriber's retained cursor; explicitly choose a retained restart point."
+    },
+    "RUNTIME_SHUTTING_DOWN": {
+      "source": "logging.durable",
+      "scenario": "This resource or installation revoked admission; create a new owner instead of reviving it."
+    },
+    "UNDO_RECORD_EXISTS": {
+      "source": "logging.durable",
+      "scenario": "The undo transaction still owns active images; forget it or choose another identity."
+    },
+    "WAL_RECORD_INVALID": {
+      "source": "logging.durable",
+      "scenario": "A requested transition targets a missing or terminal WAL record; terminal state cannot reopen."
+    }
+  }
+}

@@ -1670,11 +1670,8 @@ export const audit: IRpcFlowPluginDefinition = {
   }
 }`
 /** Features are full executing instances; numeric durations are not instances. */
-const featureExample = `import type { IRpcCallFeatures } from '@migaia/rpc-contract/interfaces'
-import { timeout, retry } from '@migaia/rpc-host/features'
-export const features: IRpcCallFeatures = {
-  timeout: timeout({ ms: 1000 }), retry: retry({ attempts: 2 })
-}`
+const featureExample =
+  "import type { IRpcCallFeatures } from '@migaia/rpc-contract/interfaces'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nexport const features: IRpcCallFeatures = {\n  timeout: timeoutFeature({ ms: 1000 }), retry: retryFeature({ attempts: 2 })\n}"
 /** Local cancellation stays with the borrowing operation. */
 const signalParam = t(
   'Borrowed parent or attempt cancellation signal from the actual owner.',

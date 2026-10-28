@@ -1,4 +1,193 @@
 {
   "package": "plugin-host",
-  "codes": {}
+  "codes": {
+    "ASYNC_STAGE_IN_SYNC_ENTRY": {
+      "source": "plugin.host",
+      "scenario": "The synchronous entry sees an installed asynchronous stage."
+    },
+    "CALLBACK_FAILED": {
+      "source": "plugin.host",
+      "scenario": "A public configuration recipe/update, domain-surface descriptor read, or factory disposal callback failed without a semantic identity."
+    },
+    "CLEANUP_INCOMPLETE": {
+      "source": "plugin.host",
+      "scenario": "Logical disposal completed while one or more physical cleanup tasks remain unsettled."
+    },
+    "COMPOSITION_TARGET_UNMANAGED": {
+      "source": "plugin.host",
+      "scenario": "`openComposition` was given a target this package never registered as a managed host."
+    },
+    "CONFIG_CYCLE_REJECTED": {
+      "source": "plugin.host",
+      "scenario": "Config input contains a reference cycle; caller must supply an acyclic value graph."
+    },
+    "DEPENDENCY_BLOCKED": {
+      "source": "plugin.host",
+      "scenario": "`unUse`/`disable` (or a managed removal) would leave required dependents behind and cascade was not requested."
+    },
+    "DEPENDENCY_CYCLE": {
+      "source": "plugin.host",
+      "scenario": "Cross-plugin Feature references inside one batch form a cycle."
+    },
+    "DEPENDENT_RESTART_FAILED": {
+      "source": "plugin.host",
+      "scenario": "`replace()` published the new provider, but at least one dependent that had to restart (no `onDependencyReplaced`, or the hook threw) failed to reinstall."
+    },
+    "DISPOSE_STEP_TIMEOUT": {
+      "source": "plugin.host",
+      "scenario": "Reported when one disposer exceeds its wait limit without settling."
+    },
+    "EXTENSION_DUPLICATE": {
+      "source": "plugin.host",
+      "scenario": "Thrown when an extension returned by `install()` conflicts with an existing host property."
+    },
+    "EXTENSION_NON_ENUMERABLE_IGNORED": {
+      "source": "plugin.host",
+      "scenario": "Diagnostic code that is reported, never thrown."
+    },
+    "EXTENSION_OBJECT_PROTOTYPE": {
+      "source": "plugin.host",
+      "scenario": "Thrown when an extension name conflicts with an `Object.prototype` key such as `toString` or `constructor`."
+    },
+    "EXTENSION_RESERVED": {
+      "source": "plugin.host",
+      "scenario": "Thrown when an extension uses a reserved host key such as `config`, `onDispose`, or `usePipeline`."
+    },
+    "FEATURE_NOT_DECLARED": {
+      "source": "plugin.host",
+      "scenario": "`definition.getFeature(name)` or `handle.getFeature(name)` named a Feature the plugin does not declare."
+    },
+    "HOST_DISPOSED": {
+      "source": "plugin.host",
+      "scenario": "Thrown when a mutation or registration targets a host after disposal completes."
+    },
+    "HOST_DISPOSING": {
+      "source": "plugin.host",
+      "scenario": "Thrown when a mutation targets a closing host after `dispose()` starts but before the terminal state."
+    },
+    "INSTALL_RESULT_THENABLE": {
+      "source": "plugin.host",
+      "scenario": "Plugin install returned an own `then` key, which is never a publishable extension result."
+    },
+    "INVALID_CONFIG_VALUE": {
+      "source": "plugin.host",
+      "scenario": "Config value violates the admitted plain-data grammar; caller must supply an allowed value."
+    },
+    "INVALID_OPTION": {
+      "source": "plugin.host",
+      "scenario": "Thrown as a native `TypeError` with an attached code when input violates its contract."
+    },
+    "INVALID_PIPELINE_MODE": {
+      "source": "plugin.host",
+      "scenario": "Thrown during host construction for a pipeline mode outside `sync`, `async`, `generator`, or `async-generator`."
+    },
+    "INVALID_PIPELINE_OPTION": {
+      "source": "plugin.host",
+      "scenario": "Construction rejected an invalid named map, spec, name or order; correct the declaration."
+    },
+    "LIFECYCLE_MUTATION": {
+      "source": "plugin.host",
+      "scenario": "Thrown when a plugin lifecycle callback (`setup`, `install`, `dispose`, `update`, or `beforeRelease`) reenters a host mutation API, or an external `config.update()` runs during setup or `beforeRelease`."
+    },
+    "MUTATION_EXECUTION_TIMEOUT": {
+      "source": "plugin.host",
+      "scenario": "A lifecycle hook exceeded the admitted mutation budget and lost commit authority."
+    },
+    "MUTATION_QUEUE_TIMEOUT": {
+      "source": "plugin.host",
+      "scenario": "Thrown when a mutation exceeds its configured FIFO admission wait and is removed and rejected."
+    },
+    "PIPELINE_DRAIN_TIMEOUT": {
+      "source": "plugin.host",
+      "scenario": "Active pipeline work exceeded the admitted drain budget; ordinary unUse reports it and returns ok:false while bounded cleanup continues."
+    },
+    "PIPELINE_EXECUTING": {
+      "source": "plugin.host",
+      "scenario": "Thrown when a stage is registered while the pipeline is executing."
+    },
+    "PIPELINE_FAILED": {
+      "source": "plugin.host",
+      "scenario": "Thrown when an async stage and its downstream both fail."
+    },
+    "PIPELINE_MODE_MISMATCH": {
+      "source": "plugin.host",
+      "scenario": "Thrown when a registered stage is incompatible with the host's pipeline mode."
+    },
+    "PIPELINE_NEXT_DUPLICATE": {
+      "source": "plugin.host",
+      "scenario": "Thrown when `next()` is called twice within one pipeline step."
+    },
+    "PIPELINE_NEXT_LATE": {
+      "source": "plugin.host",
+      "scenario": "Reports a `next()` call after the stage returns or completes."
+    },
+    "PIPELINE_UNKNOWN": {
+      "source": "plugin.host",
+      "scenario": "Lookup named no declared pipeline; declare the name at construction instead of adding it later."
+    },
+    "PLUGIN_DEFINITION_INVALID": {
+      "source": "plugin.host",
+      "scenario": "A plugin definition carries a retired or unsupported field (for example `shared`), or its dependency data is structurally invalid, or runtime integration is requested from an object that is not a canonical package-minted core."
+    },
+    "PLUGIN_DISABLED": {
+      "source": "plugin.host",
+      "scenario": "A handle member, or an extension taken from it, is used while that plugin is disabled; also thrown by `activate()` on a disabled lazy plugin."
+    },
+    "PLUGIN_DISPOSE_FAILED": {
+      "source": "plugin.host",
+      "scenario": "Thrown when a cleanup step fails during one plugin's `unUse()` or `beforeRelease()`."
+    },
+    "PLUGIN_DUPLICATE": {
+      "source": "plugin.host",
+      "scenario": "Thrown when installing a plugin whose `name` is already occupied."
+    },
+    "PLUGIN_INSTALL_FAILED": {
+      "source": "plugin.host",
+      "scenario": "Thrown when plugin installation or publication fails."
+    },
+    "PLUGIN_INSTALL_ROLLBACK_FAILED": {
+      "source": "plugin.host",
+      "scenario": "Diagnostic code that is reported, never thrown."
+    },
+    "PLUGIN_NOT_ACTIVATED": {
+      "source": "plugin.host",
+      "scenario": "A lazy plugin is accessed synchronously before activation, or a synchronous install needs an inactive lazy provider."
+    },
+    "PLUGIN_NOT_INSTALLED": {
+      "source": "plugin.host",
+      "scenario": "Thrown when `unUse()` or another operation targets an uninstalled plugin name."
+    },
+    "PLUGIN_SUSPENDED": {
+      "source": "plugin.host",
+      "scenario": "A dependent plugin is temporarily suspended because one of its required providers is inactive."
+    },
+    "PREREQUISITE_DISABLED": {
+      "source": "plugin.host",
+      "scenario": "A Feature prerequisite exists but its owner is temporarily disabled."
+    },
+    "PREREQUISITE_MISSING": {
+      "source": "plugin.host",
+      "scenario": "A required Feature provider was never installed in this host (a removed one reports `PREREQUISITE_REMOVED`)."
+    },
+    "PREREQUISITE_REMOVED": {
+      "source": "plugin.host",
+      "scenario": "A previously published Feature prerequisite lost its owner through removal."
+    },
+    "REGISTRATION_REVOKED": {
+      "source": "plugin.host",
+      "scenario": "A previously published view was logically revoked by removal or disposal."
+    },
+    "REPLACE_NAME_MISMATCH": {
+      "source": "plugin.host",
+      "scenario": "`replace(name, next)` received a candidate whose name differs from `name`."
+    },
+    "RESOURCE_OUTSIDE_INSTALL": {
+      "source": "plugin.host",
+      "scenario": "Thrown when a plugin context registers an `onDispose()` resource outside installation or after setup ends."
+    },
+    "SETUP_REQUIRES_ASYNC_INSTALL": {
+      "source": "plugin.host",
+      "scenario": "A plugin selected for immediate `useSync()` installation declares async setup."
+    }
+  }
 }

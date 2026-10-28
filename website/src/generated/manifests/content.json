@@ -101,29 +101,99 @@
     },
     {
       "locale": "zh",
-      "library": "logger",
-      "source": "src/content/zh/packages/logger/advanced.mdx",
-      "slug": "advanced",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "logger",
-      "source": "src/content/zh/packages/logger/api.mdx",
-      "slug": "api",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
-      "library": "logger",
-      "source": "src/content/zh/packages/logger/overview.mdx",
+      "library": "log-host",
+      "source": "src/content/zh/packages/log-host/overview.mdx",
       "slug": "overview",
       "format": "mdx"
     },
     {
       "locale": "zh",
-      "library": "logger",
-      "source": "src/content/zh/packages/logger/quickstart.mdx",
+      "library": "log-host",
+      "source": "src/content/zh/packages/log-host/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-console",
+      "source": "src/content/zh/packages/log-plugin-console/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-console",
+      "source": "src/content/zh/packages/log-plugin-console/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-durable",
+      "source": "src/content/zh/packages/log-plugin-durable/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-durable",
+      "source": "src/content/zh/packages/log-plugin-durable/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-file",
+      "source": "src/content/zh/packages/log-plugin-file/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-file",
+      "source": "src/content/zh/packages/log-plugin-file/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-http",
+      "source": "src/content/zh/packages/log-plugin-http/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-http",
+      "source": "src/content/zh/packages/log-plugin-http/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-process",
+      "source": "src/content/zh/packages/log-plugin-process/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-process",
+      "source": "src/content/zh/packages/log-plugin-process/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-reasoning",
+      "source": "src/content/zh/packages/log-plugin-reasoning/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "log-plugin-reasoning",
+      "source": "src/content/zh/packages/log-plugin-reasoning/quickstart.mdx",
       "slug": "quickstart",
       "format": "mdx"
     },

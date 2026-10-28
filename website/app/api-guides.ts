@@ -63,12 +63,6 @@ export type IApiGuide = {
   readonly scenarios: readonly string[]
 }
 
-/** One drain-budget contract shared by batch() and the file plugin's nested batch options. */
-const loggerBatchFlushTimeoutDescription = {
-  en: 'Maximum milliseconds spent draining accepted batches during flush or shutdown; defaults to 3000. On shutdown, undelivered entries are reported with detail.dropped.',
-  zh: 'flush 或 shutdown 等待已接收批次完成的最长毫秒数，默认 3000；shutdown 超时后，未投递条数通过清理错误的 detail.dropped 上报。'
-} as const
-
 /** Exact public field addresses share prose only where their declared behavior is the same. */
 const configurationOptionDescriptions: readonly {
   readonly keys: readonly string[]
@@ -947,14 +941,6 @@ const optionTranslations: Readonly<
     en: 'Opt in to throwing when channel admission sees an already-aborted signal, after owned cleanup; the default returns a rejected receipt without invoking listeners.',
     zh: '遇到已经取消的信号时，在自有清理完成后选择抛错；默认返回拒绝 receipt，不调用 listener。'
   },
-  'logger:plugins/file:file:rotate.maxBytes': {
-    en: 'Rotate the file before writing when the UTF-8 diagnostic buffer reaches this byte limit.',
-    zh: '诊断缓冲的 UTF-8 字节数达到该上限时，在写入之前轮转文件。'
-  },
-  'logger:plugins/file:file:rotate.maxEntries': {
-    en: 'Rotate the file before writing when the diagnostic buffer reaches this entry-count limit.',
-    zh: '诊断缓冲的条目数量达到该上限时，在写入之前轮转文件。'
-  },
   'middleware-pipeline:*:*:mode': {
     en: 'Fixes the execution algebra for every run; stages must match the mode or be lifted explicitly.',
     zh: '固定每次 run 的执行代数；stage 必须匹配该 mode，或先显式 lift。'
@@ -1039,131 +1025,97 @@ const optionTranslations: Readonly<
     en: 'Maximum wait for one cleanup step. A timeout records a failure and continues other cleanup; it does not stop the pending Promise. false waits without a deadline.',
     zh: '单个清理步骤的最长等待时间。超时记录失败并继续其他清理，不会停止仍在运行的 Promise。false 表示不设截止时间。'
   },
-  'logger:*:*:maxSize': {
-    en: 'Maximum entries collected before the current batch is sent immediately; use a smaller value for lower latency and a larger value for fewer requests.',
-    zh: '当前批次达到该条目数后立即发送；较小值降低延迟，较大值减少请求次数。'
+  'log-host:*:createLogHost:maxPending': {
+    en: 'Maximum pending entries; defaults to 10000. Overflow drops the oldest unprocessed entry and reports QUEUE_OVERFLOW.',
+    zh: '待处理 entry 上限，默认 10000；溢出丢弃最旧未处理 entry，并报告 QUEUE_OVERFLOW。'
   },
-  'logger:*:*:maxWaitMs': {
-    en: 'Maximum time from the first entry until a partial batch is sent, preventing low-volume logs from waiting indefinitely.',
-    zh: '从首条 entry 进入到发送未满批次的最长时间，避免低流量日志无限等待。'
+  'log-host:*:batchFeature:maxSize': {
+    en: 'Maximum entries per delivered batch; defaults to 20.',
+    zh: '每批最大条目数，默认 20。'
   },
-  'logger:*:*:maxConcurrentBatches': {
-    en: 'Maximum batch callbacks running at once. It must be a positive safe integer and bounds transport concurrency.',
-    zh: '同时运行的 batch 回调上限；必须是正安全整数，用于约束 transport 并发。'
+  'log-host:*:batchFeature:maxWaitMs': {
+    en: 'Maximum partial-batch wait; defaults to 2000ms.',
+    zh: '未满批次最长等待，默认 2000ms。'
   },
-  'logger:*:*:maxPendingBatches': {
-    en: 'Maximum queued plus running batches. Reaching it fails with BATCH_OVERFLOW instead of silently dropping entries.',
-    zh: '排队中与运行中 batch 的总上限；达到上限以 BATCH_OVERFLOW 失败，不会静默丢日志。'
+  'log-host:*:batchFeature:maxConcurrentBatches': {
+    en: 'Maximum active batch deliveries; defaults to 1.',
+    zh: '活跃批次交付上限，默认 1。'
   },
-  'logger:*:*:asyncOutput': {
-    en: 'Schedules output through the Logger deferred-work tracker so the caller returns synchronously while flush and shutdown still await completion.',
-    zh: '通过 Logger 的 deferred-work tracker 调度输出，让调用方同步返回，同时仍由 flush 与 shutdown 等待完成。'
+  'log-host:*:batchFeature:maxPendingBatches': {
+    en: 'Queued plus active batch bound, default 1024. Overflow reports BATCH_OVERFLOW and detail.dropped.',
+    zh: '排队和活跃批次数上限，默认 1024；溢出报告 BATCH_OVERFLOW 与 detail.dropped。'
   },
-  'logger:*:*:color': {
-    en: 'ANSI color policy: auto follows runtime TTY support, always forces color, and never emits ANSI sequences.',
-    zh: 'ANSI 颜色策略：auto 跟随运行时 TTY，always 强制着色，never 不输出 ANSI 序列。'
+  'log-host:*:batchFeature:drainTimeoutMs': {
+    en: 'Accepted-batch drain budget during flush/removal; defaults to 3000ms.',
+    zh: 'flush/移除时已接收批次的 drain 等待预算，默认 3000ms。'
   },
-  'logger:*:*:format': {
-    en: 'Console serialization format. auto chooses for the runtime, pretty favors human reading, and json favors machine ingestion.',
-    zh: '控制台序列化格式：auto 按运行时选择，pretty 面向人类阅读，json 面向机器采集。'
+  'log-host:*:retryFeature:attempts': {
+    en: 'Required positive attempt count, including the initial delivery.',
+    zh: '必填正整数尝试总数，包含首次交付。'
   },
-  'logger:*:*:timestamp': {
-    en: 'Includes the ISO timestamp in pretty console output. Disable it only when another collector already owns timestamps.',
-    zh: '在 pretty 控制台输出中包含 ISO 时间；仅在外层采集器已经统一加时间时关闭。'
+  'log-host:*:retryFeature:backoff': {
+    en: 'Milliseconds or a function of the failed attempt index; transport retry advice takes precedence.',
+    zh: '毫秒数或按失败尝试索引计算的函数；transport retry advice 优先。'
   },
-  'logger:*:*:colorMessage': {
-    en: 'Chooses which portion of the rendered message receives the tag color: head, tail, both ends, all text, or none.',
-    zh: '选择消息中由 tag 颜色覆盖的范围：开头、结尾、两端、全文或不着色。'
+  'log-host:*:timeoutFeature:ms': {
+    en: 'Maximum wait for one delivery attempt; timeout remains host-owned.',
+    zh: '单次交付尝试的最长等待，由 host 持有 timeout。'
   },
-  'logger:*:*:colorMap': {
-    en: 'Overrides tag-to-color functions while retaining the built-in map for unspecified tags.',
-    zh: '覆盖指定 tag 的着色函数；未提供的 tag 继续使用内置映射。'
+  'log-host:*:thresholdFeature:level': {
+    en: 'Minimum standard severity; levelPlugin itself does not filter.',
+    zh: '最低标准级别；levelPlugin 自身不做过滤。'
   },
-  'logger:*:*:url': {
-    en: 'Required HTTP endpoint that receives POST requests containing an entries array.',
-    zh: '必填 HTTP endpoint，接收包含 entries 数组的 POST 请求。'
+  'log-host:*:filterFeature:filters': {
+    en: 'Ordered predicates; all must accept an entry. add() returns an independently revocable registration.',
+    zh: '按序执行的 predicate，全部接受时才继续；add() 返回独立撤销句柄。'
   },
-  'logger:*:*:authToken': {
-    en: 'Optional bearer token written to Authorization. Keep credential ownership outside Logger and rotate it through plugin replacement.',
-    zh: '可选 bearer token，会写入 Authorization；凭据所有权应留在 Logger 外，并通过插件替换轮换。'
+  'log-host:*:uuidFeature:display': {
+    en: 'Controls data.uuidDisplay while every entry still receives data.uuid.',
+    zh: '控制 data.uuidDisplay；每条 entry 仍写入 data.uuid。'
   },
-  'logger:*:*:headers': {
-    en: 'Additional request headers copied into each HTTP delivery without replacing the plugin-owned content type.',
-    zh: '复制到每次 HTTP 发送的附加请求头，不替换插件拥有的 content type。'
+  'log-host:*:formatFeature:format': {
+    en: 'Host text format: json or plain. One format per scope; an output format overrides the host format.',
+    zh: 'host 文本格式为 json 或 plain；每作用域一个 format，输出 format 覆盖 host format。'
   },
-  'logger:*:*:retries': {
-    en: 'Additional attempts for network failures, HTTP 429, and 5xx responses. Other 4xx responses fail without retry.',
-    zh: '网络失败、HTTP 429 与 5xx 的额外重试次数；其他 4xx 不重试。'
+  'log-plugin-console:*:prettyFeature:color': {
+    en: 'ANSI policy: auto, always or never; native arguments retain identity.',
+    zh: 'ANSI 策略为 auto、always 或 never；原生参数保留身份。'
   },
-  'logger:*:*:requestTimeoutMs': {
-    en: 'Maximum duration of one HTTP attempt before its request is aborted and handled as a retryable network failure.',
-    zh: '单次 HTTP 尝试的最长时间；超时会 abort 请求，并按可重试网络失败处理。'
+  'log-plugin-file:*:filePlugin:rotate.maxBytes': {
+    en: 'Rotate after a successful delivery reaches this UTF-8 byte count; requires writer.rotate.',
+    zh: '成功交付达到该 UTF-8 字节数后 rotate；必须提供 writer.rotate。'
   },
-  'logger:*:*:flushTimeoutMs': loggerBatchFlushTimeoutDescription,
-  'logger:*:*:batch.flushTimeoutMs': loggerBatchFlushTimeoutDescription,
-  'logger:*:*:batch': {
-    en: 'Optional per-HTTP override for the batch capability supplied by an earlier batch plugin. Install batch() before http().',
-    zh: '对先安装的 batch 插件所提供能力进行 HTTP 局部覆盖；必须先安装 batch()，再安装 http()。'
+  'log-plugin-file:*:filePlugin:rotate.maxEntries': {
+    en: 'Rotate after a successful delivery reaches this entry count; counts do not accumulate across deliveries.',
+    zh: '成功交付达到该条目数后 rotate；不跨交付累计。'
   },
-  'logger:*:*:batch.maxSize': {
-    en: 'Overrides the shared batch maximum for HTTP delivery; reaching it sends the current entries immediately.',
-    zh: '覆盖 HTTP 发送使用的 batch 条目上限；达到该值后立即发送当前 entries。'
+  'log-plugin-http:*:httpPlugin:url': {
+    en: 'Required endpoint for POST requests containing the canonical entries envelope.',
+    zh: '必填 endpoint，接收规范 entries 请求体的 POST。'
   },
-  'logger:*:*:batch.maxWaitMs': {
-    en: 'Overrides how long an incomplete HTTP batch may wait after its first entry.',
-    zh: '覆盖未满 HTTP batch 从首条 entry 开始允许等待的最长时间。'
+  'log-plugin-http:*:httpPlugin:maxRetryAfterMs': {
+    en: 'Upper bound on valid Retry-After advice passed to the host retry feature.',
+    zh: '传给 host retry feature 的有效 Retry-After advice 上限。'
   },
-  'logger:*:*:batch.maxConcurrentBatches': {
-    en: 'Overrides the number of HTTP batches allowed to send concurrently.',
-    zh: '覆盖允许并发发送的 HTTP batch 数量。'
+  'log-plugin-process:*:processPlugin:captureCrashes': {
+    en: 'Capture uncaughtException/unhandledRejection; defaults to true when a process exists.',
+    zh: '捕获 uncaughtException/unhandledRejection；存在 process 时默认 true。'
   },
-  'logger:*:*:batch.maxPendingBatches': {
-    en: 'Overrides the total queued and active HTTP batch bound; overflow remains explicit rather than lossy.',
-    zh: '覆盖排队与运行中 HTTP batch 的总上限；溢出仍显式失败，不会丢弃。'
+  'log-plugin-process:*:processPlugin:shutdownTimeoutMs': {
+    en: 'Graceful process shutdown budget; defaults to 3000ms.',
+    zh: '进程优雅关闭预算，默认 3000ms。'
   },
-  'logger:*:*:batch.asyncOutput': {
-    en: 'Overrides whether full HTTP batches are scheduled through deferred Logger output tracking.',
-    zh: '覆盖满批 HTTP 发送是否经 Logger deferred output tracker 调度。'
+  'log-plugin-process:*:processPlugin:interceptProcessExit': {
+    en: 'Defaults to false. Explicitly enable only when taking responsibility for the borrowed exit boundary.',
+    zh: '默认 false；仅明确接管借用 exit 边界时启用。'
   },
-  'logger:*:*:maxRetryAfterMs': {
-    en: 'Caps a server-provided Retry-After delay so one response cannot postpone shutdown or delivery beyond the accepted retry budget.',
-    zh: '限制服务端 Retry-After 的最大等待，避免单个响应把 shutdown 或发送推迟到重试预算之外。'
+  'log-plugin-reasoning:*:reasoningPlugin:asyncOutput': {
+    en: 'Defaults to false. When true, stream work enters the host deferred-work tracking.',
+    zh: '默认 false；true 时把流式工作纳入 host deferred-work 跟踪。'
   },
-  'logger:*:*:level': {
-    en: 'Minimum accepted severity. Entries below it are stopped in the pipeline before reaching hooks and sinks downstream.',
-    zh: '最低接收级别；低于该级别的 entry 会在 pipeline 中被拦截，不再进入下游 hook 与 sink。'
-  },
-  'logger:*:*:filters': {
-    en: 'Additional predicates combined with logical AND. Every filter must accept an entry for it to continue.',
-    zh: '以逻辑 AND 组合的附加过滤器；所有 filter 都接受时 entry 才继续。'
-  },
-  'logger:*:*:captureCrashes': {
-    en: 'Registers uncaughtException and unhandledRejection handling where a process runtime exists; browser-like hosts remain a no-op.',
-    zh: '在存在 process runtime 时处理 uncaughtException 与 unhandledRejection；浏览器类宿主中为 no-op。'
-  },
-  'logger:*:*:shutdownTimeoutMs': {
-    en: 'Maximum process-adapter drain time after a signal, crash, or exit boundary before control returns to the runtime.',
-    zh: '收到 signal、崩溃或 exit 边界后，process adapter 等待 drain 的最长时间。'
-  },
-  'logger:*:*:interceptProcessExit': {
-    en: 'Intercepts process.exit to flush first. It changes immediate-exit semantics and should be enabled only when that ownership is intentional.',
-    zh: '拦截 process.exit 并先 flush；这会改变立即退出语义，仅在明确接管该边界时开启。'
-  },
-  'logger:*:*:labels': {
-    en: 'Groups the human-readable labels used when reasoning and response streams begin.',
-    zh: '归组 reasoning 与 response 流开始时使用的人类可读标签。'
-  },
-  'logger:*:*:labels.thinking': {
-    en: 'Label written when a thinking stream starts; it does not change the structured reasoning entry tag.',
-    zh: 'thinking 流开始时写出的标签，不改变结构化 reasoning entry 的 tag。'
-  },
-  'logger:*:*:labels.response': {
-    en: 'Optional label written when a response stream starts; omit it when the surrounding UI already owns the heading.',
-    zh: 'response 流开始时的可选标签；外层 UI 已经拥有标题时可省略。'
-  },
-  'logger:*:*:display': {
-    en: 'Shows the generated UUID in color-plugin output while retaining UUID data on every entry regardless of display.',
-    zh: '在 color 插件输出中显示生成的 UUID；无论是否显示，每条 entry 都保留 UUID 数据。'
+  'log-plugin-durable:*:binlogPlugin:store': {
+    en: 'Original creator-owned store borrowed by this plugin; the plugin never disposes it.',
+    zh: '插件借用的原始、创建者所有 store；插件不 dispose 它。'
   },
   'plugin-host:index:PluginHost:execution': {
     en: 'Required wait limits for plugin operations and running pipeline work. Supply both child fields explicitly.',
@@ -22435,467 +22387,165 @@ try {
       ]
     }
   },
-  'logger:index:getLoggerRuntimeManager': createStorageContractGuide({
+  'log-host:index:createLogHost': createStorageContractGuide({
     purposeEn:
-      'Returns the currently authoritative process-wide Logger host capability layer by identity, including UUID, scheduling, output, HTTP, and optional process adapters.',
+      'Create entries synchronously, then process and deliver them asynchronously. levelPlugin adds methods; thresholdFeature controls filtering. Runtime delivery failures reach onFailure or report; flush and shutdown fulfill. Target API; package publication is pending.',
     purposeZh:
-      '按 identity 返回当前 authoritative process-wide Logger host capability layer，包括 UUID、scheduling、output、HTTP 与 optional process adapter。',
-    quickStart: `import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst manager = getLoggerRuntimeManager()\nconst capture = (entry: unknown) => console.log('captured:', entry)\nconst runScenario = async () => capture('scenario complete')\nconst restore = setLoggerRuntimeManager({ ...manager, write: capture })\ntry { await runScenario() } finally { restore() }`,
+      '同步创建条目后异步处理和交付；levelPlugin 提供方法，thresholdFeature 单独控制门槛。运行时交付错误进入 onFailure 或 report，flush 与 shutdown 兑现。 这里展示目标 API，包尚未发布。',
+    quickStart:
+      "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** The host owns entry scheduling, plugin installation and terminal cleanup. */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')",
     scenariosEn: [
-      'A scoped replacement must inherit every capability it does not intentionally override.',
-      'Diagnostics or tests need to confirm which runtime layer is active.'
+      'Host policies are defaults for every output. Output-local policies replace the same kind. One format per scope is allowed; output format overrides host format. Entry enrichment runs once at host scope.',
+      'Compose selected level methods and outputs within one application-owned lifetime.'
     ],
     scenariosZh: [
-      'scoped replacement 需要继承所有未刻意覆盖的 capability。',
-      'diagnostics 或 test 需要确认当前 active runtime layer。'
+      'host feature 是各输出端的默认策略；输出级同 kind 覆盖默认值。每个作用域只允许一个 format，输出 format 覆盖 host format；entry 增强只在 host 级执行一次。',
+      '在同一应用生命周期中组合所选级别方法和输出端。'
     ],
     avoidEn: [
-      'Mutating the returned manager object.',
-      'Reading it repeatedly inside each log entry instead of capturing host authority at the intended boundary.'
+      'Do not use ordinary log delivery as a business transaction acknowledgement.',
+      'A synchronous durable transaction acknowledgement is required; use the durable storage API.'
     ],
     avoidZh: [
-      '修改返回的 manager object。',
-      '在每条 log entry 中重复读取，而不是在预期 boundary 捕获 host authority。'
+      '不要把普通日志交付当作业务事务提交回执。',
+      '需要同步的持久事务回执时应使用 durable 存储 API。'
     ]
   }),
-  'logger:index:Logger': createStorageContractGuide({
+  'log-plugin-console:index:consolePlugin': createStorageContractGuide({
     purposeEn:
-      'Creates the central structured logging pipeline, owns ordered plugins and deferred output, and exposes level methods plus flush and shutdown lifecycle boundaries.',
+      'Borrow console/stdout capabilities and select pretty rendering with prettyFeature. Objects and Errors remain original native arguments. Target API; package publication is pending.',
     purposeZh:
-      '创建 central structured logging pipeline，拥有 ordered plugin 与 deferred output，并公开 level method、flush 与 shutdown lifecycle boundary。',
-    quickStart: `import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level({ level: 'info' }), color()]\n})\nlogger.info('server ready', { port: 3000 })\nawait logger.flush()\nawait logger.shutdown('manual')`,
+      '借用 console/stdout 能力，通过 prettyFeature 选择可读输出；对象与 Error 保持原生参数身份。 这里展示目标 API，包尚未发布。',
+    quickStart:
+      "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\n/** The console output preserves native argument and Error identities in pretty mode. */\nconst log = createLogHost({\n  features: [prettyFeature({ color: 'auto' })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.warn('inventory is low', { sku: 'sku-42', remaining: 3 })\nawait log.flush()\nawait log.shutdown('manual')",
     scenariosEn: [
-      'Structured entries need one ordered filtering, enrichment, formatting, and delivery pipeline.',
-      'Deferred sinks must be observable through flush and deterministically released by shutdown.'
+      'warn routes to console.warn; error/fatal route to console.error. JSON/plain output uses host text. Removing the output never closes borrowed capabilities.',
+      'Inspect original native Error and object arguments during local diagnosis.'
     ],
     scenariosZh: [
-      'structured entry 需要统一有序 filtering、enrichment、formatting 与 delivery pipeline。',
-      'deferred sink 必须可由 flush 观察，并由 shutdown deterministic release。'
+      'warn 路由到 console.warn，error/fatal 路由到 console.error；JSON/plain 使用 host 文本。移除输出端不关闭借用能力。',
+      '本地诊断需要检查原始 Error 与对象参数。'
     ],
     avoidEn: [
-      'A one-off host console call is sufficient.',
-      'Several Logger instances would accidentally duplicate the same process or HTTP sink ownership.'
+      'Do not use ordinary log delivery as a business transaction acknowledgement.',
+      'Persistent records are required; select an HTTP, file or durable owner.'
     ],
     avoidZh: [
-      '一次 host console call 已足够。',
-      '多个 Logger instance 会意外重复拥有相同 process 或 HTTP sink。'
+      '不要把普通日志交付当作业务事务提交回执。',
+      '需要持久记录时应选择 HTTP、file 或 durable 所有者。'
     ]
   }),
-  'logger:plugins:batch': createStorageContractGuide({
+  'log-plugin-file:index:filePlugin': createStorageContractGuide({
     purposeEn:
-      'After installation, the Logger Host gains a shared bounded-batching capability for consumer plugins such as http. It adds no Logger method: ordinary log calls are collected, while the existing flush and shutdown boundaries wait for buffered and in-flight batches.',
+      'Append formatted records as one newline-terminated batch. Host features own format, batching, retries and deadlines. Target API; package publication is pending.',
     purposeZh:
-      '安装后，Logger 宿主获得一项供 http 等消费插件使用的有界批处理能力。它不会新增 Logger 方法：业务仍调用原有日志方法，已有的 flush 与 shutdown 会等待缓冲区和正在发送的批次完成。',
-    quickStart: `import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level(),\n    batch({ maxSize: 25, maxWaitMs: 1_000 }),\n    http({ url: '/api/logs', batch: { maxSize: 25, maxWaitMs: 1_000 } })\n  ]\n})\n\n// These calls enter one bounded HTTP batch instead of starting three requests.\nlogger.info('checkout started', { orderId: 'order-42' })\nlogger.info('payment authorized', { orderId: 'order-42' })\nlogger.info('checkout completed', { orderId: 'order-42' })\n\n// Force a partial batch to be delivered before acknowledging the request.\nawait logger.flush()\n// Shutdown also drains accepted batches and releases their timers.\nawait logger.shutdown('manual')`,
+      '把已格式化记录组成以换行结束的一批再追加；format、batch、retry 与 timeout 由 host feature 负责。 这里展示目标 API，包尚未发布。',
+    quickStart:
+      "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** An application-owned writer works in browser and server conditions. */\nclass MemoryWriter {\n  /** Complete append batches remain observable without touching a real file. */\n  readonly writes: { path: string; text: string }[] = []\n  /** Resolving acknowledges the original batch. */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n/** Uninstall borrows this writer without closing it. */\nconst writer = new MemoryWriter()\n/** Delivery policy belongs to the host, including partial-batch draining. */\nconst log = createLogHost({\n  plugins: [levelPlugin(), filePlugin({\n    path: 'application.ndjson', writer,\n    features: [batchFeature({ maxSize: 2 })]\n  })]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nconsole.log(writer.writes)\nawait log.shutdown('manual')",
     scenariosEn: [
-      'A sink is more efficient when several entries share one delivery.',
-      'Low-volume traffic still needs a maximum delivery delay and explicit overflow.'
+      'An injected writer works in all conditions. Native Node/Bun/Deno writers append only. Rotation requires an injected rotate method and applies to each delivery, after append succeeds.',
+      'Capture complete append batches through an injected writer in browser conditions.'
     ],
     scenariosZh: [
-      '多个 entry 合并 delivery 时 sink 更高效。',
-      '低流量仍需要 maximum delivery delay 与显式 overflow。'
+      '注入 writer 可用于所有条件入口；Node/Bun/Deno 原生 writer 只追加。轮转必须注入 rotate，阈值按每次交付计算，append 成功后才轮转。',
+      '在浏览器条件入口中通过注入 writer 捕获完整追加批次。'
     ],
     avoidEn: [
-      'Every entry must be delivered synchronously.',
-      'The owner cannot accept buffered durability or bounded queue semantics.'
+      'Do not use ordinary log delivery as a business transaction acknowledgement.',
+      'Native rotation is expected without an injected rotate capability.'
+    ],
+    avoidZh: ['不要把普通日志交付当作业务事务提交回执。', '期望不注入 rotate 能力就获得原生轮转。']
+  }),
+  'log-plugin-http:index:httpPlugin': createStorageContractGuide({
+    purposeEn:
+      'Send one HTTP attempt with the unchanged { entries } envelope and canonical error-chain projection. HTTP skips text formatting. Target API; package publication is pending.',
+    purposeZh:
+      '以不变的 { entries } 请求体与规范错误链投影发送一次 HTTP 尝试；HTTP 跳过文本格式化。 这里展示目标 API，包尚未发布。',
+    quickStart:
+      "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\n/** Capture the unchanged HTTP wire body without sending a real network request. */\nconst requests: unknown[] = []\n/** HTTP owns one attempt; the host owns batching, retry and timeout policy. */\nconst log = createLogHost({\n  plugins: [levelPlugin(), httpPlugin({\n    url: 'https://example.test/logs',\n    fetcher: async (_url, init) => {\n      requests.push(JSON.parse(String(init?.body)))\n      return new Response(null, { status: 204 })\n    },\n    features: [batchFeature({ maxSize: 20 }), retryFeature({ attempts: 3, backoff: 200 }), timeoutFeature({ ms: 1000 })]\n  })]\n})\nlog.info('request completed', { requestId: 'one' })\nawait log.flush()\nconsole.log(requests) // Each body contains an entries array.\nawait log.shutdown('manual')",
+    scenariosEn: [
+      'Use retryFeature for eligible network/429/5xx failures. attempts includes the first call. HTTP-local format is rejected at creation; delivery failures retain their original causes.',
+      'Capture canonical request bodies using an injected fetcher without network I/O.'
+    ],
+    scenariosZh: [
+      '用 retryFeature 处理可重试的网络、429 与 5xx 失败，attempts 包含首次调用。HTTP 输出级 format 在创建时被拒绝；交付失败保留原 cause。',
+      '通过注入 fetcher 捕获规范请求体而不产生网络 I/O。'
+    ],
+    avoidEn: [
+      'Do not use ordinary log delivery as a business transaction acknowledgement.',
+      'The endpoint requires preformatted text instead of the canonical entries envelope.'
     ],
     avoidZh: [
-      '每个 entry 都必须同步 delivery。',
-      'owner 无法接受 buffered durability 或 bounded queue semantics。'
+      '不要把普通日志交付当作业务事务提交回执。',
+      'endpoint 要求预格式化文本而不是规范 entries 请求体。'
     ]
   }),
-  'logger:plugins:color': createStorageContractGuide({
+  'log-plugin-process:index:processPlugin': createStorageContractGuide({
     purposeEn:
-      'After installation, the Logger Host gains a console renderer for its existing log calls: readable severity labels and timestamps in terminals, with automatic JSON fallback for captured output. It adds no Logger method.',
+      'Borrow a process capability to coordinate signals, crash capture and bounded graceful shutdown with the same host lifecycle. Target API; package publication is pending.',
     purposeZh:
-      '安装后，Logger 宿主原有的日志调用会获得控制台渲染能力：终端中显示易读的级别、时间与颜色，被采集或重定向时可自动改用 JSON。它不会新增 Logger 方法。',
-    quickStart: `import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level(),\n    color({ color: 'auto', format: 'pretty', timestamp: true })\n  ]\n})\n\n// The Host now renders this through the configured console sink.\nlogger.warn('inventory is low', { sku: 'sku-42', remaining: 3 })\nawait logger.flush()\nawait logger.shutdown('manual')`,
+      '借用 process 能力，把信号、崩溃捕获及有界优雅关闭接入同一 host 生命周期。 这里展示目标 API，包尚未发布。',
+    quickStart:
+      "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\n/** The process plugin borrows one runtime process object and removes its listeners on shutdown. */\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin(), processPlugin({\n    captureCrashes: true, shutdownTimeoutMs: 3000, interceptProcessExit: false\n  })]\n})\nlog.onShutdown(() => { log.info('shutdown started') })\nlog.info('worker ready')\nawait log.shutdown('manual')",
     scenariosEn: [
-      'Interactive terminal output needs readable severity and tag hierarchy.',
-      'One renderer must adapt between TTY color and non-color capture.'
+      'Hosts sharing a process object share listeners and must use compatible policy and scheduler source. Removing the last member releases listeners; manual host shutdown leaves the process capability owned by the application.',
+      'Share one listener group across hosts with compatible process policies.'
     ],
     scenariosZh: [
-      'interactive terminal output 需要易读 severity 与 tag hierarchy。',
-      '同一 renderer 需要适应 TTY color 与 non-color capture。'
+      '共享同一个 process 对象的 host 共用监听器，策略和 scheduler 来源必须兼容。最后成员移除后释放监听器；手动关闭 host 不改变应用对 process 能力的所有权。',
+      '为采用兼容进程策略的多个 host 共享一组监听器。'
     ],
     avoidEn: [
-      'The sink consumes machine JSON.',
-      'ANSI sequences would corrupt a file, protocol, or snapshot.'
+      'Do not use ordinary log delivery as a business transaction acknowledgement.',
+      'No process capability is available; omit the process integration.'
     ],
-    avoidZh: ['sink 消费 machine JSON。', 'ANSI sequence 会污染 file、protocol 或 snapshot。']
+    avoidZh: ['不要把普通日志交付当作业务事务提交回执。', '没有 process 能力时应省略进程集成。']
   }),
-  'logger:plugins-file:file': createStorageContractGuide({
+  'log-plugin-reasoning:index:reasoningPlugin': createStorageContractGuide({
     purposeEn:
-      'Adds newline-delimited JSON file delivery to Logger without putting a filesystem import in the root entry. The existing batch owner groups accepted entries; flush and shutdown wait for writes, and failures reach onFailure.',
+      'Write original fragments to an injected writer. Ending a phase also submits one structured entry containing the complete text. Target API; package publication is pending.',
     purposeZh:
-      '为 Logger 增加逐行 JSON 文件投递，不把文件系统导入放进根入口。既有 batch owner 聚合已接收的日志；flush 与 shutdown 等待写入，失败由 onFailure 观察。',
-    quickStart: `import { Logger } from '@migaia/logger'\nimport { file } from '@migaia/logger/plugins/file'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [file({ path: 'logs/app.jsonl', batch: { maxSize: 20 } })]\n})\nlogger.log('info', 'ready')\nawait logger.flush()\nawait logger.shutdown('manual')`,
+      '向注入 writer 写出原始片段；结束阶段时另提交一条包含完整文本的结构化日志。 这里展示目标 API，包尚未发布。',
+    quickStart:
+      "import { createLogHost } from '@migaia/log-host'\nimport { reasoningPlugin } from '@migaia/log-plugin-reasoning'\n\n/** The application retains the original text of every stream fragment. */\nconst fragments: string[] = []\n/** Each installation owns its phase state; no console or host raw method is required. */\nconst log = createLogHost({ plugins: [reasoningPlugin({ write: (text) => { fragments.push(text) } })] })\nlog.startThinking('Thinking')\nlog.thinking('inspect ')\nlog.thinking('the request')\nlog.endThinking()\nlog.startResponse()\nlog.response('Done.')\nlog.endResponse()\nawait log.shutdown('manual')\nconsole.log(fragments)",
     scenariosEn: [
-      'A Node service needs bounded batched file output with flush before shutdown.',
-      'A browser or embedded host has an app-owned fs adapter injected through setLoggerRuntimeManager.'
+      'No console package or host raw API is required. Completed entries use reasoningPhase and silent metadata; uninstall discards unfinished text without publishing a completed entry.',
+      'Retain a completed structured entry beside the original streamed fragments.'
     ],
     scenariosZh: [
-      'Node 服务需要有界批量文件输出，并在 shutdown 前 flush。',
-      '浏览器或嵌入式宿主通过 setLoggerRuntimeManager 注入自有 fs 适配器。'
+      '不依赖 console 包或 host raw API。完成条目使用 reasoningPhase 与 silent 元数据；卸载时丢弃未完成文本，不发布完成条目。',
+      '在原始流片段之外保留一条完整的结构化条目。'
     ],
     avoidEn: [
-      'The host cannot provide an fs capability and is not using the Node condition.',
-      'A file format other than one JSON entry per line is required.'
+      'Do not use ordinary log delivery as a business transaction acknowledgement.',
+      'The writer must receive plugin-generated ANSI; this package writes original text.'
     ],
     avoidZh: [
-      '宿主没有 fs 能力，也未使用 Node 条件入口。',
-      '调用方需要的不是每行一条 JSON 日志格式。'
-    ],
-    optionsEn: [
-      {
-        name: 'path',
-        description: 'Destination file passed to fs.append for each batch.',
-        type: 'string',
-        optional: false,
-        whenToUse: 'Provide a writable application-owned path.'
-      },
-      {
-        name: 'batch',
-        description: 'Existing batcher limits and flush timing; no second file buffer is created.',
-        type: 'IBatchPluginConfig',
-        whenToUse: 'Set maxSize or maxWaitMs for the desired file write cadence.'
-      },
-      {
-        name: 'rotate',
-        description:
-          'Per-batch entry or byte threshold that calls injected fs.rotate when supplied.',
-        type: '{ maxBytes?: number; maxEntries?: number }',
-        whenToUse: 'Use with an fs adapter that implements rotate.'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'path',
-        description: '每批写入时传给 fs.append 的目标路径。',
-        type: 'string',
-        optional: false,
-        whenToUse: '提供应用拥有且可写的路径。'
-      },
-      {
-        name: 'batch',
-        description: '复用现有 batcher 的容量与 flush 时机，不建立第二份文件缓冲。',
-        type: 'IBatchPluginConfig',
-        whenToUse: '用 maxSize 或 maxWaitMs 控制文件写入节奏。'
-      },
-      {
-        name: 'rotate',
-        description: '单批日志条数或字节数达到阈值时调用注入的 fs.rotate。',
-        type: '{ maxBytes?: number; maxEntries?: number }',
-        whenToUse: '搭配实现 rotate 的 fs 适配器使用。'
-      }
+      '不要把普通日志交付当作业务事务提交回执。',
+      'writer 需要插件生成 ANSI；本包写出原始文本。'
     ]
   }),
-  'logger:plugins:http': createStorageContractGuide({
+  'log-plugin-durable:index:binlogPlugin': createStorageContractGuide({
     purposeEn:
-      'After installation, the Logger Host gains remote delivery: its existing log calls become structured HTTP payloads, and flush or shutdown waits for accepted requests and bounded retries. It adds no Logger method.',
+      'Install binlogPlugin, walPlugin and undoLogPlugin on the host with separate original stores. Preserve append, pending-state and undo-image semantics. Target API; package publication is pending.',
     purposeZh:
-      '安装后，Logger 宿主获得远程投递能力：原有日志调用会变成结构化 HTTP 请求，flush 与 shutdown 会等待已接收的请求和有限重试完成。它不会新增 Logger 方法。',
-    quickStart: `import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level(),\n    batch(),\n    http({\n      url: 'https://logs.example.com/v1/entries',\n      headers: { 'x-service': 'checkout' },\n      retries: 2,\n      requestTimeoutMs: 5_000,\n      batch: { maxSize: 50, maxWaitMs: 1_000 }\n    })\n  ]\n})\n\nlogger.error('payment provider rejected the charge', { orderId: 'order-42' })\n// Do not return the job/request as complete until the remote sink has settled.\nawait logger.flush()\nawait logger.shutdown('manual')`,
+      '给 host 安装 binlogPlugin、walPlugin 与 undoLogPlugin，分别借用原始 store，保留追加、pending 状态与 undo image 语义。 这里展示目标 API，包尚未发布。',
+    quickStart:
+      "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\n/** Each plugin borrows a distinct creator-owned store. */\nconst events = memoryLogStore()\n/** WAL keeps original pending intent sequence identity. */\nconst intents = memoryLogStore()\n/** Undo stores JSON images without applying them to business data. */\nconst images = memoryLogStore()\n/** The host releases plugin borrows before the creator disposes these stores. */\nconst log = createLogHost({ plugins: [\n  binlogPlugin({ store: events }), walPlugin({ store: intents }), undoLogPlugin({ store: images })\n] })\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  await log.binlog.append('created', { id: 'order-1' })\n  /** This sequence belongs to an actually persisted intent. */\n  const intent = await log.wal.begin('save-order', { id: 'order-1' })\n  await log.undo.record('tx-1', [{ target: 'order-1', before: null, after: { total: 12 } }])\n  await log.wal.complete(intent)\n  await log.undo.forget('tx-1')\n} finally {\n  await log.shutdown('manual')\n  await Promise.all([events.dispose(), intents.dispose(), images.dispose()])\n}",
     scenariosEn: [
-      'Logs must reach a remote collector through a host-owned fetch boundary.',
-      'Transient network, 429, and server failures need bounded retry without hiding permanent client errors.'
+      'The creator disposes stores after plugin borrows are released. Durable readiness, append/read and revoked handles may reject with logging.durable codes and original causes; ordinary logging containment does not mask storage failures.',
+      'Keep pending WAL intents and undo images on their original independently owned stores.'
     ],
     scenariosZh: [
-      'log 需要通过 host-owned fetch boundary 到达 remote collector。',
-      'transient network、429 与 server failure 需要 bounded retry，且不能隐藏 permanent client error。'
+      '插件释放借用后由创建者 dispose store。durable ready、append/read 和失效句柄仍可用 logging.durable 码与原 cause 拒绝；普通日志的错误隔离不掩盖存储失败。',
+      '在独立持有的原始 store 上保留 pending WAL intent 与 undo image。'
     ],
     avoidEn: [
-      'Credentials or unbounded retry ownership would be embedded in Logger.',
-      'The environment cannot provide fetch or an explicit HTTP adapter.'
+      'Do not use ordinary log delivery as a business transaction acknowledgement.',
+      'Storage failures must be silently treated as ordinary logging success.'
     ],
-    avoidZh: [
-      'credential 或 unbounded retry ownership 会被嵌入 Logger。',
-      'environment 无法提供 fetch 或显式 HTTP adapter。'
-    ]
+    avoidZh: ['不要把普通日志交付当作业务事务提交回执。', '需要把存储失败静默视作普通日志成功。']
   }),
-  'logger:plugins:level': createStorageContractGuide({
-    purposeEn:
-      'After installation, the Logger Host gains debug, info, warn, error, fatal, setLevel, addFilter, and removeFilter methods. The methods create leveled entries and reject unwanted work before downstream sinks run.',
-    purposeZh:
-      '安装后，Logger 宿主会新增 debug、info、warn、error、fatal、setLevel、addFilter 与 removeFilter 方法。它们生成分级日志，并在下游 sink 工作前拦截不需要的日志。',
-    quickStart: `import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level({ level: 'info' }), color()]\n})\n\nlogger.debug('cache lookup') // Dropped: current minimum is info.\nlogger.info('request accepted', { requestId: 'req-42' })\nlogger.setLevel('error')\nlogger.warn('slow query') // Dropped after the runtime level change.\nlogger.error('database unavailable')\n\nawait logger.flush()\nawait logger.shutdown('manual')`,
-    scenariosEn: [
-      'Production output needs a stable minimum severity.',
-      'Several admission predicates must compose with logical AND at the pipeline entrance.'
-    ],
-    scenariosZh: [
-      'production output 需要稳定 minimum severity。',
-      '多个 admission predicate 需要在 pipeline entrance 以 logical AND 组合。'
-    ],
-    avoidEn: [
-      'Filtering belongs to one remote query rather than the logging pipeline.',
-      'A predicate has side effects or may throw as normal control flow.'
-    ],
-    avoidZh: [
-      'filtering 只属于一次 remote query，而不是 logging pipeline。',
-      'predicate 含 side effect，或可能把 throw 当正常 control flow。'
-    ]
-  }),
-  'logger:plugins:process': createStorageContractGuide({
-    purposeEn:
-      'After installation in a Node-like Host, process signals and uncaught failures gain one bounded Logger drain-and-shutdown path. It adds no Logger method; the Host keeps using its existing log methods while the plugin owns process lifecycle integration.',
-    purposeZh:
-      '安装到 Node 类宿主后，进程信号与未捕获失败会进入统一、有时限的 Logger 刷新和关闭流程。它不会新增 Logger 方法；业务继续使用原有日志方法，插件负责接管进程生命周期事件。',
-    quickStart: `import { Logger } from '@migaia/logger'\nimport { color, process as processLifecycle } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    color(),\n    processLifecycle({ captureCrashes: true, shutdownTimeoutMs: 2_000 })\n  ]\n})\n\nlogger.log('info', 'worker started')\n// On SIGTERM, uncaughtException, or unhandledRejection, the plugin asks every\n// registered Logger to drain and shut down before the configured deadline.\n// Application-owned graceful stops can use the same lifecycle explicitly:\nawait logger.flush()\nawait logger.shutdown('manual')`,
-    scenariosEn: [
-      'A process host must attempt bounded log drain before termination.',
-      'Uncaught failures need one observable capture and reporting path.'
-    ],
-    scenariosZh: [
-      'process host 需要在 termination 前尝试 bounded log drain。',
-      'uncaught failure 需要统一 observable capture 与 reporting path。'
-    ],
-    avoidEn: [
-      'Browser or Worker code has no process lifecycle authority.',
-      'Another framework already owns signals and process.exit interception.'
-    ],
-    avoidZh: [
-      'browser 或 Worker code 没有 process lifecycle authority。',
-      '其他 framework 已经拥有 signal 与 process.exit interception。'
-    ]
-  }),
-  'logger:plugins:reasoning': createStorageContractGuide({
-    purposeEn:
-      'After installation, the Logger Host gains startThinking, thinking, endThinking, startResponse, response, and endResponse methods. They stream token deltas for humans and emit one complete structured entry per finished phase for HTTP or audit sinks.',
-    purposeZh:
-      '安装后，Logger 宿主会新增 startThinking、thinking、endThinking、startResponse、response 与 endResponse 方法。它们向人实时输出文本片段，并在每个阶段结束时生成一条完整结构化日志，供 HTTP 或审计 sink 使用。',
-    quickStart: `import { Logger } from '@migaia/logger'\nimport { color, reasoning } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    color(),\n    reasoning({ labels: { thinking: '正在分析', response: '回答' } })\n  ]\n})\n\nlogger.startThinking()\nlogger.thinking('先核对库存，')\nlogger.thinking('再计算可承诺数量。')\nlogger.endThinking()\n\nlogger.startResponse()\nlogger.response('当前可以承诺 12 件。')\nlogger.endResponse()\n\nawait logger.flush()\nawait logger.shutdown('manual')`,
-    scenariosEn: [
-      'A streaming agent or CLI must separate thinking and response presentation phases.',
-      'Human labels and structured phase data must stay independently configurable.'
-    ],
-    scenariosZh: [
-      'streaming agent 或 CLI 需要区分 thinking 与 response presentation phase。',
-      'human label 与 structured phase data 需要独立配置。'
-    ],
-    avoidEn: [
-      'Ordinary application logs have no reasoning stream lifecycle.',
-      'The UI already owns all phase headings and methods add no semantic value.'
-    ],
-    avoidZh: [
-      '普通 application log 没有 reasoning stream lifecycle。',
-      'UI 已经拥有所有 phase heading，新增 method 没有 semantic value。'
-    ]
-  }),
-  'logger:plugins:uuid': createStorageContractGuide({
-    purposeEn:
-      'After installation, the Logger Host gains automatic per-entry correlation: every existing log call carries a runtime-generated UUID in entry.data for HTTP, batch, and diagnostic sinks. It adds no Logger method; display only controls console visibility.',
-    purposeZh:
-      '安装后，Logger 宿主获得自动的单条日志关联能力：每次原有日志调用都会在 entry.data 中携带运行时生成的 UUID，供 HTTP、批处理和诊断 sink 关联。它不会新增 Logger 方法；display 只控制控制台是否显示该 ID。',
-    quickStart: `import { Logger } from '@migaia/logger'\nimport { color, http, uuid } from '@migaia/logger/plugins'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    uuid({ display: true }),\n    color({ format: 'pretty' }),\n    http({ url: 'https://logs.example.com/v1/entries' })\n  ]\n})\n\n// The same generated UUID is visible locally and remains in entry.data for HTTP delivery.\nlogger.log('info', 'order dispatched', { orderId: 'order-42' })\nawait logger.flush()\nawait logger.shutdown('manual')`,
-    scenariosEn: [
-      'One logical entry must be correlated across batching, HTTP, console, and diagnostics.',
-      'Tests provide a deterministic UUID source through the runtime manager.'
-    ],
-    scenariosZh: [
-      '同一 logical entry 需要跨 batching、HTTP、console 与 diagnostics 关联。',
-      'test 通过 runtime manager 提供 deterministic UUID source。'
-    ],
-    avoidEn: [
-      'The identifier would be mistaken for a security credential or distributed trace identifier.',
-      'The sink already assigns and owns the canonical correlation identity.'
-    ],
-    avoidZh: [
-      'identifier 会被误认为 security credential 或 distributed trace identifier。',
-      'sink 已经分配并拥有 canonical correlation identity。'
-    ]
-  }),
-  'logger:index:setLoggerRuntimeManager': {
-    en: {
-      purpose:
-        'Temporarily replaces the process-wide capabilities Logger uses for UUID generation, deferred work, raw output, file append/rotation, HTTP, and process events. A test can capture every rendered line and provide deterministic IDs; an embedded host can route output to its own console, file adapter, or transport. The returned restore callback removes only this layer, is safe to call more than once, and reveals the previous still-active layer.',
-      quickStart: `import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst capturedLines: string[] = []\nlet nextLogId = 0\nconst restoreRuntime = setLoggerRuntimeManager({\n  randomUUID: () => \`test-log-\${++nextLogId}\`,\n  defer: (task) => queueMicrotask(task),\n  write: (text) => capturedLines.push(text)\n})\n\ntry {\n  const logger = new Logger({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\n\n  logger.log('info', 'checkout completed')\n  await logger.flush()\n  console.log(capturedLines) // The test can now assert the actual rendered output.\n  await logger.shutdown('manual')\n} finally {\n  // Restore the capabilities that were active before this test or embedded Host ran.\n  restoreRuntime()\n}`,
-      scenarios: [
-        'A deterministic test must own UUID generation, deferred work, output, HTTP, or process events.',
-        'A non-standard host must provide Logger capabilities without exposing Node globals to the core runtime.',
-        'A bounded scope must temporarily replace capabilities and reliably restore the preceding active layer.'
-      ],
-      avoidWhen: [
-        'Only one Logger instance needs different plugins or formatting; configure that Logger instead of replacing global host capabilities.',
-        'Concurrent work cannot coordinate ownership of the process-wide layer stack.',
-        'The replacement would silently drop required write, defer, or UUID behavior instead of providing an explicit implementation.'
-      ],
-      options: [
-        {
-          name: 'process',
-          description:
-            'Optional process adapter providing env, stdout, event listener registration, and exit for the process plugin.',
-          defaultValue: 'undefined',
-          type: 'ILoggerProcess',
-          whenToUse:
-            'Provide it only when the host intentionally exposes process lifecycle capabilities.',
-          example: 'setLoggerRuntimeManager({ ...manager, process: processAdapter })'
-        },
-        {
-          name: 'createAbortController',
-          description:
-            'Optional factory used by HTTP cancellation so tests and hostile realms can own AbortController construction.',
-          defaultValue: 'undefined',
-          type: '() => AbortController',
-          whenToUse:
-            'Provide it when the ambient AbortController is absent or must be instrumented.',
-          example:
-            'setLoggerRuntimeManager({ ...manager, createAbortController: () => new AbortController() })'
-        },
-        {
-          name: 'randomUUID',
-          description:
-            'Required UUID source used to create stable per-entry diagnostic identifiers.',
-          defaultValue: 'required',
-          optional: false,
-          type: '() => string',
-          whenToUse:
-            'Always provide a collision-resistant source, or a deterministic sequence in tests.',
-          example: 'setLoggerRuntimeManager({ ...manager, randomUUID: () => crypto.randomUUID() })'
-        },
-        {
-          name: 'defer',
-          description:
-            'Required scheduler that moves output work beyond the current synchronous stack while remaining observable by flush and shutdown.',
-          defaultValue: 'required',
-          optional: false,
-          type: '(task: () => void) => void',
-          whenToUse:
-            'Always provide a host-owned scheduling primitive with deterministic failure behavior.',
-          example: 'setLoggerRuntimeManager({ ...manager, defer: (task) => queueMicrotask(task) })'
-        },
-        {
-          name: 'write',
-          description: 'Required raw text sink used when Logger emits already-rendered output.',
-          defaultValue: 'required',
-          optional: false,
-          type: '(text: string) => void',
-          whenToUse:
-            'Route it to the host output boundary; do not perform unbounded asynchronous work here.',
-          example: 'setLoggerRuntimeManager({ ...manager, write: (text) => output.write(text) })'
-        },
-        {
-          name: 'console',
-          description:
-            'Optional console-shaped sink for log, warning, and error fallback paths when structured output is unavailable.',
-          defaultValue: 'undefined',
-          type: '{ log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void }',
-          whenToUse:
-            'Provide it when the host has a safe console boundary or tests need to capture fallback diagnostics.',
-          example: 'setLoggerRuntimeManager({ ...manager, console: capturedConsole })'
-        },
-        {
-          name: 'fs',
-          description:
-            'Optional file sink for the separately imported file plugin. append writes one batch; rotate is called only when a configured per-batch threshold is reached.',
-          defaultValue: 'undefined',
-          type: 'ILoggerRuntimeManager["fs"]',
-          whenToUse:
-            'Inject it before installing @migaia/logger/plugins/file in browser or other non-Node hosts.',
-          example: 'setLoggerRuntimeManager({ ...manager, fs: fileAdapter })'
-        },
-        {
-          name: 'fetch',
-          description:
-            'Optional HTTP transport used by the HTTP plugin, including request headers, body, response status, Retry-After headers, and cancellation signal.',
-          defaultValue: 'undefined',
-          type: 'ILoggerRuntimeManager["fetch"]',
-          whenToUse:
-            'Provide it before installing the HTTP plugin in hosts without a suitable global fetch.',
-          example: 'setLoggerRuntimeManager({ ...manager, fetch: (url, init) => fetch(url, init) })'
-        }
-      ]
-    },
-    zh: {
-      purpose:
-        '进程级 Logger 宿主能力可临时替换，包括 UUID 生成、延迟任务、原始文本输出、文件追加与轮转、HTTP 和 process 事件。测试可以借此捕获每一行实际输出并生成稳定 ID；桌面容器或嵌入式宿主可以把日志转交给自己的控制台、文件适配器或传输层。返回的恢复函数只移除本层，重复调用也安全，并会重新启用此前仍有效的上一层。',
-      quickStart: `import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst capturedLines: string[] = []\nlet nextLogId = 0\nconst restoreRuntime = setLoggerRuntimeManager({\n  randomUUID: () => \`test-log-\${++nextLogId}\`,\n  defer: (task) => queueMicrotask(task),\n  write: (text) => capturedLines.push(text)\n})\n\ntry {\n  const logger = new Logger({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\n\n  logger.log('info', 'checkout completed')\n  await logger.flush()\n  console.log(capturedLines) // 测试现在可以断言 Logger 真正渲染出的文本。\n  await logger.shutdown('manual')\n} finally {\n  // 恢复本次测试或嵌入式宿主运行前的 Logger 能力。\n  restoreRuntime()\n}`,
-      scenarios: [
-        '确定性测试需要接管 UUID、延迟任务、输出、HTTP 或 process 事件。',
-        '非标准宿主需要向 Logger 提供能力，但不能让核心运行时直接依赖 Node 全局对象。',
-        '有界作用域需要临时替换能力，并可靠恢复替换前仍有效的上一层。'
-      ],
-      avoidWhen: [
-        '只有一个 Logger 实例需要不同插件或格式；应配置该 Logger，而不是替换全局宿主能力。',
-        '并发工作无法协调进程级 layer stack 的所有权。',
-        '替换实现会静默丢弃必需的 write、defer 或 UUID 行为，而不是提供明确实现。'
-      ],
-      options: [
-        {
-          name: 'process',
-          description: '可选 process adapter，为 process 插件提供 env、stdout、事件登记与 exit。',
-          defaultValue: 'undefined',
-          type: 'ILoggerProcess',
-          whenToUse: '仅在宿主明确暴露 process 生命周期能力时提供。',
-          example: 'setLoggerRuntimeManager({ ...manager, process: processAdapter })'
-        },
-        {
-          name: 'createAbortController',
-          description:
-            'HTTP 取消使用的可选工厂，让测试或 hostile realm 拥有 AbortController 构造权。',
-          defaultValue: 'undefined',
-          type: '() => AbortController',
-          whenToUse: '环境没有 AbortController，或需要观测其构造与取消时提供。',
-          example:
-            'setLoggerRuntimeManager({ ...manager, createAbortController: () => new AbortController() })'
-        },
-        {
-          name: 'randomUUID',
-          description: '必填 UUID 来源，用于生成稳定的单条日志诊断标识。',
-          defaultValue: '必填',
-          optional: false,
-          type: '() => string',
-          whenToUse: '始终提供抗碰撞来源；测试中可提供确定性序列。',
-          example: 'setLoggerRuntimeManager({ ...manager, randomUUID: () => crypto.randomUUID() })'
-        },
-        {
-          name: 'defer',
-          description: '必填调度器，把输出移出当前同步栈，同时让 flush 与 shutdown 仍能观察完成。',
-          defaultValue: '必填',
-          optional: false,
-          type: '(task: () => void) => void',
-          whenToUse: '始终提供由宿主拥有、失败行为明确的调度原语。',
-          example: 'setLoggerRuntimeManager({ ...manager, defer: (task) => queueMicrotask(task) })'
-        },
-        {
-          name: 'write',
-          description: '必填原始文本 sink，用于输出 Logger 已经完成渲染的内容。',
-          defaultValue: '必填',
-          optional: false,
-          type: '(text: string) => void',
-          whenToUse: '连接宿主输出边界；不要在其中启动无界异步工作。',
-          example: 'setLoggerRuntimeManager({ ...manager, write: (text) => output.write(text) })'
-        },
-        {
-          name: 'console',
-          description:
-            '可选 console 形状 sink，在结构化输出不可用时承接 log、warning 与 error fallback。',
-          defaultValue: 'undefined',
-          type: '{ log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void }',
-          whenToUse: '宿主拥有安全 console 边界，或测试需要捕获 fallback 诊断时提供。',
-          example: 'setLoggerRuntimeManager({ ...manager, console: capturedConsole })'
-        },
-        {
-          name: 'fs',
-          description:
-            '独立 file 插件使用的可选文件能力：append 写入一批日志，配置的单批阈值达到时才调用可选 rotate。',
-          defaultValue: 'undefined',
-          type: 'ILoggerRuntimeManager["fs"]',
-          whenToUse: '浏览器或其他非 Node 宿主安装 @migaia/logger/plugins/file 前注入。',
-          example: 'setLoggerRuntimeManager({ ...manager, fs: fileAdapter })'
-        },
-        {
-          name: 'fetch',
-          description:
-            'HTTP 插件使用的可选 transport，负责请求头、body、响应状态、Retry-After 与取消 signal。',
-          defaultValue: 'undefined',
-          type: 'ILoggerRuntimeManager["fetch"]',
-          whenToUse: '没有合适全局 fetch 的宿主在安装 HTTP 插件前提供。',
-          example: 'setLoggerRuntimeManager({ ...manager, fetch: (url, init) => fetch(url, init) })'
-        }
-      ]
-    }
-  },
   'plugin-host:index:defineHost': {
     zh: {
       purpose:
@@ -25939,16 +25589,6 @@ export function findApiGuide(
   }
   if (library === 'reactive' && symbolName === 'IReactiveEffect' && guide) {
     return { ...guide, options: guide.options.filter((option) => option.name === 'debugName') }
-  }
-  if (library === 'logger' && symbolName === 'setLoggerRuntimeManager' && guide) {
-    const guideQuickStart = guide.quickStart ?? ''
-    const quickStart = guideQuickStart.includes('try {')
-      ? guideQuickStart.replaceAll('restoreRuntime()', 'restoreRuntime(); restore()')
-      : `${guideQuickStart}\n\ntry { await runScenario() } finally { restore() }`
-    const purpose = guide.purpose.includes(locale === 'zh' ? '幂等' : 'idempotent')
-      ? guide.purpose
-      : `${guide.purpose} ${locale === 'zh' ? 'restore() 是幂等的。' : 'The restore() operation is idempotent.'}`
-    return { ...guide, purpose, quickStart }
   }
   return guide
 }

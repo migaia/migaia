@@ -18,7 +18,20 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   'event-subscriber': '在本地模块间订阅和广播事件，并协调同步或异步监听器的执行。',
   lifecycle:
     '让关闭、取消和替换在并发下也不出错：按顺序释放资源、只采用最新请求的结果、限时等待进行中的工作。',
-  logger: '将日志输出到控制台或服务，按需要过滤和格式化，并等待异步输出完成。',
+  'log-host':
+    '创建异步日志宿主，由同一 host 持有条目处理、插件安装、输出策略与关闭；级别方法和输出端按需组合，日志失败不会打断业务代码。',
+  'log-plugin-console':
+    '向借用的 console/stdout 交付日志，pretty 保留原生对象和 Error 参数；颜色与可读格式由本包的 prettyFeature 提供。',
+  'log-plugin-file':
+    '把格式化日志按批追加为 NDJSON；应用拥有 writer 与目录，host 负责批量、重试、超时和关闭前排空。',
+  'log-plugin-http':
+    '把规范 entries 请求体 POST 到日志收集器；本包执行一次传输尝试，host feature 负责批量、重试与超时。',
+  'log-plugin-process':
+    '借用 process 对象处理信号、崩溃捕获和有界优雅关闭；共享进程的 host 共用监听器，最后移除时释放登记。',
+  'log-plugin-reasoning':
+    '向借用 writer 写出 thinking/response 原始片段，并在阶段完成时生成完整结构化条目；不依赖控制台插件。',
+  'log-plugin-durable':
+    '通过 binlog、WAL 与 undo 插件借用独立的持久日志存储；存储创建者负责关闭，原始追加、事务状态和错误 cause 保留。',
   'micro-hub':
     '为同一页面里的多个微前端应用提供共享状态、事件和请求。主应用创建唯一的 hub，各应用通过带类型和版本的契约协作；每份状态有明确的所有者，只有所有者和指定应用能写，应用卸载时统一释放它登记的订阅和请求处理函数。',
   'middleware-pipeline':
@@ -84,8 +97,20 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
     'Subscribe to and broadcast events between local modules and coordinate synchronous or asynchronous listeners.',
   lifecycle:
     'Keep shutdown, cancellation and replacement correct under concurrency: release resources in order, accept only the latest result, and wait for work in flight with a deadline.',
-  logger:
-    'Send logs to a console or service, filter and format them as needed, and wait for asynchronous output to finish.',
+  'log-host':
+    'Create an asynchronous logging host, compose output policies, observe failures, and drain admitted work before shutdown.',
+  'log-plugin-console':
+    'Deliver native console arguments and Errors through borrowed console/stdout capabilities with optional pretty formatting.',
+  'log-plugin-file':
+    'Append formatted NDJSON batches through a borrowed file writer while host features own delivery policy.',
+  'log-plugin-http':
+    'POST the canonical entries envelope through an injected fetcher, with host features providing batching, retry and timeout.',
+  'log-plugin-process':
+    'Coordinate process signals, crash capture and graceful log shutdown through shared borrowed process listeners.',
+  'log-plugin-reasoning':
+    'Stream original thinking and response fragments to a borrowed writer and submit complete structured entries.',
+  'log-plugin-durable':
+    'Borrow binlog, WAL and undo stores while preserving durable records, pending state and original storage failures.',
   'micro-hub':
     'Share state, events, and requests between micro-frontend apps on one page. The shell creates one hub, and apps work through typed, versioned contracts. Each piece of state has one owner; only that owner and designated apps can write it. Unmounting an app releases its subscriptions and request handlers together.',
   'middleware-pipeline':

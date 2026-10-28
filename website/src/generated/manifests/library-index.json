@@ -32,16 +32,63 @@
       "readmeLocales": ["zh", "en"]
     },
     {
-      "slug": "logger",
-      "description": null,
+      "slug": "log-host",
+      "description": "Asynchronous runtime-neutral logging host with composable delivery features.",
       "version": "0.0.11",
       "exports": [
         ".",
-        "./plugins",
-        "./plugins/durable",
-        "./plugins/durable/file",
-        "./plugins/file"
+        "./features",
+        "./features/batch",
+        "./features/filter",
+        "./features/format",
+        "./features/retry",
+        "./features/threshold",
+        "./features/timeout",
+        "./features/uuid",
+        "./plugin"
       ],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "log-plugin-console",
+      "description": "Composable console logging plugin.",
+      "version": "0.0.11",
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "log-plugin-durable",
+      "description": "Borrowed durable binlog, write-ahead and undo log stores.",
+      "version": "0.0.11",
+      "exports": [".", "./file"],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "log-plugin-file",
+      "description": "Composable file logging plugin.",
+      "version": "0.0.11",
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "log-plugin-http",
+      "description": "Composable http logging plugin.",
+      "version": "0.0.11",
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "log-plugin-process",
+      "description": "Composable process logging plugin.",
+      "version": "0.0.11",
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "log-plugin-reasoning",
+      "description": "Composable reasoning logging plugin.",
+      "version": "0.0.11",
+      "exports": ["."],
       "readmeLocales": ["zh", "en"]
     },
     {
@@ -101,6 +148,7 @@
       "version": "0.0.11",
       "exports": [
         ".",
+        "./contract",
         "./features",
         "./features/retry",
         "./features/timeout",
@@ -108,6 +156,7 @@
         "./plugins/auth",
         "./plugins/batch",
         "./plugins/chunk",
+        "./plugins/error-map",
         "./plugins/idempotency",
         "./plugins/limits",
         "./plugins/link-policy",
@@ -190,7 +239,7 @@
       "slug": "storage-contract",
       "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
       "version": "0.0.8",
-      "exports": [".", "./conformance"],
+      "exports": [".", "./conformance", "./error-code"],
       "readmeLocales": ["zh", "en"]
     },
     {
@@ -199,36 +248,18 @@
       "version": "0.0.0",
       "exports": [
         ".",
-        "./authoring/backend",
-        "./authoring/blob",
-        "./authoring/capability",
-        "./authoring/change-controller",
-        "./authoring/change-iterator",
-        "./authoring/codec",
-        "./authoring/concurrency",
-        "./authoring/context",
-        "./authoring/counter",
-        "./authoring/key",
-        "./authoring/migration",
-        "./authoring/query",
-        "./authoring/rdf",
-        "./authoring/resource",
-        "./authoring/sparql",
-        "./authoring/sql",
-        "./authoring/store",
-        "./authoring/transaction",
-        "./authoring/ttl",
-        "./authoring/vector",
         "./entity",
-        "./entity/indexes",
-        "./entity/keyset",
-        "./entity/migration",
-        "./entity/query",
-        "./entity/unique",
+        "./entity/features/indexes",
+        "./entity/features/keyset",
+        "./entity/features/migration",
+        "./entity/features/query",
+        "./entity/features/unique",
         "./features/memory-change-feed",
         "./features/memory-notifications",
-        "./journal",
-        "./vector/mmr"
+        "./plugins/journal",
+        "./plugins/memory",
+        "./plugins/probe",
+        "./sdk"
       ],
       "readmeLocales": ["zh", "en"]
     },
@@ -237,6 +268,28 @@
       "description": "Explicit record archival over borrowed transactional hot and blob cold storage",
       "version": "0.0.0",
       "exports": ["."],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "storage-plugin-browser",
+      "description": "Browser backend plugins for localStorage, sessionStorage, cookies and native IndexedDB, with optional reactive queries.",
+      "version": "0.0.8",
+      "exports": [
+        ".",
+        "./cookies",
+        "./features/blobs",
+        "./features/indexed-db-batch",
+        "./features/indexed-db-change-feed",
+        "./features/indexed-db-indexes",
+        "./features/indexed-db-journal",
+        "./features/indexed-db-keyset",
+        "./features/indexed-db-notifications",
+        "./features/indexed-db-ttl",
+        "./features/reactive",
+        "./indexed-db",
+        "./local-storage",
+        "./session-storage"
+      ],
       "readmeLocales": ["zh", "en"]
     },
     {
@@ -316,32 +369,6 @@
       "description": "Native SQLite storage backend with transactional SQL",
       "version": "0.0.0",
       "exports": [".", "./bun", "./features/maintenance", "./node"],
-      "readmeLocales": ["zh", "en"]
-    },
-    {
-      "slug": "storage-web",
-      "description": "Browser backend plugins for localStorage, sessionStorage, cookies and native IndexedDB, with optional reactive queries.",
-      "version": "0.0.8",
-      "exports": [
-        ".",
-        "./cookies",
-        "./features/blobs",
-        "./features/indexed-db-batch",
-        "./features/indexed-db-change-feed",
-        "./features/indexed-db-indexes",
-        "./features/indexed-db-journal",
-        "./features/indexed-db-keyset",
-        "./features/indexed-db-notifications",
-        "./features/indexed-db-ttl",
-        "./features/reactive",
-        "./indexed-db",
-        "./local-storage",
-        "./plugins/cookies",
-        "./plugins/indexed-db",
-        "./plugins/local-storage",
-        "./plugins/session-storage",
-        "./session-storage"
-      ],
       "readmeLocales": ["zh", "en"]
     },
     {

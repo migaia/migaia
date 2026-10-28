@@ -21,12 +21,12 @@ pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
 ```ts doc-test=run
 import { createRpcHost } from '@migaia/rpc-host'
 import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
-import { timeout } from '@migaia/rpc-host/features'
+import { timeoutFeature } from '@migaia/rpc-host/features'
 
 const host = await createRpcHost<{ double(value: number): number }>({
   plugins: [
     coroutinePlugin({
-      features: [timeout({ ms: 1500 })],
+      features: [timeoutFeature({ ms: 1500 })],
       spawn: async ({ connect, signal }) => {
         const child = await createRpcHost({
           plugins: [coroutinePlugin({ connectToParent: connect })],
@@ -90,15 +90,17 @@ try {
 
 ## 可选能力
 
-同一组 `auth`、`chunk`、`batch`、`idempotency`、`limits`、`errorMap`、`schema` 工厂既可放进 host 的 `plugins`，也可放进传输的 `features`。host 配置作用于所有命名空间；传输配置只覆盖本命名空间的同种能力，每个命名空间只启用一份实现。host 级 `limits` 跨命名空间共用额度，传输级各自独立。`probe`、`typegen` 和 Devtools 只装在 host 级。原 `namespaces` 作用范围选项已删除，按传输选择范围时使用 `features`。
+同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂既可放进 host 的 `plugins`，也可放进传输的 `features`。host 配置作用于所有命名空间；传输配置只覆盖本命名空间的同种能力，每个命名空间只启用一份实现。host 级 `limitsFeature` 跨命名空间共用额度，传输级各自独立。`probe`、`typegen` 和 Devtools 只装在 host 级。原 `namespaces` 作用范围选项已删除，按传输选择范围时使用 `features`。
 
 ```ts doc-test=check
-import { timeout, retry } from '@migaia/rpc-host/features'
-import { linkPolicy, limits, probe } from '@migaia/rpc-host/plugins'
+import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
+import { linkPolicy, limitsFeature, probe } from '@migaia/rpc-host/plugins'
 import timeoutFromSubpath from '@migaia/rpc-host/features/timeout'
 
-export const defaults = linkPolicy({ features: [timeout({ ms: 1500 }), retry({ attempts: 2 })] })
-export const capacity = limits({ maxGlobal: 256, maxPerPeer: 64 })
+export const defaults = linkPolicy({
+  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })]
+})
+export const capacity = limitsFeature({ maxGlobal: 256, maxPerPeer: 64 })
 export const observation = probe({
   stages: ['message', 'peer'],
   emit: (view) => console.log({ ...view })
@@ -106,15 +108,15 @@ export const observation = probe({
 export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 ```
 
-汇总入口与默认子路径导入均可 tree-shake。推荐安装 `limits`；省略它就不启用这些配额。安装 `idempotency` 后，才有 `host.<ns>.outcome(key)`。auth 默认把签名绑定对象交给 `sign/verify`；文本和字节模式只编码一层绑定。它的请求 ID 去重默认在完成后立即释放，也可选择签名窗口或毫秒 `retain`；`maxReplayEntriesPerPeer` 只限制数字保留模式，`onRejected` 接收容量拒绝原因。配置和 HMAC 示例见[认证说明](./USEGUIDE.md#认证签名与重复请求)。
+汇总入口与默认子路径导入均可 tree-shake。推荐安装 `limitsFeature`；省略它就不启用这些配额。安装 `idempotencyFeature` 后，才有 `host.<ns>.outcome(key)`。auth 默认把签名绑定对象交给 `sign/verify`；文本和字节模式只编码一层绑定。它的请求 ID 去重默认在完成后立即释放，也可选择签名窗口或毫秒 `retain`；`maxReplayEntriesPerPeer` 只限制数字保留模式，`onRejected` 接收容量拒绝原因。配置和 HMAC 示例见[认证说明](./USEGUIDE.md#认证签名与重复请求)。
 
-`errorMap` 同步决定对端能看到哪些错误信息，不改变本地原错、report、警告或日志观察。回调抛错、返回 Promise 或结果无法序列化时，报告映射失败，并按未映射时的规则发送原错误。未配置映射时，未认证对端的握手失败仍默认隐藏细节。见[错误映射](./USEGUIDE.md#映射发往对端的错误)。
+`errorMapFeature` 同步决定对端能看到哪些错误信息，不改变本地原错、report、警告或日志观察。回调抛错、返回 Promise 或结果无法序列化时，报告映射失败，并按未映射时的规则发送原错误。未配置映射时，未认证对端的握手失败仍默认隐藏细节。见[错误映射](./USEGUIDE.md#映射发往对端的错误)。
 
 自定义信息流通过 `defineFlowFeature` 的 `setup` 返回 `stages`，放进宿主的 `plugins` 或某个传输的 `features`；stage 接收该管道的 payload 和原生 `next(payload)`。观察事件单独放在 `observe`。frame 管道允许多次提交，各成员独立：捕获并报告一个成员失败后可以继续交出下一个；忽略失败的 `next()` Promise 会使管道拒绝。被取消的 batch 成员由原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`，其他成员照常完成。
 
 内置位置固定：出站 plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire；入站反向。数组书写顺序不改变这些位置。第三方 stage 默认在 plaintext，高阶 SDK 作者可显式指定受支持的 `layer`。
 
-`auth` 对完整消息执行保护，再由 `chunk` 拆成物理帧；接收端先重组，再还原保护。probe 的 `protected` 事件对应整条消息，`frame` 事件保留实际 `chunkIndex`、`chunkCount` 和 `members`。物理 batch 的成员数在 batch frame 上观察；`envelope` 事件仍对每条逻辑消息观察一次。
+`authFeature` 对完整消息执行保护，再由 `chunkFeature` 拆成物理帧；接收端先重组，再还原保护。probe 的 `protected` 事件对应整条消息，`frame` 事件保留实际 `chunkIndex`、`chunkCount` 和 `members`。物理 batch 的成员数在 batch frame 上观察；`envelope` 事件仍对每条逻辑消息观察一次。
 
 自定义载体可以提供可选的 `reserveWrite`，借用已有流控容量。每次逻辑写出只预留一次；chunk 的分片共用凭据，batch 保留各成员的凭据，完成后释放。`write` 的完成仍表示实际物理接纳，`close` 必须结算载体拥有的排队写入。
 
@@ -152,7 +154,7 @@ export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 
 原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。
 
-auth 的默认签名输入从文本改为对象；依赖文本的回调自行规范化，或设置 `encodedType: 'string'`。完成的请求 ID 默认立即释放，需要旧行为时配置 `retain: 310_000`。本地 verifier 与凭据解析器的原始错误保留在 cause 上，对端脱敏通过同步 `errorMap` 控制。
+auth 的默认签名输入从文本改为对象；依赖文本的回调自行规范化，或设置 `encodedType: 'string'`。完成的请求 ID 默认立即释放，需要旧行为时配置 `retain: 310_000`。本地 verifier 与凭据解析器的原始错误保留在 cause 上，对端脱敏通过同步 `errorMapFeature` 控制。
 
 配置 sign/verify 时，auth 在既有签名握手中交换并验证每个来源的新挑战；应用回调仍须签名和验证收到的完整输入。此过程不增加公开 discovery 或握手配置。
 

@@ -1,0 +1,1474 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "log-host",
+    "description": "Asynchronous runtime-neutral logging host with composable delivery features.",
+    "version": "0.0.11",
+    "exports": [
+      ".",
+      "./features",
+      "./features/batch",
+      "./features/filter",
+      "./features/format",
+      "./features/retry",
+      "./features/threshold",
+      "./features/timeout",
+      "./features/uuid",
+      "./plugin"
+    ],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-log-host",
+            "heading": "@migaia/log-host",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "异步日志 host。日志调用同步返回，条目随后按顺序经过异步管线与输出策略。控制台、HTTP、文件、进程收尾、reasoning 和持久日志由独立插件提供。"
+              }
+            ]
+          },
+          {
+            "id": "快速开始",
+            "heading": "快速开始",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 拥有插件安装、日志交付与最终释放。 */\nconst log = createLogHost({ plugins: [levelPlugin(), consolePlugin()] })\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')"
+              },
+              {
+                "type": "paragraph",
+                "text": "`info()` 返回时输出尚未开始。`flush()` 等待已接纳的条目、异步交付与插件缓冲区；默认等待预算为 3000 毫秒。`shutdown()` 先运行最后日志处理器，再停止准入、排空并释放插件。并发 shutdown 返回同一个 Promise。"
+              }
+            ]
+          },
+          {
+            "id": "组合策略",
+            "heading": "组合策略",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+              },
+              {
+                "type": "paragraph",
+                "text": "内置 feature：`thresholdFeature`、`filterFeature`、`uuidFeature`、`formatFeature`、`batchFeature`、`retryFeature`、`timeoutFeature`。支持汇总入口 `./features` 和各自的默认导出，例如 `./features/retry`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出级同 kind 策略覆盖 host 默认值。每个作用域只允许一个 format，无论 kind 是否相同；输出级 format 覆盖 host format。交付顺序固定为门槛、过滤、自定义 gate、格式、批量、重试、超时、输出，与内置 feature 的数组顺序无关。"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出可声明 `consumesText: false`，只接收原条目与取消信号，跳过 host 格式阶段；该输出不能配置 format 或 defaultFormat。条目处理、gate 与交付策略照常执行。"
+              }
+            ]
+          },
+          {
+            "id": "错误与生命周期",
+            "heading": "错误与生命周期",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "日志方法不抛出运行期交付错误；`flush()` 与 `shutdown()` 总是兑现。失败通过 `onFailure()` 观察；没有监听器时交给 `report`。",
+                  "监听器失败以 `HOOK_FAILED` 交给 reporter，原错误保留在 `cause`。reporter 自身失败会被收住，不递归报告。",
+                  "非法创建配置同步抛带 `source`、`code` 的错误。`use()`、`unUse()` 是配置操作，可以拒绝。",
+                  "durable 的 append、commit、read 与失效句柄仍按存储契约拒绝；日志的非 throw 保证不覆盖事务操作。",
+                  "待处理条目默认上限 10000，超出时丢弃最旧的未处理条目并报告 `QUEUE_OVERFLOW`。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "入口",
+            "heading": "入口",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["入口", "用途"],
+                "rows": [
+                  [
+                    "`@migaia/log-host`",
+                    "`createLogHost`、`levelPlugin`、`forwardPlugin`、状态、默认 reporter 与 host 类型"
+                  ],
+                  [
+                    "`@migaia/log-host/plugin`",
+                    "`defineLogFeature`、`defineOutputPlugin`、`projectLogEntry` 与插件作者类型"
+                  ],
+                  ["`@migaia/log-host/features`", "七个内置 feature"],
+                  ["`@migaia/log-host/features/<name>`", "对应 feature 的默认导出"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "host 不内置输出端，不依赖第三方运行时包。底层能力来自 `@migaia/plugin-host`、`@migaia/middleware-pipeline`、`@migaia/lifecycle`、`@migaia/event-subscriber` 与 `@migaia/utils`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "完整用法见 USEGUIDE.md。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "建立-host",
+            "heading": "建立 host",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 每个 host 独立拥有上下文、插件与交付队列。 */\nconst log = createLogHost({\n  context: ['orders'],\n  topic: 'api',\n  maxPending: 10000,\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.info('created', { orderId: 'o1' })\nlog.log('audit', 'arbitrary tags remain valid')\nawait log.flush()\nawait log.shutdown('manual')"
+              },
+              {
+                "type": "paragraph",
+                "text": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
+              },
+              {
+                "type": "paragraph",
+                "text": "注入的调度器必须在 `schedule()` 返回 receipt 后才运行 callback；返回之前同步调用 callback 不在支持范围内。"
+              },
+              {
+                "type": "paragraph",
+                "text": "host 门面被冻结。`ctx` 的顶层容器、上下文路径与环境标记也被冻结；嵌套用户值与 Date 保留身份，不做深克隆。`dispatchRaw()` 同步复制输入条目的顶层数组与对象，忽略输入 id，生成自己的条目 id。输出端各自收到浅快照；原生 Error 与嵌套业务对象保持身份。"
+              }
+            ]
+          },
+          {
+            "id": "级别-过滤与条目",
+            "heading": "级别、过滤与条目",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`levelPlugin()` 添加 `debug`、`info`、`warn`、`error`、`fatal` 与 `atLevel`。字符串首参作为 message，其余参数保留原生类型；非字符串首参进入 args。插件本身不做过滤。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** 每个 add 返回的撤销函数只移除该次注册。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')"
+              },
+              {
+                "type": "paragraph",
+                "text": "门槛只解释标准级别；普通未知 tag 跳过级别比较，仍经过过滤。`atLevel()` 保留业务 tag，并携带其标准级别供门槛解释。UUID 总是写入 `data.uuid`，`display` 只控制 `data.uuidDisplay`，不关闭生成。"
+              }
+            ]
+          },
+          {
+            "id": "输出策略与作用域",
+            "heading": "输出策略与作用域",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "每个输出端按门槛、过滤、自定义 gate、格式、批量、重试、超时、实际输出的固定顺序交付。内置 feature 的数组顺序不会改变这条顺序。"
+              },
+              {
+                "type": "paragraph",
+                "text": "host 级 output feature 是默认值，输出级相同 kind 的 feature 覆盖它。未覆盖的 host 自定义 gate 先运行，输出级 gate 随后按声明顺序运行。entry feature 只允许装在 host 级。"
+              },
+              {
+                "type": "paragraph",
+                "text": "同一作用域重复 kind 会在创建时抛 `INVALID_OPTION`。format 还按阶段唯一：即使 kind 不同，一个作用域也只允许一个 format。跨作用域允许各有一个，最终优先级是输出级显式 format、host 级显式 format、输出插件 `defaultFormat`。"
+              },
+              {
+                "type": "table",
+                "headers": ["Feature", "作用"],
+                "rows": [
+                  ["`thresholdFeature({ level })`", "标准级别门槛，支持 `setLevel()`"],
+                  [
+                    "`filterFeature({ filters })`",
+                    "按顺序运行 predicates，任一返回 false 即停止；支持 `add()`"
+                  ],
+                  ["`uuidFeature({ display })`", "用当前 host 的生成器丰富条目"],
+                  ["`formatFeature({ format })`", "`json` 或不着色的 `plain` 文本"],
+                  ["`batchFeature(options)`", "为可批量输出端提供有界缓冲与排空"],
+                  [
+                    "`retryFeature({ attempts, backoff })`",
+                    "基于 utils retry；attempts 是含首次调用的总次数"
+                  ],
+                  ["`timeoutFeature({ ms })`", "基于 utils withTimeout 限制一次交付"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。"
+              },
+              {
+                "type": "paragraph",
+                "text": "retry 的 `attempts` 必须显式给出正安全整数；`backoff` 可为毫秒数或接收失败尝试序号的函数。输出端的 `retryable` 决定是否继续；`retryDelay` 的值经 `beforeRetry` 接入，并优先于普通 backoff。超时通过失败通道报告 `DELIVERY_FAILED`，原始 utils 超时错误保留在 `cause`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "交付失败且 timeout 清理也失败时，`retryable` 与 `retryDelay` 收到原始交付错误。清理错误在原聚合中依次跟在主错误后，该聚合保留在 `logging / DELIVERY_FAILED` 包装的 `cause`。交付成功后的清理失败只报告一次，经相同 host 错误边界离开，不重发已成功的操作。"
+              }
+            ]
+          },
+          {
+            "id": "编写输出插件",
+            "heading": "编写输出插件",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+              },
+              {
+                "type": "paragraph",
+                "text": "`deliver` 接收 `readonly ILogOutputRecord[]` 和只读 `{ signal, format }`。record 同时包含原生 `entry` 与已选格式的 `text`。context.format 与最终选中的 descriptor 是同一个对象。输出包可由自己的 pretty descriptor 身份选择原生参数渲染，不猜测文本或重做格式优先级。"
+              },
+              {
+                "type": "paragraph",
+                "text": "不消费文本的输出声明 `consumesText: false` 并省略 `defaultFormat`。其回调收到只含 `entry` 的 record 与只含 `signal` 的 context；host 跳过该输出的格式阶段，输出级配置任何 format 都在创建时抛 `INVALID_OPTION`。entry、gate、批量、重试与超时照常执行。省略 consumesText 则保留原文本回调类型与必填 defaultFormat。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`defineOutputPlugin` 的可选 `install(core)` 返回扩展对象，host 与动态 use 句柄会保留其精确类型。非输出插件使用 `ILogPlugin` 形状。插件 core 提供安装期资源登记、scoped config、lifecycle、scheduler、sink、failure、defer、flush 与 shutdown 能力；资源通过真实 plugin-host 生命周期回滚与释放。"
+              },
+              {
+                "type": "paragraph",
+                "text": "第三方 feature 用 `defineLogFeature()` 签发，完整实现 entry、gate 或 format 中一种。delivery 阶段只由内置 batch/retry/timeout 工厂提供。描述对象被冻结；普通字面量、浅复制和类型断言都不能制造运行期签发身份。"
+              }
+            ]
+          },
+          {
+            "id": "错误投影与失败通道",
+            "heading": "错误投影与失败通道",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`projectLogEntry(entry)` 是共享结构化投影。它只把 error 替换为 utils `serializeErrorChain(entry.error.raw)`；保留 source、code、name、message、stack、cause 与 aggregate 分支，排除 raw 的自有私有字段。JSON 格式与 HTTP envelope 共用该投影，原始 entry.error.raw 不变。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost } from '@migaia/log-host'\n\n/** 单独的 reporter 接收无人处理的失败和失败监听器自身的异常。 */\nconst log = createLogHost({ report: (error) => console.error(error) })\n/** 撤销函数只移除这一监听器。 */\nconst off = log.onFailure(({ source, error }) => console.error(source, error))\nlog.log('audit', 'event')\nawait log.flush()\noff()\nawait log.shutdown('manual')"
+              },
+              {
+                "type": "paragraph",
+                "text": "日志方法与 flush/shutdown 的运行期错误不会进入业务控制流；创建配置错误与 use/unUse 的配置拒绝仍可离开调用边界。没有失败监听器时直接调用 reporter；监听器失败产生 `HOOK_FAILED`，原异常在 cause。reporter 自身抛错、then getter 失败或拒绝均被收住，终端失败不再递归上报。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`flush()` 的 3000 毫秒默认预算不证明所有日志已经送达。到期报告 `LIFECYCLE_DEADLINE` 并兑现；未完成工作的晚到拒绝仍被观察。shutdown 共享同一个 Promise，保留第一个 reason，先运行允许写最后日志的处理器，再关闭准入并释放插件。释放结果中的 `cleanupErrors` 必须由业务按需要检查。"
+              }
+            ]
+          },
+          {
+            "id": "转发与动态配置",
+            "heading": "转发与动态配置",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`forwardPlugin({ targets })` 把当前 host 处理后的逻辑条目转交给目标 host，目标自己的管线与策略仍然执行。安装时拒绝自身与多跳环，分别使用 `FORWARD_SELF`、`FORWARD_CYCLE`。源 host 的 flush 包含目标的异步工作。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`use(...plugins)` 返回按输入顺序排列的真实 plugin-host 句柄元组；原变量的静态类型不会因动态安装而增加方法。`unUse(name)` 返回 peer 的 removal 结果，重复移除不存在插件会拒绝。撤销 forward 插件移除其边；源 shutdown 不关闭目标 host。"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-log-host",
+              "heading": "@migaia/log-host",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "An asynchronous logging host. Log calls return synchronously; entries then pass through an ordered asynchronous pipeline and output policies. Separate plugins provide console, HTTP, file, process shutdown, reasoning and durable logging."
+                }
+              ]
+            },
+            {
+              "id": "quick-start",
+              "heading": "Quick start",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** The host owns plugin installation, delivery and terminal cleanup. */\nconst log = createLogHost({ plugins: [levelPlugin(), consolePlugin()] })\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output has not started when `info()` returns. `flush()` drains admitted entries, tracked asynchronous work and plugin buffers within a default 3000 ms wait budget. `shutdown()` runs final-log handlers, closes admission, drains and releases plugins. Concurrent shutdown calls share the same Promise."
+                }
+              ]
+            },
+            {
+              "id": "compose-policies",
+              "heading": "Compose policies",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** Host policies are output defaults; entry enrichment executes once per entry. */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Built-ins are `thresholdFeature`, `filterFeature`, `uuidFeature`, `formatFeature`, `batchFeature`, `retryFeature` and `timeoutFeature`. Import them together from `./features` or use individual default exports such as `./features/retry`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output-local policies replace host defaults of the same kind. Each scope admits one format regardless of kind; an output format replaces the host format. The fixed delivery order is threshold, filter, custom gates, format, batch, retry, timeout and transport, independently of built-in descriptor array order."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "An output can declare `consumesText: false` to receive entries and a cancellation signal while skipping host formatting. It cannot configure a format or defaultFormat. Entry processing, gates and delivery policies still apply."
+                }
+              ]
+            },
+            {
+              "id": "errors-and-lifecycle",
+              "heading": "Errors and lifecycle",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Log methods contain runtime delivery errors. `flush()` and `shutdown()` always fulfill. Observe failures with `onFailure()`; otherwise the host calls `report`.",
+                    "Listener failures reach the reporter as `HOOK_FAILED`, with the original on `cause`. Reporter failures are contained without recursive reporting.",
+                    "Invalid creation options throw identified errors synchronously. Configuration operations `use()` and `unUse()` may reject.",
+                    "Durable append, commit, read and invalid-handle operations keep their storage rejection contract. The logging guarantee does not mask transaction failures.",
+                    "The default pending-entry capacity is 10000. Overflow drops the oldest unprocessed entry and reports `QUEUE_OVERFLOW`."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "entries",
+              "heading": "Entries",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Entry", "Purpose"],
+                  "rows": [
+                    [
+                      "`@migaia/log-host`",
+                      "Host factory, level/forward plugins, status, default reporter and host types"
+                    ],
+                    [
+                      "`@migaia/log-host/plugin`",
+                      "Feature/output definitions, shared error projection and plugin author types"
+                    ],
+                    ["`@migaia/log-host/features`", "All seven built-in features"],
+                    [
+                      "`@migaia/log-host/features/<name>`",
+                      "The corresponding feature's default export"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The host includes no output transport or third-party runtime dependency. It uses `@migaia/plugin-host`, `@migaia/middleware-pipeline`, `@migaia/lifecycle`, `@migaia/event-subscriber` and `@migaia/utils`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "See USEGUIDE.en.md for complete usage."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "create-a-host",
+              "heading": "Create a host",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** Each host independently owns context, plugin registrations and its delivery queue. */\nconst log = createLogHost({\n  context: ['orders'],\n  topic: 'api',\n  maxPending: 10000,\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.info('created', { orderId: 'o1' })\nlog.log('audit', 'arbitrary tags remain valid')\nawait log.flush()\nawait log.shutdown('manual')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Options are `plugins`, `features`, `context`, `topic`, `maxPending`, `scheduler`, `randomUUID`, `report` and plugin-host `execution`. The scheduler defaults to utils `systemScheduler`; UUID generation defaults to `globalThis.crypto.randomUUID()`. Both may be injected per host."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "An injected scheduler must run callbacks after `schedule()` returns its receipt. Callbacks invoked synchronously before the receipt is returned are unsupported."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The host facade and top-level context containers are frozen. Nested user values and Date instances retain identity. `dispatchRaw()` captures shallow input containers synchronously and generates its own id. Each output receives a shallow snapshot; native errors and nested business objects retain their identities."
+                }
+              ]
+            },
+            {
+              "id": "levels-and-entry-policies",
+              "heading": "Levels and entry policies",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`levelPlugin()` adds `debug`, `info`, `warn`, `error`, `fatal` and `atLevel`. A string first argument becomes message; other values remain native args. The plugin performs no filtering itself."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** Reusing this descriptor deliberately shares its live threshold state. */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** Every added filter has an independently revocable registration. */\nconst filters = filterFeature()\n/** Entry enrichment runs once per entry at host scope. */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** Revocation removes only this added occurrence. */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Unknown tags bypass only the standard level threshold. `atLevel()` keeps the business tag while supplying an explicit standard level. UUID enrichment always writes `data.uuid`; display controls only `data.uuidDisplay`."
+                }
+              ]
+            },
+            {
+              "id": "output-scopes-and-delivery",
+              "heading": "Output scopes and delivery",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The fixed order is threshold, filter, custom gates, format, batch, retry, timeout and transport, independently of built-in descriptor array order. Output-local policies replace host defaults of the same kind. Surviving host gates precede local gates, retaining each scope's declaration order. Entry features are allowed only at host scope."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Duplicate kinds fail at creation with `INVALID_OPTION`. A scope also admits at most one format, regardless of kind. Across scopes, selection is output explicit format, host explicit format, then the output's `defaultFormat`."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Feature", "Behavior"],
+                  "rows": [
+                    ["`thresholdFeature({ level })`", "Standard level threshold with `setLevel()`"],
+                    [
+                      "`filterFeature({ filters })`",
+                      "Ordered predicates and independently revocable `add()`"
+                    ],
+                    [
+                      "`uuidFeature({ display })`",
+                      "Entry enrichment using the installing host's generator"
+                    ],
+                    ["`formatFeature({ format })`", "Shared `json` or uncolored `plain` rendering"],
+                    ["`batchFeature(options)`", "Bounded buffering and output draining"],
+                    [
+                      "`retryFeature({ attempts, backoff })`",
+                      "Canonical utils retry; attempts includes the first call"
+                    ],
+                    ["`timeoutFeature({ ms })`", "Canonical utils timeout for one attempt"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Batch defaults are `maxSize: 20`, `maxWaitMs: 2000`, `maxConcurrentBatches: 1`, `maxPendingBatches: 1024` and `drainTimeoutMs: 3000`. Capacity counts queued and active batches. Overflow drops the oldest queued batch, or the incoming batch when every slot is active, and reports `BATCH_OVERFLOW` with `detail.dropped`. Output removal drains its final buffer before revoking the registration signal used for delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Retry requires an explicit positive safe-integer attempts count. Backoff is milliseconds or a function receiving the failed attempt's index. Transport `retryable` controls repetition; `retryDelay` is captured through `beforeRetry` and takes precedence over ordinary backoff. Timeout failures report `DELIVERY_FAILED`, retaining the canonical utils timeout on cause."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "When delivery fails and timeout cleanup also fails, `retryable` and `retryDelay` receive the original delivery error. Cleanup failures follow it in the original aggregate, retained on a `logging / DELIVERY_FAILED` wrapper's `cause`. Cleanup after successful delivery reports once through the same host error boundary and never replays the successful operation."
+                }
+              ]
+            },
+            {
+              "id": "define-an-output",
+              "heading": "Define an output",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** The transport owns its destination while the host owns delivery policy and resources. */\nconst lines: string[] = []\n/** Local policy replaces host defaults without duplicating batching or formatting. */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** The general log method works without installing standard level methods. */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`deliver` receives readonly records and `{ signal, format }`. Each record carries native entry and selected text. `context.format` is the exact selected descriptor, allowing a pretty output owner to recognize its own format without guessing text or repeating priority resolution."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Set `consumesText: false` and omit `defaultFormat` for an entry-only output. Its callback receives records containing only `entry` and a context containing only `signal`. Host formatting is skipped for that output; configuring any output-local format throws `INVALID_OPTION` at creation. Entry features, gates, batching, retry and timeout still apply. Omitting `consumesText` keeps the existing text callback types and required defaultFormat."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Optional `install(core)` returns precisely inferred extensions on the initial host and dynamic plugin handles. Other plugins use `ILogPlugin`. The real core provides scoped config, lifecycle, scheduler, install-owned resources, sinks, failures, deferred work, flush and shutdown. Plugin-host retains rollback and resource ownership."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Use `defineLogFeature()` to issue complete entry, gate or format implementations. Delivery descriptors are internal to built-in batch/retry/timeout factories. Descriptors are frozen; object literals, shallow copies and type assertions cannot manufacture runtime issuance."
+                }
+              ]
+            },
+            {
+              "id": "errors-and-lifecycle",
+              "heading": "Errors and lifecycle",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`projectLogEntry(entry)` replaces only error with utils `serializeErrorChain(entry.error.raw)`. Structured output retains source, code, name, message, stack, cause and aggregate branches while excluding raw private fields. JSON and HTTP use this same projection; the original native raw object remains unchanged."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost } from '@migaia/log-host'\n\n/** Report unhandled failures and errors thrown by failure observers. */\nconst log = createLogHost({ report: (error) => console.error(error) })\n/** This removal capability owns only one failure observer. */\nconst off = log.onFailure(({ source, error }) => console.error(source, error))\nlog.log('audit', 'event')\nawait log.flush()\noff()\nawait log.shutdown('manual')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Log methods and flush/shutdown contain runtime failures. Creation errors and configuration use/unUse rejection remain visible to callers. Without failure listeners the reporter receives the error directly. Listener failures report `HOOK_FAILED` with the original on cause. Reporter throws, hostile then getters and rejections remain contained without recursive reporting."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The default 3000 ms flush budget is a bounded wait, not proof of successful delivery. A deadline reports `LIFECYCLE_DEADLINE` and fulfills; late rejections remain observed. Shutdown shares one Promise and the first reason. Final-log handlers run before admission closes and plugins release. Inspect structured `cleanupErrors` when cleanup matters to the application."
+                }
+              ]
+            },
+            {
+              "id": "forwarding-and-configuration",
+              "heading": "Forwarding and configuration",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`forwardPlugin({ targets })` forwards processed logical entries into target hosts' own pipelines and policies. Installation rejects self-links and multi-hop cycles as `FORWARD_SELF` and `FORWARD_CYCLE`. Source flush includes target asynchronous work."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`use(...plugins)` returns the canonical input-ordered handle tuple without changing the original variable's static extension type. `unUse(name)` returns the peer removal result; removing an absent registration rejects. Removing forward disconnects its edges. Source shutdown leaves target hosts alive."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "log-host:index",
+      "library": "log-host",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-host/getting-started",
+      "architecturePath": "/en/docs/log-host",
+      "symbols": [],
+      "aliases": []
+    },
+    {
+      "id": "log-host:features",
+      "library": "log-host",
+      "module": "features",
+      "exportPath": "./features",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-host/getting-started",
+      "architecturePath": "/en/docs/log-host",
+      "symbols": [],
+      "aliases": []
+    },
+    {
+      "id": "log-host:features/batch",
+      "library": "log-host",
+      "module": "features/batch",
+      "exportPath": "./features/batch",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-host/getting-started",
+      "architecturePath": "/en/docs/log-host",
+      "symbols": [
+        {
+          "name": "batchFeature",
+          "kind": "function",
+          "signature": "export declare function batchFeature(options?: IBatchOptions): ILogFeature;",
+          "declarationLine": 4,
+          "source": "packages/log-host/dist/features/batch.d.ts",
+          "purpose": "Collect bounded FIFO batches per output and drain partial batches on flush.",
+          "core": "options: Optional maxSize=20, maxWaitMs=2000, maxConcurrentBatches=1, maxPendingBatches=1024 and drainTimeoutMs=3000.\nA delivery descriptor; each installed batchable output owns its own FIFO batch state.\nCollect bounded FIFO batches per output and drain partial batches on flush.",
+          "advanced": "Collect bounded FIFO batches per output and drain partial batches on flush.",
+          "parameters": ["options: IBatchOptions (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IBatchOptions",
+              "optional": true
+            }
+          ],
+          "returns": "ILogFeature",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/batch",
+          "overloadSignatures": [
+            "export declare function batchFeature(options?: IBatchOptions): ILogFeature;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IBatchOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["ILogFeature"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Collect bounded FIFO batches per output and drain partial batches on flush."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import batchFeature from @migaia/log-host/features/batch, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use batchFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when batchFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Optional maxSize=20, maxWaitMs=2000, maxConcurrentBatches=1, maxPendingBatches=1024 and drainTimeoutMs=3000.\nA delivery descriptor; each installed batchable output owns its own FIFO batch state.\nCollect bounded FIFO batches per output and drain partial batches on flush."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Collect bounded FIFO batches per output and drain partial batches on flush."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "maxSize",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "maxConcurrentBatches",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "maxPendingBatches",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "drainTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/log-host/dist/features/batch.d.ts:batchFeature:export declare function batchFeature(options?: IBatchOptions): ILogFeature;",
+          "guidance": [],
+          "usageScore": 20,
+          "configuration": [
+            {
+              "name": "maxSize",
+              "type": "number",
+              "optional": true,
+              "description": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。",
+              "descriptionEn": "",
+              "descriptionZh": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。"
+            },
+            {
+              "name": "maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。",
+              "descriptionEn": "",
+              "descriptionZh": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。"
+            },
+            {
+              "name": "maxConcurrentBatches",
+              "type": "number",
+              "optional": true,
+              "description": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。",
+              "descriptionEn": "",
+              "descriptionZh": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。"
+            },
+            {
+              "name": "maxPendingBatches",
+              "type": "number",
+              "optional": true,
+              "description": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。",
+              "descriptionEn": "",
+              "descriptionZh": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。"
+            },
+            {
+              "name": "drainTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。",
+              "descriptionEn": "",
+              "descriptionZh": "batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。"
+            }
+          ],
+          "fragment": "log-host-features/batch--batchFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "log-host:features/filter",
+      "library": "log-host",
+      "module": "features/filter",
+      "exportPath": "./features/filter",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-host/getting-started",
+      "architecturePath": "/en/docs/log-host",
+      "symbols": [
+        {
+          "name": "filterFeature",
+          "kind": "function",
+          "signature": "export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; };",
+          "declarationLine": 3,
+          "source": "packages/log-host/dist/features/filter.d.ts",
+          "purpose": "Use an initial predicate and reversible added filters without mutating another owner.",
+          "core": "options: Optional filters array in insertion order; default empty.\nAn issued gate descriptor with add(predicate), which returns a removal handle for that registration only.\nUse an initial predicate and reversible added filters without mutating another owner.",
+          "advanced": "Use an initial predicate and reversible added filters without mutating another owner.",
+          "parameters": [
+            "options: { filters?: readonly ((entry: ILogEntry) => boolean)[]; } (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "{ filters?: readonly ((entry: ILogEntry) => boolean)[]; }",
+              "optional": true
+            }
+          ],
+          "returns": "ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; }",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** 每个 add 返回的撤销函数只移除该次注册。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/filter",
+          "overloadSignatures": [
+            "export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; };"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "{ filters?: readonly ((entry: ILogEntry) => boolean)[]; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; }"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Use an initial predicate and reversible added filters without mutating another owner."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import filterFeature from @migaia/log-host/features/filter, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use filterFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when filterFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Optional filters array in insertion order; default empty.\nAn issued gate descriptor with add(predicate), which returns a removal handle for that registration only.\nUse an initial predicate and reversible added filters without mutating another owner."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Use an initial predicate and reversible added filters without mutating another owner."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "filters",
+              "type": "readonly ((entry: ILogEntry) => boolean)[]",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/log-host/dist/features/filter.d.ts:filterFeature:export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; };",
+          "guidance": [],
+          "usageScore": 20,
+          "configuration": [
+            {
+              "name": "filters",
+              "type": "readonly ((entry: ILogEntry) => boolean)[]",
+              "optional": true,
+              "description": "`filterFeature({ filters })` — 按顺序运行 predicates，任一返回 false 即停止；支持 `add()`",
+              "descriptionEn": "",
+              "descriptionZh": "`filterFeature({ filters })` — 按顺序运行 predicates，任一返回 false 即停止；支持 `add()`"
+            }
+          ],
+          "fragment": "log-host-features/filter--filterFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "log-host:features/format",
+      "library": "log-host",
+      "module": "features/format",
+      "exportPath": "./features/format",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-host/getting-started",
+      "architecturePath": "/en/docs/log-host",
+      "symbols": [
+        {
+          "name": "formatFeature",
+          "kind": "function",
+          "signature": "export declare function formatFeature(options: { format: 'json' | 'plain'; }): Extract<ILogFeature, { phase: 'format'; }>;",
+          "declarationLine": 3,
+          "source": "packages/log-host/dist/features/format.d.ts",
+          "purpose": "Select json/plain formatting; every scope admits one format and output format wins.",
+          "core": "options: Required format: json or plain.\nOne json/plain format descriptor; a text output may override it, while entry-only outputs skip it.\nSelect json/plain formatting; every scope admits one format and output format wins.",
+          "advanced": "Select json/plain formatting; every scope admits one format and output format wins.",
+          "parameters": ["options: { format: 'json' | 'plain'; }"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "{ format: 'json' | 'plain'; }",
+              "optional": false
+            }
+          ],
+          "returns": "Extract<ILogFeature, { phase: 'format'; }>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/format",
+          "overloadSignatures": [
+            "export declare function formatFeature(options: { format: 'json' | 'plain'; }): Extract<ILogFeature, { phase: 'format'; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "{ format: 'json' | 'plain'; }",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Extract<ILogFeature, { phase: 'format'; }>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Select json/plain formatting; every scope admits one format and output format wins."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import formatFeature from @migaia/log-host/features/format, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use formatFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when formatFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Required format: json or plain.\nOne json/plain format descriptor; a text output may override it, while entry-only outputs skip it.\nSelect json/plain formatting; every scope admits one format and output format wins."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Select json/plain formatting; every scope admits one format and output format wins."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "format",
+              "type": "'json' | 'plain'",
+              "optional": false,
+              "description": ""
+            }
+          ],
+          "identity": "packages/log-host/dist/features/format.d.ts:formatFeature:export declare function formatFeature(options: { format: 'json' | 'plain'; }): Extract<ILogFeature, { phase: 'format'; }>;",
+          "guidance": [],
+          "usageScore": 20,
+          "configuration": [
+            {
+              "name": "format",
+              "type": "'json' | 'plain'",
+              "optional": false,
+              "description": "同一作用域重复 kind 会在创建时抛 `INVALID_OPTION`。format 还按阶段唯一：即使 kind 不同，一个作用域也只允许一个 format。跨作用域允许各有一个，最终优先级是输出级显式 format、host 级显式 format、输出插件 `defaultFormat`。",
+              "descriptionEn": "",
+              "descriptionZh": "同一作用域重复 kind 会在创建时抛 `INVALID_OPTION`。format 还按阶段唯一：即使 kind 不同，一个作用域也只允许一个 format。跨作用域允许各有一个，最终优先级是输出级显式 format、host 级显式 format、输出插件 `defaultFormat`。"
+            }
+          ],
+          "fragment": "log-host-features/format--formatFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "log-host:features/retry",
+      "library": "log-host",
+      "module": "features/retry",
+      "exportPath": "./features/retry",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-host/getting-started",
+      "architecturePath": "/en/docs/log-host",
+      "symbols": [
+        {
+          "name": "retryFeature",
+          "kind": "function",
+          "signature": "export declare function retryFeature(options: IRetryFeatureOptions): ILogFeature;",
+          "declarationLine": 4,
+          "source": "packages/log-host/dist/features/retry.d.ts",
+          "purpose": "Retry failed delivery through canonical utils policy; attempts include the first call.",
+          "core": "options: Required attempts including the first call; optional numeric/function backoff defaults to zero.\nA delivery descriptor with an explicit total attempt count and backoff policy.\nRetry failed delivery through canonical utils policy; attempts include the first call.",
+          "advanced": "Retry failed delivery through canonical utils policy; attempts include the first call.",
+          "parameters": ["options: IRetryFeatureOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IRetryFeatureOptions",
+              "optional": false
+            }
+          ],
+          "returns": "ILogFeature",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/retry",
+          "overloadSignatures": [
+            "export declare function retryFeature(options: IRetryFeatureOptions): ILogFeature;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IRetryFeatureOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ILogFeature"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Retry failed delivery through canonical utils policy; attempts include the first call."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import retryFeature from @migaia/log-host/features/retry, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use retryFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when retryFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Required attempts including the first call; optional numeric/function backoff defaults to zero.\nA delivery descriptor with an explicit total attempt count and backoff policy.\nRetry failed delivery through canonical utils policy; attempts include the first call."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Retry failed delivery through canonical utils policy; attempts include the first call."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "attempts",
+              "type": "number",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "backoff",
+              "type": "number | ((attempt: number) => number)",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/log-host/dist/features/retry.d.ts:retryFeature:export declare function retryFeature(options: IRetryFeatureOptions): ILogFeature;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [
+            {
+              "name": "attempts",
+              "type": "number",
+              "optional": false,
+              "description": "`retryFeature({ attempts, backoff })` — 基于 utils retry；attempts 是含首次调用的总次数",
+              "descriptionEn": "",
+              "descriptionZh": "`retryFeature({ attempts, backoff })` — 基于 utils retry；attempts 是含首次调用的总次数"
+            },
+            {
+              "name": "backoff",
+              "type": "number | ((attempt: number) => number)",
+              "optional": true,
+              "description": "`retryFeature({ attempts, backoff })` — 基于 utils retry；attempts 是含首次调用的总次数",
+              "descriptionEn": "",
+              "descriptionZh": "`retryFeature({ attempts, backoff })` — 基于 utils retry；attempts 是含首次调用的总次数"
+            }
+          ],
+          "fragment": "log-host-features/retry--retryFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "log-host:features/threshold",
+      "library": "log-host",
+      "module": "features/threshold",
+      "exportPath": "./features/threshold",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-host/getting-started",
+      "architecturePath": "/en/docs/log-host",
+      "symbols": [
+        {
+          "name": "thresholdFeature",
+          "kind": "function",
+          "signature": "export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature & { setLevel(level: LogLevel): void; };",
+          "declarationLine": 4,
+          "source": "packages/log-host/dist/features/threshold.d.ts",
+          "purpose": "Apply a severity threshold per output; non-level tags retain their category.",
+          "core": "options: Optional level, default debug; change it later through the returned descriptor.setLevel().\nAn issued gate descriptor with setLevel(level), shared deliberately when the descriptor is reused.\nApply a severity threshold per output; non-level tags retain their category.",
+          "advanced": "Apply a severity threshold per output; non-level tags retain their category.",
+          "parameters": ["options: { level?: LogLevel; } (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "{ level?: LogLevel; }",
+              "optional": true
+            }
+          ],
+          "returns": "ILogFeature & { setLevel(level: LogLevel): void; }",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** 每个 add 返回的撤销函数只移除该次注册。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/threshold",
+          "overloadSignatures": [
+            "export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature & { setLevel(level: LogLevel): void; };"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "{ level?: LogLevel; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["ILogFeature & { setLevel(level: LogLevel): void; }"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Apply a severity threshold per output; non-level tags retain their category."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import thresholdFeature from @migaia/log-host/features/threshold, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use thresholdFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when thresholdFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Optional level, default debug; change it later through the returned descriptor.setLevel().\nAn issued gate descriptor with setLevel(level), shared deliberately when the descriptor is reused.\nApply a severity threshold per output; non-level tags retain their category."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Apply a severity threshold per output; non-level tags retain their category."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "level",
+              "type": "LogLevel",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/log-host/dist/features/threshold.d.ts:thresholdFeature:export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature & { setLevel(level: LogLevel): void; };",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [
+            {
+              "name": "level",
+              "type": "LogLevel",
+              "optional": true,
+              "description": "`thresholdFeature({ level })` — 标准级别门槛，支持 `setLevel()`",
+              "descriptionEn": "",
+              "descriptionZh": "`thresholdFeature({ level })` — 标准级别门槛，支持 `setLevel()`"
+            }
+          ],
+          "fragment": "log-host-features/threshold--thresholdFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "log-host:features/timeout",
+      "library": "log-host",
+      "module": "features/timeout",
+      "exportPath": "./features/timeout",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-host/getting-started",
+      "architecturePath": "/en/docs/log-host",
+      "symbols": [
+        {
+          "name": "timeoutFeature",
+          "kind": "function",
+          "signature": "export declare function timeoutFeature(options: { ms: number; }): ILogFeature;",
+          "declarationLine": 3,
+          "source": "packages/log-host/dist/features/timeout.d.ts",
+          "purpose": "Bound each attempt cooperatively; keep delivery primary ahead of ordered cleanup errors.",
+          "core": "options: Required finite nonnegative ms for each attempt.\nA delivery descriptor bounding each attempt through the shared scheduler and cancellation owner.\nBound each attempt cooperatively; keep delivery primary ahead of ordered cleanup errors.",
+          "advanced": "Bound each attempt cooperatively; keep delivery primary ahead of ordered cleanup errors.",
+          "parameters": ["options: { ms: number; }"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "{ ms: number; }",
+              "optional": false
+            }
+          ],
+          "returns": "ILogFeature",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/timeout",
+          "overloadSignatures": [
+            "export declare function timeoutFeature(options: { ms: number; }): ILogFeature;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "{ ms: number; }",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ILogFeature"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Bound each attempt cooperatively; keep delivery primary ahead of ordered cleanup errors."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import timeoutFeature from @migaia/log-host/features/timeout, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use timeoutFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when timeoutFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Required finite nonnegative ms for each attempt.\nA delivery descriptor bounding each attempt through the shared scheduler and cancellation owner.\nBound each attempt cooperatively; keep delivery primary ahead of ordered cleanup errors."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Bound each attempt cooperatively; keep delivery primary ahead of ordered cleanup errors."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "ms",
+              "type": "number",
+              "optional": false,
+              "description": ""
+            }
+          ],
+          "identity": "packages/log-host/dist/features/timeout.d.ts:timeoutFeature:export declare function timeoutFeature(options: { ms: number; }): ILogFeature;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [
+            {
+              "name": "ms",
+              "type": "number",
+              "optional": false,
+              "description": "`timeoutFeature({ ms })` — 基于 utils withTimeout 限制一次交付",
+              "descriptionEn": "",
+              "descriptionZh": "`timeoutFeature({ ms })` — 基于 utils withTimeout 限制一次交付"
+            }
+          ],
+          "fragment": "log-host-features/timeout--timeoutFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "log-host:features/uuid",
+      "library": "log-host",
+      "module": "features/uuid",
+      "exportPath": "./features/uuid",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-host/getting-started",
+      "architecturePath": "/en/docs/log-host",
+      "symbols": [
+        {
+          "name": "uuidFeature",
+          "kind": "function",
+          "signature": "export declare function uuidFeature(options?: { display?: boolean; }): ILogFeature;",
+          "declarationLine": 3,
+          "source": "packages/log-host/dist/features/uuid.d.ts",
+          "purpose": "Annotate accepted entries once; keep display policy independent from formatting.",
+          "core": "options: Optional display flag, default false; UUID generation still occurs.\nAn entry-stage descriptor usable at host scope; output-local installation is rejected.\nAnnotate accepted entries once; keep display policy independent from formatting.",
+          "advanced": "Annotate accepted entries once; keep display policy independent from formatting.",
+          "parameters": ["options: { display?: boolean; } (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "{ display?: boolean; }",
+              "optional": true
+            }
+          ],
+          "returns": "ILogFeature",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** 每个 add 返回的撤销函数只移除该次注册。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/uuid",
+          "overloadSignatures": [
+            "export declare function uuidFeature(options?: { display?: boolean; }): ILogFeature;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "{ display?: boolean; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["ILogFeature"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Annotate accepted entries once; keep display policy independent from formatting."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import uuidFeature from @migaia/log-host/features/uuid, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use uuidFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when uuidFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Optional display flag, default false; UUID generation still occurs.\nAn entry-stage descriptor usable at host scope; output-local installation is rejected.\nAnnotate accepted entries once; keep display policy independent from formatting."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Annotate accepted entries once; keep display policy independent from formatting."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "display",
+              "type": "boolean",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/log-host/dist/features/uuid.d.ts:uuidFeature:export declare function uuidFeature(options?: { display?: boolean; }): ILogFeature;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [
+            {
+              "name": "display",
+              "type": "boolean",
+              "optional": true,
+              "description": "门槛只解释标准级别；普通未知 tag 跳过级别比较，仍经过过滤。`atLevel()` 保留业务 tag，并携带其标准级别供门槛解释。UUID 总是写入 `data.uuid`，`display` 只控制 `data.uuidDisplay`，不关闭生成。",
+              "descriptionEn": "",
+              "descriptionZh": "门槛只解释标准级别；普通未知 tag 跳过级别比较，仍经过过滤。`atLevel()` 保留业务 tag，并携带其标准级别供门槛解释。UUID 总是写入 `data.uuid`，`display` 只控制 `data.uuidDisplay`，不关闭生成。"
+            }
+          ],
+          "fragment": "log-host-features/uuid--uuidFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "log-host:plugin",
+      "library": "log-host",
+      "module": "plugin",
+      "exportPath": "./plugin",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/log-host/getting-started",
+      "architecturePath": "/en/docs/log-host",
+      "symbols": [],
+      "aliases": []
+    }
+  ]
+}

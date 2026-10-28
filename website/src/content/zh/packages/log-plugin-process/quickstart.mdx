@@ -1,0 +1,30 @@
+---
+title: 进程生命周期接入 - 快速开始
+---
+
+# 进程生命周期接入
+
+按进程对象共享监听，并在信号及崩溃路径协调排空和关闭。
+
+当前为仓库中的未发布实现；工作区可使用以下包，面向仓库外的安装须等待相应版本发布。
+
+```bash
+pnpm add --workspace @migaia/log-host @migaia/log-plugin-process
+```
+
+## 完整示例
+
+```ts
+import { createLogHost, levelPlugin } from '@migaia/log-host'
+import { consolePlugin } from '@migaia/log-plugin-console'
+import { processPlugin } from '@migaia/log-plugin-process'
+
+const log = createLogHost({ plugins: [levelPlugin(), consolePlugin(), processPlugin()] })
+log.onShutdown(() => {
+  log.info('shutdown started')
+})
+log.info('ready')
+await log.shutdown('manual')
+```
+
+日志方法同步返回，读取交付结果前等待 `flush()`；退出前等待 `shutdown('manual')`。持久日志的追加、提交与读取仍按自身存储契约拒绝，不能用日志方法的非抛出保证代替事务结果。

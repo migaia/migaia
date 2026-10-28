@@ -57,7 +57,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         'Create one native RPC Host that owns global identity, local provider registration and close. Installed transports publish separate typed namespaces for calls; the root does not provide request or notify methods.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeout({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeoutFeature({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}",
       options: [
         {
           name: 'plugins',
@@ -66,7 +66,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse:
             'Genuine cold definitions with at least one transport and unique namespace names. Optional flow plugins precede the first transport startup.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeout({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeoutFeature({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
         },
         {
           name: 'provide',
@@ -76,7 +76,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             'Initial recursive own-data application method whitelist; receiver identity is captured once.',
           defaultValue: 'No initial local methods.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeout({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeoutFeature({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
         },
         {
           name: 'contract',
@@ -124,7 +124,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '创建一个原生 RPC 宿主，统一拥有全局身份、本地方法登记及关闭；安装的传输各自发布有类型的调用命名空间，业务通过该命名空间选择链路。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeout({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeoutFeature({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}",
       options: [
         {
           name: 'plugins',
@@ -133,7 +133,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse:
             '至少包含一个传输且命名空间名唯一的真实冷定义。可选信息流插件在首个传输启动前安装。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeout({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeoutFeature({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
         },
         {
           name: 'provide',
@@ -141,7 +141,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '初始递归自有数据方法白名单，接收者身份只捕获一次。',
           defaultValue: '无初始本地方法。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeout({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: [timeoutFeature({ ms: 1500 })],\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 },\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true }),\n            )\n        } finally {\n          await child.close()\n        }\n      },\n    }),\n  ],\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
         },
         {
           name: 'contract',
@@ -342,12 +342,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:features:retry': {
+  'rpc-host:features:retryFeature': {
     en: {
       purpose:
         'Create a complete originating retry feature and install it in transport features or select that instance for one call. attempts is the total admission limit, including the first attempt; backoff uses the configured scheduler. Replay follows actual accepted/native availability and admitted method idempotency, preserving one logical key and the inherited remaining budget across replacements. This policy does not retry arbitrary business exceptions or refresh a deadline on every attempt.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { retry } from '@migaia/rpc-host/features/retry'\nexport async function run() {\n  const host = await createRpcHost({\n    plugins: [\n      coroutinePlugin({\n        features: [retry({ attempts: 3, backoff: 40 })],\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [coroutinePlugin({ connectToParent: connect })],\n            provide: { demo: { service: { echo: (value: string) => value } } },\n            contract: {\n              schemaVersion: 1,\n              plugin: 'demo',\n              features: {\n                service: { methods: { echo: { mode: 'request', idempotent: true } } },\n              },\n            },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('demo.service.echo', 'replay-eligible value')\n  } finally {\n    await host.close()\n  }\n}\n",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature } from '@migaia/rpc-host/features/retry'\nexport async function run() {\n  const host = await createRpcHost({\n    plugins: [\n      coroutinePlugin({\n        features: [retryFeature({ attempts: 3, backoff: 40 })],\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [coroutinePlugin({ connectToParent: connect })],\n            provide: { demo: { service: { echo: (value: string) => value } } },\n            contract: {\n              schemaVersion: 1,\n              plugin: 'demo',\n              features: {\n                service: { methods: { echo: { mode: 'request', idempotent: true } } },\n              },\n            },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('demo.service.echo', 'replay-eligible value')\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'attempts',
@@ -355,7 +355,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Positive safe integer total attempt count including the initial attempt.',
           defaultValue: '2 attempts.',
           example:
-            "import { timeout, retry } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeout({ ms: 1500 }), retry({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeout({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'backoff',
@@ -399,7 +399,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '创建完整的发起方重试实例，装入传输的 features，或为一次调用显式选择该实例。attempts 表示包含首次尝试的总接纳次数，backoff 借配置的调度器等待；实际接纳或原生代际可用性与已声明的方法幂等性共同决定能否重放。跨代际替换保留同一个逻辑幂等键与继承的剩余预算，不因新尝试重置截止时间，也不会重试任意业务异常。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { retry } from '@migaia/rpc-host/features/retry'\nexport async function run() {\n  const host = await createRpcHost({\n    plugins: [\n      coroutinePlugin({\n        features: [retry({ attempts: 3, backoff: 40 })],\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [coroutinePlugin({ connectToParent: connect })],\n            provide: { demo: { service: { echo: (value: string) => value } } },\n            contract: {\n              schemaVersion: 1,\n              plugin: 'demo',\n              features: {\n                service: { methods: { echo: { mode: 'request', idempotent: true } } },\n              },\n            },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('demo.service.echo', 'replay-eligible value')\n  } finally {\n    await host.close()\n  }\n}\n",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature } from '@migaia/rpc-host/features/retry'\nexport async function run() {\n  const host = await createRpcHost({\n    plugins: [\n      coroutinePlugin({\n        features: [retryFeature({ attempts: 3, backoff: 40 })],\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [coroutinePlugin({ connectToParent: connect })],\n            provide: { demo: { service: { echo: (value: string) => value } } },\n            contract: {\n              schemaVersion: 1,\n              plugin: 'demo',\n              features: {\n                service: { methods: { echo: { mode: 'request', idempotent: true } } },\n              },\n            },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('demo.service.echo', 'replay-eligible value')\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'attempts',
@@ -407,7 +407,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '包含首次尝试的正安全整数总次数。',
           defaultValue: '两次尝试。',
           example:
-            "import { timeout, retry } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeout({ ms: 1500 }), retry({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeout({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'backoff',
@@ -444,19 +444,19 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:features:timeout': {
+  'rpc-host:features:timeoutFeature': {
     en: {
       purpose:
         'Create a complete timeout feature with a finite nonnegative ms budget, then install it in transport features or select it for one call. Each attempt borrows a merged cancellation signal and owns its timer through the supplied scheduler; zero permits immediate expiry. The effective budget can shorten but never renew inherited remaining time. Timeout errors remain distinct from caller cancellation, while the independent handshake deadline and provider cooperation retain their own owners.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nexport async function run() {\n  const host = await createRpcHost({\n    plugins: [\n      coroutinePlugin({\n        features: [timeout({ ms: 1500 })],\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [coroutinePlugin({ connectToParent: connect })],\n            provide: { double: (value: number) => value * 2 },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('double', 21)\n  } finally {\n    await host.close()\n  }\n}\n",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nexport async function run() {\n  const host = await createRpcHost({\n    plugins: [\n      coroutinePlugin({\n        features: [timeoutFeature({ ms: 1500 })],\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [coroutinePlugin({ connectToParent: connect })],\n            provide: { double: (value: number) => value * 2 },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('double', 21)\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'ms',
           description: 'Finite nonnegative attempt milliseconds; zero allows immediate expiry.',
           whenToUse: 'Finite nonnegative attempt milliseconds; zero allows immediate expiry.',
           example:
-            "import { timeout, retry } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeout({ ms: 1500 }), retry({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeout({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'scheduler',
@@ -486,14 +486,14 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '用有限非负的 ms 创建完整超时实例，再装入传输的 features，或为一次调用显式选择该实例。每次尝试借合并取消信号，并通过配置的调度器拥有计时器，零允许立即到期；有效预算只能缩短继承的剩余时间，不能重新续期。超时错误与调用者取消保持区别，握手建立的独立截止时间和提供方是否配合取消仍由各自所有者负责。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nexport async function run() {\n  const host = await createRpcHost({\n    plugins: [\n      coroutinePlugin({\n        features: [timeout({ ms: 1500 })],\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [coroutinePlugin({ connectToParent: connect })],\n            provide: { double: (value: number) => value * 2 },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('double', 21)\n  } finally {\n    await host.close()\n  }\n}\n",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nexport async function run() {\n  const host = await createRpcHost({\n    plugins: [\n      coroutinePlugin({\n        features: [timeoutFeature({ ms: 1500 })],\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [coroutinePlugin({ connectToParent: connect })],\n            provide: { double: (value: number) => value * 2 },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('double', 21)\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'ms',
           description: '有限非负的尝试毫秒数，零允许立即到期。',
           whenToUse: '有限非负的尝试毫秒数，零允许立即到期。',
           example:
-            "import { timeout, retry } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeout({ ms: 1500 }), retry({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeout({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'scheduler',
@@ -523,7 +523,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         'Complete originating retry implementation borrowing actual replacement availability.',
       quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeout } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeout({ ms: 1500 })] })",
+        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
       options: [
         {
           name: 'attempts',
@@ -531,7 +531,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Positive safe integer total attempt count including the initial attempt.',
           defaultValue: '2 attempts.',
           example:
-            "import { timeout, retry } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeout({ ms: 1500 }), retry({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeout({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'backoff',
@@ -568,7 +568,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
     zh: {
       purpose: '借用实际替换可用性的完整发起方重试实现。',
       quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeout } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeout({ ms: 1500 })] })",
+        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
       options: [
         {
           name: 'attempts',
@@ -576,7 +576,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '包含首次尝试的正安全整数总次数。',
           defaultValue: '两次尝试。',
           example:
-            "import { timeout, retry } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeout({ ms: 1500 }), retry({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeout({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'backoff',
@@ -611,14 +611,14 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
     en: {
       purpose: 'Complete attempt-timeout implementation with owned timer cleanup.',
       quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeout } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeout({ ms: 1500 })] })",
+        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
       options: [
         {
           name: 'ms',
           description: 'Finite nonnegative attempt milliseconds; zero allows immediate expiry.',
           whenToUse: 'Finite nonnegative attempt milliseconds; zero allows immediate expiry.',
           example:
-            "import { timeout, retry } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeout({ ms: 1500 }), retry({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeout({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'scheduler',
@@ -641,14 +641,14 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
     zh: {
       purpose: '拥有计时器清理的完整尝试超时实现。',
       quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeout } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeout({ ms: 1500 })] })",
+        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
       options: [
         {
           name: 'ms',
           description: '有限非负的尝试毫秒数，零允许立即到期。',
           whenToUse: '有限非负的尝试毫秒数，零允许立即到期。',
           example:
-            "import { timeout, retry } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeout({ ms: 1500 }), retry({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeout({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'scheduler',
@@ -2144,7 +2144,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         'Capture complete call-feature defaults for native installation. FeatureScope selects those existing timeout and retry instances without creating timers or executing policy during definition.',
       quickStart:
-        "import { defineLinkPolicy } from '@migaia/rpc-host/sdk'\nimport { timeout } from '@migaia/rpc-host/features'\nexport const defaults = defineLinkPolicy({\n  name: 'application-policy',\n  features: [timeout({ ms: 500 })],\n})",
+        "import { defineLinkPolicy } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineLinkPolicy({\n  name: 'application-policy',\n  features: [timeoutFeature({ ms: 500 })],\n})",
       options: [
         {
           name: 'name',
@@ -2170,7 +2170,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '为原生安装捕获完整调用功能默认值；FeatureScope 选择已有超时与重试实例，定义阶段不创建计时器，也不执行调用策略。',
       quickStart:
-        "import { defineLinkPolicy } from '@migaia/rpc-host/sdk'\nimport { timeout } from '@migaia/rpc-host/features'\nexport const defaults = defineLinkPolicy({\n  name: 'application-policy',\n  features: [timeout({ ms: 500 })],\n})",
+        "import { defineLinkPolicy } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineLinkPolicy({\n  name: 'application-policy',\n  features: [timeoutFeature({ ms: 500 })],\n})",
       options: [
         {
           name: 'name',
@@ -3081,12 +3081,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:auth': {
+  'rpc-host:plugins:authFeature': {
     en: {
       purpose:
         'Install the authentication flow plugin on the Host before starting transports. Paired sign/verify callbacks protect the prepared representation; optional encrypt/decrypt callbacks must also match. Explicit credentials and verifyCredentials govern handshake credential exchange without discovering native launch tokens or replacing carrier identity admission. Use namespaces to select links, then close the Host after application calls finish.',
       quickStart:
-        "// Supply the application real paired cryptographic operations.\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { auth } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport async function run(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  const protection = auth({ sign, verify, encodedType: 'string' })\n  const host = await createRpcHost({\n    plugins: [\n      protection,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [protection, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'authenticated value')\n  } finally {\n    await host.close()\n  }\n}\n",
+        "// Supply the application real paired cryptographic operations.\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport async function run(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  const protection = authFeature({ sign, verify, encodedType: 'string' })\n  const host = await createRpcHost({\n    plugins: [\n      protection,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [protection, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'authenticated value')\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'encrypt',
@@ -3174,7 +3174,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '在启动传输前把认证信息流插件安装到 Host，让配套的 sign/verify 对已准备表示签名和验证，需要加密时再提供相互匹配的 encrypt/decrypt。credentials 与 verifyCredentials 处理显式握手凭据，不会自动发现原生启动令牌，也不替代载体的身份接纳。通过 namespaces 选择实际链路；业务调用结束后仍由应用关闭 Host，释放该安装拥有的认证资源。',
       quickStart:
-        "// 传入应用实际拥有且相互匹配的签名及验证能力。\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { auth } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport async function run(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  const protection = auth({ sign, verify, encodedType: 'string' })\n  const host = await createRpcHost({\n    plugins: [\n      protection,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [protection, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'authenticated value')\n  } finally {\n    await host.close()\n  }\n}\n",
+        "// 传入应用实际拥有且相互匹配的签名及验证能力。\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport async function run(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  const protection = authFeature({ sign, verify, encodedType: 'string' })\n  const host = await createRpcHost({\n    plugins: [\n      protection,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [protection, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'authenticated value')\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'encrypt',
@@ -3247,7 +3247,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:batch': {
+  'rpc-host:plugins:batchFeature': {
     en: {
       purpose:
         'Install negotiated physical batching for selected namespaces. The plugin combines compatible physical writes while keeping each logical call and application group under its original execution owner.',
@@ -3309,12 +3309,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:chunk': {
+  'rpc-host:plugins:chunkFeature': {
     en: {
       purpose:
         'Install chunk on both peers when an encoded string or byte message must travel as bounded fragments. The plugin negotiates chunk@1, applies per-message and total assembly limits, and retires incomplete assemblies and their timers with the source. chunkBytes counts UTF-16 units for strings and bytes for Uint8Array. required rejects a peer lacking the extension; optional namespaces select existing links without constructing another transport or codec.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { chunk } from '@migaia/rpc-host/plugins/chunk'\nexport async function run() {\n  const framing = chunk({ required: true, chunkBytes: 16384, maxMessageBytes: 1048576 })\n  const host = await createRpcHost({\n    plugins: [\n      framing,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [framing, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'large result'.repeat(10000))\n  } finally {\n    await host.close()\n  }\n}\n",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport async function run() {\n  const framing = chunkFeature({ required: true, chunkBytes: 16384, maxMessageBytes: 1048576 })\n  const host = await createRpcHost({\n    plugins: [\n      framing,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [framing, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'large result'.repeat(10000))\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'chunkBytes',
@@ -3408,7 +3408,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '编码后的字符串或字节消息需要拆成有界片段时，在通信双方安装 chunk。插件协商 chunk@1，约束单条消息、分片数量和总体组装保留量，并在来源退场时释放未完成组装及其计时器。chunkBytes 对文本按 UTF-16 码元、对 Uint8Array 按字节计量；required 可拒绝未支持该扩展的对端，namespaces 只选择已有链路，不另建传输或编解码器。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { chunk } from '@migaia/rpc-host/plugins/chunk'\nexport async function run() {\n  const framing = chunk({ required: true, chunkBytes: 16384, maxMessageBytes: 1048576 })\n  const host = await createRpcHost({\n    plugins: [\n      framing,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [framing, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'large result'.repeat(10000))\n  } finally {\n    await host.close()\n  }\n}\n",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport async function run() {\n  const framing = chunkFeature({ required: true, chunkBytes: 16384, maxMessageBytes: 1048576 })\n  const host = await createRpcHost({\n    plugins: [\n      framing,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [framing, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'large result'.repeat(10000))\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'chunkBytes',
@@ -3755,7 +3755,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:idempotency': {
+  'rpc-host:plugins:idempotencyFeature': {
     en: {
       purpose:
         'Install provider execution claims, outcome storage and namespace outcome queries using the selected store and scope. A key is metadata for this policy; it does not by itself enable client retry.',
@@ -3900,7 +3900,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:limits': {
+  'rpc-host:plugins:limitsFeature': {
     en: {
       purpose:
         'Install shared provider concurrency and optional connection admission limits. These policy slots count RPC work and accepted connections, independently of native worker or pool capacity.',
@@ -4082,7 +4082,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         'Install complete timeout and retry instances as link defaults before transport and per-call overrides. The policy selects existing feature owners and adds no separate call pipeline.',
       quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeout } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeout({ ms: 1500 })] })",
+        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
       options: [
         {
           name: 'features',
@@ -4104,7 +4104,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '在传输及单次调用覆盖之前安装链路默认的完整超时与重试实例；该策略只选择已有功能所有者，不增加另一套调用流水线。',
       quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeout } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeout({ ms: 1500 })] })",
+        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
       options: [
         {
           name: 'features',
@@ -4154,7 +4154,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:schema': {
+  'rpc-host:plugins:schemaFeature': {
     en: {
       purpose:
         'Install explicit method parsers for provider payloads and results using actual method paths. Without this plugin, local contract declarations remain metadata and do not perform business validation.',
@@ -8987,7 +8987,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             'Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.',
           defaultValue: 'Omitted: no optional policy installed by this field.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'parentLoss',
@@ -9224,7 +9224,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             '此传输作用域的完整调用及受支持原生功能定义；逐次调用的超时和重试使用完整实例或关闭值。',
           defaultValue: '省略时不通过此字段安装可选策略。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'parentLoss',
@@ -9275,12 +9275,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-plugin-process:features:flowControl': {
+  'rpc-plugin-process:features:flowControlFeature': {
     en: {
       purpose:
         'Create a complete per-connection native write admission feature with independent data and control capacities. Capacity remains held through actual physical completion; the feature does not count provider executions.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'maxPendingData',
@@ -9291,7 +9291,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           defaultValue:
             'Omitted: retain the existing data lane capacity for pending business frames.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'maxPendingControl',
@@ -9302,7 +9302,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           defaultValue:
             'Omitted: retain the existing control lane capacity for pending protocol frames.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -9318,7 +9318,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '创建每连接完整原生写入准入功能，分别保留业务与控制容量，额度持续到实际物理写入完成；它计量原生积压，不统计远端提供方执行并发。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'maxPendingData',
@@ -9328,7 +9328,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             '原物理发送队列中等待业务数据帧的容量上限，显式值覆盖该通道，省略时保留来源原数据通道容量。',
           defaultValue: '省略时保留原队列容量。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'maxPendingControl',
@@ -9338,7 +9338,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             '原物理发送队列中等待协议控制帧的容量上限，显式值独立覆盖，省略时保留来源原控制通道容量。',
           defaultValue: '省略时保留原队列容量。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -9351,12 +9351,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-plugin-process:features:ipcLog': {
+  'rpc-plugin-process:features:ipcLogFeature': {
     en: {
       purpose:
         'Create a complete connection-local observer for the original backlog event source and available native stderr. The caller supplies the sink; logging does not install a capacity gate or change physical write settlement.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'report',
@@ -9365,7 +9365,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse:
             'Receive original IPC records; thrown or rejected failures use the original reporting route.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -9381,14 +9381,14 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '创建连接本地完整观察功能，接收原积压事件源及实际可用的原生标准错误；调用者提供日志接收端，单独日志不会安装容量门或改变物理写入结算。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'report',
           description: '接收原进程通信记录，抛错或拒绝走原报告路径。',
           whenToUse: '接收原进程通信记录，抛错或拒绝走原报告路径。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -9401,12 +9401,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-plugin-process:features:sendQueue': {
+  'rpc-plugin-process:features:sendQueueFeature': {
     en: {
       purpose:
         'Create a complete per-connection FIFO feature that awaits each original native write. It borrows one capacity owner, including an explicitly shared flowControl definition, and releases queued cancellation receipts at settlement.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'maxPendingData',
@@ -9417,7 +9417,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           defaultValue:
             'Omitted: retain the existing data lane capacity for pending business frames.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'maxPendingControl',
@@ -9428,7 +9428,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           defaultValue:
             'Omitted: retain the existing control lane capacity for pending protocol frames.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'flow',
@@ -9438,7 +9438,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             'Exact complete flowControl definition shared with this queue, avoiding a second capacity owner.',
           defaultValue: 'Omitted: the queue creates and owns its flow.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -9454,7 +9454,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '创建每连接完整先进先出功能，逐个等待原生写入完成，借用唯一容量所有者或显式共享的 flowControl 定义，并在结算时释放排队取消回执。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'maxPendingData',
@@ -9464,7 +9464,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             '原物理发送队列中等待业务数据帧的容量上限，显式值覆盖该通道，省略时保留来源原数据通道容量。',
           defaultValue: '省略时保留原队列容量。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'maxPendingControl',
@@ -9474,7 +9474,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             '原物理发送队列中等待协议控制帧的容量上限，显式值独立覆盖，省略时保留来源原控制通道容量。',
           defaultValue: '省略时保留原队列容量。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'flow',
@@ -9482,7 +9482,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '与此队列共享的精确完整流控定义，避免另一容量所有者。',
           defaultValue: '省略时队列创建并拥有流控。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -9500,7 +9500,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         'Lower-level installed FIFO borrows one IpcFlowControl and the original Utils limiter. It owns queued cancellation and close admission while the same native write Promise owns physical completion.',
       quickStart:
-        "import { IpcSendQueue } from '@migaia/rpc-plugin-process/features/send-queue'\nimport {\n  flowControl,\n  type IProcessFeatureContext,\n} from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcSendQueue(flowControl({ maxPendingData: 32 }), context)\n}",
+        "import { IpcSendQueue } from '@migaia/rpc-plugin-process/features/send-queue'\nimport {\n  flowControlFeature,\n  type IProcessFeatureContext,\n} from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcSendQueue(flowControlFeature({ maxPendingData: 32 }), context)\n}",
       options: [],
       scenarios: [
         'Serialize original native sends for a custom Process feature integration.',
@@ -9515,7 +9515,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '底层安装值借用唯一 IpcFlowControl 与原 Utils 限流器，拥有排队取消及关闭准入；实际物理完成仍由同一个原生写入 Promise 表示。',
       quickStart:
-        "import { IpcSendQueue } from '@migaia/rpc-plugin-process/features/send-queue'\nimport {\n  flowControl,\n  type IProcessFeatureContext,\n} from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcSendQueue(flowControl({ maxPendingData: 32 }), context)\n}",
+        "import { IpcSendQueue } from '@migaia/rpc-plugin-process/features/send-queue'\nimport {\n  flowControlFeature,\n  type IProcessFeatureContext,\n} from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcSendQueue(flowControlFeature({ maxPendingData: 32 }), context)\n}",
       options: [],
       scenarios: [
         '为自定义 Process 功能集成串行化原生发送。',
@@ -9532,7 +9532,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         'Create a complete connection-local FIFO feature. The queue waits for each original native write Promise and borrows one flow capacity owner.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'maxPendingData',
@@ -9543,7 +9543,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           defaultValue:
             'Omitted: retain the existing data lane capacity for pending business frames.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'maxPendingControl',
@@ -9554,7 +9554,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           defaultValue:
             'Omitted: retain the existing control lane capacity for pending protocol frames.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'flow',
@@ -9564,7 +9564,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             'Exact complete flowControl definition shared with this queue, avoiding a second capacity owner.',
           defaultValue: 'Omitted: the queue creates and owns its flow.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [],
@@ -9573,7 +9573,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
     zh: {
       purpose: '创建连接本地的完整先进先出功能，等待每个原生写入承诺并借用唯一流控容量所有者。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'maxPendingData',
@@ -9583,7 +9583,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             '原物理发送队列中等待业务数据帧的容量上限，显式值覆盖该通道，省略时保留来源原数据通道容量。',
           defaultValue: '省略时保留原队列容量。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'maxPendingControl',
@@ -9593,7 +9593,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             '原物理发送队列中等待协议控制帧的容量上限，显式值独立覆盖，省略时保留来源原控制通道容量。',
           defaultValue: '省略时保留原队列容量。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'flow',
@@ -9601,7 +9601,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '与此队列共享的精确完整流控定义，避免另一容量所有者。',
           defaultValue: '省略时队列创建并拥有流控。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [],
@@ -9613,7 +9613,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         'Create a complete local log feature for actual backlog, send failures and captured stderr. Logging alone does not install flow control.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'report',
@@ -9622,7 +9622,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse:
             'Receive original IPC records; thrown or rejected failures use the original reporting route.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [],
@@ -9631,14 +9631,14 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
     zh: {
       purpose: '为实际积压、发送失败及捕获的标准错误创建完整本地日志功能；单独日志不会启用流控。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'report',
           description: '接收原进程通信记录，抛错或拒绝走原报告路径。',
           whenToUse: '接收原进程通信记录，抛错或拒绝走原报告路径。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [],
@@ -9650,7 +9650,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         'Lower-level installed owner of data/control counts, watermark crossings and original native write settlement. Custom native authors supply the genuine Process feature context; ordinary applications use flowControl.',
       quickStart:
-        "import { IpcFlowControl } from '@migaia/rpc-plugin-process/features/flow-control'\nimport {\n  flowControl,\n  type IProcessFeatureContext,\n} from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcFlowControl({ maxPendingData: 32 }, context)\n}",
+        "import { IpcFlowControl } from '@migaia/rpc-plugin-process/features/flow-control'\nimport {\n  flowControlFeature,\n  type IProcessFeatureContext,\n} from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcFlowControl({ maxPendingData: 32 }, context)\n}",
       options: [],
       scenarios: [
         'Integrate a custom native sender with the existing run and whenIdle ownership.',
@@ -9665,7 +9665,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '这是持有业务及控制计数、水位越界和原生写入结算的底层安装值；自定义原生作者需提供真实 Process 功能上下文，普通应用应使用 flowControl 工厂。',
       quickStart:
-        "import { IpcFlowControl } from '@migaia/rpc-plugin-process/features/flow-control'\nimport {\n  flowControl,\n  type IProcessFeatureContext,\n} from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcFlowControl({ maxPendingData: 32 }, context)\n}",
+        "import { IpcFlowControl } from '@migaia/rpc-plugin-process/features/flow-control'\nimport {\n  flowControlFeature,\n  type IProcessFeatureContext,\n} from '@migaia/rpc-plugin-process/features'\n\nexport function nativeAdmission(context: IProcessFeatureContext) {\n  return new IpcFlowControl({ maxPendingData: 32 }, context)\n}",
       options: [],
       scenarios: [
         '把自定义原生发送器接到既有 run 与 whenIdle 所有权。',
@@ -9682,7 +9682,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         'Create one complete two-lane native-write admission feature. A sendQueue may share this exact definition.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'maxPendingData',
@@ -9693,7 +9693,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           defaultValue:
             'Omitted: retain the existing data lane capacity for pending business frames.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'maxPendingControl',
@@ -9704,7 +9704,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           defaultValue:
             'Omitted: retain the existing control lane capacity for pending protocol frames.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [],
@@ -9713,7 +9713,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
     zh: {
       purpose: '创建完整的双通道原生写入接纳功能，发送队列可共享此精确定义。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}",
       options: [
         {
           name: 'maxPendingData',
@@ -9723,7 +9723,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             '原物理发送队列中等待业务数据帧的容量上限，显式值覆盖该通道，省略时保留来源原数据通道容量。',
           defaultValue: '省略时保留原队列容量。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         },
         {
           name: 'maxPendingControl',
@@ -9733,7 +9733,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             '原物理发送队列中等待协议控制帧的容量上限，显式值独立覆盖，省略时保留来源原控制通道容量。',
           defaultValue: '省略时保留原队列容量。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueue({ flow }),\n          ipcLog({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeout({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\nimport { flowControlFeature, sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function openWorker(entry: URL) {\n  const flow = flowControlFeature({ maxPendingData: 32, maxPendingControl: 8 })\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.error(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      processPlugin({\n        spawn: entry,\n        features: [\n          flow,\n          sendQueueFeature({ flow }),\n          ipcLogFeature({\n            report(record) {\n              console.error(record)\n            },\n          }),\n          timeoutFeature({ ms: 1500 }),\n        ],\n      }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [],
@@ -9815,7 +9815,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             'Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.',
           defaultValue: 'Omitted: no optional policy installed by this field.',
           example:
-            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeout, retry } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeout({ ms: 1500 }), retry({ attempts: 2 })],\n  }),\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeout({ ms: 500 }),\n    retry: false,\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
+            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n  }),\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false,\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
         },
         {
           name: 'spawn',
@@ -9883,7 +9883,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             '此传输作用域的完整调用及受支持原生功能定义；逐次调用的超时和重试使用完整实例或关闭值。',
           defaultValue: '省略时不通过此字段安装可选策略。',
           example:
-            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeout, retry } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeout({ ms: 1500 }), retry({ attempts: 2 })],\n  }),\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeout({ ms: 500 }),\n    retry: false,\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
+            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n  }),\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false,\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
         },
         {
           name: 'spawn',
@@ -9967,7 +9967,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Complete call-feature instances scoped to this transport.',
           defaultValue: 'Omitted: no optional policy installed by this field.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10030,7 +10030,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '作用于此传输的完整调用功能实例。',
           defaultValue: '省略时不通过此字段安装可选策略。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10097,7 +10097,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Complete call-feature instances scoped to this transport.',
           defaultValue: 'Omitted: no optional policy installed by this field.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10160,7 +10160,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '作用于此传输的完整调用功能实例。',
           defaultValue: '省略时不通过此字段安装可选策略。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10227,7 +10227,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Complete call-feature instances scoped to this transport.',
           defaultValue: 'Omitted: no optional policy installed by this field.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10290,7 +10290,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '作用于此传输的完整调用功能实例。',
           defaultValue: '省略时不通过此字段安装可选策略。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10372,7 +10372,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Complete call-feature instances scoped to this transport.',
           defaultValue: 'Omitted: no optional policy installed by this field.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10450,7 +10450,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '作用于此传输的完整调用功能实例。',
           defaultValue: '省略时不通过此字段安装可选策略。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10531,7 +10531,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Complete call-feature instances scoped to this transport.',
           defaultValue: 'Omitted: no optional policy installed by this field.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10607,7 +10607,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '作用于此传输的完整调用功能实例。',
           defaultValue: '省略时不通过此字段安装可选策略。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10674,7 +10674,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Complete call-feature instances scoped to this transport.',
           defaultValue: 'Omitted: no optional policy installed by this field.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10735,7 +10735,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '作用于此传输的完整调用功能实例。',
           defaultValue: '省略时不通过此字段安装可选策略。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10828,7 +10828,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Complete call-feature instances scoped to this transport.',
           defaultValue: 'Omitted: no optional policy installed by this field.',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -10913,7 +10913,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '作用于此传输的完整调用功能实例。',
           defaultValue: '省略时不通过此字段安装可选策略。',
           example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeout } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeout({ ms: 1500 })] }),\n    ],\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    },\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] }),\n    ],\n  })\n}"
         }
       ],
       scenarios: [
@@ -11480,28 +11480,31 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
 /** Every address is an actual current public entry and symbol, using the existing guide-key form. */
 export const rpcApiGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
   ...canonicalRpcGuides,
-  'rpc-host:features-retry:retry': canonicalRpcGuides['rpc-host:features:retry']!,
-  'rpc-host:features-timeout:timeout': canonicalRpcGuides['rpc-host:features:timeout']!,
+  'rpc-host:features-retry:retryFeature': canonicalRpcGuides['rpc-host:features:retryFeature']!,
+  'rpc-host:features-timeout:timeoutFeature':
+    canonicalRpcGuides['rpc-host:features:timeoutFeature']!,
   'rpc-host:sdk:createRpcStreamFrameDecoderWithLimit':
     canonicalRpcGuides['rpc-host:sdk:createRpcStreamFrameDecoder']!,
   'rpc-host:plugins-typegen:default': canonicalRpcGuides['rpc-host:plugins:typegen']!,
   'rpc-host:plugins-typegen:typegen': canonicalRpcGuides['rpc-host:plugins:typegen']!,
-  'rpc-host:plugins-schema:default': canonicalRpcGuides['rpc-host:plugins:schema']!,
-  'rpc-host:plugins-schema:schema': canonicalRpcGuides['rpc-host:plugins:schema']!,
-  'rpc-host:plugins-auth:auth': canonicalRpcGuides['rpc-host:plugins:auth']!,
-  'rpc-host:plugins-auth:default': canonicalRpcGuides['rpc-host:plugins:auth']!,
-  'rpc-host:plugins-chunk:chunk': canonicalRpcGuides['rpc-host:plugins:chunk']!,
-  'rpc-host:plugins-chunk:default': canonicalRpcGuides['rpc-host:plugins:chunk']!,
-  'rpc-host:plugins-batch:batch': canonicalRpcGuides['rpc-host:plugins:batch']!,
-  'rpc-host:plugins-batch:default': canonicalRpcGuides['rpc-host:plugins:batch']!,
-  'rpc-host:plugins-limits:default': canonicalRpcGuides['rpc-host:plugins:limits']!,
-  'rpc-host:plugins-limits:limits': canonicalRpcGuides['rpc-host:plugins:limits']!,
+  'rpc-host:plugins-schema:default': canonicalRpcGuides['rpc-host:plugins:schemaFeature']!,
+  'rpc-host:plugins-schema:schemaFeature': canonicalRpcGuides['rpc-host:plugins:schemaFeature']!,
+  'rpc-host:plugins-auth:authFeature': canonicalRpcGuides['rpc-host:plugins:authFeature']!,
+  'rpc-host:plugins-auth:default': canonicalRpcGuides['rpc-host:plugins:authFeature']!,
+  'rpc-host:plugins-chunk:chunkFeature': canonicalRpcGuides['rpc-host:plugins:chunkFeature']!,
+  'rpc-host:plugins-chunk:default': canonicalRpcGuides['rpc-host:plugins:chunkFeature']!,
+  'rpc-host:plugins-batch:batchFeature': canonicalRpcGuides['rpc-host:plugins:batchFeature']!,
+  'rpc-host:plugins-batch:default': canonicalRpcGuides['rpc-host:plugins:batchFeature']!,
+  'rpc-host:plugins-limits:default': canonicalRpcGuides['rpc-host:plugins:limitsFeature']!,
+  'rpc-host:plugins-limits:limitsFeature': canonicalRpcGuides['rpc-host:plugins:limitsFeature']!,
   'rpc-host:plugins-link-policy:default': canonicalRpcGuides['rpc-host:plugins:linkPolicy']!,
   'rpc-host:plugins-link-policy:linkPolicy': canonicalRpcGuides['rpc-host:plugins:linkPolicy']!,
   'rpc-host:plugins-idempotency:createRpcIdempotencyStore':
     canonicalRpcGuides['rpc-host:plugins:createRpcIdempotencyStore']!,
-  'rpc-host:plugins-idempotency:default': canonicalRpcGuides['rpc-host:plugins:idempotency']!,
-  'rpc-host:plugins-idempotency:idempotency': canonicalRpcGuides['rpc-host:plugins:idempotency']!,
+  'rpc-host:plugins-idempotency:default':
+    canonicalRpcGuides['rpc-host:plugins:idempotencyFeature']!,
+  'rpc-host:plugins-idempotency:idempotencyFeature':
+    canonicalRpcGuides['rpc-host:plugins:idempotencyFeature']!,
   'rpc-host:plugins-probe:default': canonicalRpcGuides['rpc-host:plugins:probe']!,
   'rpc-host:plugins-probe:defineProbe': canonicalRpcGuides['rpc-host:plugins:defineProbe']!,
   'rpc-host:plugins-probe:probe': canonicalRpcGuides['rpc-host:plugins:probe']!,
@@ -11784,16 +11787,16 @@ export const rpcApiGuides: Readonly<Record<string, Readonly<Record<IGuideLocale,
     canonicalRpcGuides['rpc-contract:index:RpcRemoteLayerErrorCode']!,
   'rpc-contract:error-code:RpcThreadErrorCode':
     canonicalRpcGuides['rpc-contract:index:RpcThreadErrorCode']!,
-  'rpc-plugin-process:features-send-queue:sendQueue':
-    canonicalRpcGuides['rpc-plugin-process:features:sendQueue']!,
-  'rpc-plugin-process:features-log:ipcLog':
-    canonicalRpcGuides['rpc-plugin-process:features:ipcLog']!,
+  'rpc-plugin-process:features-send-queue:sendQueueFeature':
+    canonicalRpcGuides['rpc-plugin-process:features:sendQueueFeature']!,
+  'rpc-plugin-process:features-log:ipcLogFeature':
+    canonicalRpcGuides['rpc-plugin-process:features:ipcLogFeature']!,
   'rpc-plugin-process:features-flow-control:IpcLogEventName':
     canonicalRpcGuides['rpc-plugin-process:features:IpcLogEventName']!,
   'rpc-plugin-process:features-flow-control:IpcSendClass':
     canonicalRpcGuides['rpc-contract:interfaces:IpcSendClass']!,
-  'rpc-plugin-process:features-flow-control:flowControl':
-    canonicalRpcGuides['rpc-plugin-process:features:flowControl']!,
+  'rpc-plugin-process:features-flow-control:flowControlFeature':
+    canonicalRpcGuides['rpc-plugin-process:features:flowControlFeature']!,
   'rpc-plugin-process:index:RPC_PROCESS_ERROR_SOURCE':
     canonicalRpcGuides['rpc-contract:index:RPC_PROCESS_ERROR_SOURCE']!,
   'rpc-plugin-process:index:RpcProcessErrorCode':

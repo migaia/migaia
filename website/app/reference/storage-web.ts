@@ -113,19 +113,19 @@ const redoExample = (
   module: string,
   plugin: string,
   id: string
-): string => `import { Logger } from '@migaia/logger'
-import { memoryLogStore, wal } from '@migaia/logger/plugins/durable'
+): string => `import { createLogHost } from '@migaia/log-host'
+import { memoryLogStore, walPlugin } from '@migaia/log-plugin-durable'
 import { createStorageHost } from '@migaia/storage-host'
 import { storageJournalPlugin } from '@migaia/storage-host/journal'
 import { ${plugin} } from '@migaia/storage-web/${module}'
 
-const logger = new Logger({
+const logger = createLogHost({
   execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 1000 },
-  plugins: [wal({ store: memoryLogStore() })]
+  plugins: [walPlugin({ store: memoryLogStore() })]
 })
 const host = await createStorageHost({
   plugins: [storageJournalPlugin(), ${plugin}({ redo: true })],
-  journal: { logger, namespace: 'history', redoWal: logger.wal }
+  journal: { logger, namespace: 'history', redoWal: logger.walPlugin }
 })
 try {
   await host.backend('${id}').transaction(async (scope) => {

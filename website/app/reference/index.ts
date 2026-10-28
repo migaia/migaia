@@ -10,7 +10,13 @@ import { pluginHostReference } from './plugin-host.js'
 import { reactiveReference } from './reactive.js'
 import { utilsReference } from './utils.js'
 import { resourceReference } from './resource.js'
-import { loggerReference } from './logger.js'
+import { logHostReference } from './log-host.js'
+import { logConsoleReference } from './log-plugin-console.js'
+import { logHttpReference } from './log-plugin-http.js'
+import { logFileReference } from './log-plugin-file.js'
+import { logProcessReference } from './log-plugin-process.js'
+import { logReasoningReference } from './log-plugin-reasoning.js'
+import { logDurableReference } from './log-plugin-durable.js'
 import { trayReference } from './tray.js'
 import { rpcBrowserReference } from './rpc-plugin-browser.js'
 import { rpcThreadsReference } from './rpc-plugin-thread.js'
@@ -195,7 +201,13 @@ export const libraryReferences: Readonly<Record<string, ILibraryReference>> = {
   'plugin-host': pluginHostReference,
   utils: utilsReference,
   resource: resourceReference,
-  logger: loggerReference,
+  'log-host': logHostReference,
+  'log-plugin-console': logConsoleReference,
+  'log-plugin-http': logHttpReference,
+  'log-plugin-file': logFileReference,
+  'log-plugin-process': logProcessReference,
+  'log-plugin-reasoning': logReasoningReference,
+  'log-plugin-durable': logDurableReference,
   tray: trayReference,
   'rpc-plugin-browser': rpcBrowserReference,
   'rpc-plugin-thread': rpcThreadsReference,

@@ -1,0 +1,61 @@
+{
+  "package": "log-host",
+  "codes": {
+    "BATCH_OVERFLOW": {
+      "source": "logging",
+      "scenario": "Batch capacity dropped the oldest queued batch, or incoming data if all batches were active."
+    },
+    "DELIVERY_FAILED": {
+      "source": "logging",
+      "scenario": "A bounded output attempt failed; cause retains the original timeout or delivery failure."
+    },
+    "FORWARD_CYCLE": {
+      "source": "logging",
+      "scenario": "A new forwarding edge would reach its own source through existing target edges."
+    },
+    "FORWARD_SELF": {
+      "source": "logging",
+      "scenario": "A host cannot register itself as a forwarding target."
+    },
+    "HOOK_FAILED": {
+      "source": "logging",
+      "scenario": "A failure listener failed while observing another failure; the terminal reporter receives it."
+    },
+    "INVALID_OPTION": {
+      "source": "logging",
+      "scenario": "Invalid construction/configuration input requires a corrected caller option."
+    },
+    "INVALID_RETRY_COUNT": {
+      "source": "logging",
+      "scenario": "Retry attempts must be a positive safe integer before any output is installed."
+    },
+    "LIFECYCLE_DEADLINE": {
+      "source": "logging",
+      "scenario": "A bounded flush/shutdown phase ran out of its shared lifecycle wait budget."
+    },
+    "PIPELINE_ENTRY_INVALID": {
+      "source": "logging",
+      "scenario": "A pipeline replacement lost its Date; delivery keeps the prior valid entry and reports it."
+    },
+    "PLUGIN_CONFIG_CONFLICT": {
+      "source": "logging",
+      "scenario": "An existing plugin configuration conflicts with a new installation."
+    },
+    "PLUGIN_SHUTDOWN_CLEANUP_FAILED": {
+      "source": "logging",
+      "scenario": "Terminal cleanup failed; callers inspect the structured disposal result and original cause."
+    },
+    "PLUGIN_UNINSTALL_CLEANUP_FAILED": {
+      "source": "logging",
+      "scenario": "Plugin release attempted all owned cleanup but at least one cleanup failed."
+    },
+    "QUEUE_OVERFLOW": {
+      "source": "logging",
+      "scenario": "Entry admission dropped the oldest unprocessed entry to maintain the pending bound."
+    },
+    "RUNTIME_SHUTTING_DOWN": {
+      "source": "logging",
+      "scenario": "Configuration admission has closed during terminal shutdown."
+    }
+  }
+}

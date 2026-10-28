@@ -1,0 +1,37 @@
+---
+title: 文件日志追加 - 快速开始
+---
+
+# 文件日志追加
+
+按批次追加已格式化文本，借用写入器及可选轮转能力。
+
+当前为仓库中的未发布实现；工作区可使用以下包，面向仓库外的安装须等待相应版本发布。
+
+```bash
+pnpm add --workspace @migaia/log-host @migaia/log-plugin-file
+```
+
+## 完整示例
+
+```ts
+import { createLogHost } from '@migaia/log-host'
+import { filePlugin } from '@migaia/log-plugin-file'
+
+const log = createLogHost({
+  plugins: [
+    filePlugin({
+      path: 'app.jsonl',
+      writer: {
+        append: async (path, text) => {
+          console.log(path, text)
+        }
+      }
+    })
+  ]
+})
+log.log('info', 'saved')
+await log.shutdown('manual')
+```
+
+日志方法同步返回，读取交付结果前等待 `flush()`；退出前等待 `shutdown('manual')`。持久日志的追加、提交与读取仍按自身存储契约拒绝，不能用日志方法的非抛出保证代替事务结果。

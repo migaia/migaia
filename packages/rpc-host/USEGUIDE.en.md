@@ -78,17 +78,19 @@ A stream starts at the first `next()`. `return()` ends consumption and waits for
 This example creates cold definitions only. Pass `policy` and `transport` to `createRpcHost({ plugins: [...] })`, and install the corresponding child source in the worker entry.
 
 ```ts doc-test=check
-import { timeout, retry } from '@migaia/rpc-host/features'
+import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
 import { linkPolicy } from '@migaia/rpc-host/plugins'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-export const policy = linkPolicy({ features: [timeout({ ms: 3000 }), retry({ attempts: 2 })] })
+export const policy = linkPolicy({
+  features: [timeoutFeature({ ms: 3000 }), retryFeature({ attempts: 2 })]
+})
 export const transport = threadPlugin({
   spawn: new URL('./worker.ts', import.meta.url),
-  features: [timeout({ ms: 1500 })]
+  features: [timeoutFeature({ ms: 1500 })]
 })
 
-export const callOptions = { timeout: timeout({ ms: 100 }), retry: false } as const
+export const callOptions = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const
 ```
 
 Selection has one order: complete per-call instance or `false`, then the transport plugin's feature, then the link-policy default. Pass `callOptions` to `host.thread.request(method, payload, callOptions)` to override one call. Numeric `{ timeout: 100 }`, `timeoutMs`, and `defaultTimeoutMs` are removed.
@@ -103,10 +105,10 @@ The complete definition batch passed to `createRpcHost({ plugins })` either succ
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
-import { limits } from '@migaia/rpc-host/plugins'
+import { limitsFeature } from '@migaia/rpc-host/plugins'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-const host = await createRpcHost({ plugins: [limits({ maxGlobal: 256 })] })
+const host = await createRpcHost({ plugins: [limitsFeature({ maxGlobal: 256 })] })
 try {
   const extended = await host.use(threadPlugin({ spawn: new URL('./worker.ts', import.meta.url) }))
   await extended.thread.notify('refresh')
@@ -159,7 +161,7 @@ export async function installRpc(
 }
 ```
 
-`rpcFlowPlugin(features)` wraps shared flow Features for an ordinary native host. The native registration owns their actual setup and cleanup; Features such as `auth()` cannot be passed directly to native `host.use` as plugins. Commit this wrapper and readonly observers before transports so the first handshake already has its complete policy.
+`rpcFlowPlugin(features)` wraps shared flow Features for an ordinary native host. The native registration owns their actual setup and cleanup; Features such as `authFeature()` cannot be passed directly to native `host.use` as plugins. Commit this wrapper and readonly observers before transports so the first handshake already has its complete policy.
 
 A class owner also reads `this` lazily through the helper. `createPluginDomainCore` must forward the current construction request without exposing protected `pipeline`. Install plugins in the same order after construction finishes.
 
@@ -202,19 +204,19 @@ Each `defineFlowFeature` setup returns installation-local `stages`; install the 
 
 Frame pipelines accept multiple submissions. The stage receives each `await next(payload)` failure and may catch, report and continue with another member. If it does not observe a failed Promise, the pipeline rejects after all started traversals settle; multiple unobserved failures are collected in submission order. Observation callbacks do not execute or advance stages.
 
-A cancelled `batch` member submits no further downstream work. Its call settles with `CANCELLED` and the original reason on `cause`; other members complete normally. An inbound member failure reports only that member and does not prevent later members from being processed.
+A cancelled `batchFeature` member submits no further downstream work. Its call settles with `CANCELLED` and the original reason on `cause`; other members complete normally. An inbound member failure reports only that member and does not prevent later members from being processed.
 
 Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound reverses the direction. Array order does not change these positions. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly.
 
-`auth` protects each complete message before `chunk` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
+`authFeature` protects each complete message before `chunkFeature` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
 
-`chunk({ maxConcurrentMessagesPerSource, maxBufferedBytesPerSource })` sets quotas per physical source. Defaults are 64 incomplete messages and 16 MiB, below the global defaults of 256 messages and 64 MiB. The default source concurrency is `min(64, max(1, floor(maxConcurrentMessages / 4)))`; default source bytes are `max(maxMessageBytes, min(16777216, floor(maxBufferedBytes / 4)))`, so one admitted complete message can reserve capacity. An explicit `maxBufferedBytesPerSource` below `maxMessageBytes` rejects at construction through the existing configuration error. The first fragment reserves its complete declared length until completion, expiry, or source closure. Exceeding a source quota rejects only that source's new fragmented message; admitted messages keep their reservations. Other sources remain subject to their own quotas and the original global retained-byte budget. String quotas use UTF-16 code units; binary quotas use bytes.
+`chunkFeature({ maxConcurrentMessagesPerSource, maxBufferedBytesPerSource })` sets quotas per physical source. Defaults are 64 incomplete messages and 16 MiB, below the global defaults of 256 messages and 64 MiB. The default source concurrency is `min(64, max(1, floor(maxConcurrentMessages / 4)))`; default source bytes are `max(maxMessageBytes, min(16777216, floor(maxBufferedBytes / 4)))`, so one admitted complete message can reserve capacity. An explicit `maxBufferedBytesPerSource` below `maxMessageBytes` rejects at construction through the existing configuration error. The first fragment reserves its complete declared length until completion, expiry, or source closure. Exceeding a source quota rejects only that source's new fragmented message; admitted messages keep their reservations. Other sources remain subject to their own quotas and the original global retained-byte budget. String quotas use UTF-16 code units; binary quotas use bytes.
 
 Local codec capture accumulates a constant-time JSON byte lower bound per node during its original traversal. It never calls `JSON.stringify` on strings, keys, binary tags, or metadata. A lower bound above the current `maxFrameBytes` rejects immediately with `FRAME_LIMIT_EXCEEDED`, preventing exponential alias expansion. Otherwise, the sole actual encoding exit still checks real UTF-8 length against the same limit. The lower bound never exceeds actual JSON bytes; admitted aliases retain their ordinary independent expansion and unchanged wire representation.
 
 A carrier may implement `reserveWrite(options)` by borrowing its existing flow-control owner and returning a receipt with `release()`. Session reserves once per logical write after encoding and releases when that frame pipeline actually settles. Chunk fragments share the same receipt; a batch retains each member's receipt and borrows a surviving member's receipt for its coalesced physical write. `write` still completes at actual physical acceptance, without counting fragments or batches as new logical calls. Receipts never enter wire data.
 
-The same `auth`, `chunk`, `batch`, `idempotency`, `limits`, `errorMap`, and `schema` factories support host `plugins` and transport `features`; transport placement overrides only its namespace. Host `limits` shares quotas; transport `limits` owns separate quotas. `probe`, `typegen`, and Devtools are host-only. Remove the former `namespaces` scope option and place the feature on its transport.
+The same `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, and `schemaFeature` factories support host `plugins` and transport `features`; transport placement overrides only its namespace. Host `limitsFeature` shares quotas; transport `limitsFeature` owns separate quotas. `probe`, `typegen`, and Devtools are host-only. Remove the former `namespaces` scope option and place the feature on its transport.
 
 ## Authentication, signing, and duplicate requests
 
@@ -222,7 +224,7 @@ With the default `encodedType: 'any'` and no `encrypt`, `sign` receives the sign
 
 ```ts doc-test=check
 import { createHmac } from 'node:crypto'
-import { auth } from '@migaia/rpc-host/plugins'
+import { authFeature } from '@migaia/rpc-host/plugins'
 
 /** Both peers use the same application-owned key and binding representation. */
 function mac(value: unknown, key: string): string {
@@ -231,7 +233,7 @@ function mac(value: unknown, key: string): string {
 
 /** The application supplies its key; callbacks cover the entire replay binding. */
 export function signedAuthentication(key: string) {
-  return auth({
+  return authFeature({
     sign: (value) => ({ value, mac: mac(value, key) }),
     verify: (envelope) => {
       const signed = envelope as { value: unknown; mac: string }
@@ -252,17 +254,17 @@ Auth always deduplicates an in-flight request ID until actual business and strea
 | `'window'`                            | When the original signed counter falls outside the 64-bit window | Requires signing or rejects with `INVALID_CONFIG`; window advancement does not release active requests |
 | Positive safe integer in milliseconds | After the configured duration                                    | Invalid numbers reject with `INVALID_CONFIG`; numeric mode has capacity limits                         |
 
-Set a default with `auth({ retain })` or override it in a transport connection's `connect: { retain }`. Only an omitted connection value falls back, so connection-level `false` also overrides the host setting. Set `retain: 310_000` explicitly for the former 310-second behavior.
+Set a default with `authFeature({ retain })` or override it in a transport connection's `connect: { retain }`. Only an omitted connection value falls back, so connection-level `false` also overrides the host setting. Set `retain: 310_000` explicitly for the former 310-second behavior.
 
-`maxReplayEntriesPerPeer` defaults to `1024`, must be a positive safe integer, and bounds active and retained identities only in numeric mode. Full capacity rejects with `OVERLOADED`; `false` and `'window'` are not subject to that numeric capacity limit. `onRejected` receives frozen `replayLedgerFull` or `groupReplayFull` notices, and callback failures still report their original errors and causes. Duplicates are silently dropped without another execution or terminal response. Install `idempotency()` to replay a completed result to a retrying caller.
+`maxReplayEntriesPerPeer` defaults to `1024`, must be a positive safe integer, and bounds active and retained identities only in numeric mode. Full capacity rejects with `OVERLOADED`; `false` and `'window'` are not subject to that numeric capacity limit. `onRejected` receives frozen `replayLedgerFull` or `groupReplayFull` notices, and callback failures still report their original errors and causes. Duplicates are silently dropped without another execution or terminal response. Install `idempotencyFeature()` to replay a completed result to a retrying caller.
 
 ## Map errors sent to the peer
 
-When a verifier or credential resolver throws or rejects, auth retains the original error on the local error's `cause`. Use `errorMap(map)` to control what a peer learns, such as replacing credential details with a public message. Local thrown errors, `report`, warnings, and readonly observation plugins still receive the original errors, regardless of installation order. Install it in host `plugins` or transport `features`; transport placement overrides host placement.
+When a verifier or credential resolver throws or rejects, auth retains the original error on the local error's `cause`. Use `errorMapFeature(map)` to control what a peer learns, such as replacing credential details with a public message. Local thrown errors, `report`, warnings, and readonly observation plugins still receive the original errors, regardless of installation order. Install it in host `plugins` or transport `features`; transport placement overrides host placement.
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
-import { errorMap, type IRpcErrorMap } from '@migaia/rpc-host/plugins'
+import { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/plugins'
 
 /** Decide what remote callers may learn while preserving local diagnostic causes. */
 const redact: IRpcErrorMap = (error) =>
@@ -272,12 +274,12 @@ const redact: IRpcErrorMap = (error) =>
       : 'request failed'
   )
 
-export const host = await createRpcHost({ plugins: [errorMap(redact)] })
+export const host = await createRpcHost({ plugins: [errorMapFeature(redact)] })
 ```
 
 `map(error, context)` must synchronously return an `Error`, portable value, or `undefined`. That result becomes the error sent to the peer; the original cause chain is not appended automatically. If the callback throws or its result cannot be serialized, the mapping failure is reported and the original error is sent under the rules used without a mapper. Returning a Promise/thenable reports `INVALID_CONFIG` and immediately uses those original rules without waiting, so it cannot block later messages in the same Session. A late Promise rejection is still reported separately.
 
-Without `errorMap`, handshake refusals hide details from unauthenticated peers by default; other errors preserve the complete cause chain. Crossing a process or thread reconstructs objects and does not preserve `===` with the sender's original error. Configure mapping to hide information from peers while keeping local logs and causes available for diagnosis.
+Without `errorMapFeature`, handshake refusals hide details from unauthenticated peers by default; other errors preserve the complete cause chain. Crossing a process or thread reconstructs objects and does not preserve `===` with the sender's original error. Configure mapping to hide information from peers while keeping local logs and causes available for diagnosis.
 
 When a connection or Auth installation closes during verification, inbound processing ends as cancellation instead of reporting an authentication failure. The original cancellation reason is retained, and genuine verification failures are still reported. Callers executing Auth SDK stages directly receive the existing `UtilsAbortError` with its original `cause` after installation closure, rather than `AUTHENTICATION_FAILED`.
 
@@ -306,7 +308,7 @@ export async function sendUpdates(host: IRpcHost<IApi>) {
 
 A `notify` Promise means physical sending completed, without business acknowledgement. An ordinary `notify` with no `cancel: 'before-start'`, no `orderKey`, and no forwarding removes its caller-signal listener after sending; later aborts send no remote cancellation. `dispatch(target, method, payload, options)` returns `void` synchronously and reports failures. Each target executes its own ordered group; there is no cross-target transaction.
 
-Install the `idempotency()` flow Feature to add `host.<ns>.outcome(key)` for retained results. Omitting it enables no store for retaining and querying results by idempotency key. Auth request-ID deduplication is independent; see the [authentication section](#authentication-signing-and-duplicate-requests) for its three retention modes. Installing `limits()` is recommended; omitting it enables no corresponding concurrency, rate, or payload quotas.
+Install the `idempotencyFeature()` flow Feature to add `host.<ns>.outcome(key)` for retained results. Omitting it enables no store for retaining and querying results by idempotency key. Auth request-ID deduplication is independent; see the [authentication section](#authentication-signing-and-duplicate-requests) for its three retention modes. Installing `limitsFeature()` is recommended; omitting it enables no corresponding concurrency, rate, or payload quotas.
 
 ## Forward and hold capabilities
 
@@ -411,7 +413,7 @@ Idempotency fingerprints follow the object's own key order. Changing key order c
 
 Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection.
 
-Auth passes an object to sign/verify by default. Normalize it explicitly or select `encodedType: 'string'` for callbacks requiring text. Completed request IDs release immediately by default; set `retain: 310_000` for the former duration. Local verifier/resolver errors retain their original causes; use synchronous `errorMap` for remote redaction.
+Auth passes an object to sign/verify by default. Normalize it explicitly or select `encodedType: 'string'` for callbacks requiring text. Completed request IDs release immediately by default; set `retain: 310_000` for the former duration. Local verifier/resolver errors retain their original causes; use synchronous `errorMapFeature` for remote redaction.
 
 With sign/verify configured, auth exchanges and validates a fresh source challenge inside the existing signed handshake. Application callbacks must still sign and verify the complete input they receive. No public discovery or handshake option is added.
 

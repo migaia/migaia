@@ -1,0 +1,25 @@
+{
+  "package": "log-plugin-process",
+  "codes": {
+    "PLUGIN_CONFIG_CONFLICT": {
+      "source": "logging.process",
+      "scenario": "Same-process policy or scheduler domain differs from its existing group; use matching options."
+    },
+    "PLUGIN_SHUTDOWN_CLEANUP_FAILED": {
+      "source": "logging.process",
+      "scenario": "Shutdown timer cancellation or the captured exit failed; inspect ordered cleanup causes."
+    },
+    "PLUGIN_UNINSTALL_CLEANUP_FAILED": {
+      "source": "logging.process",
+      "scenario": "Final uninstall attempted every restoration/removal but cleanup failed; inspect its causes."
+    },
+    "PROCESS_INSTALL_ROLLBACK_FAILED": {
+      "source": "logging.process",
+      "scenario": "Installation and rollback both failed; the original install error remains first in errors."
+    },
+    "RUNTIME_SHUTTING_DOWN": {
+      "source": "logging.process",
+      "scenario": "The same process group has begun shutdown; do not install more hosts into that group."
+    }
+  }
+}
