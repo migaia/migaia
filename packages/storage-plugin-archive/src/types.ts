@@ -1,4 +1,4 @@
-import type { Archive } from './constants.js'
+import type { Archive } from './constants.ts'
 import type { IWhere, IOperationContext } from '@migaia/storage-contract'
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
 

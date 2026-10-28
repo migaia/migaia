@@ -4,8 +4,8 @@ import {
   type ITransactionScope
 } from '@migaia/storage-contract'
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
-import { Archive } from './constants.js'
-import { invalidSegment } from './errors.js'
+import { Archive } from './constants.ts'
+import { invalidSegment } from './errors.ts'
 
 /** Manifest identity is stable only for a particular immutable segment line and selecting rule. */
 export type IArchiveManifest = Readonly<{ segmentId: string; line: number; rule: string }>

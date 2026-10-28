@@ -13,7 +13,7 @@ import { objectBackendPlugin } from '@migaia/storage-plugin-object'
 import { fsObjectDriver } from '@migaia/storage-plugin-object/fs'
 import { blob } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
-import { archivePlugin } from '../src/index.js'
+import { archivePlugin } from '../src/index.ts'
 
 /** Native PostgreSQL runs through the sole repository service launcher rather than skipping. */
 const connectionString = process.env.MIGAIA_PG_URL

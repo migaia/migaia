@@ -1,5 +1,5 @@
 import type { IStorageHookIdentity } from '@migaia/storage-host'
-import type { IArchiveRunResult, IArchiveSweepResult } from './types.js'
+import type { IArchiveRunResult, IArchiveSweepResult } from './types.ts'
 declare module '@migaia/storage-host' {
   /** Archive observes original host operations without retaining business data. */
   interface IStorageHookMap {
