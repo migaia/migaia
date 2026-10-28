@@ -20,8 +20,10 @@ export class TracedAction {
   constructor(runtime: IRuntime, diagnostics: IRuntimeInternals, name: string) {
     this.#diagnostics = diagnostics
     this.#name = name
-    this.#reportFailure = (error) =>
-      runtime.reportError(error, { phase: ReactiveErrorPhase.traceListener })
+    this.#reportFailure = {
+      reportFailure: (error: unknown) =>
+        runtime.reportError(error, { phase: ReactiveErrorPhase.traceListener })
+    }.reportFailure
   }
 
   /** Emits start, runs the callback once, then emits one success or primary-error terminal event. */

@@ -74,7 +74,9 @@ export class Scheduler {
     this.#onAsyncError = onAsyncError
     this.#maxFlushPasses = maxFlushPasses
     // 默认冲刷走注入的微任务调度入口，不直接 queueMicrotask。
-    this.#strategy = (flush) => scheduleMicrotask(flush)
+    this.#strategy = {
+      schedule: (flush: () => void) => scheduleMicrotask(flush)
+    }.schedule
     this.#safeStrategy = this.#strategy
   }
 
