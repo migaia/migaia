@@ -182,7 +182,10 @@ describe('single scheduler contract across the workspace', () => {
     /** Parsed catalog fixture. */
     const catalog = JSON.parse(
       readFileSync(
-        join(packagesRoot, 'storage-plugin-browser/test/fixtures/storage-v2-bounded-capability-catalog.json'),
+        join(
+          packagesRoot,
+          'storage-plugin-browser/test/fixtures/storage-v2-bounded-capability-catalog.json'
+        ),
         'utf8'
       )
     ) as { readonly nonCapabilityEdges: readonly ICatalogEdge[] }
