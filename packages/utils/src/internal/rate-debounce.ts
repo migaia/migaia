@@ -81,7 +81,9 @@ export class DebouncedFunction<F extends (...args: never[]) => unknown> {
     const controlled = this.#call as IControlledFunction<F>
     controlled.cancel = this.#cancel
     controlled.flush = this.#flush
-    controlled.pending = () => this.#waitTask !== undefined && this.#invocation.pending
+    Object.assign(controlled, {
+      pending: () => this.#waitTask !== undefined && this.#invocation.pending
+    })
     controlled[Symbol.dispose] = this.#cancel
     if (signal) {
       if (signal.aborted) this.#abort()
@@ -168,7 +170,7 @@ export class FrameThrottledFunction<F extends (...args: never[]) => unknown> {
     const controlled = this.#call as IControlledFunction<F>
     controlled.cancel = this.#cancel
     controlled.flush = this.#flush
-    controlled.pending = () => this.#frame !== undefined
+    Object.assign(controlled, { pending: () => this.#frame !== undefined })
     controlled[Symbol.dispose] = this.#cancel
     if (signal) {
       if (signal.aborted) this.#abort()

@@ -156,10 +156,12 @@ export class TaskDispatch {
   /** A fresh channel belongs to this task and closes on run or cancellation. */
   #registerChannel(): () => void {
     this.#channel = new (member(this.#globals, 'MessageChannel') as new () => ITaskMessageChannel)()
-    this.#channel.port1.onmessage = () => {
-      this.#closeChannel()
-      this.#run(this.#base)
-    }
+    Object.assign(this.#channel.port1, {
+      onmessage: () => {
+        this.#closeChannel()
+        this.#run(this.#base)
+      }
+    })
     this.#channel.port2.postMessage(undefined)
     return this.#closeChannel
   }
