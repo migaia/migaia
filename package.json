@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "postinstall": "cd website && bun install --frozen-lockfile",
+    "prepare": "git config core.hooksPath .githooks",
     "fmt": "pnpm -r --if-present run fmt && cd website && bun run fmt",
     "build": "turbo run build --filter=./packages/* && cd website && bun run build",
     "typecheck": "turbo run typecheck --filter=./packages/* && cd website && bun run typecheck",
