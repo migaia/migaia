@@ -482,3 +482,56 @@ it('rejects a callback failure that follows a physical replay', async () => {
   expect(attempts).toBe(2)
   expect(counts.physical).toBe(1)
 })
+
+/** Two hosts share one org and table prefix, so only the PostgreSQL lock table separates them. */
+it('excludes another process through the lock table after local queues admit', async () => {
+  const connectionString = process.env.MIGAIA_PG_URL
+  if (!connectionString)
+    throw new Error('Run through scripts/storage-services.mts run -- to provide PostgreSQL')
+  const pool = new Pool({ connectionString })
+  const prefix = 'pg_cross_' + randomUUID().slice(0, 8)
+  const org = randomUUID()
+  const holderHost = await createStorageHost({
+    org,
+    plugins: [
+      postgresBackendPlugin({ driver: pgDriver(pool), prefix, owner: { label: 'holder-host' } })
+    ] as const
+  })
+  const waiterHost = await createStorageHost({
+    org,
+    plugins: [postgresBackendPlugin({ driver: pgDriver(pool), prefix })] as const
+  })
+  onTestFinished(async () => {
+    await waiterHost.dispose()
+    await holderHost.dispose()
+    await pool.end()
+  })
+  const holder = holderHost.backend('postgres')
+  const waiter = waiterHost.backend('postgres')
+  const entered = deferred<void>()
+  const release = deferred<void>()
+  const held = holder.transaction(
+    async (scope) => {
+      entered.resolve()
+      await release.promise
+      await scope.set('shared', 'holder')
+    },
+    { lock: [lockKey.text('shared')], concurrency: ConcurrencyPolicy.wait(), timeoutMs: 5000 }
+  )
+  await entered.promise
+  let waited: Promise<void> | undefined
+  try {
+    await expect(
+      waiter.set('shared', 'rejected', { concurrency: ConcurrencyPolicy.fail() })
+    ).rejects.toMatchObject({
+      code: 'LOCK_REJECTED',
+      holder: { label: 'holder-host', scope: 'remote', status: 'held' }
+    })
+    waited = waiter.set('shared', 'waiter')
+  } finally {
+    release.resolve()
+  }
+  await held
+  await waited
+  expect(await holder.get('shared')).toBe('waiter')
+})

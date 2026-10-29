@@ -6,6 +6,7 @@ import {
   type ITransactionOptions,
   type IConcurrencyAttemptContext,
   type IConcurrencyAttempt,
+  type IConcurrencyPort,
   type ITransactionStageObserver,
   type ILockKey,
   type IOperationContext,
@@ -18,7 +19,8 @@ import {
   createStorageOperationReporter,
   reportCleanupError,
   throwIfAborted,
-  type IBackendChangeController
+  type IBackendChangeController,
+  type IBackendKeyLockPort
 } from '@migaia/storage-host/sdk'
 import type { IStorageBackendOrgContext } from '@migaia/storage-host'
 import { sleep } from '@migaia/utils/promise'
@@ -87,6 +89,11 @@ type IPgTransactionInput<TScope extends Omit<ITransactionScope, 'use'>> = {
   readonly tables: IPgTables
   readonly runtime: IStorageBackendOrgContext
   readonly controller: IBackendChangeController
+  /**
+   * Same-process key locks for this organization. Local waiters queue here in FIFO order, so only
+   * the queue head polls the PostgreSQL lock table; the table still excludes other processes.
+   */
+  readonly locks: IBackendKeyLockPort
   readonly createScope: (state: IPgState) => TScope
   readonly publish: (state: IPgState) => void
   readonly journalCapture?: (state: IPgState) => IPgJournalCapture
@@ -545,6 +552,32 @@ class PgTransactions<TScope extends Omit<ITransactionScope, 'use'>> {
     }
   }
 
+  /**
+   * Run one native attempt inside this organization's local key lock. A local holder answers a try
+   * admission with a conflict and queues a wait admission, without touching PostgreSQL. Stage
+   * observers are not passed, so lock observation stays as before.
+   */
+  #localAttempt<R>(
+    context: IConcurrencyAttemptContext,
+    native: IConcurrencyPort<R>
+  ): Promise<IConcurrencyAttempt<R>> {
+    return this.#input.locks.attempt(
+      context,
+      {
+        owner: this.#input.controller.origin,
+        ...(this.#input.configuration.label === undefined
+          ? {}
+          : { label: this.#input.configuration.label }),
+        since: Date.now(),
+        status: 'held',
+        scope: 'local'
+      },
+      native,
+      undefined,
+      this.#input.controller.closingSignal
+    )
+  }
+
   /** Execute one logical operation through the canonical concurrency and observation owners. */
   readonly run = <R>(
     callback: (scope: TScope) => R,
@@ -566,6 +599,66 @@ class PgTransactions<TScope extends Omit<ITransactionScope, 'use'>> {
     let observing = false
     let observedKeys: readonly ILockKey[] | undefined
     let observedInput = execution?.input ?? {}
+    /** One native attempt takes the PostgreSQL lock lease, runs the work and releases the lease. */
+    const native: IConcurrencyPort<Awaited<R>> = {
+      attempt: async (context) => {
+        if (observing) observedKeys = context.lock ?? []
+        if (context.orgId !== undefined && context.orgId !== this.#input.runtime.orgId)
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+            backend: PgNames.backend
+          })
+        const lease = await acquirePgLocks(
+          this.#input.configuration,
+          this.#input.tables,
+          this.#input.runtime.orgId,
+          this.#input.controller.origin,
+          context
+        )
+        if (lease instanceof PgLockConflict)
+          return {
+            status: 'conflict',
+            phase: 'acquire',
+            keys: lease.keys,
+            holder: lease.holder
+          }
+        let primary: unknown
+        let failed = false
+        let result: IConcurrencyAttempt<Awaited<R>> | undefined
+        try {
+          result = await this.#attempt(
+            context,
+            callback,
+            lease,
+            operation === PgOperation.transaction,
+            journaled,
+            observing
+              ? (keys) => {
+                  observedKeys = keys
+                }
+              : undefined
+          )
+        } catch (cause) {
+          primary = cause
+          failed = true
+        }
+        try {
+          await releasePgLocks(
+            this.#input.configuration,
+            this.#input.tables,
+            this.#input.runtime.orgId,
+            lease
+          )
+        } catch (secondary) {
+          if (failed)
+            throw normalizeTransactionFailure(
+              new AggregateError([primary, secondary], PostgresErrorText.transactionFailed)
+            )
+          throw normalizeTransactionFailure(secondary)
+        }
+        if (failed) throw primary
+        return result!
+      }
+    }
     const execute = () =>
       runWithConcurrency<Awaited<R>>(
         {
@@ -595,65 +688,7 @@ class PgTransactions<TScope extends Omit<ITransactionScope, 'use'>> {
               }
             : {})
         },
-        {
-          attempt: async (context) => {
-            if (observing) observedKeys = context.lock ?? []
-            if (context.orgId !== undefined && context.orgId !== this.#input.runtime.orgId)
-              throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-                backend: PgNames.backend
-              })
-            const lease = await acquirePgLocks(
-              this.#input.configuration,
-              this.#input.tables,
-              this.#input.runtime.orgId,
-              this.#input.controller.origin,
-              context
-            )
-            if (lease instanceof PgLockConflict)
-              return {
-                status: 'conflict',
-                phase: 'acquire',
-                keys: lease.keys,
-                holder: lease.holder
-              }
-            let primary: unknown
-            let failed = false
-            let result: IConcurrencyAttempt<Awaited<R>> | undefined
-            try {
-              result = await this.#attempt(
-                context,
-                callback,
-                lease,
-                operation === PgOperation.transaction,
-                journaled,
-                observing
-                  ? (keys) => {
-                      observedKeys = keys
-                    }
-                  : undefined
-              )
-            } catch (cause) {
-              primary = cause
-              failed = true
-            }
-            try {
-              await releasePgLocks(
-                this.#input.configuration,
-                this.#input.tables,
-                this.#input.runtime.orgId,
-                lease
-              )
-            } catch (secondary) {
-              if (failed)
-                throw normalizeTransactionFailure(
-                  new AggregateError([primary, secondary], PostgresErrorText.transactionFailed)
-                )
-              throw normalizeTransactionFailure(secondary)
-            }
-            if (failed) throw primary
-            return result!
-          }
-        }
+        { attempt: (context) => this.#localAttempt(context, native) }
       )
     const result =
       this.#input.runtime.execution.observe === undefined

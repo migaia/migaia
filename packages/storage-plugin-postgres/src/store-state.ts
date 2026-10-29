@@ -5,7 +5,8 @@ import {
   snapshotStorageTtlTarget,
   createStorageOperationReporter,
   throwIfAborted,
-  type IBackendChangeController
+  type IBackendChangeController,
+  type IBackendKeyLockPort
 } from '@migaia/storage-host/sdk'
 import type { IPgQuantizedOptions } from './features/quantized.ts'
 import {
@@ -147,12 +148,16 @@ export type IPgStoreEnvironment = {
   readonly vectorSelected: () => boolean
   readonly replicationSelected: () => IPgReplicationSelection | undefined
   readonly quantizedSelected: () => IPgQuantizedOptions['mode'] | undefined
+  /** Create one organization's same-process key locks, including organizations bound later. */
+  readonly createKeyLockPort: () => IBackendKeyLockPort
 }
 /** Fixed organization state is passed explicitly to SQL, record, vector and transaction jobs. */
 export type IPgOrganizationContext<T> = {
   readonly environment: IPgStoreEnvironment
   readonly runtime: IStorageBackendOrgContext
   readonly orgView: boolean
+  /** Same-process key locks for this organization; disposed when the backend finalizes. */
+  readonly locks: IBackendKeyLockPort
   /** The public organization view keeps capability and operation identity stable. */
   store: IPostgresStore<IPgServer, T>
   /** Capabilities are installed on this exact organization view. */

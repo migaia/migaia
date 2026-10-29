@@ -124,11 +124,14 @@ function createPgOrganization<T>(
   orgView: boolean
 ): Omit<IPostgresConstruction<T>, 'configuration' | 'tables' | 'orgBinding' | 'journalBinding'> & {
   readonly journal: Omit<IStorageJournalBackendBinding, 'forOrg'>
+  /** Release this organization's local key locks after the backend has drained its work. */
+  readonly disposeLocks: () => Promise<void>
 } {
   const organization: IPgOrganizationContext<T> = {
     environment,
     runtime,
     orgView,
+    locks: environment.createKeyLockPort(),
     store: undefined!,
     installer: undefined!,
     engine: undefined!,
@@ -181,6 +184,7 @@ function createPgOrganization<T>(
     tables: organization.environment.tables,
     runtime: organization.runtime,
     controller: organization.environment.controller,
+    locks: organization.locks,
     createScope: (_state: IPgState) => createPgOrgScope(organization, _state),
     publish: (state) => organization.environment.changes!.publish(state),
     journalCapture: (state) => organization.journalImages.capture(state),
@@ -223,6 +227,7 @@ function createPgOrganization<T>(
       organization.vectorPublication?.release()
       organization.durablePublication?.release()
     },
+    disposeLocks: () => organization.locks.dispose(),
     runNative: (scope, operation, ctx, run) =>
       runPgNative(organization, scope, operation, ctx, run),
     getTransactionClient: (scope) => {
@@ -308,9 +313,13 @@ class PgOrganizationRegistry<T> implements IStorageOrgBinding {
     }
   }
   /** Release child provider publications once the physical controller finishes disposal. */
-  dispose(): void {
+  /** Release child capabilities, then every organization's local key locks, root included. */
+  async dispose(): Promise<void> {
     for (const organization of this.#organizations.values()) organization.releaseOrgCapabilities()
+    /** Every organization owns one lock port; children are captured before the map is cleared. */
+    const owners = [this.#root, ...this.#organizations.values()]
     this.#organizations.clear()
+    for (const organization of owners) await organization.disposeLocks()
   }
 }
 
@@ -342,7 +351,9 @@ export async function createPostgresStore<T>(
   const states = new WeakMap<object, { readonly store: IStorageStore; readonly state: IPgState }>()
   let changes: Awaited<ReturnType<typeof createPgChanges>> | undefined
   /** Logical organization closures release together with the original physical controller. */
-  let releaseOrganizations = () => {}
+  let releaseOrganizations = async (): Promise<void> => {}
+  /** Lazy organizations create their local key locks through this install-time authority. */
+  const authoring = core.createOrgAuthoringPort()
   const controller = core.createChangeController(
     {
       backend: PgNames.backend,
@@ -357,7 +368,7 @@ export async function createPostgresStore<T>(
         try {
           await changes?.resource?.dispose()
         } finally {
-          releaseOrganizations()
+          await releaseOrganizations()
         }
       }
     },
@@ -381,7 +392,8 @@ export async function createPostgresStore<T>(
       changes,
       vectorSelected,
       replicationSelected,
-      quantizedSelected
+      quantizedSelected,
+      createKeyLockPort: () => authoring.createKeyLockPort()
     }
     const organizations = new PgOrganizationRegistry<T>(environment)
     const root = organizations.root
