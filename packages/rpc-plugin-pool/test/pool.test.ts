@@ -232,6 +232,28 @@ it('rejects overflow/new closed work and validates before native acquisition', a
   }
 })
 
+it('ignores a repeated release so close still drains queued work', async () => {
+  const fixture = new Resources()
+  const scheduler = await fixture.open({ size: 1 })
+  for (let cycle = 0; cycle < 2; cycle++) {
+    const slot = await scheduler.acquire()
+    scheduler.release(slot)
+    scheduler.release(slot)
+  }
+  const active = fixture.run(scheduler, 1, true)
+  const queued = fixture.run(scheduler, 2)
+  await vi.waitFor(() => expect(fixture.pending.has(1)).toBe(true))
+  const closing = scheduler.close()
+  fixture.pending.get(1)!.resolve(1)
+  expect(await active).toBe(1)
+  expect(await queued).toBe(2)
+  await closing
+  expect(fixture.dispatches).toEqual([
+    { id: 0, value: 1 },
+    { id: 0, value: 2 }
+  ])
+})
+
 it('removes queued cancellation and passes active options/errors to the Peer unchanged', async () => {
   const fixture = new Resources()
   const scheduler = await fixture.open({ size: 1, maxQueue: 2 })

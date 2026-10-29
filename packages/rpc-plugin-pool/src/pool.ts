@@ -185,6 +185,8 @@ export class PoolScheduler<T extends IPoolResource> implements IRpcPoolControls 
   }
   /** Actual Host completion releases the selected slot; pool never interprets business replies. */
   release(member: IPoolSlot<T>): void {
+    /** A slot is released once per reservation; a repeated release must not undercount work. */
+    if (!member.busy) return
     member.busy = false
     member.inFlight = false
     this.#accepted--
