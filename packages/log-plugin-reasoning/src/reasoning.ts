@@ -85,10 +85,10 @@ class ReasoningInstallation {
     this.#emit(delta)
   }
 
-  /** Finish thinking explicitly; empty buffers never produce a completed entry. */
+  /** Finish thinking explicitly; any other phase keeps its buffer for its own end call. */
   endThinking(): void {
-    if (!this.#active) return
-    if (this.#phase === ReasoningPhase.thinking) this.#emit('\n\n')
+    if (!this.#active || this.#phase !== ReasoningPhase.thinking) return
+    this.#emit('\n\n')
     this.#complete(ReasoningTag.thinking, ReasoningPhase.thinking)
   }
 
@@ -112,10 +112,10 @@ class ReasoningInstallation {
     this.#emit(delta)
   }
 
-  /** End a response with the established single newline and one completed audit entry. */
+  /** End a response with one newline and one audit entry; other phases are left untouched. */
   endResponse(): void {
-    if (!this.#active) return
-    if (this.#phase === ReasoningPhase.responding) this.#emit('\n')
+    if (!this.#active || this.#phase !== ReasoningPhase.responding) return
+    this.#emit('\n')
     this.#complete(ReasoningTag.response, ReasoningPhase.responding)
   }
 
