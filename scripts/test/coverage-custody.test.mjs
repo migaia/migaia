@@ -37,7 +37,7 @@ test('coverage custody rejects a decreased package metric', () => {
   )
 })
 
-test('coverage custody rejects covered-count decrease hidden by equal percentage', () => {
+test('coverage custody rejects a lost covered branch even when the rounded percentage hides it', () => {
   assert.throws(
     () =>
       assertMonotonic(
@@ -45,7 +45,17 @@ test('coverage custody rejects covered-count decrease hidden by equal percentage
         { branches: metrics(9, 10, 80) },
         '@migaia/example'
       ),
-    /covered count/
+    /uncovered 1 to 2/
+  )
+})
+
+test('coverage custody accepts deleted covered code without a re-signed baseline', () => {
+  assert.doesNotThrow(() =>
+    assertMonotonic(
+      { lines: metrics(76, 79, 96.2) },
+      { lines: metrics(77, 80, 96.25) },
+      '@migaia/example'
+    )
   )
 })
 

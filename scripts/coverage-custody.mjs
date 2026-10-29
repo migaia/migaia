@@ -235,9 +235,11 @@ export const summaryMetrics = (summary) => {
 }
 
 /**
- * Refuse covered-count decreases or percentage decreases. A larger total is allowed: new code that
- * keeps the percentage does not need a re-signed baseline, while new uncovered code still lowers
- * the percentage and fails.
+ * Refuse a metric only when its uncovered count grows and its percentage drops. Deleting covered
+ * code lowers both the covered count and the percentage without adding uncovered code, so it passes
+ * without a re-signed baseline. New code that keeps the percentage also passes. New uncovered code,
+ * or previously covered code that loses its tests, grows the uncovered count and lowers the
+ * percentage, and fails.
  */
 export const assertMonotonic = (current, baseline, packageName) => {
   const metrics = Object.keys(current ?? {}).sort()
@@ -247,12 +249,18 @@ export const assertMonotonic = (current, baseline, packageName) => {
     const old = baseline?.[metric]
     if (!now || !old)
       throw new Error(`${packageName} ${metric} metric missing from coverage baseline`)
-    if (now.covered < old.covered)
+    /** Lines, statements, functions or branches that no test reaches. */
+    const uncoveredNow = now.total - now.covered
+    const uncoveredOld = old.total - old.covered
+    // Exact covered/total ratios, cross-multiplied: the reported pct is rounded to two decimals.
+    // A grown uncovered count implies now.total > 0, and an empty old total counts as 100%.
+    const ratioDropped =
+      old.total === 0 ? now.covered < now.total : now.covered * old.total < old.covered * now.total
+    if (uncoveredNow > uncoveredOld && ratioDropped)
       throw new Error(
-        `${packageName} ${metric} covered count decreased from ${old.covered} to ${now.covered}`
+        `${packageName} ${metric} coverage decreased from ${old.pct} to ${now.pct} ` +
+          `(uncovered ${uncoveredOld} to ${uncoveredNow})`
       )
-    if (now.pct < old.pct)
-      throw new Error(`${packageName} ${metric} coverage decreased from ${old.pct} to ${now.pct}`)
   }
 }
 
