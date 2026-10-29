@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { expect, it } from 'vitest'
 import { createLogHost, levelPlugin } from '@migaia/log-host'
 import { formatFeature } from '@migaia/log-host/features'
@@ -15,7 +16,7 @@ async function nonStringArgument(): Promise<void> {
       consolePlugin({
         console,
         stdout: new MemoryStdout(),
-        features: [prettyFeature({ color: 'never', timestamp: false })]
+        features: { pretty: prettyFeature({ color: 'never', timestamp: false }) }
       })
     ]
   })
@@ -37,7 +38,10 @@ async function consoleStyleArguments(): Promise<void> {
   const logger = createLogHost({
     plugins: [
       levelPlugin(),
-      consolePlugin({ console, features: [prettyFeature({ color: 'always', timestamp: false })] })
+      consolePlugin({
+        console,
+        features: { pretty: prettyFeature({ color: 'always', timestamp: false }) }
+      })
     ]
   })
   logger.info('value: %s', 42, true, null)
@@ -71,8 +75,10 @@ async function structuredFields(): Promise<void> {
   const console = new ReceiverConsole()
   /** JSON is an explicit host-owned feature instead of an old color-plugin option. */
   const logger = createLogHost({
-    plugins: [consolePlugin({ console })],
-    features: [formatFeature({ format: 'json' })]
+    plugins: [
+      defineLogPlugin({ name: 'policy', features: { format: formatFeature({ format: 'json' }) } }),
+      consolePlugin({ console })
+    ]
   })
   logger.dispatchRaw({ tag: 'info', message: 'user=%s', args: ['alice'], data: { tenant: 'acme' } })
   await logger.flush()

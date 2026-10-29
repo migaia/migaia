@@ -2,7 +2,8 @@ import {
   defineHost,
   type IHostHandle,
   type IPluginHandleTuple,
-  type IPluginHostDisposalResult
+  type IPluginHostDisposalResult,
+  PluginHostErrorCode
 } from '@migaia/plugin-host'
 import { createEventChannel, withSnapshotEntries } from '@migaia/event-subscriber'
 import { boundedWait, snapshotScheduler } from '@migaia/lifecycle'
@@ -21,7 +22,6 @@ import type {
   ILogFailure,
   IRawEntryInput,
   IShutdownReason,
-  ILogFeature,
   ILogHost
 } from './typing.ts'
 import { LogPluginCore, type ILogDomainCore } from './core.ts'
@@ -32,14 +32,11 @@ import {
   FeaturePhase,
   LogFailureSource
 } from './state-constants.ts'
-import { LogHostErrorCode } from './error-code.ts'
+import { ERROR_SOURCE, LogHostErrorCode } from './error-code.ts'
 import { LogHostErrorText } from './error-text.ts'
 import { createLogError, createLogTypeError, invalidOption } from './errors.ts'
-import {
-  featureScope,
-  featureImplementation,
-  type IFeatureImplementation
-} from './feature-registry.ts'
+import { type IFeatureImplementation } from './feature-metadata.ts'
+import { LogFeatureScope } from './feature-policy.ts'
 import { defaultLogFailureReporter, reportContained } from './reporter.ts'
 import { validateForwardPlugin } from './forward.ts'
 import { deferred } from '@migaia/utils/promise'
@@ -88,14 +85,13 @@ function snapshotHostOptions(
   try {
     /** Caller-owned containers are copied only after each accessor is captured once. */
     const plugins = options.plugins
-    /** Entry/output descriptors are subsequently admitted by their private issuer identity. */
-    const features = options.features
+    /** Host-level feature injection was removed; policies belong to declaring plugins. */
+    if (Object.hasOwn(options, 'features')) throw invalidOption()
     /** Context array is shallow-copied and frozen by the owning host. */
     const context = options.context
     return {
       scheduler,
       plugins: plugins === undefined ? [] : [...plugins],
-      features: features === undefined ? [] : [...features],
       context: context === undefined ? [] : [...context],
       topic: options.topic,
       maxPending: options.maxPending,
@@ -106,6 +102,29 @@ function snapshotHostOptions(
   } catch (cause) {
     throw invalidOption(cause)
   }
+}
+
+/** Preserve log admission's public identity when native installation wraps only that primary error. */
+function installationError(error: unknown): unknown {
+  if (
+    !(error instanceof Error) ||
+    Reflect.get(error, 'code') !== PluginHostErrorCode.pluginInstallFailed
+  )
+    return error
+  /** Cleanup aggregates retain their full native wrapper instead of losing secondary failures. */
+  const cause = error.cause
+  if (
+    cause instanceof TypeError &&
+    Reflect.get(cause, 'source') === ERROR_SOURCE &&
+    Reflect.get(cause, 'code') === LogHostErrorCode.invalidOption
+  )
+    return cause
+  return error
+}
+
+/** Rejected native installs preserve existing log admission errors through the promise boundary. */
+function rejectInstallation(error: unknown): never {
+  throw installationError(error)
 }
 
 /** One entry-feature adapter owns its host generator without allocating per-entry callbacks. */
@@ -138,8 +157,18 @@ export class LogHost {
   readonly scheduler: IScheduler
   /** Canonical plugin owner admits, rolls back and releases every installation. */
   readonly #handle: IHostHandle<ILogDomainCore, ILogEntry, readonly []>
-  /** Host defaults are issued immutable descriptors, indexed by their stable kind. */
-  readonly features: ReadonlyMap<string, ILogFeature>
+  /**
+   * Log-owned scope mirrors rpc-host preparation; native plugin-host still owns installation and
+   * rollback.
+   */
+  readonly featureScope = new LogFeatureScope(this)
+  /** Installed entry adapters precede user pipeline stages without hot metadata lookup. */
+  #entryStages: readonly IAsyncMiddlewareStage<ILogEntry>[] = []
+  /**
+   * Entry adapters followed by usePipeline stages, rebuilt only when either list changes. Replaced,
+   * never mutated, so an in-flight run keeps the array it started with.
+   */
+  #runStages: readonly IAsyncMiddlewareStage<ILogEntry>[] = []
   /** One asynchronous middleware runner is reused without retaining per-run state. */
   readonly #pipeline: IMiddlewarePipeline<'async', ILogEntry> = createPipeline<ILogEntry>({
     mode: 'async'
@@ -188,7 +217,6 @@ export class LogHost {
     this.#report = snapshot.report ?? defaultLogFailureReporter
     if (typeof this.#randomUUID !== 'function' || typeof this.#report !== 'function')
       throw invalidOption()
-    this.features = featureScope(snapshot.features)
     /** Runtime environment flags are a construction snapshot without a runtime-manager API. */
     const process = (
       globalThis as unknown as {
@@ -206,12 +234,6 @@ export class LogHost {
         isCI: Boolean(process?.env?.CI)
       })
     })
-    for (const feature of this.features.values()) {
-      /** Entry adapters are installed before later explicit host pipeline stages. */
-      const implementation = featureImplementation(feature)
-      if (implementation.phase === FeaturePhase.entry)
-        this.usePipeline(new EntryFeatureStage(implementation, this.#randomUUID).run)
-    }
     this.#handle = defineHost<ILogDomainCore, ILogEntry>({
       host: {
         scheduler: this.scheduler,
@@ -221,7 +243,13 @@ export class LogHost {
       domainCore: () => LogPluginCore.create(this)
     })
     /** Initial extension descriptors retain canonical plugin-host revocation and callable identity. */
-    const handles = this.#handle.useSync(...(snapshot.plugins ?? []))
+    /** Native handles of the constructor's plugins, in declaration order. */
+    let handles
+    try {
+      handles = this.#handle.useSync(...(snapshot.plugins ?? []))
+    } catch (error) {
+      throw installationError(error)
+    }
     /** The public plain surface can freeze while all mutable state stays on this owner. */
     const surface = {
       ctx: this.ctx,
@@ -259,6 +287,20 @@ export class LogHost {
 
   /** Frozen facade identity is registered only after successful synchronous installation. */
   readonly facade: ILogHost<readonly ILogPluginConstraint[]>
+  /** Compile native-installed entry behavior only when plugin policy publication changes. */
+  setEntryFeatures(features: ReadonlyMap<string, IFeatureImplementation>): void {
+    /** Entry order follows canonical carrier and feature declaration order. */
+    const stages: IAsyncMiddlewareStage<ILogEntry>[] = []
+    for (const implementation of features.values())
+      if (implementation.phase === FeaturePhase.entry)
+        stages.push(new EntryFeatureStage(implementation, this.#randomUUID).run)
+    this.#entryStages = stages
+    this.#rebuildRunStages()
+  }
+  /** Recompile the per-entry stage list after entry adapters or pipeline registrations change. */
+  #rebuildRunStages(): void {
+    this.#runStages = [...this.#entryStages, ...this.#stages.values()]
+  }
   /** Current lifecycle phase remains observable from the frozen facade. */
   get status(): LogHostStatus {
     return this.#status
@@ -296,8 +338,9 @@ export class LogHost {
     /** Tokens prevent one repeated function registration from revoking another. */
     const token = {}
     this.#stages.set(token, stage)
+    this.#rebuildRunStages()
     return () => {
-      this.#stages.delete(token)
+      if (this.#stages.delete(token)) this.#rebuildRunStages()
     }
   }
   /** Register raw entry consumption; output SDK delivery owns its own formatting and policies. */
@@ -389,7 +432,9 @@ export class LogHost {
     } catch (error) {
       return Promise.reject(error)
     }
-    return (this.#handle.use as ILogHost['use'])(...plugins) as Promise<IPluginHandleTuple<P>>
+    return (this.#handle.use as ILogHost['use'])(...plugins).catch(rejectInstallation) as Promise<
+      IPluginHandleTuple<P>
+    >
   }
   /** Publish a shared, nonrejecting drain barrier; failures are evidence through onFailure. */
   flush(deadline?: number): Promise<void> {
@@ -418,7 +463,7 @@ export class LogHost {
         const entry = this.#queue[this.#cursor]!
         this.#queue[this.#cursor++] = undefined
         try {
-          await this.#pipeline.run([...this.#stages.values()], entry, (selected) =>
+          await this.#pipeline.run(this.#runStages, entry, (selected) =>
             this.#deliverEntry(selected, entry)
           )
         } catch (error) {

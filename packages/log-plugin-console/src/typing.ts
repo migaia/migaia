@@ -1,4 +1,4 @@
-import type { ILogFeature } from '@migaia/log-host/plugin'
+import type { ILogFeatureRecord } from '@migaia/log-host/plugin'
 import type { ConsoleColorMode } from './state-constants.ts'
 
 /** Borrowed console methods keep their receiver and native argument identity. */
@@ -12,10 +12,10 @@ export type IConsoleTarget = {
 export type IConsoleStdout = { readonly isTTY?: boolean; write(text: string): unknown }
 
 /** Plugin options borrow capabilities without taking ownership of their lifetime. */
-export type IConsoleOptions = {
+export type IConsoleOptions<F extends ILogFeatureRecord = ILogFeatureRecord> = {
   console?: IConsoleTarget
   stdout?: IConsoleStdout
-  features?: readonly ILogFeature[]
+  features?: F
 }
 
 /** Pretty policy is independent of the console output transport. */

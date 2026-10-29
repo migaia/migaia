@@ -21,7 +21,7 @@ async function canonicalProjection(): Promise<void> {
   /** Explicit formatting must not introduce a second error serializer. */
   const explicitOutput = new CaptureOutput({
     name: 'explicit',
-    features: [formatFeature({ format: 'json' })]
+    features: { format: formatFeature({ format: 'json' }) }
   })
   /** Native input errors are supplied explicitly, keeping args empty to isolate the error field. */
   const host = createLogHost({ plugins: [defaultOutput.plugin(), explicitOutput.plugin()] })

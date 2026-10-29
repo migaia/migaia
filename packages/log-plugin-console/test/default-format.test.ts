@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { expect, it, vi } from 'vitest'
 import { createLogHost } from '@migaia/log-host'
 import { formatFeature } from '@migaia/log-host/features'
@@ -64,27 +65,32 @@ async function explicitFormats(): Promise<void> {
   const hostConsole = new MemoryConsole()
   /** The host-level JSON feature wins over auto pretty. */
   const first = createLogHost({
-    features: [formatFeature({ format: 'json' })],
-    plugins: [consolePlugin({ console: hostConsole })]
+    plugins: [
+      defineLogPlugin({ name: 'policy', features: { format: formatFeature({ format: 'json' }) } }),
+      consolePlugin({ console: hostConsole })
+    ]
   })
   /** Output-level plain wins over the host's JSON and the output's pretty fallback. */
   const plainConsole = new MemoryConsole()
   /** Distinct hosts avoid duplicate same-name output registration. */
   const second = createLogHost({
-    features: [formatFeature({ format: 'json' })],
     plugins: [
-      consolePlugin({ console: plainConsole, features: [formatFeature({ format: 'plain' })] })
+      defineLogPlugin({ name: 'policy', features: { format: formatFeature({ format: 'json' }) } }),
+      consolePlugin({
+        console: plainConsole,
+        features: { format: formatFeature({ format: 'plain' }) }
+      })
     ]
   })
   /** Output-level pretty is recognized by the owner of this exact issued descriptor. */
   const prettyConsole = new MemoryConsole()
   /** Native arguments are deliberately distinct from JSON text. */
   const third = createLogHost({
-    features: [formatFeature({ format: 'json' })],
     plugins: [
+      defineLogPlugin({ name: 'policy', features: { format: formatFeature({ format: 'json' }) } }),
       consolePlugin({
         console: prettyConsole,
-        features: [prettyFeature({ color: 'never', timestamp: false })]
+        features: { format: prettyFeature({ color: 'never', timestamp: false }) }
       })
     ]
   })
@@ -130,7 +136,7 @@ async function colorPriority(fixture: IColorCase): Promise<void> {
       consolePlugin({
         console,
         stdout: new MemoryStdout(fixture.tty),
-        features: [prettyFeature({ color: fixture.color, timestamp: false })]
+        features: { pretty: prettyFeature({ color: fixture.color, timestamp: false }) }
       })
     ]
   })

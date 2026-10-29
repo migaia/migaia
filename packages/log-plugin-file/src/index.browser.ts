@@ -1,8 +1,11 @@
+import type { ILogFeatureRecord } from '@migaia/log-host/plugin'
 import { createFilePlugin } from './file-core.ts'
 import type { IFilePluginConfig } from './typing.ts'
 
 /** Create a portable file output only with an explicit writer; no native filesystem is imported. */
-export function filePlugin(options: IFilePluginConfig) {
+export function filePlugin<const F extends ILogFeatureRecord = Record<never, never>>(
+  options: IFilePluginConfig<F>
+) {
   return createFilePlugin(options)
 }
 

@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '../../src/plugin.ts'
 import { expect, it } from 'vitest'
 import { createLogHost, levelPlugin, type ILogEntry } from '../../src/index.ts'
 import { thresholdFeature, filterFeature } from '../../src/features/index.ts'
@@ -28,11 +29,14 @@ async function categoryPolicy(): Promise<void> {
   const observer = new CategoryFilter()
   /** Installing level methods alone does not acquire filtering policy. */
   const host = createLogHost({
-    plugins: [levelPlugin(), output.plugin()],
-    features: [threshold, filters]
+    plugins: [
+      defineLogPlugin({ name: 'policy', features: { threshold: threshold, filter: filters } }),
+      levelPlugin(),
+      output.plugin()
+    ]
   })
   /** Removing only this added predicate preserves the old filter-removal behavior. */
-  const off = filters.add(observer.filter)
+  const off = host.policy_filter_add(observer.filter)
   /** Native Error and nested payload identities must survive both policy and output boundaries. */
   const original = new RangeError('original categorized failure')
   /** Nested objects are caller-owned rather than deep-cloned by logging. */
@@ -47,7 +51,7 @@ async function categoryPolicy(): Promise<void> {
   expect(output.records[0].entry.args[0]).toBe(payload)
   expect(output.records[0].entry.args[1]).toBe(original)
   off()
-  threshold.setLevel('debug')
+  host.policy_threshold_setLevel('debug')
   host.atLevel('debug', { tag: 'storage', message: 'allowed' })
   host.error('legacy error')
   await host.flush()

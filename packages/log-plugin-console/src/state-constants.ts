@@ -34,8 +34,5 @@ export const ConsoleFormat = {
 /** The console is a stable output registration rather than a global runtime manager. */
 export const CONSOLE_PLUGIN_NAME = 'console'
 
-/** This private descriptor kind is identified by its factory-issued opaque object identity. */
-export const PRETTY_FEATURE_KIND = 'pretty'
-
 /** Forwarded display topics use the existing ordinary entry data field. */
 export const TOPIC_CHAIN_DATA_KEY = 'topicChain'

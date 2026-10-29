@@ -106,7 +106,10 @@ async function successfulCleanup(): Promise<void> {
       httpPlugin({
         url: 'https://example.test/logs',
         fetcher: fetch,
-        features: [retryFeature({ attempts: 3, backoff: 200 }), timeoutFeature({ ms: 10000 })]
+        features: {
+          retry: retryFeature({ attempts: 3, backoff: 200 }),
+          timeout: timeoutFeature({ ms: 10000 })
+        }
       })
     ]
   })
@@ -158,7 +161,10 @@ async function statusCleanup(): Promise<void> {
       httpPlugin({
         url: 'https://example.test/logs',
         fetcher: fetch,
-        features: [retryFeature({ attempts: 2, backoff: 200 }), timeoutFeature({ ms: 10000 })]
+        features: {
+          retry: retryFeature({ attempts: 2, backoff: 200 }),
+          timeout: timeoutFeature({ ms: 10000 })
+        }
       })
     ]
   })

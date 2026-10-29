@@ -51,7 +51,7 @@ async function existingDeliveryIdentity(): Promise<void> {
       httpPlugin({
         url: 'memory-only',
         fetcher,
-        features: [retryFeature({ attempts: 2, backoff: 0 })]
+        features: { retry: retryFeature({ attempts: 2, backoff: 0 }) }
       })
     ]
   })
@@ -82,7 +82,7 @@ async function clientFailure(): Promise<void> {
       httpPlugin({
         url: 'memory-only',
         fetcher,
-        features: [retryFeature({ attempts: 3, backoff: 0 })]
+        features: { retry: retryFeature({ attempts: 3, backoff: 0 }) }
       })
     ]
   })

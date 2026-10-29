@@ -1,7 +1,14 @@
+import { defineLogPlugin } from '../../src/plugin.ts'
 import { expect, it } from 'vitest'
 import { createLogHost, type ILogPluginCore, type ILogEntry } from '../../src/index.ts'
 import { filterFeature } from '../../src/features/filter.ts'
 import { CaptureOutput, messageOf } from '../fixtures/output.ts'
+import type { IFeatureOutput } from '@migaia/plugin-host'
+
+/** The real native output provides the filter instance owned by this registration. */
+type IConfigFeatureCore = ILogPluginCore & {
+  readonly features: { readonly filter: IFeatureOutput<ReturnType<typeof filterFeature>> }
+}
 
 /** Callable config snapshots still preserve reference identity across the real peer boundary. */
 class CallableConfigPlugin {
@@ -19,14 +26,23 @@ class CallableConfigPlugin {
   constructor(feature: ReturnType<typeof filterFeature>) {
     this.#feature = feature
   }
+  /** Declare the native feature on the same plugin that owns the callable configuration. */
+  plugin() {
+    return defineLogPlugin({
+      name: this.name,
+      config: this.config,
+      features: { filter: this.#feature },
+      install: (core) => this.install(core)
+    })
+  }
   /** Read config through the actual scoped peer reader, then install that original predicate. */
-  install(core: ILogPluginCore): Record<string, never> {
+  install(core: IConfigFeatureCore): Record<string, never> {
     /** A replacement or clone would fail exact identity even if token-based removal still worked. */
     const config = core.config.get()
     /** This fixture owns the declared config shape; callable identity is still asserted at runtime. */
     const filters = config.filters as Array<(entry: ILogEntry) => boolean>
     this.captured = filters[0]
-    this.off = this.#feature.add(filters[0])
+    this.off = core.features.filter.controls.add(filters[0])
     return {}
   }
 }
@@ -46,7 +62,7 @@ async function callableIdentity(): Promise<void> {
   /** Delivered records are observed through the real SDK transport. */
   const output = new CaptureOutput()
   /** The application installs the same feature used by the config-owning plugin. */
-  const host = createLogHost({ features: [filter], plugins: [plugin, output.plugin()] })
+  const host = createLogHost({ plugins: [plugin.plugin(), output.plugin()] })
   host.log('info', 'blocked')
   await host.flush()
   expect(output.records.map(messageOf)).toEqual([])

@@ -3,7 +3,7 @@ import {
   defineOutputPlugin,
   projectLogEntry,
   type ILogOutputRecord,
-  type ILogPlugin
+  type ILogFeatureRecord
 } from '@migaia/log-host/plugin'
 import { ERROR_SOURCE, LogHttpErrorCode, type ILogHttpErrorCode } from './error-code.ts'
 import { LogHttpErrorText } from './error-text.ts'
@@ -114,7 +114,9 @@ class HttpOutput {
 }
 
 /** Create one HTTP output with host-owned policy and the unchanged JSON entries envelope. */
-export function httpPlugin(options: IHttpPluginConfig): ILogPlugin {
+export function httpPlugin<const F extends ILogFeatureRecord = Record<never, never>>(
+  options: IHttpPluginConfig<F>
+) {
   /** A named owner retains request state; SDK callbacks only forward to its methods. */
   const output = new HttpOutput(options)
   return defineOutputPlugin({

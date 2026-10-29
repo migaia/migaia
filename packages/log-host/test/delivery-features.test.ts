@@ -11,7 +11,7 @@ import { CaptureOutput, FailureCapture, nextTurn } from './fixtures/output.ts'
 async function retryAttempts(): Promise<void> {
   /** The first two real transport calls fail; the third succeeds. */
   const output = new CaptureOutput({
-    features: [retryFeature({ attempts: 3 })],
+    features: { retry: retryFeature({ attempts: 3 }) },
     failures: 2,
     retryDelay: 0
   })
@@ -37,7 +37,7 @@ async function deliveryTimeout(): Promise<void> {
   const blocked = deferred<void>()
   /** The output uses the actual transport signal passed by the timeout operation. */
   const output = new CaptureOutput({
-    features: [timeoutFeature({ ms: 10 })],
+    features: { timeout: timeoutFeature({ ms: 10 }) },
     blocked: blocked.promise
   })
   /** Timeout must be reported once after the canonical delivery boundary settles. */

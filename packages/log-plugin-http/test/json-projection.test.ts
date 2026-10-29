@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { expect, it, vi } from 'vitest'
 import { createLogHost } from '@migaia/log-host'
 import { serializeErrorChain } from '@migaia/utils/error'
@@ -38,8 +39,8 @@ async function jsonProjection(): Promise<void> {
   const bodies: string[] = []
   /** An explicit plain format cannot change HTTP's structured envelope or error projection. */
   const host = createLogHost({
-    features: [formatFeature({ format: 'plain' })],
     plugins: [
+      defineLogPlugin({ name: 'policy', features: { format: formatFeature({ format: 'plain' }) } }),
       httpPlugin({
         url: 'memory-only',
         fetcher: async (_url, init) => {
@@ -92,13 +93,15 @@ async function skipTextFormatting(): Promise<void> {
     throw new Error('HTTP must not format text')
   })
   /** The host admits this descriptor but the HTTP output skips its format phase. */
-  const feature = defineLogFeature({ kind: 'observable-text-format', phase: 'format', format })
+  const feature = defineLogFeature({ phase: 'format', format })
   /** A public POST is the independent observation of successful entry-only delivery. */
   const fetcher = vi.fn(async () => new Response(null, { status: 200 }))
   /** Structured HTTP output owns serialization while host formatting belongs to other outputs. */
   const host = createLogHost({
-    features: [feature],
-    plugins: [httpPlugin({ url: 'memory-only', fetcher })]
+    plugins: [
+      defineLogPlugin({ name: 'policy', features: { feature: feature } }),
+      httpPlugin({ url: 'memory-only', fetcher })
+    ]
   })
   host.log('info', 'entry-only')
   await host.flush()

@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '../../src/plugin.ts'
 import { expect, it, vi } from 'vitest'
 import { createLogHost, levelPlugin, forwardPlugin, type ILogEntry } from '../../src/index.ts'
 import { thresholdFeature, uuidFeature } from '../../src/features/index.ts'
@@ -13,8 +14,15 @@ async function pipelineFeatures(): Promise<void> {
   const host = createLogHost({
     execution,
     randomUUID: fixedId,
-    features: [thresholdFeature({ level: 'error' }), uuidFeature()],
-    plugins: [levelPlugin(), output.plugin()]
+
+    plugins: [
+      defineLogPlugin({
+        name: 'policy',
+        features: { threshold: thresholdFeature({ level: 'error' }), uuid: uuidFeature() }
+      }),
+      levelPlugin(),
+      output.plugin()
+    ]
   })
   host.log('debug', 'filtered')
   host.log('error', 'passes')

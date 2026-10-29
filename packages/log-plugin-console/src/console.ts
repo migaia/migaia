@@ -3,12 +3,13 @@ import {
   defineOutputPlugin,
   LogEntryDataKey,
   type ILogFeature,
+  type ILogFeatureRecord,
+  type ILogFormat,
   type ILogOutputRecord,
-  type ILogPlugin,
   type ILogPluginCore
 } from '@migaia/log-host/plugin'
 import { consoleProcess } from './environment.ts'
-import { prettyFeature, prettyRenderers } from './pretty.ts'
+import { prettyFeature } from './pretty.ts'
 import { CONSOLE_PLUGIN_NAME, ConsoleFormat, ConsoleEnvironmentKey } from './state-constants.ts'
 import type {
   IConsoleExtension,
@@ -17,14 +18,14 @@ import type {
   IConsoleTarget
 } from './typing.ts'
 
-/** One output owner borrows console/stdout and receives only the host-selected format descriptor. */
+/** One output owner borrows console/stdout and receives only the host-selected installed formatter. */
 class ConsoleOutput {
   /** Console methods are borrowed and retain their original receiver. */
   #console: IConsoleTarget
   /** Raw text and TTY detection use the same captured output capability. */
   #stdout: IConsoleStdout | undefined
   /** Automatic output is only a fallback; the host owns explicit-format precedence. */
-  readonly defaultFormat: 'json' | Extract<ILogFeature, { phase: 'format' }>
+  readonly defaultFormat: 'json' | ILogFeature
 
   /** Capture capabilities and the existing automatic format policy before installation. */
   constructor(options: IConsoleOptions) {
@@ -52,18 +53,13 @@ class ConsoleOutput {
     return { raw: (text) => raw.write(text) }
   }
 
-  /** Native pretty delivery is selected by opaque identity; every other format writes only text. */
-  deliver(
-    records: readonly ILogOutputRecord[],
-    format: Extract<ILogFeature, { phase: 'format' }>
-  ): void {
-    /** Only this package's factory-issued descriptor can select the native-argument path. */
-    const pretty = prettyRenderers.get(format)
+  /** Installed formatter behavior selects native arguments without a definition-token lookup. */
+  deliver(records: readonly ILogOutputRecord[], format: ILogFormat): void {
     for (const record of records) {
       if (record.entry.data[LogEntryDataKey.silent]) continue
       /** Original message, args, meta and Error remain distinct values on the pretty path. */
-      const args = pretty
-        ? pretty.arguments(record.entry, Boolean(this.#stdout?.isTTY))
+      const args = format.arguments
+        ? format.arguments(record.entry, Boolean(this.#stdout?.isTTY))
         : [record.text]
       if (record.entry.tag === LogLevel.error || record.entry.tag === LogLevel.fatal)
         this.#console.error(...args)
@@ -104,7 +100,9 @@ class ConsoleRaw {
 }
 
 /** Create an optional console output with native pretty arguments and host-owned delivery policies. */
-export function consolePlugin(options: IConsoleOptions = {}): ILogPlugin<IConsoleExtension> {
+export function consolePlugin<const F extends ILogFeatureRecord = Record<never, never>>(
+  options: IConsoleOptions<F> = {}
+) {
   /** The named owner holds capability and rendering state; SDK callbacks only forward to methods. */
   const output = new ConsoleOutput(options)
   return defineOutputPlugin({

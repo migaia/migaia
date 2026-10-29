@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { createLogHost, levelPlugin, type ILogEntry, type ILogPluginCore } from '@migaia/log-host'
 import {
   batchFeature,
@@ -83,17 +84,21 @@ async function runLoggerScenario(): Promise<void> {
   /** Every observed output consumes the same host entries and native browser capabilities. */
   const logger = createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-    features: [threshold, filters, uuidFeature({ display: true })],
+
     plugins: [
+      defineLogPlugin({
+        name: 'policy',
+        features: { threshold: threshold, filter: filters, uuid: uuidFeature({ display: true }) }
+      }),
       levelPlugin(),
       httpPlugin({
         url: '/logger-e2e',
         fetcher: (url, init) => requests.fetch(url, init),
         authToken: 'e2e-token',
         headers: { 'X-Logger-E2E': 'enabled' },
-        features: [batchFeature({ maxSize: 2, maxWaitMs: 100 })]
+        features: { batch: batchFeature({ maxSize: 2, maxWaitMs: 100 }) }
       }),
-      consolePlugin({ features: [prettyFeature({ color: 'always', timestamp: false })] }),
+      consolePlugin({ features: { pretty: prettyFeature({ color: 'always', timestamp: false }) } }),
       reasoningPlugin({ labels: { thinking: 'custom thinking', response: 'custom response' } }),
       processPlugin()
     ]
@@ -104,12 +109,12 @@ async function runLoggerScenario(): Promise<void> {
   logger.warn('browser warning')
   logger.error('browser error')
   logger.fatal('browser fatal')
-  // The host drains asynchronously; finish this policy epoch before changing its live descriptor.
+  // Finish this policy epoch before changing the carrier's installed threshold.
   await logger.flush()
-  threshold.setLevel('debug')
+  logger.policy_threshold_setLevel('debug')
   logger.debug('debug after setLevel')
   /** The returned capability revokes only the dynamically added predicate. */
-  const removeDynamicFilter = filters.add(keepDynamicEntry)
+  const removeDynamicFilter = logger.policy_filter_add(keepDynamicEntry)
   logger.info('filtered dynamically')
   await logger.flush()
   removeDynamicFilter()

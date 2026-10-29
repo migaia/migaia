@@ -2,10 +2,20 @@ import { boundedWait } from '@migaia/lifecycle'
 import { retry, type IRetryContext, type IRetryFailureContext } from '@migaia/utils/promise'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IScheduledTask } from '@migaia/utils/scheduler'
-import type { IPluginBeforeReleaseContext } from '@migaia/plugin-host'
+import {
+  definePlugin,
+  type IFeatureRecord,
+  type IFeatureOutputs,
+  type IPluginConfig,
+  type IPluginBeforeReleaseContext,
+  type IPluginRegistrationContext
+} from '@migaia/plugin-host'
 import type {
   ILogEntry,
   ILogFeature,
+  ILogFeatureRecord,
+  ILogFormat,
+  ILogControlExtensions,
   ILogOutputRecord,
   ILogPlugin,
   ILogPluginCore,
@@ -15,19 +25,27 @@ import type { ILogDomainCore } from './core.ts'
 import type { LogHost } from './host.ts'
 import {
   featureScope,
-  featureImplementation,
+  featureMetadata,
+  installedFeatureScope,
   resolveFeatureScope,
   acceptsEntry,
   deliveryFeature,
-  type IBatchOptions
-} from './feature-registry.ts'
+  type IBatchOptions,
+  type IFeatureImplementation
+} from './feature-metadata.ts'
+import {
+  featureControlExtensions,
+  composeFeatureExtensions,
+  LogPolicyInstallation
+} from './feature-policy.ts'
 import { formatFeature } from './features/format.ts'
 import {
   logCoreOwner,
   FeaturePhase,
-  FeatureKind,
+  LogDeliveryPolicy,
   LogFailureSource,
-  LogFormat
+  LogFormat,
+  LogFeatureRoot
 } from './state-constants.ts'
 import { LogHostErrorCode, ERROR_SOURCE } from './error-code.ts'
 import { LogHostErrorText } from './error-text.ts'
@@ -35,25 +53,34 @@ import { invalidOption, createLogError, tagLogError, createLogCleanupError } fro
 import { DeliveryAttempt } from './delivery-attempt.ts'
 
 /** Common output policy is independent of whether the transport consumes formatted text. */
-type IOutputOptions<O extends Record<string, unknown>> = {
+type IOutputOptions<
+  O extends Record<string, unknown>,
+  F extends ILogFeatureRecord = ILogFeatureRecord
+> = {
   name: string
   batchable: boolean
-  features?: readonly ILogFeature[]
+  features?: F
   retryable?(error: unknown): boolean
   retryDelay?(error: unknown): number | undefined
   install?(core: ILogPluginCore): O
 }
 /** Existing text consumers keep their definite record text and selected format context. */
-type ITextOutputDefinition<O extends Record<string, unknown>> = IOutputOptions<O> & {
+type ITextOutputDefinition<
+  O extends Record<string, unknown>,
+  F extends ILogFeatureRecord = ILogFeatureRecord
+> = IOutputOptions<O, F> & {
   consumesText?: true
-  defaultFormat: 'json' | 'plain' | Extract<ILogFeature, { phase: 'format' }>
+  defaultFormat: 'json' | 'plain' | ILogFeature
   deliver(
     records: readonly ILogOutputRecord[],
-    context: Readonly<{ signal: AbortSignal; format: Extract<ILogFeature, { phase: 'format' }> }>
+    context: Readonly<{ signal: AbortSignal; format: ILogFormat }>
   ): void | Promise<void>
 }
 /** Entry-only transports receive no text or synthetic format descriptor. */
-type IEntryOutputDefinition<O extends Record<string, unknown>> = IOutputOptions<O> & {
+type IEntryOutputDefinition<
+  O extends Record<string, unknown>,
+  F extends ILogFeatureRecord = ILogFeatureRecord
+> = IOutputOptions<O, F> & {
   consumesText: false
   defaultFormat?: never
   deliver(
@@ -62,9 +89,10 @@ type IEntryOutputDefinition<O extends Record<string, unknown>> = IOutputOptions<
   ): void | Promise<void>
 }
 /** One public discriminant preserves inference without adding another SDK export. */
-type IOutputDefinition<O extends Record<string, unknown>> =
-  | ITextOutputDefinition<O>
-  | IEntryOutputDefinition<O>
+type IOutputDefinition<
+  O extends Record<string, unknown>,
+  F extends ILogFeatureRecord = ILogFeatureRecord
+> = ITextOutputDefinition<O, F> | IEntryOutputDefinition<O, F>
 /** Every internal output record retains its logical entry; only text consumers add text. */
 type IEntryRecord = Pick<ILogOutputRecord, 'entry'>
 /** Admitted factory configuration keeps the text descriptor correlated with the text definition. */
@@ -73,25 +101,22 @@ type IOutputConfiguration<O extends Record<string, unknown>> =
   | {
       consumesText: true
       definition: ITextOutputDefinition<O>
-      fallback: Extract<ILogFeature, { phase: 'format' }>
+      fallback: ILogFeature
     }
 
-/** A scope's admitted format is unique, so no declaration-order selection policy is needed. */
-function explicitFormat(
-  features: Iterable<ILogFeature>
-): Extract<ILogFeature, { phase: 'format' }> | undefined {
-  for (const feature of features)
-    if (featureImplementation(feature).phase === FeaturePhase.format)
-      return feature as Extract<ILogFeature, { phase: 'format' }>
+/** A scope's installed formatter is unique after alias overrides. */
+function explicitFormat(features: Iterable<IFeatureImplementation>): ILogFormat | undefined {
+  for (const feature of features) if (feature.phase === FeaturePhase.format) return feature
   return undefined
 }
-/** Normalize literal defaults through the canonical host formatter and preserve descriptor identity. */
+/** Literal defaults become native roots and are installed by the declaring output plugin. */
 function normalizeFormat(
   value: ITextOutputDefinition<Record<string, unknown>>['defaultFormat']
-): Extract<ILogFeature, { phase: 'format' }> {
+): ILogFeature {
   if (value === LogFormat.json || value === LogFormat.plain) return formatFeature({ format: value })
-  if (featureImplementation(value).phase !== FeaturePhase.format) throw invalidOption()
-  return value as Extract<ILogFeature, { phase: 'format' }>
+  featureScope({ fallback: value })
+  if (featureMetadata(value)?.phase !== FeaturePhase.format) throw invalidOption()
+  return value
 }
 
 /** One started batch owns its retry/timeout state until every canonical attempt has settled. */
@@ -153,7 +178,7 @@ class DeliveryJob<R extends IEntryRecord> {
   readonly #delay = (_error: unknown, context: IRetryFailureContext): number => {
     if (this.#retryDelay !== undefined) return this.#retryDelay
     /** Normalized retry configuration was admitted before the output was installed. */
-    const feature = deliveryFeature(this.#output.features, FeatureKind.retry)!
+    const feature = this.#output.retryPolicy!
     return typeof feature.options.backoff === 'function'
       ? feature.options.backoff(context.attempt)
       : feature.options.backoff
@@ -164,7 +189,7 @@ class DeliveryJob<R extends IEntryRecord> {
   async #run(): Promise<void> {
     try {
       /** Retry capability is a single canonical utils operation, never a second local retry loop. */
-      const feature = deliveryFeature(this.#output.features, FeatureKind.retry)
+      const feature = this.#output.retryPolicy
       if (feature)
         await retry(this.#attempt, {
           maxAttempts: feature.options.attempts,
@@ -193,10 +218,10 @@ class DeliveryJob<R extends IEntryRecord> {
   }
   /** A fresh attempt owns outcome classification without carrying prior-attempt state. */
   async #executeAttempt(): Promise<void> {
-    const timeout = deliveryFeature(this.#output.features, FeatureKind.timeout)
+    const timeout = this.#output.timeoutMs
     this.#currentAttempt = new DeliveryAttempt(this.#output, this.#records)
     try {
-      await this.#currentAttempt.run(this.#attemptSignal, timeout?.ms)
+      await this.#currentAttempt.run(this.#attemptSignal, timeout)
     } catch (error) {
       for (const cleanup of this.#currentAttempt.cleanupErrors)
         if (!this.#cleanupSeen.has(cleanup)) {
@@ -463,8 +488,18 @@ abstract class OutputInstallation<R extends IEntryRecord> {
   readonly core: ILogPluginCore
   /** Retry and lifetime policy are independent of text consumption. */
   readonly definition: IOutputOptions<Record<string, unknown>>
-  /** Host/local defaults retain prescribed order after kind overrides. */
-  readonly features: readonly ILogFeature[]
+  /** Host/local defaults retain prescribed order after record-key overrides. */
+  features: readonly IFeatureImplementation[] = []
+  /** Local installed policy belongs to this native output registration. */
+  readonly local: ReadonlyMap<string, IFeatureImplementation>
+  /** The selected batch implementation prevents gate-only changes from resetting buffers. */
+  #batchPolicy: IFeatureImplementation | undefined
+  /** Gate placement is compiled once; entries execute only the selected gate implementations. */
+  #gates: readonly Extract<IFeatureImplementation, { phase: 'gate' }>[] = []
+  /** Delivery jobs read the selected retry policy directly without scanning feature metadata. */
+  #retry: Extract<IFeatureImplementation, { policy: typeof LogDeliveryPolicy.retry }> | undefined
+  /** Per-attempt timeout is resolved when the output configuration changes. */
+  #timeoutMs: number | undefined
   /** Optional buffering has exactly the record type produced by this installation. */
   #batch: BatchFeature<R> | undefined
   /** Cleanup stops new sink admission while already-started jobs keep their owners. */
@@ -473,16 +508,41 @@ abstract class OutputInstallation<R extends IEntryRecord> {
   constructor(
     core: ILogPluginCore,
     definition: IOutputOptions<Record<string, unknown>>,
-    local: ReadonlyMap<string, ILogFeature>
+    local: ReadonlyMap<string, IFeatureImplementation>
   ) {
     this.core = core
     this.definition = definition
     this.host = (core as ILogPluginCore & ILogDomainCore)[logCoreOwner]
-    this.features = resolveFeatureScope(this.host.features, local)
-    const batch = definition.batchable
-      ? deliveryFeature(this.features, FeatureKind.batch)
+    this.local = local
+  }
+  /** Compile host overrides only after native publication, retaining unchanged batch state. */
+  configure(defaults: ReadonlyMap<string, IFeatureImplementation>): void {
+    this.features = resolveFeatureScope(defaults, this.local)
+    /** Phase classification stays on the cold configuration path. */
+    const gates: Array<Extract<IFeatureImplementation, { phase: 'gate' }>> = []
+    for (const implementation of this.features)
+      if (implementation.phase === FeaturePhase.gate) gates.push(implementation)
+    this.#gates = gates
+    this.#retry = deliveryFeature(this.features, LogDeliveryPolicy.retry)
+    this.#timeoutMs = deliveryFeature(this.features, LogDeliveryPolicy.timeout)?.ms
+    /** Batch behavior changes only when its actual installed policy changes. */
+    const batch = this.definition.batchable
+      ? deliveryFeature(this.features, LogDeliveryPolicy.batch)
       : undefined
-    if (batch) this.#batch = new BatchFeature(this, batch.options)
+    if (batch === this.#batchPolicy) return
+    if (this.#batch) this.host.track(LogFailureSource.defer, this.#batch.dispose())
+    this.#batchPolicy = batch
+    this.#batch = batch ? new BatchFeature(this, batch.options) : undefined
+  }
+  /** Read the already selected retry instance in constant time for each job. */
+  get retryPolicy():
+    | Extract<IFeatureImplementation, { policy: typeof LogDeliveryPolicy.retry }>
+    | undefined {
+    return this.#retry
+  }
+  /** Read the already selected timeout in constant time for each delivery attempt. */
+  get timeoutMs(): number | undefined {
+    return this.#timeoutMs
   }
   /** Text and entry-only records are produced by their actual owning transport boundary. */
   abstract record(entry: ILogEntry): R
@@ -493,7 +553,7 @@ abstract class OutputInstallation<R extends IEntryRecord> {
     this.core.reportFailure({ source, error })
   /** Gates run before record creation; entry-only consumers never render text. */
   push(entry: ILogEntry): void {
-    if (!this.#active || !acceptsEntry(this.features, entry)) return
+    if (!this.#active || !acceptsEntry(this.#gates, entry)) return
     const record = this.record(entry)
     if (this.#batch) this.#batch.push(record)
     else new DeliveryJob(this, [record]).start()
@@ -510,31 +570,34 @@ abstract class OutputInstallation<R extends IEntryRecord> {
   }
 }
 
-/** Text output owns actual format resolution and preserves the selected descriptor identity. */
+/** Text output owns actual format resolution and uses the selected installed formatter. */
 class TextOutputInstallation extends OutputInstallation<ILogOutputRecord> {
   /** The text branch requires both record text and a selected format. */
   #definition: ITextOutputDefinition<Record<string, unknown>>
-  /** This is the exact descriptor selected by local, host or default priority. */
-  #format: Extract<ILogFeature, { phase: 'format' }>
+  /** This is the installed formatter selected by local, host or default priority. */
+  #format: ILogFormat
   /** Resolve formatting only for an output that consumes its result. */
   constructor(
     core: ILogPluginCore,
     definition: ITextOutputDefinition<Record<string, unknown>>,
-    local: ReadonlyMap<string, ILogFeature>,
-    fallback: Extract<ILogFeature, { phase: 'format' }>
+    local: ReadonlyMap<string, IFeatureImplementation>,
+    fallback: ILogFormat
   ) {
     super(core, definition, local)
     this.#definition = definition
-    this.#format =
-      explicitFormat(local.values()) ?? explicitFormat(this.host.features.values()) ?? fallback
+    this.#fallback = fallback
+    this.#format = explicitFormat(local.values()) ?? fallback
   }
-  /** Run the admitted formatter exactly once before buffering the resulting record. */
+  /** Fallback comes from this plugin's own native-installed default feature. */
+  readonly #fallback: ILogFormat
+  /** Select an installed formatter during configuration, never through a per-entry lookup. */
+  override configure(defaults: ReadonlyMap<string, IFeatureImplementation>): void {
+    super.configure(defaults)
+    this.#format = explicitFormat(this.features) ?? this.#fallback
+  }
+  /** Render once with the cached installed formatter before buffering. */
   record(entry: ILogEntry): ILogOutputRecord {
-    const format = featureImplementation(this.#format) as Extract<
-      ReturnType<typeof featureImplementation>,
-      { phase: 'format' }
-    >
-    return { entry, text: format.format(entry) }
+    return { entry, text: this.#format.format(entry) }
   }
   /** Text consumers receive their original definite record and format context types. */
   deliver(records: readonly ILogOutputRecord[], signal: AbortSignal): void | Promise<void> {
@@ -550,7 +613,7 @@ class EntryOutputInstallation extends OutputInstallation<IEntryRecord> {
   constructor(
     core: ILogPluginCore,
     definition: IEntryOutputDefinition<Record<string, unknown>>,
-    local: ReadonlyMap<string, ILogFeature>
+    local: ReadonlyMap<string, IFeatureImplementation>
   ) {
     super(core, definition, local)
     this.#definition = definition
@@ -565,92 +628,150 @@ class EntryOutputInstallation extends OutputInstallation<IEntryRecord> {
   }
 }
 
-/** A reusable plugin definition creates fresh per-installation delivery and batch state. */
-class OutputPlugin<O extends Record<string, unknown>> implements ILogPlugin<O> {
-  /** Canonical plugin-host registration key is declared by the transport factory. */
-  readonly name: string
-  /** Stable callbacks and shallow option snapshots belong to this output definition. */
-  #configuration: IOutputConfiguration<O>
-  /** Local scope admission is shared with host scope admission, including unique format phase. */
-  #local: ReadonlyMap<string, ILogFeature>
-  /** Canonical lifetime signals select the correct installation when one plugin is reused by hosts. */
-  #outputs = new WeakMap<object, Pick<OutputInstallation<IEntryRecord>, 'dispose'>>()
-  /** Validate output options before a resource-owning installation begins. */
-  constructor(definition: IOutputDefinition<O>) {
+/** A reusable authoring owner delegates feature construction and lifecycle to definePlugin. */
+class OutputPlugin<
+  N extends string,
+  F extends ILogFeatureRecord,
+  O extends Record<string, unknown>
+> {
+  /** Native roots include explicit local policies and this output’s fallback formatter. */
+  readonly features: IFeatureRecord
+  /** Stable callbacks and shallow option snapshots belong to this definition. */
+  readonly #configuration: IOutputConfiguration<O>
+  /** Caller aliases alone determine public control names and local overrides. */
+  readonly local: F
+  /** Native lifetime signals select the installed transport without owning registration identity. */
+  readonly #outputs = new WeakMap<object, OutputInstallation<IEntryRecord>>()
+  /** Policy lifecycle dispatch retains only the native registration's derived contribution. */
+  readonly #policies = new WeakMap<object, LogPolicyInstallation>()
+  /**
+   * A longer-than-caller alias keeps the native fallback root disjoint without reserving public
+   * names.
+   */
+  readonly #fallbackAlias: string
+  /** Exact literal plugin name contributes to inferred control extension names. */
+  readonly #name: N
+
+  /** Validate options and native roots before any transport owns resources. */
+  constructor(definition: IOutputDefinition<O, F> & { name: N }) {
     if (
       !definition ||
       typeof definition.name !== 'string' ||
       !definition.name ||
       typeof definition.batchable !== 'boolean' ||
       typeof definition.deliver !== 'function' ||
-      (definition.consumesText !== undefined &&
-        definition.consumesText !== true &&
-        definition.consumesText !== false)
+      (definition.consumesText !== undefined && typeof definition.consumesText !== 'boolean')
     )
       throw invalidOption()
-    this.name = definition.name
-    const snapshot = { ...definition, features: [...(definition.features ?? [])] }
-    this.#local = featureScope(snapshot.features, true)
+    this.#name = definition.name
+    featureScope(definition.features, true)
+    this.local = Object.freeze({ ...definition.features }) as F
+    /** Any suffix on the longest declared alias is longer than every caller-owned key. */
+    let longestAlias = ''
+    for (const alias of Object.keys(this.local))
+      if (alias.length > longestAlias.length) longestAlias = alias
+    this.#fallbackAlias = `${longestAlias}${LogFeatureRoot.fallbackFormat}`
+    /** The copied definition cannot be changed by later mutation of caller containers. */
+    const snapshot = { ...definition, features: this.local }
     if (snapshot.consumesText === false) {
-      if (snapshot.defaultFormat !== undefined || explicitFormat(this.#local.values()))
-        throw invalidOption()
+      if (snapshot.defaultFormat !== undefined) throw invalidOption()
+      for (const feature of Object.values(this.local))
+        if (featureMetadata(feature)?.phase === FeaturePhase.format) throw invalidOption()
       this.#configuration = { consumesText: false, definition: snapshot }
+      this.features = Object.freeze({ ...this.local })
     } else {
-      this.#configuration = {
-        consumesText: true,
-        definition: snapshot,
-        fallback: normalizeFormat(snapshot.defaultFormat)
-      }
+      /** The native fallback root is independent of the explicit local single-format constraint. */
+      const fallback = normalizeFormat(snapshot.defaultFormat)
+      this.#configuration = { consumesText: true, definition: snapshot, fallback }
+      this.features = Object.freeze({ ...this.local, [this.#fallbackAlias]: fallback })
     }
   }
-  /**
-   * Acquire cleanup before transport installation so an install failure revokes all owned output
-   * state.
-   */
-  install(core: ILogPluginCore): O {
-    /**
-     * One named installation owns policies and state; callback literals only forward to its
-     * methods.
-     */
+  /** All policy and control values come from core.features built by plugin-host. */
+  install(
+    core: ILogPluginCore & { readonly features: Readonly<Record<string, unknown>> }
+  ): O & ILogControlExtensions<N, F> {
+    /** Alias projection selects actual native-installed local implementations. */
+    const local = installedFeatureScope(this.local, core.features)
+    /** Discriminated configuration keeps entry-only transports free of formatter work. */
     const configuration = this.#configuration
+    /** The selected fallback was installed alongside all other native roots. */
     const output = configuration.consumesText
       ? new TextOutputInstallation(
           core,
           configuration.definition,
-          this.#local,
-          configuration.fallback
+          local,
+          (core.features[this.#fallbackAlias] as { implementation: ILogFormat }).implementation
         )
-      : new EntryOutputInstallation(core, configuration.definition, this.#local)
-    /** The real registration signal remains live through the peer's pre-release hook. */
+      : new EntryOutputInstallation(core, configuration.definition, local)
+    /** The scope prepares this output against current and earlier same-batch declarations. */
+    const policy = new LogPolicyInstallation(core, {
+      name: this.#name,
+      output: true,
+      features: local,
+      configure: (defaults) => output.configure(defaults)
+    })
+    /** This signal is issued and revoked by the native registration. */
     const signal = core.lifecycle.signal
     this.#outputs.set(signal, output)
+    this.#policies.set(signal, policy)
     core.onDispose(() => this.#release(signal, output))
     core.onFlush(() => output.flush())
     core.useSink((entry) => output.push(entry))
-    return configuration.definition.install?.(core) ?? ({} as O)
+    /** Commit only after application installation succeeds; native rollback owns the receipt. */
+    const extensions = configuration.definition.install?.(core) ?? ({} as O)
+    /** Preserve the native owner's thenable/container/descriptor rejection semantics. */
+    const combined = composeFeatureExtensions(
+      this.#name,
+      extensions,
+      featureControlExtensions(this.#name, this.local, core.features as IFeatureOutputs<F>)
+    )
+    policy.commit()
+    return combined
   }
-  /**
-   * Peer admission requires an own-data hook; one class field drains the selected live
-   * registration.
-   */
-  readonly beforeRelease = (context: IPluginBeforeReleaseContext): void | Promise<void> =>
-    this.#outputs.get(context.signal)?.dispose()
-  /** Physical release removes installation lookup state and reuses the same idempotent cleanup. */
-  async #release(
-    signal: object,
-    output: Pick<OutputInstallation<IEntryRecord>, 'dispose'>
-  ): Promise<void> {
+  /** Reenable an installed output's policy using its original native registration. */
+  enable(context: IPluginRegistrationContext): void {
+    this.#policies.get(context.signal)?.enable()
+  }
+  /** Withdraw a disabled output's ready policy without creating an alternate scope. */
+  disable(context: IPluginRegistrationContext): void {
+    this.#policies.get(context.signal)?.disable()
+  }
+  /** Drain output work before native release revokes its borrowed resources. */
+  beforeRelease(context: IPluginBeforeReleaseContext): void | Promise<void> {
+    return this.#outputs.get(context.signal)?.dispose()
+  }
+  /** Forget derived dispatch state and reuse the output's idempotent disposer. */
+  async #release(signal: object, output: OutputInstallation<IEntryRecord>): Promise<void> {
     this.#outputs.delete(signal)
+    this.#policies.delete(signal)
     await output.dispose()
   }
 }
 
-/**
- * Define a transport while retaining its extension type and using the host's single policy
- * pipeline.
- */
-export function defineOutputPlugin<O extends Record<string, unknown> = Record<string, never>>(
-  definition: IOutputDefinition<O>
-): ILogPlugin<O> {
-  return new OutputPlugin(definition)
+/** Assemble an output with native feature roots and ordinary guarded plugin extensions. */
+export function defineOutputPlugin<
+  const N extends string,
+  const F extends ILogFeatureRecord = Record<never, never>,
+  O extends Record<string, unknown> = Record<never, never>
+>(
+  definition: IOutputDefinition<O, F> & { name: N }
+): ILogPlugin<O & ILogControlExtensions<N, F>, IPluginConfig, F> {
+  /** Definition callbacks forward to one named owner; plugin-host owns actual installation. */
+  const owner = new OutputPlugin(definition)
+  return definePlugin<
+    ILogPluginCore,
+    O & ILogControlExtensions<N, F>,
+    ILogEntry,
+    IPluginConfig,
+    Record<never, never>,
+    N,
+    ILogFeatureRecord
+  >({
+    name: definition.name,
+    features: owner.features as ILogFeatureRecord,
+    install: (core) => owner.install(core),
+    beforeRelease: (context) => owner.beforeRelease(context),
+    onEnable: (context) => owner.enable(context),
+    onDisable: (context) => owner.disable(context)
+  }) as ILogPlugin<O & ILogControlExtensions<N, F>, IPluginConfig, F>
 }

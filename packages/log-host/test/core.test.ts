@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '../src/plugin.ts'
 import { expect, it } from 'vitest'
 import {
   createLogHost,
@@ -69,8 +70,11 @@ async function entryEnrichment(): Promise<void> {
   /** Display false must not prevent per-entry UUID generation. */
   const host = createLogHost({
     randomUUID: generate,
-    features: [uuidFeature({ display: false })],
-    plugins: [capture]
+
+    plugins: [
+      defineLogPlugin({ name: 'policy', features: { uuid: uuidFeature({ display: false }) } }),
+      capture
+    ]
   })
   host.log('custom', 'message', error)
   await host.flush()
@@ -147,11 +151,15 @@ async function forwardingCycles(): Promise<void> {
   await c.shutdown('manual')
 }
 
-/** Descriptor identity admission rejects copied objects without guessing from public kind/phase. */
+/** Native identity admission rejects copied objects without trusting a descriptor's shape. */
 function descriptorAdmission(): void {
   /** A valid complete custom descriptor is signed by the actual public SDK factory. */
-  const feature = defineLogFeature({ kind: 'identity', phase: 'entry', stage: keepEntry })
-  expect(() => createLogHost({ features: [{ ...feature }] })).toThrowError()
+  const feature = defineLogFeature({ phase: 'entry', stage: keepEntry })
+  expect(() =>
+    createLogHost({
+      plugins: [defineLogPlugin({ name: 'policy', features: { feature0: { ...feature } } })]
+    })
+  ).toThrowError()
   expect(() => createLogHost({ maxPending: 0 })).toThrowError()
 }
 

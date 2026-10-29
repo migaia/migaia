@@ -2,16 +2,8 @@ import { Ansis } from 'ansis'
 import { LogLevel } from '@migaia/log-host'
 import { defineLogFeature, type ILogEntry, type ILogFeature } from '@migaia/log-host/plugin'
 import { consoleProcess } from './environment.ts'
-import {
-  ConsoleColorMode,
-  ConsoleEnvironmentKey,
-  PRETTY_FEATURE_KIND,
-  TOPIC_CHAIN_DATA_KEY
-} from './state-constants.ts'
+import { ConsoleColorMode, ConsoleEnvironmentKey, TOPIC_CHAIN_DATA_KEY } from './state-constants.ts'
 import type { IPrettyOptions } from './typing.ts'
-
-/** Factory-issued descriptors are recognized by reference without guessing formatted text. */
-export const prettyRenderers = new WeakMap<object, PrettyRenderer>()
 
 /** The format owner retains policy while every console delivery preserves native arguments. */
 export class PrettyRenderer {
@@ -99,20 +91,16 @@ export class PrettyRenderer {
   }
 }
 
-/** Issue one legitimate format descriptor and retain its owner in the console's private registry. */
-export function prettyFeature(
-  options: IPrettyOptions = {}
-): Extract<ILogFeature, { phase: 'format' }> {
+/** Return a native format feature whose installed formatter preserves native console arguments. */
+export function prettyFeature(options: IPrettyOptions = {}): ILogFeature {
   /** Named state owns rendering rather than factory closures owning the component. */
   const renderer = new PrettyRenderer(options)
-  /** The host grants descriptor identity; this package records only its own issued result. */
-  const descriptor = defineLogFeature({
-    kind: PRETTY_FEATURE_KIND,
+  /** Native installation carries these formatter callbacks; the token has no public fields. */
+  return defineLogFeature({
     phase: 'format',
     format: (entry) => renderer.format(entry),
     paint: (tag, text) => renderer.paint(tag, text),
-    dim: (text) => renderer.dim(text)
+    dim: (text) => renderer.dim(text),
+    arguments: (entry: ILogEntry, isTTY: boolean) => renderer.arguments(entry, isTTY)
   })
-  prettyRenderers.set(descriptor, renderer)
-  return descriptor
 }

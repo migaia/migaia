@@ -4,77 +4,93 @@ import * as sdk from '../src/plugin.ts'
 import { formatFeature } from '../src/features/format.ts'
 import { thresholdFeature } from '../src/features/threshold.ts'
 import { uuidFeature } from '../src/features/uuid.ts'
-import type { ILogOutputRecord, ILogFeature } from '../src/typing.ts'
+import type { ILogOutputRecord, ILogFeature, ILogFeatureRecord, ILogFormat } from '../src/typing.ts'
 import { CaptureOutput } from './fixtures/output.ts'
 import type { ILogEntry } from '../src/typing.ts'
 
-/** Public third-party format deliberately uses a kind different from the built-in format. */
+/** Public third-party text is independent of the record key used to declare it. */
 function otherFormat() {
-  return sdk.defineLogFeature({ kind: 'custom-format', phase: 'format', format: customText })
+  return sdk.defineLogFeature({ phase: 'format', format: customText })
 }
-/** A deterministic text makes selected descriptor identity observable independently of entry JSON. */
+/** Deterministic text makes installed format selection observable independently of entry JSON. */
 function customText(): string {
   return 'custom'
 }
 /** Startup-only output fixtures never need to deliver a record. */
 function ignoreDelivery(): void {}
-/** Reject a second host format even though its kind differs from the first one's kind. */
+/** Distinct host keys both survive, so a text output rejects the second effective format. */
 function duplicateHostFormats(): void {
-  expect(() =>
-    createLogHost({ features: [formatFeature({ format: 'json' }), otherFormat()] })
-  ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
+  /** Constructing cold declarations is valid before an output's effective scope exists. */
+  const policy = sdk.defineLogPlugin({
+    name: 'policy',
+    features: { format: formatFeature({ format: 'json' }), otherFormat: otherFormat() }
+  })
+  /** The singular format slot belongs to an installed output after key overrides. */
+  const output = new CaptureOutput()
+  expect(() => createLogHost({ plugins: [policy, output.plugin()] })).toThrowError(
+    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
+  )
 }
-/** Output scope duplicate admission uses the same identity and path as other scope errors. */
+/** Local singular-slot validation runs at actual installation rather than cold definition. */
 function duplicateOutputFormats(): void {
-  expect(() =>
-    sdk.defineOutputPlugin({
-      name: 'output',
-      batchable: true,
-      defaultFormat: 'json',
-      features: [formatFeature({ format: 'json' }), otherFormat()],
-      deliver: ignoreDelivery
-    })
-  ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
+  /** Both declarations remain native features while they await an installing host. */
+  const output = sdk.defineOutputPlugin({
+    name: 'output',
+    batchable: true,
+    defaultFormat: 'json',
+    features: { format: formatFeature({ format: 'json' }), otherFormat: otherFormat() },
+    deliver: ignoreDelivery
+  })
+  expect(() => createLogHost({ plugins: [output] })).toThrowError(
+    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
+  )
 }
 
-/** The capture fixture observes selected text and descriptor identity from real output delivery. */
+/** The capture fixture observes selected text and the installed formatter from real output delivery. */
 class FormatCapture {
   /** All records preserve the output factory's declared text format. */
   readonly records: ILogOutputRecord[] = []
-  /** Selected descriptor identity must survive the host priority resolver unchanged. */
-  selected: ILogFeature | undefined
+  /** Installed formatter metadata makes selection observable without exposing token fields. */
+  selected: ILogFormat | undefined
   /** Build a normal output scope containing exactly one custom format. */
-  plugin(feature: Extract<ILogFeature, { phase: 'format' }>) {
+  plugin(feature: ILogFeature) {
     return sdk.defineOutputPlugin({
       name: 'output',
       batchable: true,
       defaultFormat: 'json',
-      features: [feature],
+      features: { format: feature },
       deliver: (records, context) => this.receive(records, context.format)
     })
   }
   /** Keep the observation loop outside the factory callback. */
-  receive(records: readonly ILogOutputRecord[], format: ILogFeature): void {
+  receive(records: readonly ILogOutputRecord[], format: ILogFormat): void {
     this.records.push(...records)
     this.selected = format
   }
 }
-/** Cross-scope formats remain legal, with every output format overriding the host's format. */
-async function outputOverridesDifferentKind(): Promise<void> {
-  /** The factory returns the exact descriptor that delivery must later expose. */
+/** A local record key replaces precisely the matching host-wide record key. */
+async function outputOverridesSameKey(): Promise<void> {
+  /** The cold native token selects the installed formatter observed through delivery. */
   const feature = otherFormat()
   /** Independent observations avoid inferring selection merely from total record count. */
   const capture = new FormatCapture()
-  /** Each scope has one format; their different kinds do not prevent overriding. */
+  /** Both declarations use the format key, leaving one effective installed formatter. */
   const host = createLogHost({
-    features: [formatFeature({ format: 'json' })],
-    plugins: [capture.plugin(feature)]
+    plugins: [
+      sdk.defineLogPlugin({
+        name: 'policy',
+        features: { format: formatFeature({ format: 'json' }) }
+      }),
+      capture.plugin(feature)
+    ]
   })
   host.log('info', 'message')
   await host.flush()
   expect(capture.records).toHaveLength(1)
   expect(capture.records[0].text).toBe('custom')
-  expect(capture.selected).toBe(feature)
+  expect(capture.selected?.format).toBe(customText)
+  expect(capture.selected?.phase).toBe('format')
+  expect(capture.selected).not.toBe(feature)
   await host.shutdown('manual')
 }
 
@@ -83,34 +99,72 @@ function malformedHostOptions(): void {
   expect(() => createLogHost({ maxPending: 0 })).toThrowError(
     expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
   )
-  expect(() => createLogHost({ features: [thresholdFeature(), thresholdFeature()] })).toThrowError(
-    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
-  )
+  expect(() =>
+    createLogHost({
+      plugins: [
+        sdk.defineLogPlugin({ name: 'first-policy', features: { threshold: thresholdFeature() } }),
+        sdk.defineLogPlugin({ name: 'second-policy', features: { threshold: thresholdFeature() } })
+      ]
+    })
+  ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
   expect(() =>
     sdk.defineOutputPlugin({
       name: 'entry-output',
       batchable: true,
       defaultFormat: 'json',
-      features: [uuidFeature()],
+      features: { uuid: uuidFeature() },
       deliver: ignoreDelivery
     })
   ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
 }
 
-it('rejects distinct-kind duplicate host formats', duplicateHostFormats)
-it('rejects distinct-kind duplicate output formats', duplicateOutputFormats)
-it('uses output format across different host/output kinds', outputOverridesDifferentKind)
+it('rejects multiple effective host formats at output installation', duplicateHostFormats)
+it('rejects multiple effective local formats at output installation', duplicateOutputFormats)
+it('uses output format for the same host/output record key', outputOverridesSameKey)
 it('rejects malformed options and output-local entry features', malformedHostOptions)
 
-/** Plain complete literals and shallow copies cannot manufacture the private descriptor identity. */
+/** A local format with a different key supplements the host format rather than replacing it. */
+function differentFormatKeysConflict(): void {
+  /** The host key and output key deliberately differ while both select the format phase. */
+  const policy = sdk.defineLogPlugin({ name: 'policy', features: { hostFormat: otherFormat() } })
+  /** The cold output is valid until its host-wide defaults become known during installation. */
+  const output = sdk.defineOutputPlugin({
+    name: 'output',
+    batchable: true,
+    defaultFormat: 'json',
+    features: { localFormat: formatFeature({ format: 'plain' }) },
+    deliver: ignoreDelivery
+  })
+  expect(() => createLogHost({ plugins: [policy, output] })).toThrowError(
+    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
+  )
+}
+it(
+  'BC6 rejects distinct-key host and output formats at actual installation',
+  differentFormatKeysConflict
+)
+
+/** Plain complete literals and shallow copies cannot manufacture native feature identity. */
 function forgedDescriptors(): void {
-  /** A complete callable shape still lacks the factory-issued runtime identity. */
-  const literal = { kind: 'forged', phase: 'entry', stage: identityEntry } as unknown as ILogFeature
-  /** Copying a real descriptor does not copy its private registry registration. */
-  const original = sdk.defineLogFeature({ kind: 'original', phase: 'entry', stage: identityEntry })
+  /** A complete callable shape still lacks plugin-host native identity. */
+  const literal = { phase: 'entry', stage: identityEntry } as unknown as ILogFeature
+  /** Copying a native feature does not copy plugin-host issuance. */
+  const original = sdk.defineLogFeature({ phase: 'entry', stage: identityEntry })
   for (const feature of [literal, { ...original }])
-    expect(() => createLogHost({ features: [feature] })).toThrowError(
-      expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
+    expect(() =>
+      createLogHost({
+        plugins: [sdk.defineLogPlugin({ name: 'policy', features: { feature: feature } })]
+      })
+    ).toThrowError(
+      expect.objectContaining({
+        source: 'logging',
+        code: 'INVALID_OPTION',
+        cause: expect.objectContaining({
+          source: 'plugin.host',
+          code: 'INVALID_OPTION',
+          stack: expect.any(String)
+        })
+      })
     )
 }
 /** An identity stage keeps negative descriptor admission fixtures behaviorally complete. */
@@ -121,8 +175,8 @@ function identityEntry(entry: ILogEntry): ILogEntry {
 /** The caller may mutate its input definition after issuance without changing the issued policy. */
 async function immutableDefinitionSnapshot(): Promise<void> {
   /** The input remains caller-owned and deliberately mutable after factory return. */
-  const definition = { kind: 'snapshot', phase: 'entry' as const, stage: originalMessage }
-  /** Both visible descriptor fields and private normalized behavior must capture this revision. */
+  const definition = { phase: 'entry' as const, stage: originalMessage }
+  /** The installed implementation must capture this definition revision without token fields. */
   const feature = sdk.defineLogFeature(definition)
   definition.stage = replacementMessage
   expect(Object.isFrozen(feature)).toBe(true)
@@ -130,7 +184,12 @@ async function immutableDefinitionSnapshot(): Promise<void> {
   /** Transport output observes behavior through the real host feature pipeline. */
   const output = new CaptureOutput()
   /** Factory-issued entry processing runs once before output consumption. */
-  const host = createLogHost({ features: [feature], plugins: [output.plugin()] })
+  const host = createLogHost({
+    plugins: [
+      sdk.defineLogPlugin({ name: 'policy', features: { feature: feature } }),
+      output.plugin()
+    ]
+  })
   host.log('info', 'input')
   await host.flush()
   expect(output.records[0].entry.message).toBe('original-definition')
@@ -147,6 +206,29 @@ function replacementMessage(entry: ILogEntry): ILogEntry {
 it('rejects complete forged and copied descriptors with the same identity', forgedDescriptors)
 it('snapshots caller-owned definitions without freezing their input', immutableDefinitionSnapshot)
 
+/** A10: JavaScript arrays are rejected rather than silently losing their requested policies. */
+function rejectArrayDeclarations(): void {
+  /** Even an empty array uses the retired declaration form and must be rejected. */
+  for (const features of [[], [thresholdFeature()]]) {
+    expect(() =>
+      sdk.defineLogPlugin({
+        name: 'array-carrier',
+        features: features as unknown as ILogFeatureRecord
+      })
+    ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
+    expect(() =>
+      sdk.defineOutputPlugin({
+        name: 'array-output',
+        batchable: true,
+        defaultFormat: 'json',
+        features: features as unknown as ILogFeatureRecord,
+        deliver: ignoreDelivery
+      })
+    ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
+  }
+}
+it('A10 rejects array feature declarations on carriers and outputs', rejectArrayDeclarations)
+
 /** An entry-only transport observes neither host text nor a fabricated format context. */
 class EntryOnlyOutput {
   /** Host entry processing must still run exactly once for this output. */
@@ -160,16 +242,15 @@ class EntryOnlyOutput {
   /** Context keys make the absence of a dummy format independently observable. */
   readonly contexts: object[] = []
   /** Real issued entry, gate and format policies exercise every relevant phase. */
-  features(): readonly ILogFeature[] {
-    return [
-      sdk.defineLogFeature({
-        kind: 'entry-count',
+  features(): ILogFeatureRecord {
+    return {
+      entry: sdk.defineLogFeature({
         phase: 'entry',
         stage: (entry) => this.enter(entry)
       }),
-      sdk.defineLogFeature({ kind: 'gate-count', phase: 'gate', accept: () => this.accept() }),
-      sdk.defineLogFeature({ kind: 'ignored-format', phase: 'format', format: () => this.format() })
-    ]
+      gate: sdk.defineLogFeature({ phase: 'gate', accept: () => this.accept() }),
+      format: sdk.defineLogFeature({ phase: 'format', format: () => this.format() })
+    }
   }
   /** This normal public definition deliberately has no defaultFormat. */
   plugin() {
@@ -210,7 +291,9 @@ async function entryOnlyIgnoresHostFormat(): Promise<void> {
   /** The fixture observes entry, gate, format and final records separately. */
   const output = new EntryOnlyOutput()
   /** Every host policy is installed through the actual factory boundary. */
-  const host = createLogHost({ features: output.features(), plugins: [output.plugin()] })
+  const host = createLogHost({
+    plugins: [sdk.defineLogPlugin({ name: 'policy', features: output.features() }), output.plugin()]
+  })
   host.log('info', 'unformatted')
   await host.flush()
   expect(output.entries).toBe(1)
@@ -230,7 +313,7 @@ function entryOnlyRejectsLocalFormat(): void {
       name: 'invalid-entry-only',
       batchable: true,
       consumesText: false,
-      features: [formatFeature({ format: 'json' })],
+      features: { format: formatFeature({ format: 'json' }) },
       deliver: ignoreDelivery
     })
   ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))

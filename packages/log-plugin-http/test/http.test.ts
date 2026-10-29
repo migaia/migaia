@@ -42,7 +42,7 @@ async function batchRetry(): Promise<void> {
       httpPlugin({
         url: 'memory-only',
         fetcher: transport.fetch,
-        features: [batchFeature({ maxSize: 2 }), retryFeature({ attempts: 2 })]
+        features: { batch: batchFeature({ maxSize: 2 }), retry: retryFeature({ attempts: 2 }) }
       })
     ]
   })

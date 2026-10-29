@@ -1,4 +1,5 @@
-export { defineLogFeature } from './feature-registry.ts'
+export { defineLogFeature } from './feature-metadata.ts'
+export { defineLogPlugin } from './log-plugin.ts'
 export { defineOutputPlugin } from './output.ts'
 export { projectLogEntry } from './projection.ts'
 export { LogEntryDataKey } from './state-constants.ts'
@@ -15,6 +16,9 @@ export type {
   IPluginExtensions,
   ILogFeatureDefinition,
   ILogFeature,
+  ILogFeatureRecord,
+  ILogFormat,
+  ILogControlExtensions,
   ILogProjectedEntry,
   ILogOutputRecord
 } from './typing.ts'

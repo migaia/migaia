@@ -104,7 +104,7 @@ async function failedDeliveryPrimary(): Promise<void> {
         name: 'primary-output',
         batchable: true,
         defaultFormat: 'json',
-        features: [retryFeature({ attempts: 2 }), timeoutFeature({ ms: 10000 })],
+        features: { retry: retryFeature({ attempts: 2 }), timeout: timeoutFeature({ ms: 10000 }) },
         deliver,
         retryable,
         retryDelay
@@ -158,7 +158,7 @@ async function successfulDeliveryCleanup(): Promise<void> {
         name: 'success-output',
         batchable: true,
         defaultFormat: 'json',
-        features: [retryFeature({ attempts: 3 }), timeoutFeature({ ms: 10000 })],
+        features: { retry: retryFeature({ attempts: 3 }), timeout: timeoutFeature({ ms: 10000 }) },
         deliver,
         retryable,
         retryDelay

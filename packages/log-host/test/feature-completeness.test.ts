@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '../src/plugin.ts'
 import { expect, it } from 'vitest'
 import { createLogHost } from '../src/index.ts'
 import { filterFeature } from '../src/features/filter.ts'
@@ -14,9 +15,11 @@ async function mutableFilters(): Promise<void> {
   /** Output observation is independent of filter implementation internals. */
   const output = new CaptureOutput()
   /** Shared host-level policy applies before formatting and output delivery. */
-  const host = createLogHost({ features: [feature], plugins: [output.plugin()] })
+  const host = createLogHost({
+    plugins: [defineLogPlugin({ name: 'policy', features: { feature: feature } }), output.plugin()]
+  })
   /** Only this added occurrence is revoked by its returned handle. */
-  const off = feature.add(rejectAdded)
+  const off = host.policy_feature_add(rejectAdded)
   host.log('info', 'initial')
   host.log('info', 'added')
   host.log('info', 'allowed')
@@ -39,21 +42,24 @@ function rejectAdded(entry: ILogEntry): boolean {
   return entry.message !== 'added'
 }
 
-/** UUID generation belongs to each host while its display flag remains descriptor configuration. */
+/** UUID generation belongs to each host while its display flag remains cold definition policy. */
 async function uuidDisplay(): Promise<void> {
   /** Both flags need separate observations rather than one shared total-count assertion. */
   for (const display of [false, true]) {
-    /** Built-in entry descriptors retain the callable entry shape promised by the public union. */
+    /** Native tokens stay opaque while installed entry behavior is observed through delivery. */
     const feature = uuidFeature({ display })
-    expect(feature.phase).toBe('entry')
-    expect(feature).toHaveProperty('stage', expect.any(Function))
+    expect(Object.isFrozen(feature)).toBe(true)
+    expect(Reflect.ownKeys(feature)).toEqual([])
     /** Stable injected identity makes accidental global generation visible. */
     const output = new CaptureOutput()
     /** Each host independently owns its generator and display policy. */
     const host = createLogHost({
       randomUUID: fixedUUID,
-      features: [feature],
-      plugins: [output.plugin()]
+
+      plugins: [
+        defineLogPlugin({ name: 'policy', features: { feature: feature } }),
+        output.plugin()
+      ]
     })
     host.log('info', 'uuid')
     await host.flush()
@@ -72,9 +78,15 @@ function fixedUUID(): string {
 /** Both built-in format paths have independent observable baselines. */
 async function builtinFormats(): Promise<void> {
   /** Structured JSON must use the shared projection rather than a second serializer. */
-  const json = new CaptureOutput({ name: 'json', features: [formatFeature({ format: 'json' })] })
+  const json = new CaptureOutput({
+    name: 'json',
+    features: { format: formatFeature({ format: 'json' }) }
+  })
   /** Plain output retains the uncolored textual prefix and original argument text. */
-  const plain = new CaptureOutput({ name: 'plain', features: [formatFeature({ format: 'plain' })] })
+  const plain = new CaptureOutput({
+    name: 'plain',
+    features: { format: formatFeature({ format: 'plain' }) }
+  })
   /** Explicit input time makes the plain baseline deterministic. */
   const host = createLogHost({ plugins: [json.plugin(), plain.plugin()] })
   host.dispatchRaw({

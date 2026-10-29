@@ -1,7 +1,10 @@
-import { issueFeature } from '../feature-registry.ts'
-import { FeatureKind, FeaturePhase } from '../state-constants.ts'
+import { defineNativeLogFeature, type ILogFeatureRuntime } from '../feature-metadata.ts'
+import { FeaturePhase } from '../state-constants.ts'
 import type { ILogEntry, ILogFeature } from '../typing.ts'
 import { invalidOption } from '../errors.ts'
+
+/** Each added predicate has one independently revocable registration in its plugin instance. */
+type IFilterControls = { add(filter: (entry: ILogEntry) => boolean): () => void }
 
 /** Distinct registrations preserve initial predicates when an added reference is later removed. */
 class FilterFeature {
@@ -10,6 +13,18 @@ class FilterFeature {
   /** Capture initial predicates without borrowing a caller-mutable array. */
   constructor(filters: readonly ((entry: ILogEntry) => boolean)[]) {
     for (const filter of filters) this.add(filter)
+  }
+  /** Native output carries this installation's implementation and separately exposed controls. */
+  runtime(): ILogFeatureRuntime<IFilterControls> {
+    return {
+      implementation: Object.freeze({
+        phase: FeaturePhase.gate,
+        accept: (entry: ILogEntry) => this.accept(entry)
+      }),
+      controls: Object.freeze({
+        add: (filter: (entry: ILogEntry) => boolean) => this.add(filter)
+      })
+    }
   }
   /** Every currently registered predicate must accept the entry in insertion order. */
   accept(entry: ILogEntry): boolean {
@@ -27,20 +42,15 @@ class FilterFeature {
     }
   }
 }
-/** Create an ordered filtering policy with independently removable added predicates. */
+/** Define a cold native filter with mutable registrations owned by each installed instance. */
 export function filterFeature(
   options: { filters?: readonly ((entry: ILogEntry) => boolean)[] } = {}
-): ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void } {
-  /** All installations of this descriptor share its explicitly mutable filter registrations. */
-  const owner = new FilterFeature(options.filters ?? [])
-  return issueFeature(
-    {
-      kind: FeatureKind.filter,
-      phase: FeaturePhase.gate,
-      accept: (entry: ILogEntry) => owner.accept(entry),
-      add: (filter: (entry: ILogEntry) => boolean) => owner.add(filter)
-    },
-    { kind: FeatureKind.filter, phase: FeaturePhase.gate, accept: (entry) => owner.accept(entry) }
+): ILogFeature<IFilterControls> {
+  /** Preserve initial predicates without borrowing the caller's array until later installation. */
+  const filters = Object.freeze([...(options.filters ?? [])])
+  for (const filter of filters) if (typeof filter !== 'function') throw invalidOption()
+  return defineNativeLogFeature({ phase: FeaturePhase.gate }, () =>
+    new FilterFeature(filters).runtime()
   )
 }
 export default filterFeature

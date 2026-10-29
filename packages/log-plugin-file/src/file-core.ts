@@ -1,5 +1,9 @@
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { defineOutputPlugin, type ILogOutputRecord, type ILogPlugin } from '@migaia/log-host/plugin'
+import {
+  defineOutputPlugin,
+  type ILogOutputRecord,
+  type ILogFeatureRecord
+} from '@migaia/log-host/plugin'
 import { ERROR_SOURCE, LogFileErrorCode, type ILogFileErrorCode } from './error-code.ts'
 import { LogFileErrorText } from './error-text.ts'
 import type { IFilePluginConfig, IFileWriter } from './typing.ts'
@@ -92,10 +96,10 @@ function recordText(record: ILogOutputRecord): string {
 }
 
 /** Condition entries provide only their supported default capability to the same file owner. */
-export function createFilePlugin(
-  options: IFilePluginConfig,
+export function createFilePlugin<const F extends ILogFeatureRecord = Record<never, never>>(
+  options: IFilePluginConfig<F>,
   defaultWriter?: IFileWriter
-): ILogPlugin {
+) {
   /** Named state owns the writer; the SDK callback only forwards the batch. */
   const output = new FileOutput(options, defaultWriter)
   return defineOutputPlugin({

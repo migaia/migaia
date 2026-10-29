@@ -1,9 +1,9 @@
-import { issueFeature, type IBatchOptions } from '../feature-registry.ts'
-import { FeatureKind, FeaturePhase } from '../state-constants.ts'
+import { defineNativeLogFeature, type IBatchOptions } from '../feature-metadata.ts'
+import { LogDeliveryPolicy, FeaturePhase } from '../state-constants.ts'
 import { invalidOption } from '../errors.ts'
 import type { ILogFeature } from '../typing.ts'
 
-/** Batch state belongs to each installed output controller rather than this reusable descriptor. */
+/** Batch state belongs to each installed output controller rather than the cold native feature. */
 export function batchFeature(options: IBatchOptions = {}): ILogFeature {
   /** Established capacity and timer defaults are normalized before installation. */
   const normalized = {
@@ -21,9 +21,16 @@ export function batchFeature(options: IBatchOptions = {}): ILogFeature {
     if (!Number.isSafeInteger(value) || value < 1) throw invalidOption()
   for (const value of [normalized.maxWaitMs, normalized.drainTimeoutMs])
     if (!Number.isFinite(value) || value < 0) throw invalidOption()
-  return issueFeature(
-    { kind: FeatureKind.batch, phase: FeaturePhase.delivery },
-    { kind: FeatureKind.batch, phase: FeaturePhase.delivery, options: Object.freeze(normalized) }
+  return defineNativeLogFeature(
+    { policy: LogDeliveryPolicy.batch, phase: FeaturePhase.delivery },
+    () => ({
+      implementation: Object.freeze({
+        policy: LogDeliveryPolicy.batch,
+        phase: FeaturePhase.delivery,
+        options: Object.freeze({ ...normalized })
+      }),
+      controls: Object.freeze({})
+    })
   )
 }
 export default batchFeature

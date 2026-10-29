@@ -20,7 +20,7 @@ function recordMessage(record: ILogOutputRecord): string {
 /** Ordinary logs return before their default asynchronous full-batch delivery. */
 async function asynchronousFullBatch(): Promise<void> {
   /** A one-entry boundary makes each completed entry independently observable. */
-  const output = new CaptureOutput({ features: [batchFeature({ maxSize: 1 })] })
+  const output = new CaptureOutput({ features: { batch: batchFeature({ maxSize: 1 }) } })
   /** Only the new public output SDK owns batching. */
   const host = createLogHost({ execution, report: ignoreReport, plugins: [output.plugin()] })
   host.log('info', 'deferred-1')
@@ -59,14 +59,14 @@ class BlockingOutput {
       name: 'blocking-batch',
       batchable: true,
       defaultFormat: 'plain',
-      features: [
-        batchFeature({
+      features: {
+        batch: batchFeature({
           maxSize: 1,
           maxConcurrentBatches: 1,
           maxPendingBatches: this.#capacity,
           maxWaitMs: 5
         })
-      ],
+      },
       deliver: (records) => this.deliver(records)
     })
   }
@@ -199,7 +199,9 @@ async function synchronousDebounceOwnership(): Promise<void> {
   /** Callback ordering comes from the real injected scheduler capability. */
   const scheduler = new ImmediateScheduler()
   /** The buffer is partial, so the timer rather than size triggers delivery. */
-  const output = new CaptureOutput({ features: [batchFeature({ maxSize: 10, maxWaitMs: 5 })] })
+  const output = new CaptureOutput({
+    features: { batch: batchFeature({ maxSize: 10, maxWaitMs: 5 }) }
+  })
   /** The test uses the real host scheduler admission and output installation. */
   const host = createLogHost({
     execution,
@@ -251,7 +253,7 @@ class ThrowingOutput {
       name: 'throws-batch',
       batchable: true,
       defaultFormat: 'plain',
-      features: [batchFeature({ maxSize: 1 })],
+      features: { batch: batchFeature({ maxSize: 1 }) },
       deliver: () => this.deliver()
     })
   }
@@ -337,18 +339,18 @@ async function uninstallBatchIsolation(): Promise<void> {
   /** Each partial buffer must be drained exactly once during its real registration cleanup. */
   const first = new CaptureOutput({
     name: 'old-first',
-    features: [
-      filterFeature({ filters: [firstOutput] }),
-      batchFeature({ maxSize: 3, maxWaitMs: 10 })
-    ]
+    features: {
+      filter: filterFeature({ filters: [firstOutput] }),
+      batch: batchFeature({ maxSize: 3, maxWaitMs: 10 })
+    }
   })
   /** The second output owns a separate timer even though it shares the same policy shape. */
   const second = new CaptureOutput({
     name: 'old-second',
-    features: [
-      filterFeature({ filters: [secondOutput] }),
-      batchFeature({ maxSize: 3, maxWaitMs: 10 })
-    ]
+    features: {
+      filter: filterFeature({ filters: [secondOutput] }),
+      batch: batchFeature({ maxSize: 3, maxWaitMs: 10 })
+    }
   })
   /** Both outputs borrow the same canonical scheduler source. */
   const host = createLogHost({
@@ -383,7 +385,7 @@ async function uninstallBatchIsolation(): Promise<void> {
   /** The later owner has a fresh partial buffer and timer with no route to either old callback. */
   const fresh = new CaptureOutput({
     name: 'new-install',
-    features: [batchFeature({ maxSize: 2, maxWaitMs: 10 })]
+    features: { batch: batchFeature({ maxSize: 2, maxWaitMs: 10 }) }
   })
   /** Reinstallation remains a distinct host and resource lifetime as in the original scenario. */
   const reinstalled = createLogHost({

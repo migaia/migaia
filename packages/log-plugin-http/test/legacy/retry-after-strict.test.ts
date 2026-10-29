@@ -88,7 +88,10 @@ async function startRetryAfter(header: string | null, maxRetryAfterMs?: number) 
         url: 'https://example.test/logs',
         fetcher: transport.fetch,
         maxRetryAfterMs,
-        features: [retryFeature({ attempts: 2, backoff: 200 }), timeoutFeature({ ms: 10000 })]
+        features: {
+          retry: retryFeature({ attempts: 2, backoff: 200 }),
+          timeout: timeoutFeature({ ms: 10000 })
+        }
       })
     ]
   })

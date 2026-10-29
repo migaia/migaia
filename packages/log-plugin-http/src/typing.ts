@@ -1,4 +1,4 @@
-import type { ILogFeature } from '@migaia/log-host/plugin'
+import type { ILogFeatureRecord } from '@migaia/log-host/plugin'
 
 /** A fetch response needs only success, status and the existing Retry-After header reader. */
 export type IHttpResponse = {
@@ -14,7 +14,7 @@ export type IHttpFetcher = (
 ) => Promise<IHttpResponse>
 
 /** A single HTTP attempt delegates batching, retries and timeouts to the host's features. */
-export type IHttpPluginConfig = {
+export type IHttpPluginConfig<F extends ILogFeatureRecord = ILogFeatureRecord> = {
   /** Destination passed unchanged to the borrowed fetcher. */
   url: string
   /** Defaults to the current host fetch function when present. */
@@ -26,5 +26,5 @@ export type IHttpPluginConfig = {
   /** Valid server delays are clamped to this finite nonnegative bound, default 30000ms. */
   maxRetryAfterMs?: number
   /** Output-scoped host features override defaults without adding a second transport policy. */
-  features?: readonly ILogFeature[]
+  features?: F
 }

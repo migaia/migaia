@@ -1,12 +1,19 @@
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import { defineOutputPlugin } from '../../src/plugin.ts'
-import type { ILogEntry, ILogFailure, ILogFeature, ILogOutputRecord } from '../../src/typing.ts'
+import type {
+  ILogEntry,
+  ILogFailure,
+  ILogFeature,
+  ILogFeatureRecord,
+  ILogFormat,
+  ILogOutputRecord
+} from '../../src/typing.ts'
 
 /** Shared transport fixture options describe independently observable delivery behavior. */
 type ICaptureOptions = {
   name?: string
-  features?: readonly ILogFeature[]
-  defaultFormat?: 'json' | 'plain' | Extract<ILogFeature, { phase: 'format' }>
+  features?: ILogFeatureRecord
+  defaultFormat?: 'json' | 'plain' | ILogFeature
   failures?: number
   blocked?: Promise<void>
   retryDelay?: number
@@ -27,8 +34,8 @@ export class CaptureOutput {
   readonly records: ILogOutputRecord[] = []
   /** Each transport call observes its batch boundary independently. */
   readonly batches: readonly ILogOutputRecord[][] = []
-  /** Selected format descriptors remain exact references supplied by the host resolver. */
-  readonly formats: ILogFeature[] = []
+  /** Selected installed format implementations expose the actual rendering policy. */
+  readonly formats: ILogFormat[] = []
   /** Per-attempt cancellation signals are the real transport context values. */
   readonly signals: AbortSignal[] = []
   /**
@@ -61,7 +68,7 @@ export class CaptureOutput {
   /** Observe actual transport entry before optionally failing or waiting on a borrowed test barrier. */
   deliver(
     records: readonly ILogOutputRecord[],
-    context: Readonly<{ signal: AbortSignal; format: Extract<ILogFeature, { phase: 'format' }> }>
+    context: Readonly<{ signal: AbortSignal; format: ILogFormat }>
   ): void | Promise<void> {
     this.attempts++
     this.#options.trace?.push('deliver')

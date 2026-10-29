@@ -1,6 +1,7 @@
 import { expectTypeOf } from 'vitest'
 import { createLogHost, levelPlugin, LogHostStatus } from '../src/index.ts'
-import { defineOutputPlugin, defineLogFeature } from '../src/plugin.ts'
+import { defineOutputPlugin, defineLogFeature, defineLogPlugin } from '../src/plugin.ts'
+import { filterFeature, thresholdFeature, uuidFeature } from '../src/features/index.ts'
 import type { ILogPluginCore, ILogFeature, ILevelPluginExt } from '../src/typing.ts'
 import type { IPluginRemoval } from '@migaia/plugin-host'
 
@@ -34,10 +35,10 @@ const output = defineOutputPlugin({
   name: 'custom',
   batchable: true,
   defaultFormat: 'json',
-  features: [
-    defineLogFeature({ kind: 'gate', phase: 'gate', accept: acceptAll }),
-    defineLogFeature({ kind: 'format', phase: 'format', format: formatAll })
-  ],
+  features: {
+    defineLog: defineLogFeature({ phase: 'gate', accept: acceptAll }),
+    defineLog1: defineLogFeature({ phase: 'format', format: formatAll })
+  },
   install: installCustom,
   deliver: deliverCustom
 })
@@ -74,18 +75,58 @@ const statuses: LogHostStatus[] = [
 ]
 void statuses
 // @ts-expect-error Third parties cannot define the internal delivery phase.
-defineLogFeature({ kind: 'delivery', phase: 'delivery' })
+defineLogFeature({ phase: 'delivery' })
 // @ts-expect-error A complete entry feature must provide its stage implementation.
-defineLogFeature({ kind: 'entry', phase: 'entry' })
-// @ts-expect-error Structural descriptors do not possess the private factory identity.
-const forgedEntry: ILogFeature = { kind: 'entry', phase: 'entry', stage: (entry) => entry }
-// @ts-expect-error A public delivery-looking object cannot manufacture private issuance.
-const forgedDelivery: ILogFeature = { kind: 'batch', phase: 'delivery' }
+defineLogFeature({ phase: 'entry' })
+defineLogFeature({
+  // @ts-expect-error Feature names belong to record keys; kind is not a definition field.
+  kind: 'retired-name',
+  phase: 'gate',
+  accept: acceptAll
+})
+// @ts-expect-error Structural descriptors do not possess plugin-host native feature identity.
+const forgedEntry: ILogFeature = { phase: 'entry', stage: (entry) => entry }
+// @ts-expect-error A public delivery-looking object cannot manufacture native issuance.
+const forgedDelivery: ILogFeature = { phase: 'delivery' }
 // @ts-expect-error The retired status spelling has no compatibility alias.
 const retiredStatus: LogHostStatus = 'shutting-down'
 void forgedEntry
 void forgedDelivery
 void retiredStatus
+
+/** BC1–BC3: record declarations keep controls inferred on the plugin's host extensions. */
+const policy = defineLogPlugin({
+  name: 'policy',
+  features: { threshold: thresholdFeature(), filter: filterFeature() }
+})
+/** Actual installed extensions preserve exact input and removal types. */
+const policyHost = createLogHost({ plugins: [policy] })
+policyHost.policy_threshold_setLevel('warn')
+expectTypeOf(policyHost.policy_filter_add(acceptAll)).toEqualTypeOf<() => void>()
+// @ts-expect-error Features enter through declaring plugins, never through host options.
+createLogHost({ features: { uuid: uuidFeature() } })
+defineLogPlugin({
+  name: 'array-rejected',
+  // @ts-expect-error Native feature declarations use a named record, not an array.
+  features: [filterFeature()]
+})
+/** Native feature definitions have no public runtime fields or controls. */
+const opaqueFilter = filterFeature()
+// @ts-expect-error Filter controls belong to an installed plugin extension.
+opaqueFilter.add(acceptAll)
+// @ts-expect-error Definition tokens expose no descriptor fields.
+void opaqueFilter.phase
+// @ts-expect-error Entry implementations are installed, never read from a token.
+void uuidFeature().stage
+
+defineOutputPlugin({
+  name: 'array-output-rejected',
+  batchable: true,
+  defaultFormat: 'json',
+  // @ts-expect-error Output plugins use the same native record declaration form.
+  features: [filterFeature()],
+  deliver: deliverCustom
+})
 
 /** The text-free branch keeps entry/signal and rejects fields that were deliberately not produced. */
 const entryOnly = defineOutputPlugin({

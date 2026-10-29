@@ -1,5 +1,6 @@
 import type { IAsyncMiddlewareStage } from '@migaia/middleware-pipeline'
 import type {
+  IFeature,
   IFeatureRecord,
   IHostHandle,
   IMergePluginExts,
@@ -13,6 +14,7 @@ import type {
 } from '@migaia/plugin-host'
 import type { ISerializedErrorChain } from '@migaia/utils/error'
 import type { IScheduler } from '@migaia/utils/scheduler'
+import type { IFeatureImplementation, ILogFeatureRuntime } from './feature-metadata.ts'
 import type { LogLevel, LogHostStatus } from './state-constants.ts'
 
 /** Native identity is retained for console inspection; structured output uses the projection. */
@@ -73,32 +75,54 @@ export type ILogPlugin<
   E extends object = Record<never, never>
 > = IPlugin<ILogPluginCore, O, C, Record<never, never>, F, E>
 /** Plugin tuples retain each member's actual declaration instead of erasing extensions. */
-export type ILogPluginConstraint = IPluginConstraint<ILogPluginCore>
+export type ILogPluginConstraint = IPluginConstraint<any>
 /** The peer owns extension intersection and overloaded method inference. */
 export type IPluginExtensions<P extends readonly ILogPluginConstraint[]> = IMergePluginExts<P>
-/** This private type identity cannot be imported to construct a forged descriptor. */
-declare const logFeatureIdentity: unique symbol
 /** Third-party features implement exactly one of the supported public processing stages. */
 export type ILogFeatureDefinition =
   | {
-      kind: string
       phase: 'entry'
       stage(entry: ILogEntry): ILogEntry | undefined | Promise<ILogEntry | undefined>
     }
-  | { kind: string; phase: 'gate'; accept(entry: ILogEntry): boolean }
+  | { phase: 'gate'; accept(entry: ILogEntry): boolean }
   | {
-      kind: string
       phase: 'format'
       format(entry: ILogEntry): string
       paint?(tag: string, text: string): string
       dim?(text: string): string
+      arguments?(entry: ILogEntry, isTTY: boolean): unknown[]
     }
-/** Delivery descriptors are issued only by this package's batch/retry/timeout factories. */
-export type ILogFeature = Readonly<{ readonly [logFeatureIdentity]: true }> &
-  (
-    | Readonly<ILogFeatureDefinition>
-    | Readonly<{ kind: 'batch' | 'retry' | 'timeout'; phase: 'delivery' }>
-  )
+/** Log definitions retain plugin-host's opaque identity and exact per-installation controls. */
+export type ILogFeature<C extends object = Record<never, never>> = IFeature<
+  Record<never, never>,
+  ILogFeatureRuntime<C>
+>
+/** Plugin-host aliases retain exact feature output inference. */
+export type ILogFeatureRecord = Readonly<Record<string, ILogFeature<any>>>
+/** Installed format observations carry behavior without exposing a feature definition token. */
+export type ILogFormat = Extract<IFeatureImplementation, { phase: 'format' }>
+/** Merge separately named controls without erasing the empty-feature case. */
+type IUnionToIntersection<T> = (T extends unknown ? (value: T) => void : never) extends (
+  value: infer I
+) => void
+  ? I
+  : never
+/** Controls use plugin and record names so host-wide and local policies can coexist. */
+export type ILogControlExtensions<
+  N extends string,
+  F extends ILogFeatureRecord
+> = keyof F extends never
+  ? Record<never, never>
+  : IUnionToIntersection<
+      {
+        [A in keyof F & string]: F[A] extends ILogFeature<infer C>
+          ? {
+              [M in keyof C & string as `${N}_${A}_${M}`]: C[M]
+            }
+          : never
+      }[keyof F & string]
+    > &
+      Record<never, never>
 /** Output projection replaces only errors, preserving the established entry wire shape. */
 export type ILogProjectedEntry = Omit<ILogEntry, 'error'> & {
   readonly error?: ISerializedErrorChain | undefined
@@ -117,7 +141,6 @@ export type ILevelPluginExt = {
 /** Host creation captures capabilities and plugin declarations synchronously. */
 export type ILogHostOptions<P extends readonly ILogPluginConstraint[] = readonly []> = {
   readonly plugins?: P
-  readonly features?: readonly ILogFeature[]
   readonly context?: readonly string[]
   readonly topic?: string
   readonly maxPending?: number

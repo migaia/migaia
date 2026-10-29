@@ -13,18 +13,22 @@ import { CaptureOutput } from './fixtures/output.ts'
 /** Reordering built-in descriptors cannot change batch boundaries or actual retry/format behavior. */
 async function fixedDeliveryOrder(): Promise<void> {
   /** Shared policy values are installed in two opposite declaration orders. */
-  const features = [
-    thresholdFeature({ level: 'debug' }),
-    filterFeature(),
-    formatFeature({ format: 'plain' }),
-    batchFeature({ maxSize: 2 }),
-    retryFeature({ attempts: 2 }),
-    timeoutFeature({ ms: 100 })
-  ]
+  const features = {
+    threshold: thresholdFeature({ level: 'debug' }),
+    filter: filterFeature(),
+    format: formatFeature({ format: 'plain' }),
+    batch: batchFeature({ maxSize: 2 }),
+    retry: retryFeature({ attempts: 2 }),
+    timeout: timeoutFeature({ ms: 100 })
+  }
   /** A deliberate first failure proves retry applies to the already-formed batch. */
   const a = new CaptureOutput({ name: 'a', features, failures: 1 })
   /** The reverse list must still yield the same transport sequence. */
-  const b = new CaptureOutput({ name: 'b', features: [...features].reverse(), failures: 1 })
+  const b = new CaptureOutput({
+    name: 'b',
+    features: Object.fromEntries(Object.entries(features).reverse()),
+    failures: 1
+  })
   /** Two logical entries reach each independently resolved output pipeline. */
   const host = createLogHost({ plugins: [a.plugin(), b.plugin()] })
   host.log('info', 'one')

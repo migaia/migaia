@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { expect, it } from 'vitest'
 import { createLogHost } from '@migaia/log-host'
 import { formatFeature } from '@migaia/log-host/features'
@@ -22,12 +23,17 @@ async function originalNativeArguments(): Promise<void> {
     // Exactly two declared color policies are checked; no growable domain is sorted or rescanned.
     /** A fake console captures the argument list without invoking platform inspection. */
     const console = new MemoryConsole()
-    /** The selected descriptor's opaque identity chooses native delivery. */
+    /** The installed pretty implementation chooses native argument delivery. */
     const feature = prettyFeature({ color, timestamp: false })
     /** A host-level JSON format is overridden by this output's explicit pretty format. */
     const host = createLogHost({
-      features: [formatFeature({ format: 'json' })],
-      plugins: [consolePlugin({ console, stdout: new MemoryStdout(), features: [feature] })]
+      plugins: [
+        defineLogPlugin({
+          name: 'policy',
+          features: { format: formatFeature({ format: 'json' }) }
+        }),
+        consolePlugin({ console, stdout: new MemoryStdout(), features: { format: feature } })
+      ]
     })
     host.dispatchRaw({
       tag: 'info',
@@ -69,7 +75,6 @@ it(
 async function nonPrettyText(): Promise<void> {
   /** This descriptor has legitimate host identity but no console-owned pretty identity. */
   const thirdParty = defineLogFeature({
-    kind: 'external-format',
     phase: 'format',
     format: () => '[INFO] fake-pretty'
   })
@@ -82,7 +87,9 @@ async function nonPrettyText(): Promise<void> {
     /** One output observes exactly one selected formatting policy. */
     const console = new MemoryConsole()
     /** The native object must not become another argument on any ordinary text path. */
-    const host = createLogHost({ plugins: [consolePlugin({ console, features: [feature] })] })
+    const host = createLogHost({
+      plugins: [consolePlugin({ console, features: { format: feature } })]
+    })
     host.log('info', 'ordinary', { value: true })
     await host.flush()
     expect(console.logs[0]).toHaveLength(1)

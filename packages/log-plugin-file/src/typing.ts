@@ -1,4 +1,4 @@
-import type { ILogFeature } from '@migaia/log-host/plugin'
+import type { ILogFeatureRecord } from '@migaia/log-host/plugin'
 
 /** Borrowed file operations need no Node, Bun or Deno-specific public type declarations. */
 export type IFileWriter = {
@@ -7,7 +7,7 @@ export type IFileWriter = {
 }
 
 /** NDJSON delivery delegates all buffering and delivery policy to host features. */
-export type IFilePluginConfig = {
+export type IFilePluginConfig<F extends ILogFeatureRecord = ILogFeatureRecord> = {
   /** Required nonempty destination passed unchanged to the borrowed append capability. */
   readonly path: string
   /** Defaults to a supported runtime's native append writer in server conditions only. */
@@ -20,5 +20,5 @@ export type IFilePluginConfig = {
     readonly maxEntries?: number
   }
   /** Host-owned output policies override host defaults without creating a private queue. */
-  readonly features?: readonly ILogFeature[]
+  readonly features?: F
 }

@@ -1,22 +1,28 @@
-import { issueFeature } from '../feature-registry.ts'
-import {
-  FeatureKind,
-  FeaturePhase,
-  explicitLevel,
-  levelOrder,
-  LogLevel
-} from '../state-constants.ts'
+import { defineNativeLogFeature, type ILogFeatureRuntime } from '../feature-metadata.ts'
+import { FeaturePhase, explicitLevel, levelOrder, LogLevel } from '../state-constants.ts'
 import type { ILogEntry, ILogFeature } from '../typing.ts'
 import { invalidOption } from '../errors.ts'
 
-/** A shared threshold owner allows one descriptor to control every scope where it is installed. */
+/** A plugin exposes only its own installed threshold control through native extensions. */
+type IThresholdControls = { setLevel(level: LogLevel): void }
+
+/** One native installation owns its threshold independently of every other registration. */
 class ThresholdFeature {
-  /** Current standard threshold changes without replacing the issued descriptor identity. */
+  /** Current standard threshold changes only within this native installation. */
   #level: LogLevel
-  /** Validate the initial policy before any host can retain it. */
+  /** Initial policy was synchronously validated while defining the native feature. */
   constructor(level: LogLevel) {
     this.#level = level
-    this.setLevel(level)
+  }
+  /** Return forwarding methods tied to this installation's explicitly owned state. */
+  runtime(): ILogFeatureRuntime<IThresholdControls> {
+    return {
+      implementation: Object.freeze({
+        phase: FeaturePhase.gate,
+        accept: (entry: ILogEntry) => this.accept(entry)
+      }),
+      controls: Object.freeze({ setLevel: (level: LogLevel) => this.setLevel(level) })
+    }
   }
   /** Unknown tags bypass level threshold while category entries retain their explicit level. */
   accept(entry: ILogEntry): boolean {
@@ -34,24 +40,15 @@ class ThresholdFeature {
     this.#level = level
   }
 }
-/** Create a mutable threshold policy behind one immutable issued descriptor. */
+/** Define a cold native threshold whose mutable controls belong to its installed plugin. */
 export function thresholdFeature(
   options: { level?: LogLevel } = {}
-): ILogFeature & { setLevel(level: LogLevel): void } {
-  /** State is shared deliberately when a descriptor is reused across outputs. */
-  const owner = new ThresholdFeature(options.level ?? LogLevel.debug)
-  return issueFeature(
-    {
-      kind: FeatureKind.threshold,
-      phase: FeaturePhase.gate,
-      accept: (entry: ILogEntry) => owner.accept(entry),
-      setLevel: (level: LogLevel) => owner.setLevel(level)
-    },
-    {
-      kind: FeatureKind.threshold,
-      phase: FeaturePhase.gate,
-      accept: (entry) => owner.accept(entry)
-    }
+): ILogFeature<IThresholdControls> {
+  /** Snapshot the initial value without constructing mutable runtime state before installation. */
+  const level = options.level ?? LogLevel.debug
+  if (!Object.hasOwn(levelOrder, level)) throw invalidOption()
+  return defineNativeLogFeature({ phase: FeaturePhase.gate }, () =>
+    new ThresholdFeature(level).runtime()
   )
 }
 export default thresholdFeature

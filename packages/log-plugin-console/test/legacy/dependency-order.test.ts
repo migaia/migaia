@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { expect, it } from 'vitest'
 import { createLogHost, forwardPlugin } from '@migaia/log-host'
 import { batchFeature, formatFeature } from '@migaia/log-host/features'
@@ -13,7 +14,10 @@ async function reasoningOrder(reverse: boolean): Promise<string[]> {
   /** The console output is still installed so lost silence would create an extra native call. */
   const console = new MemoryConsole()
   /** Each order uses the same public console formatting and standalone writer contract. */
-  const output = consolePlugin({ console, features: [prettyFeature({ color: 'always' })] })
+  const output = consolePlugin({
+    console,
+    features: { pretty: prettyFeature({ color: 'always' }) }
+  })
   /** The phase controller no longer borrows console color capabilities. */
   const reasoning = reasoningPlugin({
     write: (text) => {
@@ -42,11 +46,11 @@ async function batchScope(outputScope: boolean): Promise<string[][]> {
   const batch = batchFeature({ maxSize: 2 })
   /** The production HTTP output owns one attempt and the host owns the batch. */
   const host = createLogHost({
-    features: outputScope ? [] : [batch],
     plugins: [
+      defineLogPlugin({ name: 'policy', features: outputScope ? {} : { batch: batch } }),
       httpPlugin({
         url: 'memory-only',
-        features: outputScope ? [batch] : [],
+        features: outputScope ? { batch: batch } : {},
         fetcher: async (_url, init) => {
           bodies.push(init.body)
           return new Response(null, { status: 200 })
@@ -87,8 +91,10 @@ async function forwardedTopics(): Promise<void> {
   /** Target topic extends the original path at the forwarding boundary. */
   const target = createLogHost({
     topic: 'audit',
-    plugins: [consolePlugin({ console })],
-    features: [formatFeature({ format: 'json' })]
+    plugins: [
+      defineLogPlugin({ name: 'policy', features: { format: formatFeature({ format: 'json' }) } }),
+      consolePlugin({ console })
+    ]
   })
   /** The public forward plugin replaces the removed extends facade operation. */
   const source = createLogHost({ topic: 'source', plugins: [forwardPlugin({ targets: [target] })] })

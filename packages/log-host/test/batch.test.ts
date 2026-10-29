@@ -10,7 +10,9 @@ async function batchOverflow(): Promise<void> {
   const blocked = deferred<void>()
   /** One active and one queued batch exhaust the admitted pending capacity. */
   const output = new CaptureOutput({
-    features: [batchFeature({ maxSize: 1, maxConcurrentBatches: 1, maxPendingBatches: 2 })],
+    features: {
+      batch: batchFeature({ maxSize: 1, maxConcurrentBatches: 1, maxPendingBatches: 2 })
+    },
     blocked: blocked.promise
   })
   /** Failure detail must retain dropped entry counts rather than only a shared code. */
@@ -38,7 +40,7 @@ async function batchOverflow(): Promise<void> {
 /** The established default size boundary starts a full batch before an explicit host flush. */
 async function batchDefaults(): Promise<void> {
   /** Full default batches contain twenty entries and are independently visible to the transport. */
-  const output = new CaptureOutput({ features: [batchFeature()] })
+  const output = new CaptureOutput({ features: { batch: batchFeature() } })
   /** A normal host exercises real asynchronous entry traversal and the class-owned batch buffer. */
   const host = createLogHost({ plugins: [output.plugin()] })
   for (let index = 0; index < 20; index++) host.log('info', String(index))
@@ -53,7 +55,7 @@ it('retains the established default size boundary before flush', batchDefaults)
 /** Final buffered output must be delivered before canonical registration lifetime revocation. */
 async function releaseFinalBatch(): Promise<void> {
   /** The partial batch cannot be delivered by its size boundary before removal starts. */
-  const output = new CaptureOutput({ features: [batchFeature({ maxSize: 2 })] })
+  const output = new CaptureOutput({ features: { batch: batchFeature({ maxSize: 2 }) } })
   /** Removal uses the same supported public configuration operation as real output replacement. */
   const host = createLogHost({ plugins: [output.plugin()] })
   host.log('info', 'final-buffered')

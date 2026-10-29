@@ -35,7 +35,7 @@ async function injectedWriter(): Promise<void> {
         path: 'memory.ndjson',
         writer,
         rotate: { maxEntries: 2 },
-        features: [batchFeature({ maxSize: 2 })]
+        features: { batch: batchFeature({ maxSize: 2 }) }
       })
     ]
   })
@@ -164,7 +164,7 @@ function retryingHost(writer: ScriptedWriter, reported: unknown[]) {
         path: 'retry.ndjson',
         writer,
         rotate: { maxEntries: 1 },
-        features: [retryFeature({ attempts: 3 })]
+        features: { retry: retryFeature({ attempts: 3 }) }
       })
     ]
   })

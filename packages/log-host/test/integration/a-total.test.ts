@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { setImmediate } from 'node:timers'
 import { expect, it } from 'vitest'
 import { createLogHost, levelPlugin, LogHostStatus } from '@migaia/log-host'
@@ -100,12 +101,16 @@ async function composedOutputs(): Promise<void> {
   const log = createLogHost({
     execution,
     report: (error) => failures.push(error),
-    features: [
-      thresholdFeature({ level: 'info' }),
-      formatFeature({ format: 'json' }),
-      batchFeature({ maxSize: 2 })
-    ],
+
     plugins: [
+      defineLogPlugin({
+        name: 'policy',
+        features: {
+          threshold: thresholdFeature({ level: 'info' }),
+          format: formatFeature({ format: 'json' }),
+          batch: batchFeature({ maxSize: 2 })
+        }
+      }),
       levelPlugin(),
       consolePlugin({ console: outputs }),
       httpPlugin({

@@ -51,7 +51,7 @@ async function shutdownAbort(): Promise<void> {
       httpPlugin({
         url: 'memory-only',
         fetcher: transport.fetch,
-        features: [timeoutFeature({ ms: 10000 })]
+        features: { timeout: timeoutFeature({ ms: 10000 }) }
       })
     ]
   })

@@ -25,16 +25,14 @@ export const levelOrder: Readonly<Record<string, number>> = {
   error: 3,
   fatal: 4
 }
-/** Only named built-in feature policies receive their prescribed chain positions. */
-export const FeatureKind = {
-  threshold: 'threshold',
-  filter: 'filter',
-  uuid: 'uuid',
-  format: 'format',
+/** Output installation reserves one slot for each package-owned delivery policy. */
+export const LogDeliveryPolicy = {
   batch: 'batch',
   retry: 'retry',
   timeout: 'timeout'
 } as const
+/** This private policy domain is not part of third-party feature definitions. */
+export type LogDeliveryPolicy = (typeof LogDeliveryPolicy)[keyof typeof LogDeliveryPolicy]
 /** Stages separate one-time entry enrichment from per-output admission and delivery. */
 export const FeaturePhase = {
   entry: 'entry',
@@ -71,3 +69,8 @@ export const LogFailureSource = {
 export const LogFormat = { json: 'json', plain: 'plain' } as const
 /** Entry identity text belongs to the entry contract rather than transport-specific rendering. */
 export const LogEntryText = { id: (sequence: number): string => `log_${sequence}` } as const
+
+/** A private suffix keeps the native output default separate from caller-owned policy aliases. */
+export const LogFeatureRoot = {
+  fallbackFormat: '$logFallbackFormat'
+} as const

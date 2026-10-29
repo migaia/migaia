@@ -1,3 +1,4 @@
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { expect, it, vi } from 'vitest'
 import { createLogHost, levelPlugin } from '@migaia/log-host'
 import { consolePlugin, prettyFeature } from '../src/index.ts'
@@ -12,8 +13,14 @@ async function consoleDelivery(): Promise<void> {
   const stdout = new MemoryStdout()
   /** Pretty formatting is selected once at host scope. */
   const host = createLogHost({
-    plugins: [levelPlugin(), consolePlugin({ console, stdout })],
-    features: [prettyFeature({ color: 'never', timestamp: false })]
+    plugins: [
+      defineLogPlugin({
+        name: 'policy',
+        features: { pretty: prettyFeature({ color: 'never', timestamp: false }) }
+      }),
+      levelPlugin(),
+      consolePlugin({ console, stdout })
+    ]
   })
   host.info('ordinary')
   host.warn('warning')

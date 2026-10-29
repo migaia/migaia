@@ -93,10 +93,10 @@ async function runHttp(
       httpPlugin({
         url: 'https://example.test/logs',
         fetcher,
-        features: [
-          retryFeature({ attempts: retries + 1, backoff: 200 }),
-          timeoutFeature({ ms: 10000 })
-        ]
+        features: {
+          retry: retryFeature({ attempts: retries + 1, backoff: 200 }),
+          timeout: timeoutFeature({ ms: 10000 })
+        }
       })
     ]
   })

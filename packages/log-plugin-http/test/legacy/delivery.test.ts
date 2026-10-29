@@ -14,7 +14,7 @@ async function finalBufferedEntry(): Promise<void> {
     plugins: [
       httpPlugin({
         url: 'memory-only',
-        features: [batchFeature()],
+        features: { batch: batchFeature() },
         fetcher: async (_url, init) => {
           bodies.push(init.body)
           aborted.push(init.signal?.aborted)
@@ -72,7 +72,7 @@ async function retryFailure(name: 'HTTP 5xx' | 'network failure'): Promise<void>
       httpPlugin({
         url: 'https://example.test/logs',
         fetcher: fetch,
-        features: [retryFeature({ attempts: 2, backoff: 0 })]
+        features: { retry: retryFeature({ attempts: 2, backoff: 0 }) }
       })
     ]
   })
