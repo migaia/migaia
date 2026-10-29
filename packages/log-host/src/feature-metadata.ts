@@ -100,9 +100,9 @@ export function featureScope(
   /** Record aliases supply policy names without creating a second scope registry. */
   const selected = new Map<string, ILogFeature<any>>()
   for (const [alias, feature] of Object.entries(roots)) {
-    /** Ordinary non-log native features keep their own plugin-host meaning. */
+    /** Log plugin records hold only log features; the public types already require this. */
     const metadata = featureMetadata(feature)
-    if (!metadata) continue
+    if (!metadata) throw invalidOption()
     if (output && metadata.phase === FeaturePhase.entry) throw invalidOption()
     selected.set(alias, feature as ILogFeature<any>)
   }
@@ -116,10 +116,8 @@ export function installedFeatureScope(
 ): Map<string, IFeatureImplementation> {
   /** This installed-policy projection is rebuilt only during configuration or installation. */
   const selected = new Map<string, IFeatureImplementation>()
-  for (const [alias, feature] of Object.entries(record)) {
-    /** Native roots unrelated to log processing are not log policy contributions. */
-    const metadata = featureMetadata(feature)
-    if (!metadata) continue
+  // featureScope admitted every alias as a log feature when the plugin was defined.
+  for (const alias of Object.keys(record)) {
     /** Alias resolution uses the exact instance produced by plugin-host for this registration. */
     const runtime = outputs[alias] as ILogFeatureRuntime
     selected.set(alias, runtime.implementation)

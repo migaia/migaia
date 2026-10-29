@@ -340,7 +340,8 @@ export class LogHost {
     this.#stages.set(token, stage)
     this.#rebuildRunStages()
     return () => {
-      if (this.#stages.delete(token)) this.#rebuildRunStages()
+      this.#stages.delete(token)
+      this.#rebuildRunStages()
     }
   }
   /** Register raw entry consumption; output SDK delivery owns its own formatting and policies. */

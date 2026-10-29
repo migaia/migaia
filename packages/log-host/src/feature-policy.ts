@@ -7,11 +7,7 @@ import {
 import type { ILogControlExtensions, ILogFeatureRecord, ILogPluginCore } from './typing.ts'
 import type { ILogDomainCore } from './core.ts'
 import type { LogHost } from './host.ts'
-import {
-  featureMetadata,
-  type IFeatureImplementation,
-  type ILogFeatureRuntime
-} from './feature-metadata.ts'
+import { type IFeatureImplementation, type ILogFeatureRuntime } from './feature-metadata.ts'
 import { logCoreOwner, FeaturePhase, LogDeliveryPolicy } from './state-constants.ts'
 import { invalidOption } from './errors.ts'
 
@@ -138,43 +134,38 @@ export class LogFeatureScope {
    * Publish caches after this plugin's user install callback succeeds; native rollback owns
    * withdrawal.
    */
-  commit(signal: object, contribution: IPolicyContribution): void {
-    /**
-     * Exact receipt matching prevents a stale cleanup or callback from affecting another
-     * installation.
-     */
-    const entry = this.#entries.get(signal)
-    if (!entry || entry.contribution !== contribution || entry.committed) return
+  commit(signal: object): void {
+    /** Prepare() registered this signal earlier in the same native install; commit runs once. */
+    const entry = this.#entries.get(signal)!
     entry.committed = true
     this.#publish(entry)
   }
 
   /** Reenable the original installed policies without recreating feature outputs or releasing names. */
-  enable(signal: object, contribution: IPolicyContribution): void {
+  enable(signal: object): void {
     /** A prepared registration cannot become visible before its own install callback succeeds. */
     const entry = this.#entries.get(signal)
-    if (entry?.contribution === contribution && entry.committed && !entry.enabled)
-      this.#publish(entry)
+    if (entry?.committed && !entry.enabled) this.#publish(entry)
   }
 
   /**
    * Withdraw delivery policy while preserving the native registration's cold declaration
    * reservation.
    */
-  disable(signal: object, contribution: IPolicyContribution): void {
+  disable(signal: object): void {
     /** Native lifecycle callbacks retain the exact signal used by this scope's receipt. */
     const entry = this.#entries.get(signal)
-    if (entry?.contribution === contribution && entry.enabled) this.#unpublish(entry)
+    if (entry?.enabled) this.#unpublish(entry)
   }
 
   /** Release a prepared or committed declaration through its native onDispose receipt, idempotently. */
-  remove(signal: object, contribution: IPolicyContribution): void {
-    /** A different installation can never be removed by this receipt. */
+  remove(signal: object): void {
+    /** Rollback and onDispose can both reach this receipt; the second call finds nothing. */
     const entry = this.#entries.get(signal)
-    if (!entry || entry.contribution !== contribution) return
+    if (!entry) return
     this.#entries.delete(signal)
     if (entry.projection) this.#removeOutput(entry.projection)
-    else this.#removeHost(contribution)
+    else this.#removeHost(entry.contribution)
     if (entry.enabled) this.#unpublish(entry)
   }
 
@@ -338,8 +329,6 @@ export class LogPolicyInstallation {
   readonly #scope: LogFeatureScope
   /** The native lifetime signal identifies this exact installation across callbacks and cleanup. */
   readonly #signal: object
-  /** Immutable installed implementations belong to this plugin's real native feature outputs. */
-  readonly #contribution: IPolicyContribution
 
   /**
    * Prepare inside native installation and register rollback ownership before returning to caller
@@ -348,30 +337,29 @@ export class LogPolicyInstallation {
   constructor(core: ILogPluginCore, contribution: IPolicyContribution) {
     this.#scope = (core as ILogPluginCore & ILogDomainCore)[logCoreOwner].featureScope
     this.#signal = core.lifecycle.signal
-    this.#contribution = contribution
     this.#scope.prepare(this.#signal, contribution)
     try {
       core.onDispose(() => this.close())
     } catch (error) {
-      this.#scope.remove(this.#signal, contribution)
+      this.#scope.remove(this.#signal)
       throw error
     }
   }
   /** The authoring helper calls this only after its install callback and extension assembly succeed. */
   commit(): void {
-    this.#scope.commit(this.#signal, this.#contribution)
+    this.#scope.commit(this.#signal)
   }
   /** Restore cached behavior using the exact original feature instances. */
   enable(): void {
-    this.#scope.enable(this.#signal, this.#contribution)
+    this.#scope.enable(this.#signal)
   }
   /** Withdraw ready behavior while retaining the native registration's declarations. */
   disable(): void {
-    this.#scope.disable(this.#signal, this.#contribution)
+    this.#scope.disable(this.#signal)
   }
   /** Native rollback, removal and disposal share the same idempotent receipt. */
   close(): void {
-    this.#scope.remove(this.#signal, this.#contribution)
+    this.#scope.remove(this.#signal)
   }
 }
 
@@ -386,8 +374,8 @@ export function featureControlExtensions<N extends string, F extends ILogFeature
 ): ILogControlExtensions<N, F> {
   /** The native plugin owner validates and guards every enumerable extension data property. */
   const extensions: Record<string, unknown> = {}
+  // featureScope admitted every alias as a log feature when the plugin was defined.
   for (const alias of Object.keys(features)) {
-    if (!featureMetadata(features[alias]!)) continue
     /** Controls come from the same native instance as this alias's installed policy implementation. */
     const runtime = outputs[alias] as ILogFeatureRuntime<object>
     for (const method of Object.keys(runtime.controls))
