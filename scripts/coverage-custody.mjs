@@ -233,7 +233,11 @@ export const summaryMetrics = (summary) => {
   )
 }
 
-/** Refuse covered-count decreases, denominator expansion, or percentage decreases. */
+/**
+ * Refuse covered-count decreases or percentage decreases. A larger total is allowed: new code that
+ * keeps the percentage does not need a re-signed baseline, while new uncovered code still lowers
+ * the percentage and fails.
+ */
 export const assertMonotonic = (current, baseline, packageName) => {
   const metrics = Object.keys(current ?? {}).sort()
   if (metrics.length === 0) throw new Error(`${packageName} coverage baseline has no metrics`)
@@ -246,8 +250,6 @@ export const assertMonotonic = (current, baseline, packageName) => {
       throw new Error(
         `${packageName} ${metric} covered count decreased from ${old.covered} to ${now.covered}`
       )
-    if (now.total > old.total)
-      throw new Error(`${packageName} ${metric} total expanded from ${old.total} to ${now.total}`)
     if (now.pct < old.pct)
       throw new Error(`${packageName} ${metric} coverage decreased from ${old.pct} to ${now.pct}`)
   }

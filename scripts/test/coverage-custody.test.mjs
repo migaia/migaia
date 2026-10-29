@@ -47,15 +47,25 @@ test('coverage custody rejects covered-count decrease hidden by equal percentage
   )
 })
 
-test('coverage custody rejects denominator expansion hidden by equal percentage', () => {
+test('coverage custody accepts new code that keeps the percentage', () => {
+  assert.doesNotThrow(() =>
+    assertMonotonic(
+      { branches: metrics(16, 20, 80) },
+      { branches: metrics(8, 10, 80) },
+      '@migaia/example'
+    )
+  )
+})
+
+test('coverage custody rejects new uncovered code through the percentage', () => {
   assert.throws(
     () =>
       assertMonotonic(
-        { branches: metrics(16, 20, 80) },
+        { branches: metrics(8, 12, 66.67) },
         { branches: metrics(8, 10, 80) },
         '@migaia/example'
       ),
-    /expanded/
+    /coverage decreased/
   )
 })
 
