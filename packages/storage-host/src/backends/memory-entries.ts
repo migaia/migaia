@@ -83,7 +83,7 @@ export function holding<T>(namespaceContext: IMemoryNamespaceContext<T>): IConcu
     owner: namespaceContext.ownerId,
     label: namespaceContext.label,
     scope: 'local',
-    since: Date.now(),
+    since: namespaceContext.scheduler.now(),
     ...(namespaceContext.pid === undefined ? {} : { pid: namespaceContext.pid })
   }
 }
