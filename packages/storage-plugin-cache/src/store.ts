@@ -213,7 +213,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
     orgBinding: {
       backend: (orgId: string) => bind(cacheContext, orgId).store,
       drop: async (orgId: string) => {
-        await bind(cacheContext, orgId).erase('', true)
+        await projectionFor(cacheContext, orgId).erase('', true)
       }
     }
   }
@@ -255,8 +255,6 @@ export type ICacheOrganizationContext = {
   readonly cacheContext: ICacheBackendContext
   /** Original orgId belongs to this physical namespace. */
   readonly orgId: string
-
-  existing: IProjection | undefined
 
   ports: ReturnType<IStoragePluginCore['getOrgContext']>
 
@@ -304,14 +302,30 @@ export type ICacheOrganizationContext = {
 
   projection: IProjection
 }
+/** Return the registered org projection, creating and registering it on first local use. */
 function bind(cacheContext: ICacheBackendContext, orgId: string): IProjection {
+  /** A registered projection keeps its pending writes, flights and counters for this org. */
+  const existing = cacheContext.projections.get(orgId)
+  if (existing) return existing
+  /** First local use publishes the projection so later calls share its state. */
+  const projection = createProjection(cacheContext, orgId)
+  cacheContext.projections.set(orgId, projection)
+  return projection
+}
+
+/**
+ * Return the registered org projection, or an unregistered one for physical invalidation only.
+ * Change feeds and drop() can name orgs this process never uses; registering those would keep a
+ * projection per org for the store's lifetime.
+ */
+function projectionFor(cacheContext: ICacheBackendContext, orgId: string): IProjection {
+  return cacheContext.projections.get(orgId) ?? createProjection(cacheContext, orgId)
+}
+
+/** Build one org projection over the shared physical tiers without registering it. */
+function createProjection(cacheContext: ICacheBackendContext, orgId: string): IProjection {
   /** Initialize physical owners in original order before a store escapes. */
   const organizationContext = { cacheContext, orgId } as ICacheOrganizationContext
-  organizationContext.existing = organizationContext.cacheContext.projections.get(
-    organizationContext.orgId
-  )
-
-  if (organizationContext.existing) return organizationContext.existing
   organizationContext.ports = organizationContext.cacheContext.core.getOrgContext(
     organizationContext.orgId
   )
@@ -379,11 +393,6 @@ function bind(cacheContext: ICacheBackendContext, orgId: string): IProjection {
             )
     }
   }
-
-  organizationContext.cacheContext.projections.set(
-    organizationContext.orgId,
-    organizationContext.projection
-  )
   return organizationContext.projection
 }
 
@@ -440,7 +449,7 @@ function propagateCacheChange(
   const work =
     change.kind === 'reset' && change.orgId === undefined
       ? resetCacheFeed(cacheContext, index)
-      : bind(cacheContext, change.orgId ?? cacheContext.core.defaultOrgId).propagation(
+      : projectionFor(cacheContext, change.orgId ?? cacheContext.core.defaultOrgId).propagation(
           change,
           index
         )
@@ -493,7 +502,7 @@ class CacheDurableTail {
       if (this.#needsReset || (change.kind === 'reset' && change.orgId === undefined))
         await this.#reset()
       else
-        await bind(
+        await projectionFor(
           this.#cacheContext,
           change.orgId ?? this.#cacheContext.core.defaultOrgId
         ).propagation(change, this.#index)
