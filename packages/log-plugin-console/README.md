@@ -7,8 +7,10 @@ import { createLogHost, levelPlugin } from '@migaia/log-host'
 import { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'
 
 const log = createLogHost({
-  plugins: [levelPlugin(), consolePlugin()],
-  features: [prettyFeature({ color: 'auto' })]
+  plugins: [
+    levelPlugin(),
+    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })
+  ]
 })
 log.info('server ready', { port: 3000 })
 await log.flush()
@@ -26,3 +28,5 @@ await log.shutdown('manual')
 完整选项与覆盖示例见 [使用指南](./USEGUIDE.md)。
 
 meta 保留 host 入口的浅复制语义；同一对象同时作为 args 与 meta 传入时，原 args 对象与额外 meta 副本都会交给控制台。
+
+`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `console_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `console_threshold_setLevel`。全局默认策略由 `@migaia/log-host/plugin` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。

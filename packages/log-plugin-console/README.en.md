@@ -7,8 +7,10 @@ import { createLogHost, levelPlugin } from '@migaia/log-host'
 import { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'
 
 const log = createLogHost({
-  plugins: [levelPlugin(), consolePlugin()],
-  features: [prettyFeature({ color: 'auto' })]
+  plugins: [
+    levelPlugin(),
+    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })
+  ]
 })
 log.info('server ready', { port: 3000 })
 await log.flush()
@@ -26,3 +28,5 @@ Runtime exports are `consolePlugin`, `prettyFeature`, `ConsoleColorMode` and the
 See the [usage guide](./USEGUIDE.en.md) for options and scope examples.
 
 Meta retains the host entry’s shallow-copy boundary. Passing the same object in args and as meta delivers both the original argument and an additional meta copy to the console.
+
+`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `console_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `console_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/plugin`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported.

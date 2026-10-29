@@ -21,13 +21,23 @@ await log.shutdown('manual')
 
 ```ts
 import { createLogHost, levelPlugin } from '@migaia/log-host'
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { thresholdFeature, uuidFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 
 /** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */
 const log = createLogHost({
-  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],
-  plugins: [levelPlugin(), consolePlugin()]
+  plugins: [
+    defineLogPlugin({
+      name: 'policy',
+      features: {
+        threshold: thresholdFeature({ level: 'info' }),
+        uuid: uuidFeature({ display: false })
+      }
+    }),
+    levelPlugin(),
+    consolePlugin()
+  ]
 })
 log.debug('filtered by this output')
 log.info('accepted')
@@ -36,7 +46,9 @@ await log.shutdown('manual')
 
 内置 feature：`thresholdFeature`、`filterFeature`、`uuidFeature`、`formatFeature`、`batchFeature`、`retryFeature`、`timeoutFeature`。支持汇总入口 `./features` 和各自的默认导出，例如 `./features/retry`。
 
-输出级同 kind 策略覆盖 host 默认值。每个作用域只允许一个 format，无论 kind 是否相同；输出级 format 覆盖 host format。交付顺序固定为门槛、过滤、自定义 gate、格式、批量、重试、超时、输出，与内置 feature 的数组顺序无关。
+feature 工厂返回 `@migaia/plugin-host` 的原生 opaque 定义，不暴露 descriptor 字段或控制方法。`defineLogPlugin` 基于 `definePlugin` 组装普通 host-wide 插件；`createLogHost` 只通过 `plugins` 接收策略。`features` 一律使用 `{ alias: feature }` record。每次插件安装独立创建状态，控制通过 `${pluginName}_${alias}_${method}` 扩展调用，例如 `log.policy_threshold_setLevel('warn')`。
+
+输出插件的 features 只作用于自身，并仅覆盖 host-wide record 中同 key 的 feature。不同 key 的 gate 都会执行，即使来自同一工厂；多个 host-wide carrier 声明同 key 时冲突。执行按 entry、gate、format、batch、retry、timeout、输出阶段组织，gate 保留有效 record 声明顺序。每个输出在实际安装、按 key 覆盖后，最多有一个有效 format，以及各一个 batch、retry、timeout；冲突使用既有 `INVALID_OPTION`。没有有效显式 format 时才采用输出默认格式。
 
 输出可声明 `consumesText: false`，只接收原条目与取消信号，跳过 host 格式阶段；该输出不能配置 format 或 defaultFormat。条目处理、gate 与交付策略照常执行。
 
@@ -50,12 +62,12 @@ await log.shutdown('manual')
 
 ## 入口
 
-| 入口                               | 用途                                                                              |
-| ---------------------------------- | --------------------------------------------------------------------------------- |
-| `@migaia/log-host`                 | `createLogHost`、`levelPlugin`、`forwardPlugin`、状态、默认 reporter 与 host 类型 |
-| `@migaia/log-host/plugin`          | `defineLogFeature`、`defineOutputPlugin`、`projectLogEntry` 与插件作者类型        |
-| `@migaia/log-host/features`        | 七个内置 feature                                                                  |
-| `@migaia/log-host/features/<name>` | 对应 feature 的默认导出                                                           |
+| 入口                               | 用途                                                                                          |
+| ---------------------------------- | --------------------------------------------------------------------------------------------- |
+| `@migaia/log-host`                 | `createLogHost`、`levelPlugin`、`forwardPlugin`、状态、默认 reporter 与 host 类型             |
+| `@migaia/log-host/plugin`          | `defineLogFeature`、`defineLogPlugin`、`defineOutputPlugin`、`projectLogEntry` 与插件作者类型 |
+| `@migaia/log-host/features`        | 七个内置 feature                                                                              |
+| `@migaia/log-host/features/<name>` | 对应 feature 的默认导出                                                                       |
 
 host 不内置输出端，不依赖第三方运行时包。底层能力来自 `@migaia/plugin-host`、`@migaia/middleware-pipeline`、`@migaia/lifecycle`、`@migaia/event-subscriber` 与 `@migaia/utils`。
 

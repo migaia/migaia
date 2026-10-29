@@ -19,7 +19,7 @@ await log.flush()
 await log.shutdown('manual')
 ```
 
-Options are `plugins`, `features`, `context`, `topic`, `maxPending`, `scheduler`, `randomUUID`, `report` and plugin-host `execution`. The scheduler defaults to utils `systemScheduler`; UUID generation defaults to `globalThis.crypto.randomUUID()`. Both may be injected per host.
+Options are `plugins`, `context`, `topic`, `maxPending`, `scheduler`, `randomUUID`, `report` and plugin-host `execution`. The scheduler defaults to utils `systemScheduler`; UUID generation defaults to `globalThis.crypto.randomUUID()`. Both may be injected per host.
 
 An injected scheduler must run callbacks after `schedule()` returns its receipt. Callbacks invoked synchronously before the receipt is returned are unsupported.
 
@@ -31,22 +31,29 @@ The host facade and top-level context containers are frozen. Nested user values 
 
 ```ts
 import { createLogHost, levelPlugin } from '@migaia/log-host'
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 
-/** Reusing this descriptor deliberately shares its live threshold state. */
+/** A cold definition can be reused; each plugin installation owns its live threshold state. */
 const threshold = thresholdFeature({ level: 'warn' })
-/** Every added filter has an independently revocable registration. */
+/** The cold filter has no controls; its installed plugin extension provides add. */
 const filters = filterFeature()
 /** Entry enrichment runs once per entry at host scope. */
 const log = createLogHost({
-  features: [threshold, filters, uuidFeature({ display: false })],
-  plugins: [levelPlugin(), consolePlugin()]
+  plugins: [
+    defineLogPlugin({
+      name: 'policy',
+      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }
+    }),
+    levelPlugin(),
+    consolePlugin()
+  ]
 })
 /** Revocation removes only this added occurrence. */
-const off = filters.add((entry) => entry.message !== 'hidden')
+const off = log.policy_filter_add((entry) => entry.message !== 'hidden')
 log.atLevel('error', { tag: 'storage', message: 'write failed' })
-threshold.setLevel('debug')
+log.policy_threshold_setLevel('debug')
 off()
 await log.shutdown('manual')
 ```
@@ -55,19 +62,19 @@ Unknown tags bypass only the standard level threshold. `atLevel()` keeps the bus
 
 ## Output scopes and delivery
 
-The fixed order is threshold, filter, custom gates, format, batch, retry, timeout and transport, independently of built-in descriptor array order. Output-local policies replace host defaults of the same kind. Surviving host gates precede local gates, retaining each scope's declaration order. Entry features are allowed only at host scope.
+Entry features execute once at host ingress. Each output then follows gate, format, batch, retry, timeout and transport phases, retaining effective record declaration order within the gate phase. `defineLogPlugin({ name, features })` installs host-wide policy through native `definePlugin`. `createLogHost` has no `features` option; policies arrive through caller-declared plugins. `defineOutputPlugin` policies apply only to their own output. Both use `{ alias: feature }` records in property declaration order. The record key is the only feature name: output `features.<key>` overrides only the same host-wide key. Different keys retain both features even when they use the same factory; `{ a: thresholdFeature(), b: thresholdFeature() }` applies both gates. Surviving host gates precede local gates in declaration order. Entry features belong only to host-wide carriers.
 
-Duplicate kinds fail at creation with `INVALID_OPTION`. A scope also admits at most one format, regardless of kind. Across scopes, selection is output explicit format, host explicit format, then the output's `defaultFormat`.
+Keys within a record are unique. Two host-wide carriers declaring the same key use the existing name-conflict error path. At actual installation, each output merges host and local features by key and admits at most one effective format and one each of batch, retry and timeout. Different keys do not override one another; singular-slot collisions use the existing `INVALID_OPTION`, including during dynamic `use()`. The output's `defaultFormat` applies only when no explicit formatter survives.
 
-| Feature                               | Behavior                                                |
-| ------------------------------------- | ------------------------------------------------------- |
-| `thresholdFeature({ level })`         | Standard level threshold with `setLevel()`              |
-| `filterFeature({ filters })`          | Ordered predicates and independently revocable `add()`  |
-| `uuidFeature({ display })`            | Entry enrichment using the installing host's generator  |
-| `formatFeature({ format })`           | Shared `json` or uncolored `plain` rendering            |
-| `batchFeature(options)`               | Bounded buffering and output draining                   |
-| `retryFeature({ attempts, backoff })` | Canonical utils retry; attempts includes the first call |
-| `timeoutFeature({ ms })`              | Canonical utils timeout for one attempt                 |
+| Feature                               | Behavior                                                                                    |
+| ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `thresholdFeature({ level })`         | Standard threshold; installed `${pluginName}_${alias}_setLevel()` control                   |
+| `filterFeature({ filters })`          | Ordered predicates; installed `${pluginName}_${alias}_add()` returns an independent remover |
+| `uuidFeature({ display })`            | Entry enrichment using the installing host's generator                                      |
+| `formatFeature({ format })`           | Shared `json` or uncolored `plain` rendering                                                |
+| `batchFeature(options)`               | Bounded buffering and output draining                                                       |
+| `retryFeature({ attempts, backoff })` | Canonical utils retry; attempts includes the first call                                     |
+| `timeoutFeature({ ms })`              | Canonical utils timeout for one attempt                                                     |
 
 Batch defaults are `maxSize: 20`, `maxWaitMs: 2000`, `maxConcurrentBatches: 1`, `maxPendingBatches: 1024` and `drainTimeoutMs: 3000`. Capacity counts queued and active batches. Overflow drops the oldest queued batch, or the incoming batch when every slot is active, and reports `BATCH_OVERFLOW` with `detail.dropped`. Output removal drains its final buffer before revoking the registration signal used for delivery.
 
@@ -89,7 +96,7 @@ const output = defineOutputPlugin({
   name: 'memory-output',
   batchable: true,
   defaultFormat: 'json',
-  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],
+  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },
   deliver(records) {
     for (const record of records) lines.push(record.text)
   }
@@ -102,13 +109,13 @@ await log.flush()
 await log.shutdown('manual')
 ```
 
-`deliver` receives readonly records and `{ signal, format }`. Each record carries native entry and selected text. `context.format` is the exact selected descriptor, allowing a pretty output owner to recognize its own format without guessing text or repeating priority resolution.
+`deliver` receives readonly records and `{ signal, format }`. Each record carries native entry and selected text. `context.format` is the selected installed formatter implementation, rather than the cold feature token. Observe its formatter or optional pretty-rendering behavior instead of comparing token identity.
 
 Set `consumesText: false` and omit `defaultFormat` for an entry-only output. Its callback receives records containing only `entry` and a context containing only `signal`. Host formatting is skipped for that output; configuring any output-local format throws `INVALID_OPTION` at creation. Entry features, gates, batching, retry and timeout still apply. Omitting `consumesText` keeps the existing text callback types and required defaultFormat.
 
-Optional `install(core)` returns precisely inferred extensions on the initial host and dynamic plugin handles. Other plugins use `ILogPlugin`. The real core provides scoped config, lifecycle, scheduler, install-owned resources, sinks, failures, deferred work, flush and shutdown. Plugin-host retains rollback and resource ownership.
+`defineLogPlugin` and `defineOutputPlugin` declare real native `features` records. Their optional `install(core)` reads native outputs through `core.features[alias]` and returns precisely inferred host and dynamic-handle extensions. Filter and threshold controls automatically use `${pluginName}_${alias}_${method}` names; plugin-host rejects duplicate complete extension names. Reusing a token never shares mutable state between plugin or host installations. A carrier control affects every output inheriting that carrier policy. The real core provides scoped config, lifecycle, scheduler, install-owned resources, sinks, failures, deferred work, flush and shutdown. Plugin-host retains rollback and resource ownership.
 
-Use `defineLogFeature()` to issue complete entry, gate or format implementations. Delivery descriptors are internal to built-in batch/retry/timeout factories. Descriptors are frozen; object literals, shallow copies and type assertions cannot manufacture runtime issuance.
+Use `defineLogFeature()` for a complete entry, gate or format implementation, for example `defineLogFeature({ phase: 'gate', accept: () => true })`. Delivery remains limited to built-in batch/retry/timeout factories. Every factory returns an opaque native `defineFeature` token without phase, stage, setLevel or add fields. The definition accepts no feature name; the record key supplies it. Package-private metadata describes phase and scope rules and identifies only the three built-in singular delivery policies; native installation outputs own state and controls. Object literals, shallow copies and type assertions cannot manufacture plugin-host identity.
 
 ## Errors and lifecycle
 
@@ -162,6 +169,7 @@ Runtime logging, flush and shutdown failures use the failure channel instead of 
 ```ts doc-test=run
 import assert from 'node:assert/strict'
 import { createLogHost, levelPlugin } from '@migaia/log-host'
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import {
   batchFeature,
   formatFeature,
@@ -186,15 +194,18 @@ const target = {
     this.log(text)
   }
 }
-/** Host features own delivery policy; each transport only owns its destination. */
+/** An ordinary carrier declares delivery policy; each transport owns its destination. */
 const log = createLogHost({
-  features: [
-    formatFeature({ format: 'json' }),
-    batchFeature({ maxSize: 2 }),
-    retryFeature({ attempts: 2, backoff: 0 }),
-    timeoutFeature({ ms: 10000 })
-  ],
   plugins: [
+    defineLogPlugin({
+      name: 'policy',
+      features: {
+        format: formatFeature({ format: 'json' }),
+        batch: batchFeature({ maxSize: 2 }),
+        retry: retryFeature({ attempts: 2, backoff: 0 }),
+        timeout: timeoutFeature({ ms: 10000 })
+      }
+    }),
     levelPlugin(),
     consolePlugin({ console: target }),
     httpPlugin({

@@ -19,7 +19,7 @@ await log.flush()
 await log.shutdown('manual')
 ```
 
-选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。
+选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。
 
 注入的调度器必须在 `schedule()` 返回 receipt 后才运行 callback；返回之前同步调用 callback 不在支持范围内。
 
@@ -31,22 +31,29 @@ host 门面被冻结。`ctx` 的顶层容器、上下文路径与环境标记也
 
 ```ts
 import { createLogHost, levelPlugin } from '@migaia/log-host'
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 
-/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */
+/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */
 const threshold = thresholdFeature({ level: 'warn' })
-/** 每个 add 返回的撤销函数只移除该次注册。 */
+/** filter 定义不包含控制；安装后的插件扩展提供 add。 */
 const filters = filterFeature()
 /** entry feature 只在 host 级执行一次。 */
 const log = createLogHost({
-  features: [threshold, filters, uuidFeature({ display: false })],
-  plugins: [levelPlugin(), consolePlugin()]
+  plugins: [
+    defineLogPlugin({
+      name: 'policy',
+      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }
+    }),
+    levelPlugin(),
+    consolePlugin()
+  ]
 })
 /** 这一过滤器与其它注册保持独立。 */
-const off = filters.add((entry) => entry.message !== 'hidden')
+const off = log.policy_filter_add((entry) => entry.message !== 'hidden')
 log.atLevel('error', { tag: 'storage', message: 'write failed' })
-threshold.setLevel('debug')
+log.policy_threshold_setLevel('debug')
 off()
 await log.shutdown('manual')
 ```
@@ -55,21 +62,23 @@ await log.shutdown('manual')
 
 ## 输出策略与作用域
 
-每个输出端按门槛、过滤、自定义 gate、格式、批量、重试、超时、实际输出的固定顺序交付。内置 feature 的数组顺序不会改变这条顺序。
+entry 在 host 入口执行一次；每个输出端随后按 gate、format、batch、retry、timeout、实际输出的阶段顺序交付。同一 gate 阶段保留有效 record 的声明顺序，不用工厂类别决定名称或覆盖。
 
-host 级 output feature 是默认值，输出级相同 kind 的 feature 覆盖它。未覆盖的 host 自定义 gate 先运行，输出级 gate 随后按声明顺序运行。entry feature 只允许装在 host 级。
+`defineLogPlugin({ name, features })` 通过原生 `definePlugin` 安装 host-wide 策略。`createLogHost` 没有 `features` 选项；所有策略随调用者声明的插件进入。`defineOutputPlugin` 的策略只作用于自己的输出。两者一律使用 `{ alias: feature }` record，保留属性声明顺序。
 
-同一作用域重复 kind 会在创建时抛 `INVALID_OPTION`。format 还按阶段唯一：即使 kind 不同，一个作用域也只允许一个 format。跨作用域允许各有一个，最终优先级是输出级显式 format、host 级显式 format、输出插件 `defaultFormat`。
+record key 是唯一名称：输出级 `features.<key>` 仅覆盖 host-wide 同 key 的 feature。不同 key 即使使用同一工厂也都保留，例如 `{ a: thresholdFeature(), b: thresholdFeature() }` 会应用两个 gate。未覆盖的 host gate 先运行，输出级 gate 随后按声明顺序运行。entry feature 只允许装在 host-wide carrier。
 
-| Feature                               | 作用                                                       |
-| ------------------------------------- | ---------------------------------------------------------- |
-| `thresholdFeature({ level })`         | 标准级别门槛，支持 `setLevel()`                            |
-| `filterFeature({ filters })`          | 按顺序运行 predicates，任一返回 false 即停止；支持 `add()` |
-| `uuidFeature({ display })`            | 用当前 host 的生成器丰富条目                               |
-| `formatFeature({ format })`           | `json` 或不着色的 `plain` 文本                             |
-| `batchFeature(options)`               | 为可批量输出端提供有界缓冲与排空                           |
-| `retryFeature({ attempts, backoff })` | 基于 utils retry；attempts 是含首次调用的总次数            |
-| `timeoutFeature({ ms })`              | 基于 utils withTimeout 限制一次交付                        |
+一个 record 内 key 天然唯一；多个 host-wide carrier 声明同 key 时使用既有名称冲突错误路径。所有输出各自在实际安装时按 key 合并 host/local，随后检查单一执行槽：最多一个有效 format，以及各一个 batch、retry、timeout。不同 key 不会互相覆盖，违反单一槽约束以既有 `INVALID_OPTION` 拒绝，动态 `use()` 也执行这项安装校验。没有有效显式 format 时采用输出插件的 `defaultFormat`。
+
+| Feature                               | 作用                                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------------- |
+| `thresholdFeature({ level })`         | 标准级别门槛，安装后暴露 `${pluginName}_${alias}_setLevel()`                       |
+| `filterFeature({ filters })`          | 按顺序运行 predicates；安装后暴露 `${pluginName}_${alias}_add()`，返回独立撤销函数 |
+| `uuidFeature({ display })`            | 用当前 host 的生成器丰富条目                                                       |
+| `formatFeature({ format })`           | `json` 或不着色的 `plain` 文本                                                     |
+| `batchFeature(options)`               | 为可批量输出端提供有界缓冲与排空                                                   |
+| `retryFeature({ attempts, backoff })` | 基于 utils retry；attempts 是含首次调用的总次数                                    |
+| `timeoutFeature({ ms })`              | 基于 utils withTimeout 限制一次交付                                                |
 
 batch 默认 `maxSize: 20`、`maxWaitMs: 2000`、`maxConcurrentBatches: 1`、`maxPendingBatches: 1024`、`drainTimeoutMs: 3000`。容量同时计入排队和执行中的批次；满时丢弃最旧的排队批次，若所有槽位都在执行中则丢弃传入批次，并报告带 `detail.dropped` 的 `BATCH_OVERFLOW`。移除输出插件时先排空最后缓冲，再撤销交付所用的注册 signal。
 
@@ -91,7 +100,7 @@ const output = defineOutputPlugin({
   name: 'memory-output',
   batchable: true,
   defaultFormat: 'json',
-  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],
+  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },
   deliver(records) {
     for (const record of records) lines.push(record.text)
   }
@@ -104,13 +113,13 @@ await log.flush()
 await log.shutdown('manual')
 ```
 
-`deliver` 接收 `readonly ILogOutputRecord[]` 和只读 `{ signal, format }`。record 同时包含原生 `entry` 与已选格式的 `text`。context.format 与最终选中的 descriptor 是同一个对象。输出包可由自己的 pretty descriptor 身份选择原生参数渲染，不猜测文本或重做格式优先级。
+`deliver` 接收 `readonly ILogOutputRecord[]` 和只读 `{ signal, format }`。record 同时包含原生 `entry` 与已选格式的 `text`。`context.format` 是实际安装后的 formatter implementation，不是冷 feature token；通过其格式函数或可选 pretty 渲染能力观察行为，不比较 token 身份。
 
 不消费文本的输出声明 `consumesText: false` 并省略 `defaultFormat`。其回调收到只含 `entry` 的 record 与只含 `signal` 的 context；host 跳过该输出的格式阶段，输出级配置任何 format 都在创建时抛 `INVALID_OPTION`。entry、gate、批量、重试与超时照常执行。省略 consumesText 则保留原文本回调类型与必填 defaultFormat。
 
-`defineOutputPlugin` 的可选 `install(core)` 返回扩展对象，host 与动态 use 句柄会保留其精确类型。非输出插件使用 `ILogPlugin` 形状。插件 core 提供安装期资源登记、scoped config、lifecycle、scheduler、sink、failure、defer、flush 与 shutdown 能力；资源通过真实 plugin-host 生命周期回滚与释放。
+`defineLogPlugin` 与 `defineOutputPlugin` 都在真实 native `features` record 中声明 feature；可选 `install(core)` 通过 `core.features[alias]` 读取原生安装输出并返回扩展。host 与动态 use 句柄保留扩展的精确类型。filter/threshold 的控制自动以 `${pluginName}_${alias}_${method}` 命名暴露，完整扩展重名由 plugin-host 拒绝。复用同一 token 不会共享不同插件或 host 的可变状态；一个 carrier 的控制会影响所有继承其默认策略的输出。插件 core 提供安装期资源登记、scoped config、lifecycle、scheduler、sink、failure、defer、flush 与 shutdown 能力；资源通过真实 plugin-host 生命周期回滚与释放。
 
-第三方 feature 用 `defineLogFeature()` 签发，完整实现 entry、gate 或 format 中一种。delivery 阶段只由内置 batch/retry/timeout 工厂提供。描述对象被冻结；普通字面量、浅复制和类型断言都不能制造运行期签发身份。
+第三方使用 `defineLogFeature()`，完整实现 entry、gate 或 format 中一种，例如 `defineLogFeature({ phase: 'gate', accept: () => true })`；delivery 只由内置 batch/retry/timeout 工厂提供。所有工厂返回真实 `defineFeature` 原生 opaque token，不带 phase、stage、setLevel 或 add 字段。定义不接受名称字段，名称仅来自 record key。phase 与作用域规则留在 log metadata；三个内置交付工厂的单一槽身份也只保存在私有 metadata；状态和控制由原生 install 输出拥有。普通字面量、浅复制和类型断言都不能制造 plugin-host 身份。
 
 ## 错误投影与失败通道
 
@@ -164,6 +173,7 @@ await log.shutdown('manual')
 ```ts doc-test=run
 import assert from 'node:assert/strict'
 import { createLogHost, levelPlugin } from '@migaia/log-host'
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import {
   batchFeature,
   formatFeature,
@@ -188,15 +198,18 @@ const target = {
     this.log(text)
   }
 }
-/** Host features own delivery policy; each transport only owns its destination. */
+/** An ordinary carrier declares delivery policy; each transport owns its destination. */
 const log = createLogHost({
-  features: [
-    formatFeature({ format: 'json' }),
-    batchFeature({ maxSize: 2 }),
-    retryFeature({ attempts: 2, backoff: 0 }),
-    timeoutFeature({ ms: 10000 })
-  ],
   plugins: [
+    defineLogPlugin({
+      name: 'policy',
+      features: {
+        format: formatFeature({ format: 'json' }),
+        batch: batchFeature({ maxSize: 2 }),
+        retry: retryFeature({ attempts: 2, backoff: 0 }),
+        timeout: timeoutFeature({ ms: 10000 })
+      }
+    }),
     levelPlugin(),
     consolePlugin({ console: target }),
     httpPlugin({

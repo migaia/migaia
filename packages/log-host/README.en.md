@@ -21,13 +21,23 @@ Output has not started when `info()` returns. `flush()` drains admitted entries,
 
 ```ts
 import { createLogHost, levelPlugin } from '@migaia/log-host'
+import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { thresholdFeature, uuidFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 
 /** Host policies are output defaults; entry enrichment executes once per entry. */
 const log = createLogHost({
-  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],
-  plugins: [levelPlugin(), consolePlugin()]
+  plugins: [
+    defineLogPlugin({
+      name: 'policy',
+      features: {
+        threshold: thresholdFeature({ level: 'info' }),
+        uuid: uuidFeature({ display: false })
+      }
+    }),
+    levelPlugin(),
+    consolePlugin()
+  ]
 })
 log.debug('filtered by this output')
 log.info('accepted')
@@ -36,7 +46,9 @@ await log.shutdown('manual')
 
 Built-ins are `thresholdFeature`, `filterFeature`, `uuidFeature`, `formatFeature`, `batchFeature`, `retryFeature` and `timeoutFeature`. Import them together from `./features` or use individual default exports such as `./features/retry`.
 
-Output-local policies replace host defaults of the same kind. Each scope admits one format regardless of kind; an output format replaces the host format. The fixed delivery order is threshold, filter, custom gates, format, batch, retry, timeout and transport, independently of built-in descriptor array order.
+Feature factories return opaque native `@migaia/plugin-host` definitions without descriptor fields or controls. `defineLogPlugin` uses `definePlugin` to assemble an ordinary host-wide plugin; `createLogHost` receives policies only through `plugins`. Every `features` declaration uses a `{ alias: feature }` record. Each plugin installation owns independent state. Controls are plugin extensions named `${pluginName}_${alias}_${method}`, for example `log.policy_threshold_setLevel('warn')`.
+
+Features on an output plugin apply only to that output and override only the same host-wide record key. Gates under different keys both execute, including two instances of the same factory. Two host-wide carriers cannot declare the same key. Execution follows entry, gate, format, batch, retry, timeout and transport phases, retaining effective record order within the gate phase. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout. Collisions use the existing `INVALID_OPTION`. The output default format applies only when no explicit format survives.
 
 An output can declare `consumesText: false` to receive entries and a cancellation signal while skipping host formatting. It cannot configure a format or defaultFormat. Entry processing, gates and delivery policies still apply.
 
@@ -50,12 +62,12 @@ An output can declare `consumesText: false` to receive entries and a cancellatio
 
 ## Entries
 
-| Entry                              | Purpose                                                                      |
-| ---------------------------------- | ---------------------------------------------------------------------------- |
-| `@migaia/log-host`                 | Host factory, level/forward plugins, status, default reporter and host types |
-| `@migaia/log-host/plugin`          | Feature/output definitions, shared error projection and plugin author types  |
-| `@migaia/log-host/features`        | All seven built-in features                                                  |
-| `@migaia/log-host/features/<name>` | The corresponding feature's default export                                   |
+| Entry                              | Purpose                                                                                               |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `@migaia/log-host`                 | Host factory, level/forward plugins, status, default reporter and host types                          |
+| `@migaia/log-host/plugin`          | `defineLogFeature`, `defineLogPlugin`, `defineOutputPlugin`, shared error projection and author types |
+| `@migaia/log-host/features`        | All seven built-in features                                                                           |
+| `@migaia/log-host/features/<name>` | The corresponding feature's default export                                                            |
 
 The host includes no output transport or third-party runtime dependency. It uses `@migaia/plugin-host`, `@migaia/middleware-pipeline`, `@migaia/lifecycle`, `@migaia/event-subscriber` and `@migaia/utils`.
 

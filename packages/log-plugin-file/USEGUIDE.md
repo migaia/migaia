@@ -29,7 +29,11 @@ const writer = new MemoryWriter()
 const log = createLogHost({
   plugins: [
     levelPlugin(),
-    filePlugin({ path: 'application.ndjson', writer, features: [batchFeature({ maxSize: 2 })] })
+    filePlugin({
+      path: 'application.ndjson',
+      writer,
+      features: { batch: batchFeature({ maxSize: 2 }) }
+    })
   ]
 })
 log.info('first')
@@ -57,3 +61,5 @@ Node/Bun 默认动态使用 `node:fs/promises.appendFile`；Deno 默认使用原
 ## 错误与关闭
 
 错误 source 为 `LOG_FILE_ERROR_SOURCE`（`logging.file`）。`INVALID_OPTION` 表示 path/轮转配置不合法；`FILE_SINK_UNAVAILABLE` 表示当前入口没有 writer；两者在创建时同步抛出。`DELIVERY_FAILED` 表示 append 或 rotate 失败，`cause` 保留原异常，失败经 host 的 `onFailure` 观察，日志方法不因此抛出。卸载不会关闭应用的 writer。
+
+`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `file_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `file_threshold_setLevel`。全局默认策略由 `@migaia/log-host/plugin` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。
