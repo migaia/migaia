@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { createLogHost } from '@migaia/log-host'
-import { batchFeature } from '@migaia/log-host/features'
+import { batchFeature, retryFeature } from '@migaia/log-host/features'
+import { walkErrorCauses } from '@migaia/utils/error'
 import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -130,3 +131,77 @@ async function nativeDeno(): Promise<void> {
   await host.shutdown('manual')
 }
 it('uses native Deno writeTextFile with append true', nativeDeno)
+
+/** A writer whose append and rotate outcomes are scripted per call. */
+class ScriptedWriter {
+  /** Every append attempt, including failed ones, in call order. */
+  readonly appends: string[] = []
+  /** Every rotation attempt in call order. */
+  readonly rotations: string[] = []
+  /** Errors thrown by the next append attempts, consumed front to back. */
+  readonly appendFailures: Error[] = []
+  /** Error thrown by every rotation attempt, if any. */
+  rotateFailure: Error | undefined
+  /** Record the attempt, then fail it when a scripted append failure is queued. */
+  async append(path: string): Promise<void> {
+    this.appends.push(path)
+    const failure = this.appendFailures.shift()
+    if (failure) throw failure
+  }
+  /** Record the attempt, then fail it when a rotation failure is scripted. */
+  async rotate(path: string): Promise<void> {
+    this.rotations.push(path)
+    if (this.rotateFailure) throw this.rotateFailure
+  }
+}
+
+/** Build a host whose file output rotates after every record and retries up to three times. */
+function retryingHost(writer: ScriptedWriter, reported: unknown[]) {
+  return createLogHost({
+    report: (error) => reported.push(error),
+    plugins: [
+      filePlugin({
+        path: 'retry.ndjson',
+        writer,
+        rotate: { maxEntries: 1 },
+        features: [retryFeature({ attempts: 3 })]
+      })
+    ]
+  })
+}
+
+/** A rotation failure after a committed append is reported once and never replays the append. */
+async function rotateFailureNotReplayed(): Promise<void> {
+  /** The append succeeds, so retrying would write the same record twice. */
+  const writer = new ScriptedWriter()
+  writer.rotateFailure = new Error('rotate-failed')
+  /** Failures the host hands to the report channel. */
+  const reported: unknown[] = []
+  const host = retryingHost(writer, reported)
+  host.log('info', 'once')
+  await host.flush()
+  expect(writer.appends).toHaveLength(1)
+  expect(writer.rotations).toHaveLength(1)
+  expect(reported).toHaveLength(1)
+  expect(reported[0]).toMatchObject({ source: 'logging.file', code: 'DELIVERY_FAILED' })
+  expect(walkErrorCauses(reported[0])).toContain(writer.rotateFailure)
+  await host.shutdown('manual')
+}
+it('does not replay a committed append when rotation fails', rotateFailureNotReplayed)
+
+/** An append failure stays retryable, so the next attempt delivers and then rotates. */
+async function appendFailureRetried(): Promise<void> {
+  /** Only the first append fails; nothing reached the file before the retry. */
+  const writer = new ScriptedWriter()
+  writer.appendFailures.push(new Error('append-failed'))
+  /** Failures the host hands to the report channel. */
+  const reported: unknown[] = []
+  const host = retryingHost(writer, reported)
+  host.log('info', 'retried')
+  await host.flush()
+  expect(writer.appends).toHaveLength(2)
+  expect(writer.rotations).toHaveLength(1)
+  expect(reported).toEqual([])
+  await host.shutdown('manual')
+}
+it('retries an append failure before rotating', appendFailureRetried)
