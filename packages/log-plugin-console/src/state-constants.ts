@@ -37,8 +37,5 @@ export const CONSOLE_PLUGIN_NAME = 'console'
 /** This private descriptor kind is identified by its factory-issued opaque object identity. */
 export const PRETTY_FEATURE_KIND = 'pretty'
 
-/** Completed reasoning entries use this portable data convention to suppress duplicate console text. */
-export const SILENT_DATA_KEY = 'silent'
-
 /** Forwarded display topics use the existing ordinary entry data field. */
 export const TOPIC_CHAIN_DATA_KEY = 'topicChain'

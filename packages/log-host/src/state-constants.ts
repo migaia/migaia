@@ -48,8 +48,13 @@ export const LogPluginName = { level: 'level', forward: 'forward' } as const
 export const explicitLevel = Symbol('log.level')
 /** Per-installation domain state is copied by the canonical plugin-core data boundary. */
 export const logCoreOwner = Symbol('log.core.owner')
-/** Existing public display data survives forwarding while traversal authority stays private. */
-export const LogEntryDataKey = { topicChain: 'topicChain' } as const
+/** Entry data keys shared by producers and outputs; the values are part of the plugin contract. */
+export const LogEntryDataKey = {
+  /** Existing public display data survives forwarding while traversal authority stays private. */
+  topicChain: 'topicChain',
+  /** A producer that already streamed the text sets this to true; console skips the entry. */
+  silent: 'silent'
+} as const
 /** The existing bounded lifecycle wait is shared by flush and shutdown. */
 export const DRAIN_TIMEOUT_MS = 3000
 /** Failure event provenance is shared by queue, lifecycle, forwarding and output owners. */

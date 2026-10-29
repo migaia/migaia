@@ -1,6 +1,7 @@
 import { LogLevel } from '@migaia/log-host'
 import {
   defineOutputPlugin,
+  LogEntryDataKey,
   type ILogFeature,
   type ILogOutputRecord,
   type ILogPlugin,
@@ -8,12 +9,7 @@ import {
 } from '@migaia/log-host/plugin'
 import { consoleProcess } from './environment.ts'
 import { prettyFeature, prettyRenderers } from './pretty.ts'
-import {
-  CONSOLE_PLUGIN_NAME,
-  ConsoleFormat,
-  ConsoleEnvironmentKey,
-  SILENT_DATA_KEY
-} from './state-constants.ts'
+import { CONSOLE_PLUGIN_NAME, ConsoleFormat, ConsoleEnvironmentKey } from './state-constants.ts'
 import type {
   IConsoleExtension,
   IConsoleOptions,
@@ -64,7 +60,7 @@ class ConsoleOutput {
     /** Only this package's factory-issued descriptor can select the native-argument path. */
     const pretty = prettyRenderers.get(format)
     for (const record of records) {
-      if (record.entry.data[SILENT_DATA_KEY]) continue
+      if (record.entry.data[LogEntryDataKey.silent]) continue
       /** Original message, args, meta and Error remain distinct values on the pretty path. */
       const args = pretty
         ? pretty.arguments(record.entry, Boolean(this.#stdout?.isTTY))

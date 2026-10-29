@@ -1,5 +1,5 @@
 import { detectServerRuntime } from '@migaia/utils'
-import type { ILogPlugin, ILogPluginCore } from '@migaia/log-host/plugin'
+import { LogEntryDataKey, type ILogPlugin, type ILogPluginCore } from '@migaia/log-host/plugin'
 import {
   DEFAULT_THINKING_LABEL,
   REASONING_PLUGIN_NAME,
@@ -136,7 +136,11 @@ class ReasoningInstallation {
     phase: ReasoningPhase,
     text: string
   ): void {
-    this.#core.dispatchRaw({ tag, message: text, data: { reasoningPhase: phase, silent: true } })
+    this.#core.dispatchRaw({
+      tag,
+      message: text,
+      data: { reasoningPhase: phase, [LogEntryDataKey.silent]: true }
+    })
   }
 
   /** Defer only when explicitly requested, using the host's existing tracked-work capability. */
