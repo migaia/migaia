@@ -450,3 +450,35 @@ for (const end of ['deadline', 'abort', 'failure'] as const) {
     else expect(counts.physical).toBeGreaterThan(0)
   })
 }
+
+/** A non-retryable failure after one physical replay still checks the original budget first. */
+it('rejects a callback failure that follows a physical replay', async () => {
+  const original = new Error('after-physical-replay')
+  const { store, pool, prefix, counts } = await installed(true)
+  const table = prefix + '_physical_then_fail'
+  await pool.query('CREATE TABLE ' + table + ' (id integer PRIMARY KEY,value integer NOT NULL)')
+  await pool.query('INSERT INTO ' + table + ' VALUES(1,0)')
+  let attempts = 0
+  const failure = await store
+    .transaction(
+      async (scope) => {
+        attempts += 1
+        if (attempts === 2) throw original
+        await scope.get('stable-revision')
+        await scope.sql`SELECT value FROM ${scope.sql.id(table)} WHERE id=1`.get()
+        await pool.query('UPDATE ' + table + ' SET value=value+1 WHERE id=1')
+        await scope.sql`UPDATE ${scope.sql.id(table)} SET value=value+1 WHERE id=1`.run()
+      },
+      {
+        concurrency: ConcurrencyPolicy.fail(),
+        lock: [lockKey.text('stable-revision')]
+      }
+    )
+    .then(
+      () => undefined,
+      (cause: unknown) => cause
+    )
+  expect(walkErrorCauses(failure)).toContain(original)
+  expect(attempts).toBe(2)
+  expect(counts.physical).toBe(1)
+})
