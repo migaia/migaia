@@ -510,14 +510,14 @@
     },
     "storage-plugin-postgres": {
       "lines": {
-        "covered": 2010,
+        "covered": 2011,
         "total": 2344,
-        "pct": 85.75
+        "pct": 85.79
       },
       "statements": {
-        "covered": 2178,
+        "covered": 2179,
         "total": 2647,
-        "pct": 82.28
+        "pct": 82.31
       },
       "functions": {
         "covered": 694,
@@ -525,9 +525,9 @@
         "pct": 85.67
       },
       "branches": {
-        "covered": 1243,
+        "covered": 1244,
         "total": 1634,
-        "pct": 76.07
+        "pct": 76.13
       }
     },
     "storage-plugin-qdrant": {
@@ -24998,14 +24998,14 @@
     },
     "packages/storage-plugin-postgres/src/transaction.ts": {
       "lines": {
-        "covered": 197,
+        "covered": 198,
         "total": 213,
-        "pct": 92.48
+        "pct": 92.95
       },
       "statements": {
-        "covered": 206,
+        "covered": 207,
         "total": 227,
-        "pct": 90.74
+        "pct": 91.18
       },
       "functions": {
         "covered": 40,
@@ -25013,9 +25013,9 @@
         "pct": 95.23
       },
       "branches": {
-        "covered": 122,
+        "covered": 123,
         "total": 148,
-        "pct": 82.43
+        "pct": 83.1
       }
     },
     "packages/storage-plugin-postgres/src/types.ts": {
@@ -34399,6 +34399,50 @@
   "deletedCoveragePackages": [
     "rpc"
   ],
+  "inputs": {
+    "capability": "cd30bb81a8bd1db8711fc071b1b906d847d0462fc55c5989cc83827234e5135e",
+    "event-subscriber": "bad9e35692d843ed4740dbe421a5c95e9c60ba896caf888040f04eb5a3504ed6",
+    "lifecycle": "9130db3b4add4c338e2e4bc2034d60239e3df1029cd99d2d935db4734284eedb",
+    "log-host": "6847dfccc7f9544ee30b3b8d12c92b75b190805a2c6d8bb29b36ade5f8c0fde4",
+    "log-plugin-console": "cb4ff825bae2bf892b4cf8a808b01d8992e18b988a24fbf4737baaf222c0658a",
+    "log-plugin-durable": "6688cc62d0918bec0cd7c6d19472c66112ec7e776720569851339d9d2f24ce74",
+    "log-plugin-file": "3d191962f34afcee8258aa0401b08dad6d5e3bd5d48bf5a9594ef1120f508c8a",
+    "log-plugin-http": "e421f0f4eaea04d223b07c30b61e7a1c258fd7b7aea4f9fa1cdae9244c935ae4",
+    "log-plugin-process": "828ffb52425d041d9dc365ac072eb9a7d983e552309355ba68bc6c3a479cc902",
+    "log-plugin-reasoning": "f63db7f19e6aafb49a1e63f8d3611587d64f1af55c77742883ca61e7461f6a03",
+    "micro-hub": "67384a82c3ae5bec0421fd9cc5af41a64e661c0ee804db874ea4c8b913544b5e",
+    "middleware-pipeline": "3ab11a4182dae687c013ba799cf96fbd9f8f5a9faa4bb148afddb7bd62a2ffea",
+    "plugin-host": "9bd66b07282a77c034f2a5bd6a9edbefb7ed1925c95141674271ba4015abfd0e",
+    "reactive": "0ffa81171fb46472703974335fa90fffbb2b7b2e026b9d6b95899ece90d9be74",
+    "resource": "c6d8a191d001a0072b6c7e4dd2c6217c637a13a6496e10cdf2dc214a04aeff58",
+    "rpc-family": "5813606f6b8b252e690169aab679985a4a4f0ceab4fb5843e4b7e33611f759d6",
+    "serialize": "eb5436a39a9b2ef6cedbc6f45b6f22b157546ba7ae5c0a84ccf077419d363ede",
+    "storage-contract": "effc02972165c3d66265e56a0c5b9e24a342ea53a52bfddafa81eb5fe48cf619",
+    "storage-host": "9cde022b069c3cdf95fb518a94227f94f839a30a496d2fd9dc1227aed77dd54b",
+    "storage-plugin-archive": "c224ff7589adb0ca0cd5eaa7ed9761afb1ded402362566fa9978c72eb728271b",
+    "storage-plugin-browser": "da0c3142a5b36332f6d7d21d645662f140b5119c49974f85b3f5daf21da3ede9",
+    "storage-plugin-cache": "29f0bd206edbd53160fa212873e5b1c71309036a8a31495b745ca60db63bf625",
+    "storage-plugin-object": "2f5fb022b8632c25218d4075865f4bbcf73e59839787c8c167fca2dff0d46235",
+    "storage-plugin-postgres": "81f38101615234002de07d168a88471b7f4b65f9b5aece97f2164fb2f4fb3fb8",
+    "storage-plugin-qdrant": "8a0413462286f30db276876292443d7d19d41745d08a2fafe665ed9bed5aac6a",
+    "storage-plugin-redis": "4335964408cdf84cb5ce51110d4a85a3c28ee4ac17b5a9b631eb9dc9a276348f",
+    "storage-plugin-sparql": "5b1dd5e8429bf8758d6ea4a03aaed19674d7880a9c749f1dc799dc521205a32f",
+    "storage-plugin-sqlite": "d7299c6219f16d5b1c17cafba7e050f030065f63527711bdffca5c8c6e387cd9",
+    "store-devtools": "f8703532d9cd89fc7da2a92de9edb33f58baafafeb04fdeb1a9c1fc6253d89e2",
+    "store-indexed": "816f0a44cc2bbd4e82456209f55305b3611281172aef36fc13101e053fd26e53",
+    "store-keyed": "e6ee7130bfeeeee8cb423349ca0f494bd75e889019b2a1783c3c9091b9e04cef",
+    "store-light": "30415e4eea70721b65db8e557eabf186001a1704bf16a54cbf1cc137219efcc3",
+    "store-middleware": "2b8cca44d80507662a7df6357e117ac516904f9835d95c81bf5e071768be1a92",
+    "store-persist": "b09457ea38a5351e01e04984df85b88473772f0359c9b26fa943330d6e4a2edf",
+    "store-react": "fc1cd4c1a3bd91550f90844318cad45de0081431cefb264fde3b5480872175e3",
+    "store-shared": "d01760b4ed5ed57ae316db35685c657a0aae2f58592354125cbe74bc28c4861a",
+    "store-ssr": "9604ba692b70edc61c0e15c13d4be66eb966892614979defe87b47fc304fe609",
+    "store-wasm": "5b1e5d26fb750a03639aaec00e0778d114d9d78d806ff1b912778a53ab2f7023",
+    "store-worker": "546d1818b67acf3df6fc8aefd00a6acced6a3a0061270bfb369e1abd5b04968c",
+    "supervision": "cc9c79d58a6d8004e34e37c411208a135e27c24f3c7617c1325f871d3e9fb99c",
+    "tray": "af5b067f5f22af9f3f4ca151b29ced0b037cf60d2cc2eb85c764b8e22f58ec5e",
+    "utils": "a45a45b5a9d2a93f04a873fff1c63ac1e36ab3f25c9e83e21596bf0e8e7f85f8"
+  },
   "baselineInventoryDrift": {
     "missing": [],
     "unexpected": []
