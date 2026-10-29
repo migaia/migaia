@@ -493,23 +493,30 @@ export class LogHost {
       /** A shutdown supplies its existing absolute deadline rather than receiving another budget. */
       const deadlineAt = deadline ?? this.scheduler.now() + DRAIN_TIMEOUT_MS
       await this.#drain(deadlineAt)
+      /** A flusher that misses or is skipped by the deadline is not part of host pending work. */
+      let flushersTimedOut = false
       await withSnapshotEntries(this.#flushers, undefined, async (entries) => {
         for (const invocation of entries) {
-          if (this.scheduler.now() >= deadlineAt) break
+          if (this.scheduler.now() >= deadlineAt) {
+            flushersTimedOut = true
+            break
+          }
           try {
             if (
               !(await boundedWait(Promise.resolve(invocation.invoke()), deadlineAt, {
                 scheduler: this.scheduler
               }))
-            )
+            ) {
+              flushersTimedOut = true
               break
+            }
           } catch (error) {
             this.reportFailure({ source: LogFailureSource.flush, error })
           }
         }
       })
       await this.#drain(deadlineAt)
-      if (this.#draining || this.#pending.size)
+      if (flushersTimedOut || this.#draining || this.#pending.size)
         this.reportFailure({
           source: LogFailureSource.flush,
           error: createLogError(LogHostErrorCode.lifecycleDeadline, LogHostErrorText.flushDeadline)
