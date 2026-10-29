@@ -23,6 +23,11 @@ class FileOutput {
   #writer: IFileWriter
   /** Rotation is evaluated per delivered batch, preserving the previous counting boundary. */
   #rotate: IFilePluginConfig['rotate']
+  /**
+   * Rotation failures that follow a successful append. Host retry must not replay them: the batch
+   * is already on disk, so another attempt would append the same records twice.
+   */
+  #rotateFailures = new WeakSet<Error>()
 
   /** Validate path, thresholds and required capabilities synchronously before publication. */
   constructor(options: IFilePluginConfig, defaultWriter?: IFileWriter) {
@@ -48,19 +53,36 @@ class FileOutput {
 
   /** Join once, append once and rotate only after a successful triggering batch. */
   async deliver(records: readonly ILogOutputRecord[]): Promise<void> {
+    /** Formatting, including shared JSON error projection, has already run in the host. */
+    const text = `${records.map(recordText).join('\n')}\n`
     try {
-      /** Formatting, including shared JSON error projection, has already run in the host. */
-      const text = `${records.map(recordText).join('\n')}\n`
       await this.#writer.append(this.#path, text)
-      if (
-        (this.#rotate?.maxEntries !== undefined && records.length >= this.#rotate.maxEntries) ||
-        (this.#rotate?.maxBytes !== undefined &&
-          new TextEncoder().encode(text).length >= this.#rotate.maxBytes)
-      )
-        await this.#writer.rotate!(this.#path)
     } catch (cause) {
       throw fileError(LogFileErrorCode.deliveryFailed, LogFileErrorText.writeFailed, cause)
     }
+    if (
+      (this.#rotate?.maxEntries !== undefined && records.length >= this.#rotate.maxEntries) ||
+      (this.#rotate?.maxBytes !== undefined &&
+        new TextEncoder().encode(text).length >= this.#rotate.maxBytes)
+    ) {
+      try {
+        await this.#writer.rotate!(this.#path)
+      } catch (cause) {
+        /** Same public code and text; only the retry classification differs. */
+        const error = fileError(
+          LogFileErrorCode.deliveryFailed,
+          LogFileErrorText.writeFailed,
+          cause
+        )
+        this.#rotateFailures.add(error)
+        throw error
+      }
+    }
+  }
+
+  /** Append failures stay retryable; a rotation failure after a committed append does not. */
+  retryable(error: unknown): boolean {
+    return !(error instanceof Error && this.#rotateFailures.has(error))
   }
 }
 
@@ -81,6 +103,7 @@ export function createFilePlugin(
     batchable: true,
     defaultFormat: 'json',
     features: options.features,
+    retryable: (error: unknown) => output.retryable(error),
     deliver: (records) => output.deliver(records)
   })
 }
