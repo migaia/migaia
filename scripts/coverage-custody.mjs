@@ -458,8 +458,45 @@ export const ownerDirectories = (packageName) =>
     ? [...RPC_COVERAGE_FAMILY.runtimeOwners, RPC_COVERAGE_FAMILY.runner]
     : [packageName]
 
+/** Files whose text can import a workspace package: sources, tests, fixtures and doc examples. */
+const IMPORTING_FILE = /\.(?:[cm]?[jt]sx?|md)$/
+
+/** A workspace package named in an import specifier or doc example. */
+const WORKSPACE_REFERENCE = /@migaia\/([a-z0-9-]+)/g
+
 /**
- * Union of the `dist/` closures the given owners' tests read.
+ * Workspace packages the owners' files name by package, including ones they do not declare: a test
+ * or doc example may import a sibling that would form a dependency cycle if declared.
+ *
+ * @param {readonly string[]} directories Directory names under `packages/`.
+ * @returns {string[]} Referenced directory names that exist under `packages/`.
+ */
+const referencedWorkspacePackages = (directories) => {
+  /** Referenced names, each kept once. */
+  const referenced = new Set()
+  const listed = run('git', [
+    'ls-files',
+    '--cached',
+    '--others',
+    '--exclude-standard',
+    '--',
+    ...directories.map((directory) => `packages/${directory}`)
+  ])
+  for (const name of listed.split('\n')) {
+    if (!IMPORTING_FILE.test(name)) continue
+    const absolute = join(repositoryRoot, name)
+    if (!existsSync(absolute)) continue
+    for (const [, packageName] of readFileSync(absolute, 'utf8').matchAll(WORKSPACE_REFERENCE))
+      referenced.add(packageName)
+  }
+  return [...referenced].filter((packageName) =>
+    existsSync(join(repositoryRoot, 'packages', packageName, 'package.json'))
+  )
+}
+
+/**
+ * Every package `dist/` the given owners' tests and doc examples can load: the declared
+ * `dist-stamp` closure of each owner, plus each package the owners name by import and its closure.
  *
  * @param {readonly string[]} directories Directory names under `packages/`.
  * @returns {string[]} Absolute package directories, sorted.
@@ -470,6 +507,11 @@ const ownersDistClosure = (directories) => {
   for (const directory of directories)
     for (const member of distClosure(join(repositoryRoot, 'packages', directory)))
       closure.add(member)
+  for (const packageName of referencedWorkspacePackages(directories)) {
+    const directory = join(repositoryRoot, 'packages', packageName)
+    closure.add(directory)
+    for (const member of distClosure(directory)) closure.add(member)
+  }
   return [...closure].sort()
 }
 
