@@ -511,6 +511,8 @@ export class CallTable {
 
   /** Cancellation uses metadata only, including notifications whose public Promise already settled. */
   #cancel(record: CallRecord, reason: unknown): void {
+    /** A closed table or replaced record sends nothing, so skip serializing its reason. */
+    if (this.#closed || this.#records.get(record.id) !== record) return
     try {
       /** Serialize through the contract owner, preserving native name/stack/cause topology. */
       const frame: IRpcEnvelope = {
@@ -521,7 +523,6 @@ export class CallTable {
         task: record.task,
         reason: serializeHostWireError(reason, { report: (failure) => this.#report(failure.error) })
       }
-      if (this.#closed || this.#records.get(record.id) !== record) return
       Promise.resolve(
         this.#options.send(
           record.carrierId,
