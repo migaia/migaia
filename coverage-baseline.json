@@ -70,14 +70,14 @@
     },
     "log-host": {
       "lines": {
-        "covered": 660,
-        "total": 713,
-        "pct": 92.56
+        "covered": 664,
+        "total": 717,
+        "pct": 92.6
       },
       "statements": {
-        "covered": 730,
-        "total": 803,
-        "pct": 90.9
+        "covered": 733,
+        "total": 806,
+        "pct": 90.94
       },
       "functions": {
         "covered": 195,
@@ -85,9 +85,9 @@
         "pct": 94.66
       },
       "branches": {
-        "covered": 411,
-        "total": 476,
-        "pct": 86.34
+        "covered": 412,
+        "total": 477,
+        "pct": 86.37
       }
     },
     "log-plugin-console": {
@@ -136,24 +136,24 @@
     },
     "log-plugin-file": {
       "lines": {
-        "covered": 35,
-        "total": 38,
-        "pct": 92.1
+        "covered": 42,
+        "total": 45,
+        "pct": 93.33
       },
       "statements": {
-        "covered": 37,
-        "total": 40,
-        "pct": 92.5
+        "covered": 44,
+        "total": 47,
+        "pct": 93.61
       },
       "functions": {
-        "covered": 12,
-        "total": 12,
+        "covered": 14,
+        "total": 14,
         "pct": 100
       },
       "branches": {
-        "covered": 31,
-        "total": 36,
-        "pct": 86.11
+        "covered": 33,
+        "total": 38,
+        "pct": 86.84
       }
     },
     "log-plugin-http": {
@@ -466,24 +466,24 @@
     },
     "storage-plugin-cache": {
       "lines": {
-        "covered": 987,
-        "total": 1065,
-        "pct": 92.67
+        "covered": 990,
+        "total": 1068,
+        "pct": 92.69
       },
       "statements": {
-        "covered": 1092,
-        "total": 1215,
-        "pct": 89.87
+        "covered": 1095,
+        "total": 1218,
+        "pct": 89.9
       },
       "functions": {
-        "covered": 230,
-        "total": 257,
-        "pct": 89.49
+        "covered": 232,
+        "total": 259,
+        "pct": 89.57
       },
       "branches": {
-        "covered": 723,
-        "total": 827,
-        "pct": 87.42
+        "covered": 725,
+        "total": 829,
+        "pct": 87.45
       }
     },
     "storage-plugin-object": {
@@ -3350,14 +3350,14 @@
     },
     "packages/log-host/src/host.ts": {
       "lines": {
-        "covered": 201,
-        "total": 213,
-        "pct": 94.36
+        "covered": 205,
+        "total": 217,
+        "pct": 94.47
       },
       "statements": {
-        "covered": 225,
-        "total": 238,
-        "pct": 94.53
+        "covered": 228,
+        "total": 241,
+        "pct": 94.6
       },
       "functions": {
         "covered": 56,
@@ -3365,9 +3365,9 @@
         "pct": 96.55
       },
       "branches": {
-        "covered": 100,
-        "total": 109,
-        "pct": 91.74
+        "covered": 101,
+        "total": 110,
+        "pct": 91.81
       }
     },
     "packages/log-host/src/index.ts": {
@@ -4120,24 +4120,24 @@
     },
     "packages/log-plugin-file/src/file-core.ts": {
       "lines": {
-        "covered": 22,
-        "total": 24,
-        "pct": 91.66
+        "covered": 29,
+        "total": 31,
+        "pct": 93.54
       },
       "statements": {
-        "covered": 23,
-        "total": 25,
-        "pct": 92
+        "covered": 30,
+        "total": 32,
+        "pct": 93.75
       },
       "functions": {
-        "covered": 6,
-        "total": 6,
+        "covered": 8,
+        "total": 8,
         "pct": 100
       },
       "branches": {
-        "covered": 25,
-        "total": 28,
-        "pct": 89.28
+        "covered": 27,
+        "total": 30,
+        "pct": 90
       }
     },
     "packages/log-plugin-file/src/index.browser.ts": {
@@ -23722,24 +23722,24 @@
     },
     "packages/storage-plugin-cache/src/store.ts": {
       "lines": {
-        "covered": 132,
-        "total": 151,
-        "pct": 87.41
+        "covered": 135,
+        "total": 154,
+        "pct": 87.66
       },
       "statements": {
-        "covered": 146,
-        "total": 175,
-        "pct": 83.42
+        "covered": 149,
+        "total": 178,
+        "pct": 83.7
       },
       "functions": {
-        "covered": 32,
-        "total": 42,
-        "pct": 76.19
+        "covered": 34,
+        "total": 44,
+        "pct": 77.27
       },
       "branches": {
-        "covered": 102,
-        "total": 121,
-        "pct": 84.29
+        "covered": 104,
+        "total": 123,
+        "pct": 84.55
       }
     },
     "packages/storage-plugin-cache/src/types.ts": {
@@ -34400,48 +34400,48 @@
     "rpc"
   ],
   "inputs": {
-    "capability": "cd30bb81a8bd1db8711fc071b1b906d847d0462fc55c5989cc83827234e5135e",
-    "event-subscriber": "bad9e35692d843ed4740dbe421a5c95e9c60ba896caf888040f04eb5a3504ed6",
-    "lifecycle": "9130db3b4add4c338e2e4bc2034d60239e3df1029cd99d2d935db4734284eedb",
-    "log-host": "6847dfccc7f9544ee30b3b8d12c92b75b190805a2c6d8bb29b36ade5f8c0fde4",
-    "log-plugin-console": "cb4ff825bae2bf892b4cf8a808b01d8992e18b988a24fbf4737baaf222c0658a",
-    "log-plugin-durable": "6688cc62d0918bec0cd7c6d19472c66112ec7e776720569851339d9d2f24ce74",
-    "log-plugin-file": "3d191962f34afcee8258aa0401b08dad6d5e3bd5d48bf5a9594ef1120f508c8a",
-    "log-plugin-http": "e421f0f4eaea04d223b07c30b61e7a1c258fd7b7aea4f9fa1cdae9244c935ae4",
-    "log-plugin-process": "828ffb52425d041d9dc365ac072eb9a7d983e552309355ba68bc6c3a479cc902",
-    "log-plugin-reasoning": "f63db7f19e6aafb49a1e63f8d3611587d64f1af55c77742883ca61e7461f6a03",
-    "micro-hub": "67384a82c3ae5bec0421fd9cc5af41a64e661c0ee804db874ea4c8b913544b5e",
-    "middleware-pipeline": "3ab11a4182dae687c013ba799cf96fbd9f8f5a9faa4bb148afddb7bd62a2ffea",
-    "plugin-host": "9bd66b07282a77c034f2a5bd6a9edbefb7ed1925c95141674271ba4015abfd0e",
-    "reactive": "0ffa81171fb46472703974335fa90fffbb2b7b2e026b9d6b95899ece90d9be74",
-    "resource": "c6d8a191d001a0072b6c7e4dd2c6217c637a13a6496e10cdf2dc214a04aeff58",
-    "rpc-family": "5813606f6b8b252e690169aab679985a4a4f0ceab4fb5843e4b7e33611f759d6",
-    "serialize": "eb5436a39a9b2ef6cedbc6f45b6f22b157546ba7ae5c0a84ccf077419d363ede",
-    "storage-contract": "effc02972165c3d66265e56a0c5b9e24a342ea53a52bfddafa81eb5fe48cf619",
-    "storage-host": "9cde022b069c3cdf95fb518a94227f94f839a30a496d2fd9dc1227aed77dd54b",
-    "storage-plugin-archive": "c224ff7589adb0ca0cd5eaa7ed9761afb1ded402362566fa9978c72eb728271b",
-    "storage-plugin-browser": "da0c3142a5b36332f6d7d21d645662f140b5119c49974f85b3f5daf21da3ede9",
-    "storage-plugin-cache": "29f0bd206edbd53160fa212873e5b1c71309036a8a31495b745ca60db63bf625",
-    "storage-plugin-object": "2f5fb022b8632c25218d4075865f4bbcf73e59839787c8c167fca2dff0d46235",
-    "storage-plugin-postgres": "81f38101615234002de07d168a88471b7f4b65f9b5aece97f2164fb2f4fb3fb8",
-    "storage-plugin-qdrant": "8a0413462286f30db276876292443d7d19d41745d08a2fafe665ed9bed5aac6a",
-    "storage-plugin-redis": "4335964408cdf84cb5ce51110d4a85a3c28ee4ac17b5a9b631eb9dc9a276348f",
-    "storage-plugin-sparql": "5b1dd5e8429bf8758d6ea4a03aaed19674d7880a9c749f1dc799dc521205a32f",
-    "storage-plugin-sqlite": "d7299c6219f16d5b1c17cafba7e050f030065f63527711bdffca5c8c6e387cd9",
-    "store-devtools": "f8703532d9cd89fc7da2a92de9edb33f58baafafeb04fdeb1a9c1fc6253d89e2",
-    "store-indexed": "816f0a44cc2bbd4e82456209f55305b3611281172aef36fc13101e053fd26e53",
-    "store-keyed": "e6ee7130bfeeeee8cb423349ca0f494bd75e889019b2a1783c3c9091b9e04cef",
-    "store-light": "30415e4eea70721b65db8e557eabf186001a1704bf16a54cbf1cc137219efcc3",
-    "store-middleware": "2b8cca44d80507662a7df6357e117ac516904f9835d95c81bf5e071768be1a92",
-    "store-persist": "b09457ea38a5351e01e04984df85b88473772f0359c9b26fa943330d6e4a2edf",
-    "store-react": "fc1cd4c1a3bd91550f90844318cad45de0081431cefb264fde3b5480872175e3",
-    "store-shared": "d01760b4ed5ed57ae316db35685c657a0aae2f58592354125cbe74bc28c4861a",
-    "store-ssr": "9604ba692b70edc61c0e15c13d4be66eb966892614979defe87b47fc304fe609",
-    "store-wasm": "5b1e5d26fb750a03639aaec00e0778d114d9d78d806ff1b912778a53ab2f7023",
-    "store-worker": "546d1818b67acf3df6fc8aefd00a6acced6a3a0061270bfb369e1abd5b04968c",
-    "supervision": "cc9c79d58a6d8004e34e37c411208a135e27c24f3c7617c1325f871d3e9fb99c",
-    "tray": "af5b067f5f22af9f3f4ca151b29ced0b037cf60d2cc2eb85c764b8e22f58ec5e",
-    "utils": "a45a45b5a9d2a93f04a873fff1c63ac1e36ab3f25c9e83e21596bf0e8e7f85f8"
+    "capability": "7e56832b7463b42ba1536794d6fd6bae14efe7b762b67df72c993aaf562c2c37",
+    "event-subscriber": "01e5ada364ee6bccc339eeeeafc3bd4edf25f137263db1fa855ab10e73d404c3",
+    "lifecycle": "fc81e04120562f96bd6148bbc20be6d2b5f3b1f8dd7b4b60d12c27b96d4b14d4",
+    "log-host": "4eea35b1e582eb433bcb94f7e0c58dccdd2d9dc085459252047de86276574df3",
+    "log-plugin-console": "cbba28dcd717e87025634b53b955a2990b284ef994793244110a364ac06ec63e",
+    "log-plugin-durable": "7bcd66b6e12267bda10c47fdf0e9334b1a3858f8b8a5510983e4595e5439f91c",
+    "log-plugin-file": "a1bd322a37d77214d70626bcedf3c92f86779e61c7ed2e38a84ffb21bb4f028d",
+    "log-plugin-http": "98cda2d129f14ebbc58011d89da12c2907113104805dee10fa2ac8bc99a6c3f1",
+    "log-plugin-process": "b0773a8b05dfbac4aadee27a977c859f18e4b1b4a34029f9c6174732f5e702cd",
+    "log-plugin-reasoning": "6cbcddc5bc131ce19dbcb792b456ff2543eb1f013734798252f4a04b1977562b",
+    "micro-hub": "4b32118895e200ece7afde7710e86707bd0eb870850b52a4d551a9c552e9232b",
+    "middleware-pipeline": "41793064e2a898821e6390b6824b344272c53d2ecf92d8954c5b0ee3b587b6d8",
+    "plugin-host": "a1ce060165744bba897b8a9e1cf63dd95d5af7fab17f94d01d14ac88ced35994",
+    "reactive": "eada4440c769b0b0939443b2d1ae2f6eac8ab6489c24c2aebbc0884ddee81027",
+    "resource": "1e69cbe3933a7e18b5dd9675246e6c14a148ce37d5670577a422a4a3aeab47d7",
+    "rpc-family": "92b985ce79c552aef1a533a38e1f99e6a0f3aaeb8e1ade961edfc267eb973bd2",
+    "serialize": "972e42fd44aa37aba09439347f2195858accf444a96739f9dafc12ca68110687",
+    "storage-contract": "9b710d172f9d529d52b89a1ef70ebc7915df38081d10149c9949d8f3a3ca348d",
+    "storage-host": "66b4b155cfa85bba7035e904fcc29954cff1b8d3aefe521beb46921d27cf5c38",
+    "storage-plugin-archive": "d62db0a2a738d16362497c3e8c389818a344516612ea7b453c27df2616e1fd5d",
+    "storage-plugin-browser": "5bce3f87f00095fc7c979d3a28ea68b93f062f598647f4b15d302ed1f5a0f946",
+    "storage-plugin-cache": "744dec00e6b41458d8269fdb0874b17ec56d53aa3540e957efa6fdd47e89f8e2",
+    "storage-plugin-object": "e9d89f89ee669a0776cf189967ed16ae4164b0ca0c59972a7a17ecc6160532de",
+    "storage-plugin-postgres": "d7c05ef16df85ca5de1f80e3ba5f3434759be68d1c9313ef0d7bdde80cb44ac1",
+    "storage-plugin-qdrant": "e695ec2c5788f941ff2a88e7e5a54413ef035298d786cb9accef9e9ef8cbc347",
+    "storage-plugin-redis": "7e6173bdd0cc3ffef91b311b8f0fd119bdcc873c64d7d073412369a39b9be2be",
+    "storage-plugin-sparql": "5084cf3c910d1baaf15506767296ae61ec2a6be7caf9dd63f581a1e740c24e94",
+    "storage-plugin-sqlite": "415f03c1c481c9e5fbf39f8a6de68bb03829c88719f6676e0a6a5128df9776b9",
+    "store-devtools": "c7c5d8ba75de66ef0102687925e54da1bf42ff007a2939b9dc464b8e8966247f",
+    "store-indexed": "dbc880cf4b020f80ecb82d5c244e6edc33d8b9971154de9838d43f9ed6008ff4",
+    "store-keyed": "b0d38bf12d40ba2088cf5d5c34939cb099b6f9f2fd4a2c96c3cd412061cf48ff",
+    "store-light": "a346888cc04c65c4866d68a5f84c7c5e24a2b60736a667c1bf2a75a676fb13b8",
+    "store-middleware": "7fd82457ce63aac2d8f16816b5322a7103e8b5f37f66acc14d6951e0c0297988",
+    "store-persist": "7cc01162f081ba01f901e4fff4de92eed241fcc6c2fac6c6e5ef577c2bed3dc2",
+    "store-react": "6263a0b1a7377610e35c0a6ab8355a0f58f48142588770fdf9467ec61ecac90e",
+    "store-shared": "4b6e357c192db31d0a8eefe797af4768d4112bb2cac4a449e95ab7c31767d0a4",
+    "store-ssr": "940fb44513ad50b1a334135a50638fb06e9f6d10838d3548355009db82ebc875",
+    "store-wasm": "d19e4406f761d34d327f3ffe1064331bc5307942371f46e24c588ef92e58b525",
+    "store-worker": "c40ed24d67db56c10988567587e6abf1aa6468dfe33e92e9c2a94c01a19f5c14",
+    "supervision": "0084cf370e2232981ef2bf1e160821daab89b42fb298b694cb951ab7a7f69a33",
+    "tray": "2e0818c2418cff9c228d8d905812524d8ea8197f604125905bcaec9b074b2323",
+    "utils": "5a0263356315bb275c1b00ba7f27b63c0d4f2e97bbfb7ffd5760bec70196b9ba"
   },
   "baselineInventoryDrift": {
     "missing": [],
