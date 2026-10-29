@@ -14,10 +14,11 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  assertAllFresh,
+  assertFresh,
+  distClosure,
   DistStampErrorCode,
-  isStampable,
-  workspacePackages
+  inputDigests,
+  isStampable
 } from './dist-stamp.mjs'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -400,17 +401,150 @@ export const assertBaselineResetPreconditions = () => {
 }
 
 /**
- * Builds every package that publishes `dist/`, in workspace topological order, before any capture.
- * Tests import sibling packages through their `dist/`, so capturing against output built from older
- * sources would measure code that is no longer in the candidate. Packages without `dist/` (the
- * wasm-pack package) are not built here, matching their own test scripts.
+ * Builds the given packages that publish `dist/`, in workspace topological order, before any
+ * capture. Tests import sibling packages through their `dist/`, so capturing against output built
+ * from older sources would measure code that is no longer in the candidate. Packages without
+ * `dist/` (the wasm-pack package) are not built here, matching their own test scripts.
+ *
+ * @param {readonly string[]} directories Absolute package directories the captures read.
  */
-export const buildWorkspaceOutput = () => {
+export const buildWorkspaceOutput = (directories) => {
   /** Pnpm filters naming each stampable package; pnpm orders them topologically. */
-  const filters = [...workspacePackages().entries()]
-    .filter(([, directory]) => isStampable(directory))
-    .flatMap(([name]) => ['--filter', `./packages/${name}`])
-  run('pnpm', ['-r', '--workspace-concurrency=2', ...filters, 'run', 'build'])
+  const filters = directories
+    .filter((directory) => isStampable(directory))
+    .flatMap((directory) => ['--filter', `./${relative(repositoryRoot, directory)}`])
+  if (filters.length > 0)
+    run('pnpm', ['-r', '--workspace-concurrency=2', ...filters, 'run', 'build'])
+}
+
+/**
+ * Assert the given `dist/` outputs are fresh, building them once when stale.
+ *
+ * @param {readonly string[]} directories Absolute package directories the captures read.
+ * @throws {Error} A non-stale freshness failure, or output still stale after one build.
+ */
+const ensureFresh = (directories) => {
+  if (directories.length === 0) return
+  try {
+    assertFresh(directories)
+  } catch (error) {
+    if (error?.code !== DistStampErrorCode.stale) throw error
+    buildWorkspaceOutput(directories)
+    assertFresh(directories)
+  }
+}
+
+/**
+ * Repository paths every package test reads besides its own package and its workspace dependencies.
+ * Any edit under one of them re-captures every coverage owner.
+ */
+const SHARED_COVERAGE_INPUTS = Object.freeze([
+  'mise.toml',
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'scripts',
+  'tsconfig.base.json'
+])
+
+/**
+ * Package directory names whose sources and tests form one coverage owner.
+ *
+ * @param {string} packageName Actual package or the declared RPC family unit.
+ * @returns {string[]} Directory names under `packages/`.
+ */
+export const ownerDirectories = (packageName) =>
+  packageName === RPC_COVERAGE_FAMILY.unit
+    ? [...RPC_COVERAGE_FAMILY.runtimeOwners, RPC_COVERAGE_FAMILY.runner]
+    : [packageName]
+
+/**
+ * Union of the `dist/` closures the given owners' tests read.
+ *
+ * @param {readonly string[]} directories Directory names under `packages/`.
+ * @returns {string[]} Absolute package directories, sorted.
+ */
+const ownersDistClosure = (directories) => {
+  /** Each closure package enters once however many owners read it. */
+  const closure = new Set()
+  for (const directory of directories)
+    for (const member of distClosure(join(repositoryRoot, 'packages', directory)))
+      closure.add(member)
+  return [...closure].sort()
+}
+
+/**
+ * Hash every tracked or nonignored file under the given repository paths, with its path.
+ *
+ * @param {readonly string[]} paths Repository-relative files or directories.
+ * @returns {string} Hex SHA-256 of the listed paths and contents.
+ */
+const hashRepositoryPaths = (paths) => {
+  /** Deduplicated because `--cached --others` can list a path twice around index edges. */
+  const names = new Set(
+    run('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', ...paths])
+      .split('\n')
+      .filter(Boolean)
+  )
+  const hash = createHash('sha256')
+  for (const name of [...names].sort()) {
+    /** A tracked file deleted in the worktree is absent from the input, changing the digest. */
+    const absolute = join(repositoryRoot, name)
+    if (!existsSync(absolute)) continue
+    hash.update(name).update('\0').update(readFileSync(absolute)).update('\0')
+  }
+  return hash.digest('hex')
+}
+
+/**
+ * Digest everything that can change one owner's coverage: its own sources and tests, the build
+ * inputs of every workspace package its tests read through `dist/`, and the shared root inputs. An
+ * owner whose digest equals the signed baseline's keeps its signed numbers without a capture.
+ *
+ * @param {readonly string[]} coveragePackages Current coverage owners.
+ * @returns {Record<string, string>} Owner → hex digest.
+ */
+export const ownerInputDigests = (coveragePackages) => {
+  /** Shared inputs are hashed once and folded into every owner's digest. */
+  const shared = hashRepositoryPaths(SHARED_COVERAGE_INPUTS)
+  /** Owner → digest, in inventory order. */
+  const digests = {}
+  for (const packageName of coveragePackages) {
+    const directories = ownerDirectories(packageName)
+    /** Build-input digests of every package the owner's tests load through `dist/`. */
+    const dependencies = inputDigests(ownersDistClosure(directories))
+    const hash = createHash('sha256')
+      .update(shared)
+      .update('\0')
+      .update(hashRepositoryPaths(directories.map((directory) => `packages/${directory}`)))
+    for (const [directory, digest] of dependencies)
+      hash.update('\0').update(relative(repositoryRoot, directory)).update('\0').update(digest)
+    digests[packageName] = hash.digest('hex')
+  }
+  return digests
+}
+
+/**
+ * Group signed file records by coverage owner in one pass.
+ *
+ * @param {readonly string[]} coveragePackages Current coverage owners.
+ * @param {Record<string, unknown>} signedFiles File records from the signed baseline.
+ * @returns {Map<string, Record<string, unknown>>} Owner → its signed file records.
+ */
+const signedFilesByOwner = (coveragePackages, signedFiles) => {
+  /** Package directory name → owning coverage unit. */
+  const ownerOf = new Map()
+  for (const packageName of coveragePackages)
+    for (const directory of ownerDirectories(packageName)) ownerOf.set(directory, packageName)
+  /** Owner → file records, filled as each signed file is visited once. */
+  const grouped = new Map()
+  for (const [file, record] of Object.entries(signedFiles ?? {})) {
+    const owner = ownerOf.get(file.split('/')[1])
+    if (owner === undefined) continue
+    if (!grouped.has(owner)) grouped.set(owner, {})
+    grouped.get(owner)[file] = record
+  }
+  return grouped
 }
 
 /**
@@ -545,7 +679,13 @@ export const serializeBaseline = (result) => {
   const files = Object.fromEntries(
     Object.entries(result.files ?? {}).sort(([left], [right]) => left.localeCompare(right))
   )
-  return `${JSON.stringify({ ...result, packages, files, changedRuntimeFiles: [...(result.changedRuntimeFiles ?? [])].sort() }, null, 2)}\n`
+  /** Owner input digests, absent from baselines signed before affected-only capture. */
+  const inputs = result.inputs
+    ? Object.fromEntries(
+        Object.entries(result.inputs).sort(([left], [right]) => left.localeCompare(right))
+      )
+    : undefined
+  return `${JSON.stringify({ ...result, packages, files, inputs, changedRuntimeFiles: [...(result.changedRuntimeFiles ?? [])].sort() }, null, 2)}\n`
 }
 
 /** Atomically install a fully validated baseline and never expose partial JSON. */
@@ -559,7 +699,41 @@ export const writeBaselineAtomically = (result) => {
   }
 }
 
-/** Execute the complete root custody matrix and optionally replace its baseline. */
+/**
+ * Read this CI invocation's report for one owner when its capture succeeded.
+ *
+ * @param {string} packageName Actual package or the declared RPC family unit.
+ * @param {string | undefined} ciReportRoot Capture root shared by the CI runner, if any.
+ * @returns {ReturnType<typeof readCoverageReport> | null} The report, or null to capture.
+ * @throws {Error} The CI capture recorded a nonzero exit; it is never retried.
+ */
+const readCiReport = (packageName, ciReportRoot) => {
+  if (!ciReportRoot) return null
+  /** A failed Vitest command can still emit JSON, so its exit marker is checked first. */
+  const ciPackageReport = join(ciReportRoot, packageName)
+  /** Missing markers identify output that has no successful CI capture evidence. */
+  const captureExitCodePath = join(ciPackageReport, CAPTURE_EXIT_CODE_FILE)
+  /** The runner writes a numeric exit code; nonzero output must never trigger a retry. */
+  const captureExitCode = existsSync(captureExitCodePath)
+    ? readFileSync(captureExitCodePath, 'utf8').trim()
+    : null
+  if (captureExitCode !== null && captureExitCode !== '0') {
+    throw new Error(captureFailureMessage(packageName), {
+      cause: { status: Number(captureExitCode) }
+    })
+  }
+  /** Reuse only a successful, complete report; missing output retains standalone capture. */
+  const complete =
+    captureExitCode === '0' &&
+    existsSync(join(ciPackageReport, 'coverage-summary.json')) &&
+    existsSync(join(ciPackageReport, 'coverage-final.json'))
+  return complete ? readCoverageReport(packageName, ciPackageReport) : null
+}
+
+/**
+ * Execute the root custody matrix and optionally replace its baseline. Owners whose input digest
+ * equals the signed baseline's keep their signed numbers; only changed owners are captured.
+ */
 export const main = () => {
   /** Selects fresh baseline production, which must not compare against the stale baseline. */
   const updateBaseline = process.argv.includes('--update-baseline')
@@ -571,20 +745,32 @@ export const main = () => {
     else assertBaselineResetPreconditions()
   }
   const { coveragePackages, deletedCoveragePackages } = assertInventory()
-  try {
-    assertAllFresh()
-  } catch (error) {
-    if (error?.code !== DistStampErrorCode.stale) throw error
-    buildWorkspaceOutput()
-    assertAllFresh()
-  }
-  const existing =
-    !updateBaseline && existsSync(baselinePath)
-      ? JSON.parse(readFileSync(baselinePath, 'utf8'))
-      : null
+  /** The signed baseline supplies unchanged owners' numbers, also when producing a new one. */
+  const signed = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : null
+  /** Selects fresh baseline production, which must not compare against the stale baseline. */
+  const existing = updateBaseline ? null : signed
   if (existing) {
     assertExclusions(existing.exclusions)
   }
+  /** Owner → digest of everything that can change its coverage. */
+  const inputs = ownerInputDigests(coveragePackages)
+  /** Owners whose inputs equal the signed baseline's; their signed numbers are reused as-is. */
+  const unchanged = new Set(
+    coveragePackages.filter(
+      (packageName) =>
+        signed?.inputs?.[packageName] === inputs[packageName] &&
+        signed.packages?.[packageName] !== undefined
+    )
+  )
+  /** Signed file records of the unchanged owners, grouped once. */
+  const unchangedFiles = signedFilesByOwner([...unchanged], signed?.files)
+  /** Only the `dist/` the changed owners' tests read must be built and fresh. */
+  const closure = ownersDistClosure(
+    coveragePackages
+      .filter((packageName) => !unchanged.has(packageName))
+      .flatMap((packageName) => ownerDirectories(packageName))
+  )
+  ensureFresh(closure)
   const reportRoot = mkdtempSync(join(tmpdir(), 'migai-coverage-custody-'))
   /** Only the current CI invocation supplies reusable reports; standalone custody still captures. */
   const ciReportRoot = process.env[CI_COVERAGE_REPORT_ENV]
@@ -600,31 +786,14 @@ export const main = () => {
       ...coveragePackages.filter((packageName) => packageName !== RPC_COVERAGE_FAMILY.unit)
     ]
     for (const packageName of captureOrder) {
-      /** A failed Vitest command can still emit JSON, so its exit marker is checked first. */
-      const ciPackageReport = ciReportRoot ? join(ciReportRoot, packageName) : null
-      /** Missing markers identify output that has no successful CI capture evidence. */
-      const captureExitCodePath = ciPackageReport
-        ? join(ciPackageReport, CAPTURE_EXIT_CODE_FILE)
-        : null
-      /** The runner writes a numeric exit code; nonzero output must never trigger a retry. */
-      const captureExitCode =
-        captureExitCodePath && existsSync(captureExitCodePath)
-          ? readFileSync(captureExitCodePath, 'utf8').trim()
-          : null
-      if (captureExitCode !== null && captureExitCode !== '0') {
-        throw new Error(captureFailureMessage(packageName), {
-          cause: { status: Number(captureExitCode) }
-        })
+      if (unchanged.has(packageName)) {
+        packages[packageName] = signed.packages[packageName]
+        Object.assign(files, unchangedFiles.get(packageName))
+        continue
       }
-      /** Reuse only a successful, complete report; missing output retains standalone capture. */
-      const reuseReport =
-        captureExitCode === '0' &&
-        existsSync(join(ciPackageReport, 'coverage-summary.json')) &&
-        existsSync(join(ciPackageReport, 'coverage-final.json'))
       /** Both paths use the existing report reader and all unchanged custody assertions below. */
-      const report = reuseReport
-        ? readCoverageReport(packageName, ciPackageReport)
-        : capturePackage(packageName, reportRoot)
+      const report =
+        readCiReport(packageName, ciReportRoot) ?? capturePackage(packageName, reportRoot)
       packages[packageName] = report.metrics
       assertCompleteMetrics(report.metrics, packageName)
       for (const [sourcePath, entry] of Object.entries(report.files)) {
@@ -653,6 +822,7 @@ export const main = () => {
       changedRuntimeFiles: changedFiles,
       deletedRuntimeFiles: deletedFiles,
       deletedCoveragePackages,
+      inputs,
       baselineInventoryDrift: existing
         ? {
             missing: coveragePackages.filter((name) => !Object.hasOwn(existing.packages, name)),
@@ -685,12 +855,13 @@ export const main = () => {
     } else assertChangedFilesPresent(filesRequiringCoverage, detail)
     if (updateBaseline) {
       if (hasCandidateSha256) assertCandidateInputSha256(candidateSha256)
-      assertAllFresh()
+      if (closure.length > 0) assertFresh(closure)
       writeBaselineAtomically(result)
     }
     console.log(
       JSON.stringify({
         packages: coveragePackages.length,
+        captured: coveragePackages.length - unchanged.size,
         changedRuntimeFiles: changedFiles.length,
         baseline: updateBaseline
       })

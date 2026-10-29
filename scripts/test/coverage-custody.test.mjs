@@ -11,6 +11,8 @@ import {
   assertMonotonic,
   changedRuntimeFiles,
   normalizeCoveragePath,
+  ownerDirectories,
+  RPC_COVERAGE_FAMILY,
   serializeBaseline,
   summaryMetrics
 } from '../coverage-custody.mjs'
@@ -67,6 +69,14 @@ test('coverage custody rejects new uncovered code through the percentage', () =>
       ),
     /coverage decreased/
   )
+})
+
+test('coverage custody keeps the RPC family as one owner of its eight packages', () => {
+  assert.deepEqual(ownerDirectories('utils'), ['utils'])
+  assert.deepEqual(ownerDirectories(RPC_COVERAGE_FAMILY.unit), [
+    ...RPC_COVERAGE_FAMILY.runtimeOwners,
+    RPC_COVERAGE_FAMILY.runner
+  ])
 })
 
 test('coverage custody rejects a changed file absent from the report', () => {
