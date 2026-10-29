@@ -106,6 +106,29 @@ async function exercise(driver: IRedisDriver, key: string): Promise<void> {
     } finally {
       await resource.dispose()
     }
+    // One MULTI delivers both messages before the unsubscribe reply, so the second one always
+    // arrives after the first listener call has started closing the subscription.
+    /** Settles with the dispose started from inside the first listener call. */
+    const closing = Promise.withResolvers<void>()
+    /** Counts listener calls; the in-flight second message must not reach the listener. */
+    let closingCalls = 0
+    /** Subscription that starts closing itself on its first message. */
+    const closingResource = await driver.subscribe(channel, () => {
+      closingCalls++
+      closing.resolve(closingResource.dispose())
+    })
+    try {
+      await driver.withConnection((connection) =>
+        connection.exec([
+          ['PUBLISH', channel, 'first'],
+          ['PUBLISH', channel, 'during-close']
+        ])
+      )
+      await closing.promise
+      expect(closingCalls).toBe(1)
+    } finally {
+      await closingResource.dispose()
+    }
   } finally {
     await driver.command(['DEL', key])
   }

@@ -427,12 +427,26 @@ for (const mode of ['pid-query', 'abort', 'ready-query-abort', 'pid-mismatch'] a
     const cancellation = new AbortController()
     let reported: unknown
     let startupSettled = false
+    /** Set once close has observed the native backend still alive and waited for its exit. */
+    let closeWaited = false
     /** Intercept only the pool readiness query; original native clients keep their real receiver. */
     const observedPool = new Proxy(pool, {
       get(target, key, receiver) {
         if (key !== 'query') return Reflect.get(target, key, receiver)
         return async (input: QueryArrayConfig) => {
           const text = input.text
+          /** The first exit probe also matches this pool backend, so close must wait once. */
+          if (
+            !closeWaited &&
+            typeof text === 'string' &&
+            text.includes('FROM pg_stat_activity WHERE pid=$1')
+          ) {
+            closeWaited = true
+            return target.query({
+              ...input,
+              text: text.replace('WHERE pid=$1', 'WHERE pid IN ($1, pg_backend_pid())')
+            })
+          }
           if (
             mode === 'pid-query' &&
             typeof text === 'string' &&
@@ -494,6 +508,8 @@ for (const mode of ['pid-query', 'abort', 'ready-query-abort', 'pid-mismatch'] a
       ).rejects.toMatchObject(expected)
       expect(reported).toMatchObject(expected)
       if (mode === 'ready-query-abort') expect(startupSettled).toBe(true)
+      // `abort` cancels before a native backend exists, so close has no backend exit to wait for.
+      expect(closeWaited).toBe(mode !== 'abort')
       expect((await pool.query('SELECT 1::int4 AS alive')).rows[0]).toEqual({ alive: 1 })
     } finally {
       await host.dispose()
