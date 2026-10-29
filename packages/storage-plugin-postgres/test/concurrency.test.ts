@@ -396,11 +396,16 @@ it('seals its original controller when COMMIT recovery cannot establish the actu
 })
 
 /** Actual SERIALIZABLE conflicts keep native cause evidence when the original budget ends. */
-for (const end of ['deadline', 'abort'] as const) {
+// `failure` aborts as the conflicting statement is sent, so the native failure meets a cancelled budget.
+for (const end of ['deadline', 'abort', 'failure'] as const) {
   it('retains actual 40001 through physical replay ' + end, async () => {
     const cancelled = new AbortController()
     const original = new Error('cancel-physical-replay')
     const { store, pool, prefix, counts } = await installed(true, {
+      sent: (text) => {
+        if (end === 'failure' && text.startsWith('UPDATE ') && text.includes('_physical_budget'))
+          cancelled.abort(original)
+      },
       retried: () => {
         if (end === 'abort') cancelled.abort(original)
       }
@@ -421,25 +426,27 @@ for (const end of ['deadline', 'abort'] as const) {
         {
           concurrency: ConcurrencyPolicy.fail(),
           lock: [lockKey.text('stable-revision')],
-          ...(end === 'abort' ? { signal: cancelled.signal } : { timeoutMs: 120 })
+          ...(end === 'deadline' ? { timeoutMs: 120 } : { signal: cancelled.signal })
         }
       )
       .then(
         () => undefined,
         (cause: unknown) => cause
       )
-    expect(failure).toMatchObject({ code: end === 'abort' ? 'ABORTED' : 'LOCK_TIMEOUT' })
+    expect(failure).toMatchObject({ code: end === 'deadline' ? 'LOCK_TIMEOUT' : 'ABORTED' })
     expect(
       walkErrorCauses(failure).some(
         (error) =>
           error !== null && typeof error === 'object' && 'code' in error && error.code === '40001'
       )
     ).toBe(true)
-    if (end === 'abort') {
+    if (end === 'deadline') expect(attempts).toBeGreaterThan(1)
+    else {
       expect(walkErrorCauses(failure)).toContain(original)
       expect(attempts).toBe(1)
-    } else expect(attempts).toBeGreaterThan(1)
+    }
     expect(counts.conflicts).toBe(0)
-    expect(counts.physical).toBeGreaterThan(0)
+    if (end === 'failure') expect(counts.physical).toBe(0)
+    else expect(counts.physical).toBeGreaterThan(0)
   })
 }
