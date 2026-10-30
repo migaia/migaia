@@ -13,10 +13,12 @@ import type { IBrowserFeature } from './plugin-types.ts'
 /** Capture an already ordered/reliable native channel; no signaling or implicit native close. */
 export function rtcDataChannelPlugin<
   const N extends string = 'rtcDataChannel',
-  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+  const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<
+    Record<string, IBrowserFeature>
+  >
 >(
   options: IRtcDataChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
-): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true> {
   /** Native reliability settings are admitted before any listener acquisition. */
   const channel = options?.rtcDataChannel
   if (
@@ -38,5 +40,5 @@ export function rtcDataChannelPlugin<
     handshakeTimeoutMs: options.connect?.timeoutMs,
     connect: { retain: options.connect?.retain },
     open: (context) => attachBrowserCarrier(createRtcDataChannelCarrier(channel, context), context)
-  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>
 }

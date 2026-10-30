@@ -91,7 +91,7 @@ it('isolates same-id producers by actual admitted sender before intruder pull an
   /** Actual server reply metadata supplies the unchanged target/value oracle. */
   const items: IStreamItem[] = []
   /** This existing listener admits three separate physical source pairs. */
-  const listener = coreMemoryServer('server', 'server', 'memory', [], [], {
+  const listener = coreMemoryServer('server', 'server', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
@@ -277,7 +277,7 @@ it('isolates a pending consumer from another actual target replaying its origina
   /** Beta can deliver before alpha without reordering any native receive or credit path. */
   const betaRelease = deferred<void>()
   /** The public caller owns one allocator and two genuinely distinct native source bindings. */
-  const listener = coreMemoryServer('client', 'client', 'memory', [], [], {
+  const listener = coreMemoryServer('client', 'client', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })

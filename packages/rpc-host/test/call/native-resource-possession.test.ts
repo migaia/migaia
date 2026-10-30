@@ -11,7 +11,7 @@ it('sole-profile request retains caller option counts before codec capture', asy
   /** Only the original two caller accessors change their independent observed read counts. */
   const reads = { order: 0, cancel: 0 }
   /** Actual JSON capture is the sole snapshot algorithm; the fixture adds no clone or validator. */
-  const server = coreMemoryServer('provider', 'resource-1', 'memory', [], [], {
+  const server = coreMemoryServer('provider', 'resource-1', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
@@ -44,7 +44,7 @@ it('sole-profile request retains caller option counts before codec capture', asy
 // Exact payload42/99, directsend43 and real close Promise identity.
 it('snapshots the original public request synchronously and retains direct send and close identity', async () => {
   /** Both physical endpoints borrow the canonical codec's actual synchronous portable capture. */
-  const server = coreMemoryServer('provider', 'resource-1', 'memory', [], [], {
+  const server = coreMemoryServer('provider', 'resource-1', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
@@ -76,7 +76,7 @@ it('ready public stream keeps lazy input until first pull and preserves complete
   /** Only original application generator entry/finally can change these lifetime counts. */
   const lifetime = { constructed: 0, cleaned: 0 }
   /** Actual JSON media captures once at first pull, matching the original already-ready branch. */
-  const server = coreMemoryServer('provider', 'resource-1', 'memory', [], [], {
+  const server = coreMemoryServer('provider', 'resource-1', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })

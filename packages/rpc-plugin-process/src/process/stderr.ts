@@ -4,7 +4,7 @@
  */
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import type { ipcLogFeature } from '../features/log.ts'
+import type { IIpcLogExecution } from '../features/log.ts'
 import { IpcLogEventName } from '../features/flow-control.ts'
 import { IpcReporterContext } from '@migaia/rpc-host/sdk'
 import {
@@ -14,7 +14,7 @@ import {
 } from './constants.ts'
 import type { IProcessCommonOptions } from './types.ts'
 /** The concrete log installation owns its sink and exact observer remover. */
-type IProcessLog = ReturnType<ReturnType<typeof ipcLogFeature>['install']>['value']
+type IProcessLog = ReturnType<IIpcLogExecution['install']>['value']
 
 /** Project the existing reader into a bounded session log without retaining or delaying bytes. */
 /** Own one session's stderr budget, timer and exact native unsubscription. */

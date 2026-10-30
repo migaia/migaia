@@ -6,7 +6,7 @@ Contract defines pure protocol rules and interfaces. Host owns sessions, directo
 
 ## Explicit parent and child entries
 
-The parent uses a real `worker.js` and installs complete policies in transport `features`. When declaring remote methods, retain `typeof plugins` as well, so namespaces and member controls retain their types.
+The parent uses a real `worker.js` and installs native policy tokens in the transport `features` record. When declaring remote methods, retain `typeof plugins` as well, so namespaces and member controls retain their types.
 
 ```ts doc-test=check
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
@@ -23,7 +23,7 @@ const plugins = [
   threadPlugin({
     name: 'worker',
     spawn: new URL('./worker.js', import.meta.url),
-    features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })]
+    features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) }
   })
 ] as const
 
@@ -45,7 +45,7 @@ export async function firstValue(host: IThreadHost) {
 export function work(host: IThreadHost, signal: AbortSignal) {
   return host.thread.send('worker', 'wait', 21, {
     signal,
-    timeout: timeoutFeature({ ms: 500 }),
+    timeout: { ms: 500 },
     retry: false
   })
 }
@@ -85,7 +85,7 @@ Choose exactly one of `spawn` and `connectToParent`. Shorthand accepts `entry/na
 
 Untargeted `host.thread.request` uses current direct targets. `send(nameOrId, method, payload, options)` selects one target. `notify` selects with `{ targetId }` and waits only for actual physical write, without provider completion or ACK. With several ordinary direct targets, untargeted calls retain independent per-target results.
 
-`timeoutFeature` and `retryFeature` accept complete feature instances or `false`. Precedence is per-call, installed transport policy, then link-policy plugin. The example chooses a 500 ms call timeout and disables retry for that call. No selected policy means no automatic policy. Native startup, health, stop, and business deadlines keep their respective owners; business timeout does not configure those clocks.
+Per-call `timeout` and `retry` accept policy options or `false`; the transport `features` record accepts native feature tokens. Precedence is per-call, installed transport policy, then link-policy plugin. The example chooses a 500 ms call timeout and disables retry for that call. No selected policy means no automatic policy. Native startup, health, stop, and business deadlines keep their respective owners; business timeout does not configure those clocks.
 
 Thread `spec.limits.callWallTimeMs` surrounds the whole originating call, including retry/backoff. The native registration retains its initially admitted spec's cap across restart and replacement. A shorter business timeout may end the call earlier; `timeout: false` cannot disable the native cap. Without a native cap, `timeout: false` adds no deadline.
 

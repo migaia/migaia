@@ -132,7 +132,7 @@ export class RpcHostInstallation {
     ports.setNative(native)
     this.#public = native as unknown as IRpcHost
     try {
-      await this.#native!.use(...program.flows, program.plugin())
+      await this.#native!.use(...program.flows)
       await this.#native!.use(...program.transports)
       await ports.announceDirectory()
       return this.#public
@@ -150,7 +150,7 @@ export class RpcHostInstallation {
   readonly use = async (...plugins: readonly IRpcHostPlugin[]): Promise<IRpcHost> => {
     this.#ports.assertOpen()
     for (const plugin of plugins)
-      if (readRpcDefinition(plugin)?.kind === RpcDefinitionKind.feature)
+      if (readRpcDefinition(plugin)?.kind === RpcDefinitionKind.features)
         throw tagRpcError(new TypeError(HostErrorText.flowStarted), RpcCoreErrorCode.invalidConfig)
     /** The same compiler fixes placement order before any new transport opens IO. */
     const program = new RpcFlowProgram(plugins)

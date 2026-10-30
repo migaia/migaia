@@ -6,6 +6,8 @@ import type {
   IDefinedPluginConstraint,
   IPluginHostCore,
   IFeature,
+  IFeatureRecord,
+  IFeatureOutputs,
   IFeatureDependencyRecord
 } from '@migaia/plugin-host'
 import type { IAbortSignal } from '@migaia/utils/promise'
@@ -28,7 +30,7 @@ import type { IRpcWarning } from '../host/warning.ts'
 /** Native source policy borrows its genuine installation core, including dependency liquidation. */
 export type IRpcTransportSetupContext = IRpcTransportContext &
   Readonly<{
-    owner: IPluginHostCore
+    owner: IPluginHostCore & Readonly<{ features: Readonly<Record<string, object>> }>
     /** Native notice coalescing borrows the original optional reporter, never a default wrapper. */
     configuredReport?: (error: unknown) => void
   }>
@@ -78,17 +80,19 @@ export type IRpcFlowFeature<E extends object = Record<never, never>> = IFeature<
  * Host accepts genuine SDK registrations only; structural metadata grants no installation
  * authority.
  */
-export type IRpcHostPlugin = IRpcTransportPlugin | IRpcFlowPlugin | IRpcFlowFeature<object>
+export type IRpcHostPlugin = IRpcTransportPlugin | IRpcFlowPlugin
 
 /** Project local feature extensions once so every native transport uses the same public inference. */
-export type IRpcTransportFeatureExtensions<TFeature> = IRpcIntersection<
-  TFeature extends IRpcFlowFeature<infer E>
-    ? E
-    : TFeature extends IRpcNativeTransportFeature<infer E>
+export type IRpcTransportFeatureExtensions<TFeatures extends IFeatureRecord> = IRpcIntersection<
+  TFeatures[keyof TFeatures] extends infer TFeature
+    ? TFeature extends IRpcFlowFeature<infer E>
       ? E
-      : never
+      : TFeature extends IRpcNativeTransportFeature<infer E>
+        ? E
+        : never
+    : never
 > &
-  object
+  Readonly<{ features: IFeatureOutputs<TFeatures> }>
 
 /** Per-host setup receives cancellation and reporting without mutable host work tables. */
 export type IRpcFlowSetupContext = Readonly<{
@@ -126,13 +130,17 @@ export type IRpcFlowInstallation<E extends object = Record<never, never>> = Read
 /** Cold reusable flow configuration constructs installation-local resources in its native hook. */
 export type IRpcFlowDefinition<E extends object = Record<never, never>> = Readonly<{
   name: string
+  /** Custom flow execution uses this unsigned 16-bit phase, independent from record enumeration. */
+  phase?: number
   /** The same native opaque Features determine dependency order inside each fixed stage position. */
   dependencies?: IFeatureDependencyRecord
   setup(context: IRpcFlowSetupContext): IRpcFlowInstallation<E> | Promise<IRpcFlowInstallation<E>>
 }>
 
 /** A link policy supplies only complete feature instances; host contains no concrete strategies. */
-export type IRpcLinkPolicyDefinition = Readonly<{
+export type IRpcLinkPolicyDefinition<
+  F extends Readonly<Record<string, IRpcCallFeature>> = Readonly<Record<string, IRpcCallFeature>>
+> = Readonly<{
   name: string
-  features: readonly IRpcCallFeature[]
+  features: F
 }>

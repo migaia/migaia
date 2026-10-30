@@ -109,7 +109,7 @@ it('opens three genuine managed units behind one logical Pool target', async () 
     self: { name: 'assembled-host', instanceId: 'assembled-host' },
     plugins: [
       coroutinePlugin({
-        features: [feature],
+        features: { feature },
         spawn: workload.task,
         supervisor: { budget },
         report: (error) => reports.push(error)

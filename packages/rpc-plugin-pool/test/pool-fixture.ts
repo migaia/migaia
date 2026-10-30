@@ -2,8 +2,11 @@
 import type {
   IRpcNativeTransportFeature,
   IRpcNativeFeatureContext,
-  IRpcNativePoolMember
+  IRpcNativePoolMember,
+  IRpcNativePoolEvents
 } from '@migaia/rpc-host/sdk'
+import { registerRpcNativeFeature, RpcNativeFeatureKind } from '@migaia/rpc-host/sdk'
+import { defineFeature, type IFeatureOutput } from '@migaia/plugin-host'
 
 /** Cases observe acquisition/cleanup through existing concrete native member methods. */
 export type INativeObservation = Readonly<{
@@ -64,7 +67,7 @@ class ObservedMember implements IRpcNativePoolMember {
 /** Per-installation counters never cross reusable cold feature instances or host lifetimes. */
 class NativeObservation<E extends object> {
   /** The complete production feature still owns every scheduler and business operation. */
-  readonly #feature: IRpcNativeTransportFeature<E>
+  readonly #feature: IFeatureOutput<IRpcNativeTransportFeature<E>>
   /** Only actual accepted native resources become visible here. */
   readonly #members: IRpcNativePoolMember[]
   /** Existing callback gates and teardown observations are case-owned inputs. */
@@ -73,7 +76,7 @@ class NativeObservation<E extends object> {
   #next = 0
   /** Save cold configuration without opening any source. */
   constructor(
-    feature: IRpcNativeTransportFeature<E>,
+    feature: IFeatureOutput<IRpcNativeTransportFeature<E>>,
     members: IRpcNativePoolMember[],
     observation: INativeObservation
   ) {
@@ -82,25 +85,34 @@ class NativeObservation<E extends object> {
     this.#observation = observation
   }
   /** Only the native constructor callback is observed; no Peer or logical media is fabricated. */
-  readonly install = (context: IRpcNativeFeatureContext) =>
-    this.#feature.install({
+  install(context: IRpcNativeFeatureContext) {
+    return this.#feature.install({
       ...context,
       openMember:
         context.openMember === undefined
           ? undefined
-          : async (privateContext, events) => {
-              const index = this.#next++
-              this.#observation.opened?.(index)
-              await this.#observation.beforeOpen?.(index)
-              const member = new ObservedMember(
-                await context.openMember!(privateContext, events),
-                index,
-                this.#observation
-              )
-              this.#members.push(member)
-              return member
-            }
+          : (privateContext, events) => this.#openMember(context, privateContext, events)
     })
+  }
+  /** Observe the genuine repeatable opener while retaining its exact native resources. */
+  async #openMember(
+    context: IRpcNativeFeatureContext,
+    privateContext: Parameters<NonNullable<IRpcNativeFeatureContext['openMember']>>[0],
+    events: IRpcNativePoolEvents
+  ): Promise<IRpcNativePoolMember> {
+    /** Acquisition order remains local to this actual native output installation. */
+    const index = this.#next++
+    this.#observation.opened?.(index)
+    await this.#observation.beforeOpen?.(index)
+    /** Cleanup observation wraps only the native source returned by its real opener. */
+    const member = new ObservedMember(
+      await context.openMember!(privateContext, events),
+      index,
+      this.#observation
+    )
+    this.#members.push(member)
+    return member
+  }
 }
 
 /** A genuine feature remains complete while the fixture observes its original acquisition port. */
@@ -109,8 +121,11 @@ export function observingPool<E extends object>(
   members: IRpcNativePoolMember[],
   observation: INativeObservation = {}
 ): IRpcNativeTransportFeature<E> {
-  return {
-    kind: feature.kind,
-    install: (context) => new NativeObservation(feature, members, observation).install(context)
-  }
+  /** Genuine native dependency construction supplies the production output under a local alias. */
+  const observed = defineFeature({
+    dependencies: { original: feature },
+    install: (_core, outputs) => new NativeObservation(outputs.original, members, observation)
+  })
+  registerRpcNativeFeature(observed, { role: RpcNativeFeatureKind.pool })
+  return observed
 }

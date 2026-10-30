@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original connection policy and handshake rollback assertions use canonical public owners. */
 import { EventEmitter } from 'node:events'
 import { expect, it, vi } from 'vitest'
@@ -74,26 +75,27 @@ it.each(['deployment', 'managed'] as const)(
       'local',
       `call-policy-${configuration}`,
       'memory',
-      configuration === 'deployment' ? [strategy] : []
+      configuration === 'deployment' ? { strategy } : {}
     )
     /** The chain policy precedes native startup and leaves the original feature instance intact. */
     const host = await createRpcHost({
       ...server.options,
       plugins:
         configuration === 'managed'
-          ? [linkPolicy({ features: [strategy] }), server.transport]
+          ? [linkPolicy({ features: { strategy } }), server.transport]
           : [server.transport]
     })
     /** Actual provider dispatch observes the received method and unchanged originating key. */
     const received: IRpcEnvelope[] = []
     /** Only the real fixed dispatch hook records actual business admission. */
     const observer = defineFlowFeature({
+      phase: 1000,
       name: 'received-call-policy',
       setup: () => receivedCallStages(received)
     })
     /** A real accepted declaration is the only authority for retry idempotency. */
     const client = await server.connect('remote', {
-      plugins: [observer],
+      plugins: [rpcFeaturesPlugin({ features: { observer } })],
       provide: { api: { value: business } },
       contract: {
         schemaVersion: 1,

@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Preserve early business delivery through the current public Process socket and Host owners. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -90,6 +91,7 @@ class EarlyProcessFrames {
   client() {
     /** This actual flow stage only holds user work at its admitted handshake boundary. */
     const gate = defineFlowFeature({
+      phase: 1000,
       name: 'early-process-accept',
       setup: () => ({ stages: { [RpcFlowPoint.handshakeOutbound]: this.#accept } })
     })
@@ -98,7 +100,7 @@ class EarlyProcessFrames {
       self: { name: 'early-client', instanceId: 'early-client' },
       provide: { receive: this.#receive },
       plugins: [
-        gate,
+        rpcFeaturesPlugin({ features: { gate } }),
         processPlugin({
           connect: {
             target: {

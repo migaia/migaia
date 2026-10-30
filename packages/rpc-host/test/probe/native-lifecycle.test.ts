@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original observer lifecycle predicates receive actual public Host and native Session owners. */
 import { createRpcHost } from '@migaia/rpc-host'
 import auth from '@migaia/rpc-host/plugins/auth'
@@ -76,7 +77,7 @@ it('describes native encryption from the actual authentication configuration own
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      protection,
+      rpcFeaturesPlugin({ features: { feature0: protection } }),
       probe({
         stages: ['frame', 'protected'],
         emit: () => undefined,
@@ -86,7 +87,9 @@ it('describes native encryption from the actual authentication configuration own
     ]
   })
   /** Both handshakes use the same genuine opaque Feature definition with independent installations. */
-  const client = await listener.connect('caller', { plugins: [protection] })
+  const client = await listener.connect('caller', {
+    plugins: [rpcFeaturesPlugin({ features: { feature0: protection } })]
+  })
   try {
     expect(descriptors[0]!.authentication).toBe('encrypt-sign')
   } finally {

@@ -16,10 +16,12 @@ import type { IBrowserFeature } from './plugin-types.ts'
 /** Borrow a real Worker or worker self; installation never launches or terminates its native owner. */
 export function dedicatedWorkerPlugin<
   const N extends string = 'worker',
-  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+  const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<
+    Record<string, IBrowserFeature>
+  >
 >(
   options: IWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
-): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true> {
   /** Source admission is cold and precedes all native subscriptions. */
   const worker = options?.worker
   if (
@@ -41,5 +43,5 @@ export function dedicatedWorkerPlugin<
     handshakeTimeoutMs: options.connect?.timeoutMs,
     connect: { retain: options.connect?.retain },
     open: (context) => attachBrowserCarrier(createDedicatedWorkerCarrier(worker, context), context)
-  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>
 }

@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Genuine Auth capacity retains a stream through its actual iterator and physical terminal work. */
 import { createRpcHost } from '@migaia/rpc-host'
 import auth from '@migaia/rpc-host/plugins/auth'
@@ -54,6 +55,7 @@ it('retains legacy stream admission through next, return and terminal physical c
   }
   /** Native registration places this original callback before the authentic Auth transform. */
   const terminalGate = defineFlowFeature({
+    phase: 1000,
     name: 'stream-retention-physical-terminal',
     setup: () => ({ stages: { [RpcFlowPoint.envelopeOutbound]: holdTerminal } })
   })
@@ -63,16 +65,20 @@ it('retains legacy stream admission through next, return and terminal physical c
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      auth({
-        sign: (value) => value,
-        verify: (value) => value,
-        retain: 310_000,
-        maxReplayEntriesPerPeer: 1,
-        onRejected: (rejection) => {
-          rejected.push(rejection.reason)
+      rpcFeaturesPlugin({
+        features: {
+          terminalGate,
+          feature0: auth({
+            sign: (value) => value,
+            verify: (value) => value,
+            retain: 310_000,
+            maxReplayEntriesPerPeer: 1,
+            onRejected: (rejection) => {
+              rejected.push(rejection.reason)
+            }
+          })
         }
       }),
-      terminalGate,
       server.transport
     ],
     provide: {
@@ -85,7 +91,11 @@ it('retains legacy stream admission through next, return and terminal physical c
   })
   /** The opposite public Host supplies every real opening, credit, cancellation and fresh id. */
   const client = await server.connect('peer', {
-    plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+    plugins: [
+      rpcFeaturesPlugin({
+        features: { feature0: auth({ sign: (value) => value, verify: (value) => value }) }
+      })
+    ]
   })
   state.carrier = client.pair[0]
   /** The original native clock input is controlled only after both real handshakes have finished. */

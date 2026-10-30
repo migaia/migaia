@@ -25,7 +25,7 @@ it('keeps an actual Process call pending beyond its installed timeout when timeo
     plugins: [
       processPlugin({
         spawn: new URL('./fixtures/core-session-child.ts', import.meta.url),
-        features: [timeoutFeature({ ms: 100, scheduler })]
+        features: { timeout: timeoutFeature({ ms: 100, scheduler }) }
       })
     ],
     report: () => undefined

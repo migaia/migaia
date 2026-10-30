@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { createNodeThreadChannelFactory } from '../../src/threads/node-launcher.ts'
 import { nativeFixture, workerEntry } from './fixture.ts'
 import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import type { IRpcNotifyOptions } from '@migaia/rpc-host'
 import { threadFrames } from './frame.ts'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 describe('thread Host facade', () => {
   it.each([false, true])(
     'Host forwards callWallTimeMs as the total request deadline (timeout disabled: %s)',
@@ -19,6 +20,10 @@ describe('thread Host facade', () => {
         spec: { entry: workerEntry, limits: { callWallTimeMs: 100 } }
       })
       try {
+        /** The optional larger caller budget uses its real installed Feature's original clock. */
+        await host.host.use(
+          linkPolicy({ features: { budget: timeoutFeature({ ms: 200, scheduler }) } })
+        )
         /** Adoption creates the actual Worker-side plugin before its never-finishing request. */
         await host.host.use(host.plugin)
         const outlet = host.host.thread!
@@ -26,7 +31,7 @@ describe('thread Host facade', () => {
         /** Caller allowance is larger, so the facade's 100 ms cap must win. */
         const result = outlet
           .send('p', 'p.hold', undefined, {
-            timeout: disabled ? false : timeoutFeature({ ms: 200, scheduler })
+            timeout: disabled ? false : undefined
           })
           .catch((error: unknown) => error)
         await expect

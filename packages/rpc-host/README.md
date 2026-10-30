@@ -26,7 +26,7 @@ import { timeoutFeature } from '@migaia/rpc-host/features'
 const host = await createRpcHost<{ double(value: number): number }>({
   plugins: [
     coroutinePlugin({
-      features: [timeoutFeature({ ms: 1500 })],
+      features: { timeout: timeoutFeature({ ms: 1500 }) },
       spawn: async ({ connect, signal }) => {
         const child = await createRpcHost({
           plugins: [coroutinePlugin({ connectToParent: connect })],
@@ -59,7 +59,7 @@ try {
 
 构造后可用 `const extended = await host.use(transport)` 后装传输，返回同一个冻结的原生 host，并在返回值的类型上增加命名空间。每次 `use` 独立提交或回滚；构造时那一批则一起成功或失败。改变消息流的宿主级 Feature 只能在构造的 `plugins` 中配置，后装会以 `INVALID_CONFIG` 拒绝；后装传输自动借用它们，传输自己的 `features` 随传输一起安装，仍只覆盖本命名空间。只读观察插件，包括警告订阅，可以后装。
 
-已有 `defineHost` 或 class 宿主通过 `@migaia/rpc-host/sdk` 的 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`，并把原生构造请求转交 `pipeline(name, request)`。每个传输自己声明管道，无需预列命名空间。普通原生宿主用 `rpcFlowPlugin([...features])` 安装共享信息流，再装传输。具体接法见[使用指南](./USEGUIDE.md#在已有宿主中安装-rpc)。
+已有 `defineHost` 或 class 宿主通过 `@migaia/rpc-host/sdk` 的 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`，并把原生构造请求转交 `pipeline(name, request)`。每个传输自己声明管道，无需预列命名空间。普通原生宿主用 `rpcFeaturesPlugin({ features })` 安装共享信息流，再装传输。具体接法见[使用指南](./USEGUIDE.md#在已有宿主中安装-rpc)。
 
 ## 调用与归属
 
@@ -90,7 +90,7 @@ try {
 
 ## 可选能力
 
-同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂既可放进 host 的 `plugins`，也可放进传输的 `features`。host 配置作用于所有命名空间；传输配置只覆盖本命名空间的同种能力，每个命名空间只启用一份实现。host 级 `limitsFeature` 跨命名空间共用额度，传输级各自独立。`probe`、`typegen` 和 Devtools 只装在 host 级。原 `namespaces` 作用范围选项已删除，按传输选择范围时使用 `features`。
+同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂产物放入 `rpcFeaturesPlugin({ features: { name: feature } })`，再把该 plugin 放进 host 的 `plugins`；传输也用 `features: { name: feature }`。host 配置作用于所有命名空间；传输配置只覆盖本命名空间的同种能力，每个命名空间只启用一份实现。host 级 `limitsFeature` 跨命名空间共用额度，传输级各自独立。`probe`、`typegen` 和 Devtools 只装在 host 级。原 `namespaces` 作用范围选项已删除，按传输选择范围时使用 `features`。
 
 ```ts doc-test=check
 import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
@@ -98,23 +98,24 @@ import { linkPolicy, limitsFeature, probe } from '@migaia/rpc-host/plugins'
 import timeoutFromSubpath from '@migaia/rpc-host/features/timeout'
 
 export const defaults = linkPolicy({
-  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })]
+  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) }
 })
 export const capacity = limitsFeature({ maxGlobal: 256, maxPerPeer: 64 })
 export const observation = probe({
   stages: ['message', 'peer'],
   emit: (view) => console.log({ ...view })
 })
-export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
+export const deadlineFeature = timeoutFromSubpath({ ms: 100 })
+export const perCallDeadline = { ms: 100 }
 ```
 
 汇总入口与默认子路径导入均可 tree-shake。推荐安装 `limitsFeature`；省略它就不启用这些配额。安装 `idempotencyFeature` 后，才有 `host.<ns>.outcome(key)`。auth 默认把签名绑定对象交给 `sign/verify`；文本和字节模式只编码一层绑定。它的请求 ID 去重默认在完成后立即释放，也可选择签名窗口或毫秒 `retain`；`maxReplayEntriesPerPeer` 只限制数字保留模式，`onRejected` 接收容量拒绝原因。配置和 HMAC 示例见[认证说明](./USEGUIDE.md#认证签名与重复请求)。
 
 `errorMapFeature` 同步决定对端能看到哪些错误信息，不改变本地原错、report、警告或日志观察。回调抛错、返回 Promise 或结果无法序列化时，报告映射失败，并按未映射时的规则发送原错误。未配置映射时，未认证对端的握手失败仍默认隐藏细节。见[错误映射](./USEGUIDE.md#映射发往对端的错误)。
 
-自定义信息流通过 `defineFlowFeature` 的 `setup` 返回 `stages`，放进宿主的 `plugins` 或某个传输的 `features`；stage 接收该管道的 payload 和原生 `next(payload)`。观察事件单独放在 `observe`。frame 管道允许多次提交，各成员独立：捕获并报告一个成员失败后可以继续交出下一个；忽略失败的 `next()` Promise 会使管道拒绝。被取消的 batch 成员由原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`，其他成员照常完成。
+自定义信息流通过 `defineFlowFeature` 的 `setup` 返回 `stages`，放进 `rpcFeaturesPlugin` 的 `features` record 或某个传输的 `features` record；stage 接收该管道的 payload 和原生 `next(payload)`。观察事件单独放在 `observe`。frame 管道允许多次提交，各成员独立：捕获并报告一个成员失败后可以继续交出下一个；忽略失败的 `next()` Promise 会使管道拒绝。被取消的 batch 成员由原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`，其他成员照常完成。
 
-内置位置固定：出站 plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire；入站反向。数组书写顺序不改变这些位置。第三方 stage 默认在 plaintext，高阶 SDK 作者可显式指定受支持的 `layer`。
+内置位置固定：出站 plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire；入站反向。record 的键名与插入顺序不决定执行顺序。第三方 feature 必须声明整数 `phase`（0–65535）；同一 stage point 与 layer 不允许 phase 冲突。`dependencies` 决定原生安装顺序，`phase` 决定执行顺序。第三方 stage 默认在 plaintext，高阶 SDK 作者可显式指定受支持的 `layer`。
 
 `authFeature` 对完整消息执行保护，再由 `chunkFeature` 拆成物理帧；接收端先重组，再还原保护。probe 的 `protected` 事件对应整条消息，`frame` 事件保留实际 `chunkIndex`、`chunkCount` 和 `members`。物理 batch 的成员数在 batch frame 上观察；`envelope` 事件仍对每条逻辑消息观察一次。
 
@@ -128,7 +129,7 @@ export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 
 ## 期限、取消与错误
 
-`FeatureScope` 唯一解析覆盖顺序：单次调用 `options.timeout/retry`、所在传输 plugin 的 feature、链路策略 plugin。单次值只接受完整 feature 实例或 `false`，不接受数字或配置对象。`timeout: false` 不启用 feature 超时，持续等待响应；已经继承的上游剩余期限仍递减。`retry: false` 禁用重试。只有发起方的标量调用和 group 重试，stream 从不重放、只使用 timeout；转发跳不重新开始预算。
+`FeatureScope` 唯一解析覆盖顺序：单次调用 `options.timeout/retry`、所在传输 plugin 的 feature、链路策略 plugin。单次值接受 timeout `{ ms }`、retry 配置对象或 `false`；不接受 feature token、执行方法或数字。`timeout: false` 不启用 feature 超时，持续等待响应；已经继承的上游剩余期限仍递减。`retry: false` 禁用重试。只有发起方的标量调用和 group 重试，stream 从不重放、只使用 timeout；转发跳不重新开始预算。
 
 进入 provider 前剩余截止时间已经耗尽的调用，以 `DEADLINE_EXCEEDED` 拒绝，不执行 provider；`before-start` 的取消语义保持不变。
 

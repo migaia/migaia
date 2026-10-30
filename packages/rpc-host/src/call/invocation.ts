@@ -3,19 +3,18 @@ import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import type {
   IRpcAttempt,
   IRpcAttemptFacts,
-  IRpcAttemptOptions,
-  IRpcCallFeatures
+  IRpcAttemptOptions
 } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { createRpcError, createRpcTimeoutError } from '../host/error-owner.ts'
-import type { FeatureScope } from '../feature/scope.ts'
+import type { FeatureScope, ISelectedCallFeatures } from '../feature/scope.ts'
 import { resolveAbortReason } from '../host/abort-reason.ts'
 import type { ICallCommand, ICallLocalOptions, ICallTargetRef } from './types.ts'
 
 /** Only this explicit port can start an attempt or retire the originating feature execution. */
 export type ICallInvocationOwner = Readonly<{
-  features: Pick<FeatureScope, 'execute'>
+  features: Pick<FeatureScope, 'executeSelected'>
   now(): number
   attempt(
     target: ICallTargetRef,
@@ -37,7 +36,7 @@ export class CallInvocation implements IRpcAttempt<unknown> {
   /** A narrow address is refreshed by Namespace only when a new attempt actually begins. */
   readonly #target: ICallTargetRef
   /** Selected complete instances stay fixed throughout this originating execution. */
-  readonly #selected: IRpcCallFeatures
+  readonly #selected: ISelectedCallFeatures
   /** Retry alone authorizes retaining original business data beyond physical write completion. */
   readonly #retry: boolean
   /** Input exists only until first write without retry, or the final retry result. */
@@ -73,7 +72,7 @@ export class CallInvocation implements IRpcAttempt<unknown> {
     target: ICallTargetRef,
     command: ICallCommand,
     options: ICallLocalOptions,
-    selected: IRpcCallFeatures,
+    selected: ISelectedCallFeatures,
     facts?: IRpcAttemptFacts
   ) {
     this.#owner = owner
@@ -119,9 +118,7 @@ export class CallInvocation implements IRpcAttempt<unknown> {
         if (this.#caller.aborted) this.#abort()
       }
       if (this.#settled) return this.#completion.promise
-      Promise.resolve(
-        this.#owner.features.execute(this.#target.namespace, this.#selected, this)
-      ).then(
+      Promise.resolve(this.#owner.features.executeSelected(this.#selected, this)).then(
         (value) => this.#finish(true, value),
         (error: unknown) => this.#finish(false, error)
       )

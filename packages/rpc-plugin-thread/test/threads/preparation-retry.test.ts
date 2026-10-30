@@ -1,3 +1,4 @@
+import { createRpcRetryExecution } from '@migaia/rpc-host/features/retry'
 import { EventEmitter } from 'node:events'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -5,11 +6,12 @@ import type { IRpcAvailableAttempt } from '@migaia/rpc-contract/interfaces'
 import { describe, expect, it } from 'vitest'
 import { createWebThreadChannelFactory } from '../../src/threads/web-launcher.ts'
 import type { IThreadWebPort } from '../../src/threads/types.ts'
-import { retryFeature } from '@migaia/rpc-host/features/retry'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
 import { threadFrames } from './frame.ts'
 import { nativeFixture, workerEntry } from './fixture.ts'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 /** Ordinary lifecycle regressions from archived audit receipts do not restart the interrupted audit. */
 describe('thread preparation and retry settlement', () => {
   it('invokes the configured stop hook without a receiver on the real native unit', async () => {
@@ -108,7 +110,7 @@ describe('thread preparation and retry settlement', () => {
     /** Only the initial generation may receive the physical send. */
     let sends = 0
     /** Canonical retry owns cancellation and cleanup; this test adds no retry implementation. */
-    const result = retryFeature({ scheduler, report: () => undefined })
+    const result = createRpcRetryExecution({ scheduler, report: () => undefined })
       .run({
         facts: {
           method: 'p.read',
@@ -146,14 +148,15 @@ describe('thread preparation and retry settlement', () => {
     /** Settlement is checked before joining the request or closing the fixture. */
     let outcome: unknown
     try {
-      /** The only installed feature belongs to the real Worker. */
+      /** The larger optional caller budget borrows the real installed Feature's manual clock. */
+      await fixture.host.use(
+        linkPolicy({ features: { budget: timeoutFeature({ ms: 200, scheduler }) } })
+      )
       const feature = await fixture.install()
       /** A held request remains physically pending so only its logical deadline may settle it. */
-      const result = feature
-        .hold([], { timeout: timeoutFeature({ ms: 200, scheduler }) })
-        .catch((error: unknown) => {
-          outcome = error
-        })
+      const result = feature.hold([]).catch((error: unknown) => {
+        outcome = error
+      })
       await expect
         .poll(async () =>
           (await threadFrames(fixture.frames)).some(

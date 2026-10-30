@@ -1,6 +1,8 @@
 /** Pool is a complete native resource feature installed by its concrete transport. */
+import { defineFeature } from '@migaia/plugin-host'
 import {
   RpcNativeFeatureKind,
+  registerRpcNativeFeature,
   RpcNativeMembers,
   defaultRpcId,
   type IRpcNativeFeatureContext,
@@ -234,18 +236,32 @@ class PoolInstallation implements IRpcOriginSelection {
   }
 }
 
-/** Validate before installation; each native transport acquires its own independent pool. */
+/** Native Feature output retains the original scheduler factory without acquiring members early. */
+class PoolExecution {
+  /** Caller-selected native scheduling policy belongs to this installation's pool resources. */
+  readonly #options: IPoolPluginOptions
+
+  /** Numeric admission already succeeded at the public factory boundary. */
+  constructor(options: IPoolPluginOptions) {
+    this.#options = options
+  }
+
+  /** Only a concrete repeatable transport source can open and own this pool's actual members. */
+  async install(context: IRpcNativeFeatureContext) {
+    if (!context.openMember)
+      throw tagPoolError(
+        new TypeError(RpcPoolText.transportUnsupported),
+        RpcPoolErrorCode.transportUnsupported
+      )
+    return new PoolInstallation(this.#options, context).open()
+  }
+}
+
+/** Validate before native installation; each transport acquires its own independent pool. */
 export function pool(options: IPoolPluginOptions): IRpcNativeTransportFeature<IPoolExtensions> {
   validatePoolOptions(options)
-  return Object.freeze({
-    kind: RpcNativeFeatureKind.pool,
-    install: async (context: IRpcNativeFeatureContext) => {
-      if (!context.openMember)
-        throw tagPoolError(
-          new TypeError(RpcPoolText.transportUnsupported),
-          RpcPoolErrorCode.transportUnsupported
-        )
-      return new PoolInstallation(options, context).open()
-    }
-  })
+  /** The opaque identity contributes installation controls through the genuine native graph. */
+  const feature = defineFeature(() => new PoolExecution(options))
+  registerRpcNativeFeature(feature, { role: RpcNativeFeatureKind.pool })
+  return feature
 }

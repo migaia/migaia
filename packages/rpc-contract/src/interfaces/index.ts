@@ -5,5 +5,4 @@ export { IpcSendClass, RpcSessionRetirement, rpcCarrierWriteFacts } from './carr
 export type * from './flow.ts'
 export { RpcDispatchDrop } from './flow.ts'
 export type * from './feature.ts'
-export { RpcCallFeatureKind } from './feature.ts'
 export * from './observation.ts'

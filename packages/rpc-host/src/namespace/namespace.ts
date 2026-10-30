@@ -14,7 +14,11 @@ import type {
   IRpcTransportDefinition,
   IRpcTransportInstallation
 } from '@migaia/rpc-contract/interfaces'
-import { getPluginRuntimeIntegration, type IPluginHostCore } from '@migaia/plugin-host'
+import {
+  getPluginRuntimeIntegration,
+  type IPluginHostCore,
+  type IFeatureRecord
+} from '@migaia/plugin-host'
 import {
   createAbortController,
   createLifecycleScope,
@@ -180,7 +184,7 @@ class NamespaceSource {
   /** The genuine source registration alone grants native commit and rollback authority. */
   readonly #core: IPluginHostCore
   /** Original native source construction remains with its concrete transport factory. */
-  readonly #definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>
+  readonly #definition: IRpcTransportDefinition<IFeatureRecord, object, IRpcTransportSetupContext>
   /** Acquisition cancellation stays live until the same source Sessions finish closing. */
   readonly #controller = createAbortController()
   /** Actual acquired source and Session handles retain original reverse cleanup ownership. */
@@ -197,7 +201,7 @@ class NamespaceSource {
     owner: Namespace,
     options: INamespaceOptions,
     core: IPluginHostCore,
-    definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>
+    definition: IRpcTransportDefinition<IFeatureRecord, object, IRpcTransportSetupContext>
   ) {
     this.#owner = owner
     this.#options = options
@@ -222,7 +226,7 @@ class NamespaceSource {
   async open(): Promise<void> {
     /** Source callbacks use their original resource lifetime while borrowing the fixed namespace. */
     const context: IRpcTransportSetupContext = {
-      owner: this.#core,
+      owner: this.#core as IRpcTransportSetupContext['owner'],
       configuredReport: this.#options.configuredReport,
       ...this.#options.sessions.context(
         this.#scope,
@@ -359,7 +363,7 @@ export class Namespace {
   /** A genuine source definition joins this already-declared namespace's original admission owner. */
   installSource(
     core: IPluginHostCore,
-    definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>
+    definition: IRpcTransportDefinition<IFeatureRecord, object, IRpcTransportSetupContext>
   ): Promise<void> {
     this.#assertOpen()
     return new NamespaceSource(this, this.#options, core, definition).open()
@@ -368,7 +372,7 @@ export class Namespace {
   /** Transport and source acquisition share the original operation-abort and resource handoff. */
   async openTransport(
     core: IPluginHostCore,
-    definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>,
+    definition: IRpcTransportDefinition<IFeatureRecord, object, IRpcTransportSetupContext>,
     context: IRpcTransportSetupContext,
     resources: ILifecycleScope,
     close: (reason: unknown) => Promise<void>

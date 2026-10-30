@@ -65,16 +65,16 @@ export async function openWorker(entry: URL) {
       observer,
       processPlugin({
         spawn: entry,
-        features: [
+        features: {
           flow,
-          sendQueueFeature({ flow }),
-          ipcLogFeature({
+          sendQueue: sendQueueFeature({ flow }),
+          ipcLog: ipcLogFeature({
             report(record) {
               console.error(record)
             }
           }),
-          timeoutFeature({ ms: 1500 })
-        ]
+          timeout: timeoutFeature({ ms: 1500 })
+        }
       })
     ]
   })
@@ -87,7 +87,7 @@ export async function openWorker(entry: URL) {
 
 ## 选项与期限
 
-`connect: { target, timeoutMs? }` 选择已有服务；timeout-only 的 `connect` 可修饰 spawn/listen/parent。协商阶段默认 10,000 ms；随后名字准入用 `connect.timeoutMs`，默认也为 10,000 ms，`pending` 传递尚未用完的协商时间与本次名字探测预算之和；只在首次通知延长期限，重复通知不会刷新。`connectTimeoutMs` 则是命名本机来源的查找等待。单次业务调用使用完整 `timeoutFeature(...)` feature 或 `timeout: false`，并可传 `signal`；这些期限相互独立。
+`connect: { target, timeoutMs? }` 选择已有服务；timeout-only 的 `connect` 可修饰 spawn/listen/parent。协商阶段默认 10,000 ms；随后名字准入用 `connect.timeoutMs`，默认也为 10,000 ms，`pending` 传递尚未用完的协商时间与本次名字探测预算之和；只在首次通知延长期限，重复通知不会刷新。`connectTimeoutMs` 则是命名本机来源的查找等待。单次业务调用使用 `timeout: { ms }` 或 `timeout: false`，并可传 `signal`；这些期限相互独立。
 
 `spawn` 可选主入口、路径/URL、短启动配置或完整原生 recipe。主入口自派生写法见 README。原生 `supervision` 保留重启、健康检查和停止策略；恢复连接不重放未确认业务。stdio 的 stdout 属于 RPC，应用日志使用 stderr。
 

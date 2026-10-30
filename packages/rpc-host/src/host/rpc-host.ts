@@ -42,7 +42,7 @@ import {
 } from '../sdk/flow-pipelines.ts'
 import type { RpcFlowProgram, RpcTransportFlowProgram } from '../sdk/flow-program.ts'
 import type { IRpcDefinitionMetadata, IRpcSharedFlows } from '../sdk/metadata.ts'
-import { RpcDefinitionKind } from '../sdk/metadata.ts'
+import { readRpcFeature, RpcDefinitionKind } from '../sdk/metadata.ts'
 import { HostIdentity, defaultRpcId } from './identity.ts'
 import { createRpcAbortError, createRpcError, createRpcLifecycleError } from './error-owner.ts'
 import { HostErrorText } from './error-text.ts'
@@ -262,7 +262,13 @@ export class RpcHost {
     if (metadata.kind === RpcDefinitionKind.source)
       return this.#namespace(metadata.namespace).installSource(core, metadata.definition)
     if (metadata.kind === RpcDefinitionKind.policy) {
-      core.onDispose(this.#features.setDefaults(metadata.definition.features))
+      this.#flow.registerControls(core, (core as IRpcTransportSetupContext['owner']).features)
+      core.onDispose(
+        this.#features.setDefaults(
+          metadata.definition.features,
+          (core as IRpcTransportSetupContext['owner']).features
+        )
+      )
       return
     }
     if (metadata.kind === RpcDefinitionKind.feature)
@@ -273,6 +279,17 @@ export class RpcHost {
     /** Setup borrows the same Host lifetime and real work owners for every optional registration. */
     const context = this.#flowSetupContext(core)
     if (metadata.kind === RpcDefinitionKind.features) {
+      if (
+        Object.values(metadata.features).some(
+          (feature) => readRpcFeature(feature)?.category === 'call'
+        )
+      )
+        core.onDispose(
+          this.#features.setDefaults(
+            metadata.features,
+            (core as IRpcTransportSetupContext['owner']).features
+          )
+        )
       /** The original shared setup lends only its selected group relationship to native removal. */
       const shared = await metadata.prepare(core, this.#controller.signal, context)
       this.#flow.registerShared(core, shared)
@@ -285,6 +302,8 @@ export class RpcHost {
      * Readonly observers retain their native registration rather than becoming information-flow
      * Features.
      */
+    if (metadata.kind !== RpcDefinitionKind.flow)
+      throw tagRpcError(new TypeError(HostErrorText.pluginInvalid), RpcCoreErrorCode.invalidConfig)
     const installed = await metadata.prepare(core, this.#controller.signal, context)
     this.#flow.register(core, installed)
   }
@@ -466,7 +485,11 @@ export class RpcHost {
   /** Installation admits namespace names before a transport can acquire any physical resources. */
   async #installTransport(
     core: IPluginHostCore,
-    definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>,
+    definition: IRpcTransportDefinition<
+      import('@migaia/plugin-host').IFeatureRecord,
+      object,
+      IRpcTransportSetupContext
+    >,
     flows: RpcTransportFlowProgram
   ): Promise<void> {
     this.#sessions.admitNamespace(definition.namespace, this.#pendingNamespaces)
@@ -569,12 +592,16 @@ export class RpcHost {
      * Only call-feature instances are interpreted here; media/pool features remain with their
      * transport.
      */
-    const commitFeatures = this.#features.prepare(definition.namespace, definition.features ?? [])
+    const commitFeatures = this.#features.prepare(
+      definition.namespace,
+      definition.features ?? {},
+      (core as IRpcTransportSetupContext['owner']).features
+    )
     this.#flow.start()
     /** Native slot admission is the only way this namespace becomes part of the public host. */
     /** The transport receives lifecycle/session operations and owns every concrete media algorithm. */
     const transport: IRpcTransportSetupContext = {
-      owner: core,
+      owner: core as IRpcTransportSetupContext['owner'],
       configuredReport: this.#configuredReport,
       ...this.#sessions.context(sessionScope, resources, () => this.#reason)
     }
@@ -587,7 +614,10 @@ export class RpcHost {
       (reason) => namespace.close(this.#closing ? this.#reason : reason)
     )
     registration.surface = namespace.surface(
-      flow.namespaceExtensions(definition.namespace),
+      [
+        ...flow.namespaceExtensions(definition.namespace),
+        { features: this.#flow.controls(flows.controls(core)) }
+      ],
       installed.namespaceExtensions
     )
     /** Compose all methods before native publication; a published namespace is immutable. */

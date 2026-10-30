@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
@@ -186,9 +187,9 @@ it.each(['request', 'group'] as const)(
     /** Each original native endpoint constructs its own real inline JSON carrier codec. */
     const codec = { create: () => new RpcJsonCarrierCodec(), nativeBinary: false }
     /** The terminal provider and relay have independent installed native transport owners. */
-    const providerListener = coreMemoryServer('chunk-provider', undefined, 'memory', [], [], codec)
+    const providerListener = coreMemoryServer('chunk-provider', undefined, 'memory', {}, [], codec)
     /** Both actual connections use the same supported codec selection and negotiated chunk plugin. */
-    const relayListener = coreMemoryServer('chunk-relay', undefined, 'memory', [], [], codec)
+    const relayListener = coreMemoryServer('chunk-relay', undefined, 'memory', {}, [], codec)
     /** Real business invocation count distinguishes replay from diagnostic duplication. */
     let executions = 0
     /** This collector receives only actual logical Forwarder observations from the relay. */
@@ -198,7 +199,10 @@ it.each(['request', 'group'] as const)(
     /** The leaf owns ordinary provider execution, independent of the relay's held capability. */
     const provider = await createRpcHost({
       ...providerListener.options,
-      plugins: [chunkFeature(chunkOptions), providerListener.transport],
+      plugins: [
+        rpcFeaturesPlugin({ features: { chunk: chunkFeature(chunkOptions) } }),
+        providerListener.transport
+      ],
       provide: {
         echo: (value) => {
           executions++
@@ -210,7 +214,7 @@ it.each(['request', 'group'] as const)(
     const relay = await createRpcHost({
       ...relayListener.options,
       plugins: [
-        chunkFeature(chunkOptions),
+        rpcFeaturesPlugin({ features: { chunk: chunkFeature(chunkOptions) } }),
         probe({
           stages: ['forward'],
           emit: (event) => events.push({ ...event, route: event.route?.slice() })
@@ -224,7 +228,7 @@ it.each(['request', 'group'] as const)(
       await relayListener.link(providerListener)
       relay.provide({ echo: relay.memory.peers['chunk-provider']!.echo! })
       caller = await relayListener.connect('chunk-caller', {
-        plugins: [chunkFeature(chunkOptions)]
+        plugins: [rpcFeaturesPlugin({ features: { chunk: chunkFeature(chunkOptions) } })]
       })
       /** This exact business input requires several actual extension writes on the relay link. */
       const payload = 'forward-chunk-payload'.repeat(32)

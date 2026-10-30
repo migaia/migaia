@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original privacy atoms use current canonical error admission and real public request/stream IO. */
 import { randomUUID } from 'node:crypto'
 import { assert, describe, expect, it, vi } from 'vitest'
@@ -5,7 +6,7 @@ import type { IRpcHost } from '@migaia/rpc-host'
 import { normalizePortable } from '@migaia/rpc-contract/portable'
 import type { IRpcProviderDeclaration } from '@migaia/rpc-contract/protocol'
 import { RpcContractErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { errorMapFeature } from '@migaia/rpc-host/plugins/error-map'
 import { deserializeRpcError } from '@migaia/rpc-contract/errors'
 import { hostErrorWireMetadata, serializeRpcError } from '../../dist/host/error-wire-metadata.js'
@@ -94,7 +95,7 @@ describe('application-selected contract error privacy through public native Host
         () => undefined,
         undefined,
         (error) => reports.push(error),
-        [errorMapFeature(redactControlledError)]
+        [rpcFeaturesPlugin({ features: { feature0: errorMapFeature(redactControlledError) } })]
       )
       try {
         local =
@@ -125,7 +126,7 @@ describe('application-selected contract error privacy through public native Host
             ? RpcRemoteLayerErrorCode.contractInvalid
             : RpcContractErrorCode.invalidEnvelope
         await expect(
-          fixture.a.memory.send('b', 'describe', null, { timeout: timeoutFeature({ ms: 1000 }) })
+          fixture.a.memory.send('b', 'describe', null, { timeout: { ms: 1000 } })
         ).rejects.toMatchObject({ code, message: local.message })
         /**
          * The identity medium records original post-codec frames without decoding or restoring
@@ -174,7 +175,7 @@ describe('application-selected contract error privacy through public native Host
       () => undefined,
       undefined,
       undefined,
-      [errorMapFeature(redactControlledError)]
+      [rpcFeaturesPlugin({ features: { feature0: errorMapFeature(redactControlledError) } })]
     )
     try {
       /**
@@ -184,7 +185,7 @@ describe('application-selected contract error privacy through public native Host
       const start = fixture.pair[1].written.length
       /** The original one-second deadline is a complete timeout feature on the real directed stream. */
       const iterator = fixture.a.memory.streamTo('b', 'controlled-failure', [], {
-        timeout: timeoutFeature({ ms: 1000 })
+        timeout: { ms: 1000 }
       })
       /** Keep the genuine consumer's failure rather than decoding its terminal in a fixture path. */
       const failure = await iterator.next().catch((error: unknown) => error)

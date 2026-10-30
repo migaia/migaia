@@ -2,7 +2,8 @@ import { expect, it, vi } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { defineTransportPlugin, type IRpcNativeTransportFeature } from '@migaia/rpc-host/sdk'
+import type { IFeatureOutput } from '@migaia/plugin-host'
 import * as pool from '../dist/index.js'
 import { pool as poolFeature } from '../dist/index.js'
 import { repeatableConnect } from './connect-fixture.ts'
@@ -68,8 +69,12 @@ it('rejects listen and connect-to-parent before opening any member source', asyn
           defineTransportPlugin({
             name: mode,
             namespace: 'unsupported',
+            features: { scheduling: poolFeature({ size: 3 }) },
             open: async (context) => {
-              const installed = await poolFeature({ size: 3 }).install({
+              /** Read only the output created by this actual native plugin registration. */
+              const execution = context.owner.features
+                .scheduling as IFeatureOutput<IRpcNativeTransportFeature>
+              const installed = await execution.install({
                 ...context,
                 memberKind: 'process'
               })

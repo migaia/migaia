@@ -65,7 +65,7 @@ it('opens three genuine coroutine tasks and executes each scalar request only on
   const contexts = workload.contexts
   const calls = workload.calls
   const host = await createRpcHost({
-    plugins: [coroutinePlugin({ features: [pool({ size: 3 })], spawn: workload.task })]
+    plugins: [coroutinePlugin({ features: { workers: pool({ size: 3 }) }, spawn: workload.task })]
   })
   try {
     const ids = await Promise.all(
@@ -90,7 +90,7 @@ it('routes six calls once each through three real process members as scalar pool
     plugins: [
       processPlugin({
         spawn: new URL('./fixtures/process-child.mjs', import.meta.url),
-        features: [feature]
+        features: { feature }
       })
     ]
   })
@@ -138,7 +138,7 @@ it('routes six calls once each through three real thread members and closes all 
     plugins: [
       threadPlugin({
         spawn: new URL('./fixtures/thread-child.mjs', import.meta.url),
-        features: [feature]
+        features: { feature }
       })
     ]
   })

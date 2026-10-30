@@ -8,7 +8,11 @@ import type { IRpcStepOutcome, IRpcOutcomeLookupResult } from '@migaia/rpc-contr
 import type { IRpcFanoutResult } from '@migaia/rpc-host'
 import { createRpcHost, type IRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
 import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
-import { defineTransportPlugin, type IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
+import {
+  defineTransportPlugin,
+  rpcFeaturesPlugin,
+  type IRpcTransportPlugin
+} from '@migaia/rpc-host/sdk'
 
 /** Client A owns one scalar route and one streaming route. */
 type IAApi = { resize(width: number): string; frames(count: number): AsyncIterableIterator<number> }
@@ -59,7 +63,10 @@ expectTypeOf(mapped.memory.peers['client-a'].resize(800)).toEqualTypeOf<Promise<
 /** Single-remote APIs retain their own nested method namespace. */
 declare const single: IRpcHost<
   IAApi & { math: { add(pair: [number, number]): number } },
-  readonly [IRpcTransportPlugin<'memory'>, ReturnType<typeof idempotencyFeature>]
+  readonly [
+    IRpcTransportPlugin<'memory'>,
+    ReturnType<typeof rpcFeaturesPlugin<{ replay: ReturnType<typeof idempotencyFeature> }>>
+  ]
 >
 expectTypeOf(single.memory.request('resize', 800)).toEqualTypeOf<
   Promise<string | IRpcFanoutResult<string>>

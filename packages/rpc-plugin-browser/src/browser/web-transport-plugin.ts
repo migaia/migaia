@@ -140,10 +140,12 @@ function cleanupFailed(errors: readonly unknown[]): Error {
 /** Opening is cold; the reliable stream is created only by the receiving native host install. */
 export function webTransportPlugin<
   const N extends string = 'webTransport',
-  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+  const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<
+    Record<string, IBrowserFeature>
+  >
 >(
   options: IWebTransportPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
-): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true> {
   if (!options?.session || typeof options.session.createBidirectionalStream !== 'function')
     throw createBrowserPeerError(
       RpcBrowserErrorCode.invalidPeerSource,
@@ -158,5 +160,5 @@ export function webTransportPlugin<
     handshakeTimeoutMs: options.connect?.timeoutMs,
     connect: { retain: options.connect?.retain },
     open: (context) => openStream(options.session, context)
-  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>
 }

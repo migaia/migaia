@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public close cancels native verification without retaining a user callback or execution lease. */
 import { createRpcHost } from '@migaia/rpc-host'
 import auth, { type IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'
@@ -39,7 +40,7 @@ it.each(['fulfilled', 'rejected'] as const)(
     /** This is application input suspension, not a replacement queue, pipeline or dispatcher. */
     const verifier = new ClosingVerification()
     /** Explicit closing support exercises the same real keepalive path as native transports. */
-    const server = coreMemoryServer('provider', 'provider', 'memory', [], [], {
+    const server = coreMemoryServer('provider', 'provider', 'memory', {}, [], {
       create: () => new RpcJsonCarrierCodec(),
       nativeBinary: false,
       closingWrites: true
@@ -48,7 +49,9 @@ it.each(['fulfilled', 'rejected'] as const)(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        auth({ sign: (value) => value, verify: verifier.verify }),
+        rpcFeaturesPlugin({
+          features: { feature0: auth({ sign: (value) => value, verify: verifier.verify }) }
+        }),
         ...server.options.plugins
       ],
       report: (error) => failures.push(error),
@@ -62,7 +65,11 @@ it.each(['fulfilled', 'rejected'] as const)(
     })
     /** The caller's independent Auth and actual native pair perform both real handshakes. */
     const client = await server.connect('caller', {
-      plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+      plugins: [
+        rpcFeaturesPlugin({
+          features: { feature0: auth({ sign: (value) => value, verify: (value) => value }) }
+        })
+      ]
     })
     /** The original public request is observed until its actual source is retired. */
     let pending: Promise<unknown> | undefined

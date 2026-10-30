@@ -14,7 +14,7 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import * as catalog from '../../dist/dispatch/catalog.js'
 import * as exposure from '../../dist/dispatch/exposure.js'
 import type { IProviderCommitGate } from '../../dist/dispatch/types.js'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The existing connection owns the exact public Host rather than a per-session Peer facade. */
@@ -61,7 +61,7 @@ class ServeCommitBarrier {
     (name, request) => this.#host.pipeline(name, request)
   )
   /** The canonical memory listener lends actual SDK attach and bilateral Session negotiation. */
-  readonly #server = coreMemoryServer('provider', 'provider-1', 'memory', [], ['business'])
+  readonly #server = coreMemoryServer('provider', 'provider-1', 'memory', {}, ['business'])
   /** Only the native installation's existing continuation is held by this acceptance fixture. */
   readonly #release = deferred<void>()
   /** This receipt means the actual SDK transport install has returned its original resources. */
@@ -423,9 +423,7 @@ describe('runtime exposed methods serve after commit', () => {
       const cancellation = createRpcAbortError()
       /** Deadline expiry uses the complete timeout feature, with no fixture timer. */
       const options =
-        interruption === 'abort'
-          ? { signal: controller.signal }
-          : { timeout: timeoutFeature({ ms: 20 }) }
+        interruption === 'abort' ? { signal: controller.signal } : { timeout: { ms: 20 } }
       /** Handle caller failure immediately while waiting for actual provider admission. */
       const request = observe(
         fixture.caller.memory.request('business.request', interruption, options)

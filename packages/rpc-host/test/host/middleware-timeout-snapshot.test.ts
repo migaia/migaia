@@ -25,7 +25,7 @@ it.each(
     }
   })
   /** This installed native namespace borrows the actual complete policy instance. */
-  const server = coreMemoryServer('timeout-once', 'timeout-once', 'memory', [strategy])
+  const server = coreMemoryServer('timeout-once', 'timeout-once', 'memory', { strategy })
   /** A real SDK transport installs the original policy without another host or role registry. */
   const host = await createRpcHost(server.options)
   try {
@@ -52,7 +52,7 @@ it('timeout snapshots its configuration in receiver-free order', async () => {
   /** The complete factory is the new policy-capture boundary. */
   const strategy = timeoutFeature(config)
   /** Genuine native installation consumes the exact captured feature instance. */
-  const server = coreMemoryServer('timeout-fields', 'timeout-fields', 'memory', [strategy])
+  const server = coreMemoryServer('timeout-fields', 'timeout-fields', 'memory', { strategy })
   /** No deleted plugin.install context or result.ports object is recreated. */
   const host = await createRpcHost(server.options)
   try {
@@ -85,7 +85,7 @@ it('native timeout snapshot survives post-install mutation', async () => {
   const strategy = timeoutFeature(config)
   timeoutMs = 101
   /** This real transport owns the feature used by both originating namespace calls. */
-  const server = coreMemoryServer('timeout-snapshot', 'timeout-snapshot', 'memory', [strategy])
+  const server = coreMemoryServer('timeout-snapshot', 'timeout-snapshot', 'memory', { strategy })
   /** The actual public Host owns session admission and dispatch independently of the policy. */
   const host = await createRpcHost(server.options)
   /** The real peer responds normally, allowing both original snapshot observations to finish. */

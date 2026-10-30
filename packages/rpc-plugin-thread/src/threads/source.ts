@@ -15,7 +15,7 @@ import type {
   IRpcSessionHandle,
   IRpcSessionView,
   IRpcTransportContext,
-  IRpcTimeoutFeature
+  IRpcTimeoutExecution
 } from '@migaia/rpc-contract/interfaces'
 import {
   RpcMemberGeneration,
@@ -30,7 +30,7 @@ import {
   type IRpcNativePoolEvents
 } from '@migaia/rpc-host/sdk'
 import type { IThreadChannelFactory } from './types.ts'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { createRpcTimeoutExecution } from '@migaia/rpc-host/features/timeout'
 import { portableThreadSpec } from './error.ts'
 
 /** A full source preserves its actual launcher, budget, scheduler and native supervision policy. */
@@ -67,7 +67,7 @@ export class ThreadSource<THandle extends IThreadHandle = IThreadHandle> {
   /** Health and beforeTerminate use the exact accepted Session for that original native unit. */
   readonly #sessions = new WeakMap<THandle, IRpcSessionHandle>()
   /** The original registration's admitted native wall cap stays fixed across generation replacement. */
-  readonly #callTimeoutCap: IRpcTimeoutFeature | undefined
+  readonly #callTimeoutCap: IRpcTimeoutExecution | undefined
   /** Cold sampling retains only the accepted native unit and its exact directory receipt. */
   #accepted: Readonly<{ unit: THandle; view: IRpcSessionView }> | undefined
   /** The sole native supervisor still owns budgets, stop, restart and native actual-exit receipts. */
@@ -111,7 +111,7 @@ export class ThreadSource<THandle extends IThreadHandle = IThreadHandle> {
     this.#callTimeoutCap =
       spec.limits?.callWallTimeMs === undefined
         ? undefined
-        : timeoutFeature({ ms: spec.limits.callWallTimeMs, scheduler: source.scheduler })
+        : createRpcTimeoutExecution({ ms: spec.limits.callWallTimeMs, scheduler: source.scheduler })
     this.generation = new RpcMemberGeneration({
       context,
       binding: {

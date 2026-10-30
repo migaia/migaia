@@ -28,7 +28,7 @@ if (await isThreadChild()) {
   })
 } else {
   const plugins = [
-    threadPlugin({ spawn: true, features: [pool({ size: 3, maxQueue: 32 })] })
+    threadPlugin({ spawn: true, features: { workers: pool({ size: 3, maxQueue: 32 }) } })
   ] as const
   const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })
   try {

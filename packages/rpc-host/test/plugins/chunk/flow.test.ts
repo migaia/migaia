@@ -65,7 +65,7 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   /** Only prepared original groups contribute namespace facts to this fixture. */
   const groups = new Map<string, IRpcFlowGroup>()
   /** Canonical native Feature inspection owns the local setup and its dependency closure. */
-  const program = new RpcTransportFlowProgram([feature])
+  const program = new RpcTransportFlowProgram({ feature })
   /** Both qualified groups retain native declarations and their exact original execution owners. */
   const rpc = rpcHostPipelines(
     () => flow,
@@ -133,9 +133,9 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
     })
   )
   /** A second public feature uses default source bytes with an explicitly larger legal message. */
-  const largeProgram = new RpcTransportFlowProgram([
-    chunkFeature({ chunkBytes: 1024 * 1024, maxMessageBytes: 32 * 1024 * 1024 })
-  ])
+  const largeProgram = new RpcTransportFlowProgram({
+    chunk: chunkFeature({ chunkBytes: 1024 * 1024, maxMessageBytes: 32 * 1024 * 1024 })
+  })
   await flow.use(
     definePlugin({
       name: 'large',

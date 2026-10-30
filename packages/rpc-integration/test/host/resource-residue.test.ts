@@ -8,15 +8,16 @@ import { deferred } from '@migaia/utils/promise'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'
 import { RpcAbortError, RpcTimeoutError } from '@migaia/rpc-contract/errors'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import type { IRpcContext } from '@migaia/rpc-host'
 import type { IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
 import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import {
   defineFlowFeature,
+  rpcFeaturesPlugin,
   defineTransportPlugin,
   RpcJsonCarrierCodec,
-  type IRpcFlowFeature,
   type IRpcTransportSetupContext
 } from '@migaia/rpc-host/sdk'
 import { RpcHost } from '../../../rpc-host/dist/host/rpc-host.js'
@@ -316,12 +317,14 @@ function createA17JsonCodec(): RpcJsonCarrierCodec {
 function nativeSource(
   namespace: string,
   listener: ReturnType<typeof coreMemoryServer>,
-  carriers: MemoryCarrier[]
+  carriers: MemoryCarrier[],
+  scheduler: IManualScheduler
 ) {
   return defineTransportPlugin({
     name: `a17-${namespace}-source`,
     namespace,
     closingWrites: true,
+    features: { deadline: timeoutFeature({ ms: 1000, scheduler }) },
     open: async (context) => {
       /** Each physical endpoint uses the same real JSON codec as its listening native namespace. */
       const left = new MemoryCarrier(
@@ -353,25 +356,29 @@ function nativeSource(
 }
 
 /** Retain each complete production flow only at the normal SDK installation boundary. */
-function optionalFlows(owners: IRetainedOwners, rejections: unknown[]): IRpcFlowFeature[] {
+function optionalFlows(owners: IRetainedOwners, rejections: unknown[]) {
   /** The fixed observer borrows only its actual output collection. */
   const onRejected = rejectionObserver(rejections)
-  return [
-    defineFlowFeature({
-      name: 'a17-batch',
-      setup: (context) => {
-        owners.batch = new RpcBatchFlow(context.signal, false)
-        return owners.batch.value
-      }
-    }),
-    defineFlowFeature({
-      name: 'a17-limits',
-      setup: (context) => {
-        owners.limits = new RpcLimitsFlow({ onRejected }, context)
-        return owners.limits.value
-      }
-    })
-  ]
+  return rpcFeaturesPlugin({
+    features: {
+      batch: defineFlowFeature({
+        phase: 1000,
+        name: 'a17-batch',
+        setup: (context) => {
+          owners.batch = new RpcBatchFlow(context.signal, false)
+          return owners.batch.value
+        }
+      }),
+      limits: defineFlowFeature({
+        phase: 1001,
+        name: 'a17-limits',
+        setup: (context) => {
+          owners.limits = new RpcLimitsFlow({ onRejected }, context)
+          return owners.limits.value
+        }
+      })
+    }
+  })
 }
 
 /** Keep every failure's public fields and existing package reason channel with its exact sample. */
@@ -413,15 +420,18 @@ async function operate(
   const namespace = ordinal % 2 === 0 ? 'alpha' : 'beta'
   /** Both namespaces are actual independently accepted physical sources on this one public Host. */
   const endpoint = host[namespace]
-  if (kind === 'request') expect(await endpoint.send('a17-server', 'echo', ordinal)).toBe(ordinal)
+  if (kind === 'request')
+    expect(await endpoint.send('a17-server', 'echo', ordinal, { timeout: false })).toBe(ordinal)
   else if (kind === 'notify') {
     business.notice = deferred<void>()
-    await endpoint.notify('notice', ordinal, { targetId: 'a17-server' })
+    await endpoint.notify('notice', ordinal, { targetId: 'a17-server', timeout: false })
     await business.notice.promise
   } else if (kind === 'stream') {
     /** Fully consuming the original remote iterator exercises both actual stream tables. */
     const values: unknown[] = []
-    for await (const value of endpoint.stream('values', ordinal) as AsyncIterable<unknown>)
+    for await (const value of endpoint.stream('values', ordinal, {
+      timeout: false
+    }) as AsyncIterable<unknown>)
       values.push(value)
     expect(values).toEqual([ordinal, ordinal + 1])
   } else {
@@ -436,9 +446,7 @@ async function operate(
         'a17-server',
         'hold',
         ordinal,
-        kind === 'cancel'
-          ? { signal: caller.signal }
-          : { timeout: timeoutFeature({ ms: 1000, scheduler }) }
+        kind === 'cancel' ? { signal: caller.signal, timeout: false } : {}
       )
       .then(
         () => {
@@ -492,7 +500,7 @@ function createResidueFixture() {
   const carriers: MemoryCarrier[] = []
   /** Both listeners use the canonical existing memory medium and real JSON codec. */
   const listeners = ['alpha', 'beta'].map((namespace) =>
-    coreMemoryServer('a17-server', 'a17-server', namespace, [], [], {
+    coreMemoryServer('a17-server', 'a17-server', namespace, {}, [], {
       create: createA17JsonCodec,
       nativeBinary: false,
       closingWrites: true
@@ -578,16 +586,16 @@ it('drains actual work, flow, session, listener and timer owners after 10000 mix
   try {
     await server.host.open(
       new RpcFlowProgram([
-        ...optionalFlows(server, rejections),
+        optionalFlows(server, rejections),
         ...listeners.map((listener) => listener.transport)
       ])
     )
     /** Opening both native sources commits to the same real Host and actual SessionTable. */
     const publicHost = await client.host.open(
       new RpcFlowProgram([
-        ...optionalFlows(client, rejections),
+        optionalFlows(client, rejections),
         ...listeners.map((listener, index) =>
-          nativeSource(index === 0 ? 'alpha' : 'beta', listener, carriers)
+          nativeSource(index === 0 ? 'alpha' : 'beta', listener, carriers, scheduler)
         )
       ])
     )

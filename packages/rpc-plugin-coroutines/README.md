@@ -64,7 +64,7 @@ try {
 | `spawn: task`                    | 创建一个受监管的协作任务                                                |
 | `connectToParent: connect`       | 使用该次任务收到的准确 opaque 句柄，不是布尔值                          |
 | `name` / `namespace`             | 原生注册名与调用命名空间；默认 `coroutine`                              |
-| `features`                       | 完整 timeout、retry 或 pool feature                                     |
+| `features`                       | `{ localName: nativeFeature }`，接收 timeout、retry 或 pool                                     |
 | `supervisor`                     | 原生 restart/terminalPolicy/startupTimeoutMs/stop/budget/heartbeat 策略 |
 | `context.signal` / `heartbeat()` | 整代任务停止信号与原监管活性上报                                        |
 | `host.coroutine.members`         | 实际成员 list/get/stop/kill/restart/replace/on/watch                    |
@@ -75,8 +75,8 @@ spawn 与 connectToParent 恰选一个。句柄只属于当前实际任务，不
 
 ## 策略与组合
 
-调用选项使用完整 `timeoutFeature({ ms })`、`retryFeature({ attempts })` 或 `false`。优先级是单次调用、transport feature、链路策略 plugin；没有选中的策略时不自动启用。业务超时不替代原生启动或停止预算。
+调用选项使用 timeout `{ ms }`、retry `{ attempts }` 配置或 `false`。优先级是单次调用、transport feature、链路策略 plugin；没有选中的策略时不自动启用。业务超时不替代原生启动或停止预算。
 
-同载体多任务使用 `coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })`，pool 来自独立 [rpc-plugin-pool](../rpc-plugin-pool/README.md)。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 [Devtools](../rpc-plugin-devtools/README.md)。
+同载体多任务使用 `coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })`，pool 来自独立 [rpc-plugin-pool](../rpc-plugin-pool/README.md)。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 [Devtools](../rpc-plugin-devtools/README.md)。
 
 自定义部署使用 `@migaia/rpc-host/sdk`，只读观察使用 `@migaia/rpc-host/plugins/probe`。来源错误保留 TypeError、`rpc.transport.coroutine`、COROUTINE_SOURCE_INVALID；业务、握手和监督错误保留各自 source/code/cause。具体流、取消与替换示例见[使用指南](./USEGUIDE.md)。

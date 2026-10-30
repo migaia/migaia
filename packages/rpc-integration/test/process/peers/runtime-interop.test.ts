@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -38,7 +39,7 @@ for (const fixture of peers.filter((peer) => peer.language !== 'ts-reference')) 
         }
       },
       plugins: [
-        observed.plugin,
+        rpcFeaturesPlugin({ features: { feature1: observed.plugin } }),
         processPlugin({
           name: fixture.language,
           spawn: {
@@ -194,7 +195,7 @@ it('production SDK standard request → ts-reference', async () => {
     /** Construction must negotiate with the executable reference before any request is possible. */
     const active = await createRpcHost({
       self: { name: 'sdk-reference-caller', instanceId: 'sdk-reference-caller' },
-      plugins: [observed.plugin, plugin],
+      plugins: [rpcFeaturesPlugin({ features: { feature1: observed.plugin } }), plugin],
       report: (error) => failures.push(error)
     })
     try {

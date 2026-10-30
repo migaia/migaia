@@ -2,6 +2,7 @@
 import { workerData } from 'node:worker_threads'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import type { IRpcFlowFeature } from '@migaia/rpc-host/sdk'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { TopologyLeaf } from './topology-leaf.ts'
 import {
@@ -16,13 +17,13 @@ const options = (workerData?.data ?? {}) as ITopologyOptions
 /** Providers and counters of this leaf. */
 const leaf = new TopologyLeaf()
 /** Hop-scoped auth on this thread's parent connection only. */
-const features = options.hopAuth
-  ? [
-      authFeature(
+const features: Readonly<Record<string, IRpcFlowFeature>> = options.hopAuth
+  ? {
+      authentication: authFeature(
         leaf.auth.options(options.hopAuth === 'match' ? HopSecret.shared : HopSecret.other)
       )
-    ]
-  : []
+    }
+  : {}
 /** The leaf host connected to b. */
 const opening: Promise<IRpcHost> = createRpcHost({
   plugins: [leaf.recorder.plugin, threadPlugin({ connectToParent: true, features })],

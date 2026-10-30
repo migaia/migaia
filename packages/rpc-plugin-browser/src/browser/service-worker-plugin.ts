@@ -192,10 +192,12 @@ class ServiceWorkerClientListener {
 /** Capture either an actual page target/container or native worker Clients scope, without IO. */
 export function serviceWorkerPlugin<
   const N extends string = 'serviceWorker',
-  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+  const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<
+    Record<string, IBrowserFeature>
+  >
 >(
   options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
-): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true> {
   /** Native page receive owner stays independent of the outgoing ServiceWorker. */
   const receiver =
     options?.receiver ??
@@ -240,5 +242,5 @@ export function serviceWorkerPlugin<
       const listener = new ServiceWorkerClientListener(coldContext.clients, context)
       return { dispose: listener.close }
     }
-  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>
 }

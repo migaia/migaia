@@ -16,7 +16,7 @@ function sourceFiles(root: string): string[] {
 }
 
 describe('pure contract acceptance', () => {
-  it('publishes only runtime-neutral pure contract/protocol exports with an explicit dependency allowlist', () => {
+  it('publishes runtime-neutral contract/protocol exports and native feature types with an explicit dependency allowlist', () => {
     const metadata = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
       exports?: Record<string, unknown>
@@ -29,16 +29,18 @@ describe('pure contract acceptance', () => {
       './errors': expect.any(Object)
     })
     /**
-     * Portable traversal moves inward to serialize; platform and unrelated package imports stay
-     * forbidden.
+     * Portable traversal moves inward to serialize; native feature and scheduler types describe
+     * installation outputs without adding runtime ownership. Other package imports stay forbidden.
      */
     const allowedBareSpecifiers = new Set<string>([
+      '@migaia/plugin-host',
       '@migaia/serialize',
       '@migaia/serialize/core',
       '@migaia/utils/bytes',
       '@migaia/utils/error',
       '@migaia/utils/string',
-      '@migaia/utils/promise'
+      '@migaia/utils/promise',
+      '@migaia/utils/scheduler'
     ])
     const bareSpecifiers = new Set<string>()
     for (const path of sourceFiles(join(packageRoot, 'src'))) {

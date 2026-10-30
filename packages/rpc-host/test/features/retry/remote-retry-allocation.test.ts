@@ -1,8 +1,8 @@
+import { createRpcRetryExecution } from '@migaia/rpc-host/features/retry'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import type { IRpcAvailableAttempt } from '@migaia/rpc-contract/interfaces'
-import { retryFeature } from '@migaia/rpc-host/features/retry'
 
 /** Count only this original retry owner's readiness controllers, outside native endpoint setup. */
 const allocations = vi.hoisted(() => ({ controllers: 0 }))
@@ -30,7 +30,7 @@ it('successful unreplayed retry dispatch creates no readiness AbortController', 
   const scheduler = createManualScheduler()
   /** User key factories receive no immutable retry-policy receiver. */
   const keyReceivers: unknown[] = []
-  const strategy = retryFeature({
+  const strategy = createRpcRetryExecution({
     scheduler,
     keyFactory(this: unknown) {
       keyReceivers.push(this)

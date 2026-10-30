@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { mkdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { expect, vi } from 'vitest'
@@ -9,7 +10,7 @@ import {
   withRpcLaunchFacts
 } from '@migaia/rpc-host/sdk'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { createUnitBudget, type IUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'
 import {
@@ -192,14 +193,14 @@ function deployment(
 async function installBusinessClient(
   fixture: Pick<ReturnType<typeof deployment>, 'reports'>,
   source: ISpawnProcessPluginDeployment | IConnectProcessPluginDeployment,
-  features?: readonly IProcessFeature[],
+  features?: Readonly<Record<string, IProcessFeature>>,
   self: Readonly<{ name: string; instanceId: string }> = { name: 'caller', instanceId: 'caller' }
 ) {
   /** Credentials remain mandatory when the original foreign peer requires its inherited token. */
   const host = await createRpcHost({
     self,
     plugins: [
-      authFeature({ credentials: source.token }),
+      rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: source.token }) } }),
       processPlugin({
         name: 'p',
         features,
@@ -243,7 +244,7 @@ async function business(active: Awaited<ReturnType<typeof client>>) {
   const namespace = active.namespace
   expect(
     await namespace.request('p.f.request', [expected.request.input], {
-      timeout: timeoutFeature({ ms: 1000 }),
+      timeout: { ms: 1000 },
       idempotencyKey: 'h-bridge-key'
     })
   ).toBe(expected.request.expected)

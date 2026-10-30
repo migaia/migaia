@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { describe, it, vi } from 'vitest'
@@ -20,7 +21,9 @@ describe('replay-window r12 physical session authority', () => {
       createRpcHost({
         self: { name: 'client', instanceId: 'client' },
         plugins: [
-          authFeature({ sign: (value) => value, verify: (value) => value }),
+          rpcFeaturesPlugin({
+            features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+          }),
           windowPlugin({
             window: pair.right.target,
             receiver: pair.left.target,
@@ -32,11 +35,15 @@ describe('replay-window r12 physical session authority', () => {
       createRpcHost({
         self: { name: 'server', instanceId: 'server' },
         plugins: [
-          authFeature({
-            sign: (value) => value,
-            verify: (value) => {
-              verifies++
-              return value
+          rpcFeaturesPlugin({
+            features: {
+              auth: authFeature({
+                sign: (value) => value,
+                verify: (value) => {
+                  verifies++
+                  return value
+                }
+              })
             }
           }),
           windowPlugin({

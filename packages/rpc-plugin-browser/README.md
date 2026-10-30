@@ -60,7 +60,7 @@ Worker 提供 `double` 后，兼容的页面调用可取得 `42`。应用仍负�
 | `rtcDataChannelPlugin`   | `{ rtcDataChannel }`                                  | `rtcDataChannel`   |
 | `webTransportPlugin`     | `{ session }`                                         | `webTransport`     |
 
-公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。
+公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。
 
 推荐每个 Host 只安装一种传输，而非混用多种媒介；多端口或多参与者仍可属于同一种传输。确需混装时明确 namespace、路由与权限，不能把异构媒体当作同质成员池。
 

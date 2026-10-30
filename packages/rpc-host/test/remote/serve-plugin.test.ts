@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { errorMapFeature } from '@migaia/rpc-host/plugins/error-map'
@@ -117,7 +118,7 @@ it('passes the stream-open context unchanged and invokes its hook once', async (
   /** Provider construction is complete before the independent client starts its one handshake. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [redaction, listener.transport],
+    plugins: [rpcFeaturesPlugin({ features: { redaction } }), listener.transport],
     provide: fixture.provide,
     contract: fixture.contract
   })

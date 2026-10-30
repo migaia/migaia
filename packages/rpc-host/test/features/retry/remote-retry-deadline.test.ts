@@ -1,6 +1,7 @@
+import { createRpcRetryExecution } from '@migaia/rpc-host/features/retry'
 import { createManualScheduler } from '@migaia/utils/testing'
 import type { IRpcAvailableAttempt } from '@migaia/rpc-contract/interfaces'
-import { retryFeature } from '@migaia/rpc-host/features/retry'
+
 import { describe, expect, it, vi } from 'vitest'
 
 describe('shared retry deadline', () => {
@@ -24,7 +25,7 @@ describe('shared retry deadline', () => {
         })
     }
     const sendOnce = vi.fn(() => new Promise<string>(() => undefined))
-    const result = retryFeature({ scheduler, report: vi.fn() }).run({
+    const result = createRpcRetryExecution({ scheduler, report: vi.fn() }).run({
       signal: new AbortController().signal,
       facts: {
         method: 'p.f.read',

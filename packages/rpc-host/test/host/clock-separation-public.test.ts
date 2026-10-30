@@ -1,6 +1,7 @@
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 /** Original failure, counter and deadline business crosses actual namespace and feature owners. */
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { expect, it } from 'vitest'
@@ -26,15 +27,17 @@ it('preserves original provider failure,49/50 deadline and first counter result'
         return release.promise
       }
     },
-    () => undefined
+    () => undefined,
+    undefined,
+    undefined,
+    undefined,
+    { deadline: timeoutFeature({ ms: 50, scheduler }) }
   )
   try {
     // Preserve the original explicit provider failure path.
     await expect(fixture.a.memory.send('b', 'fail', null, { timeout: false })).rejects.toBeDefined()
     /** Observe the same public call before its real feature timer is advanced. */
-    const outcome = fixture.a.memory
-      .send('b', 'hang', null, { timeout: timeoutFeature({ ms: 50, scheduler }) })
-      .catch((error: unknown) => error)
+    const outcome = fixture.a.memory.send('b', 'hang', null).catch((error: unknown) => error)
     /** A passive settlement observation preserves the original before-deadline assertion. */
     let settled = false
     void outcome.then(() => {

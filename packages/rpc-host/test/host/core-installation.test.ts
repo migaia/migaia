@@ -10,11 +10,9 @@ import {
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { defineFlowPlugin, defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
-import type {
-  IRpcAttempt,
-  IRpcTimeoutFeature,
-  IRpcTransportContext
-} from '@migaia/rpc-contract/interfaces'
+import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
 import { coreMemoryServer } from './core-fixture.ts'
@@ -87,15 +85,11 @@ it('withdraws rolled-back flow hooks, extensions and policy before an ordinary n
   /** The rollback counter belongs to the exact failed flow installation. */
   const disposed = vi.fn()
   /** A rolled-back complete policy must not silently affect a later successful call. */
-  const runs = { count: 0 }
-  /** Complete policy instances execute through their one actual attempt port. */
-  const timeout: IRpcTimeoutFeature = {
-    kind: 'timeout',
-    run<T>(attempt: IRpcAttempt<T>): Promise<T> {
-      runs.count++
-      return attempt.invoke(attempt.signal, attempt.remainingMs)
-    }
-  }
+  const clock = createManualScheduler()
+  /** A leaked timeout would schedule a real deadline on the later recovered call. */
+  const runs = vi.spyOn(clock, 'schedule')
+  /** Native installation owns the actual timeout execution output. */
+  const timeout = timeoutFeature({ ms: 1000, scheduler: clock })
   /** These hooks and extension must disappear with their original native batch. */
   const failedFlow = defineFlowPlugin({
     name: 'failed-flow',
@@ -114,7 +108,7 @@ it('withdraws rolled-back flow hooks, extensions and policy before an ordinary n
     }
   })
   await expect(
-    native.use(linkPolicy({ features: [timeout] }), failedFlow, failedTransport)
+    native.use(linkPolicy({ features: { timeout } }), failedFlow, failedTransport)
   ).rejects.toMatchObject({ cause: failure })
   expect(disposed).toHaveBeenCalledTimes(1)
   /** A new cold flow must be installable after the entire first batch rolled back. */
@@ -133,7 +127,7 @@ it('withdraws rolled-back flow hooks, extensions and policy before an ordinary n
     expect(Object.hasOwn(surface, 'stale')).toBe(false)
     expect(surface.recovered()).toBe(true)
     expect(await surface.send('provider', 'echo', 42)).toBe(42)
-    expect(runs.count).toBe(0)
+    expect(runs).toHaveBeenCalledTimes(0)
   } finally {
     await Promise.all([client.host.close(), native.dispose()])
   }
@@ -153,7 +147,7 @@ it('preserves real native Feature exposure and releases an ordinary transport ex
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** The explicit whitelist is captured by the actual SDK transport definition. */
-  const server = coreMemoryServer('server', 'server', 'memory', [], ['app.resize'])
+  const server = coreMemoryServer('server', 'server', 'memory', {}, ['app.resize'])
   /** Native Feature output guards stay with their original receiving host registration. */
   const app = definePlugin({
     name: 'app',

@@ -1,7 +1,7 @@
 /** Real Session/probe owners retain frame capture, transfer and physical write evidence. */
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
+import { RpcJsonCarrierCodec, rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
 import { batchFeature } from '@migaia/rpc-host/plugins/batch'
@@ -24,7 +24,7 @@ async function observedHosts(options: {
   readonly incoming?: IRpcProbeEventView[]
   readonly capture?: readonly IRpcProbeStageName[]
   readonly redact?: (stage: RpcProbeStage, content: unknown) => unknown
-  readonly features?: readonly IRpcFlowFeature[]
+  readonly features?: Readonly<Record<string, IRpcFlowFeature>>
   readonly json?: boolean
   readonly echo?: (value: unknown) => unknown
 }) {
@@ -40,14 +40,18 @@ async function observedHosts(options: {
     'frame-caller',
     'frame-caller',
     'memory',
-    [],
+    {},
     [],
     options.json ? { create: () => new RpcJsonCarrierCodec(), nativeBinary: false } : undefined
   )
   /** Observation is installed through the same native public plugin path as other Host consumers. */
   const caller = await createRpcHost({
     ...listener.options,
-    plugins: [...(options.features ?? []), probe(callerProbe), listener.transport]
+    plugins: [
+      rpcFeaturesPlugin({ features: options.features ?? {} }),
+      probe(callerProbe),
+      listener.transport
+    ]
   })
   try {
     /** The provider probe sees actual codec restoration and genuine provider invocation. */
@@ -60,7 +64,10 @@ async function observedHosts(options: {
       })
     /** Both real installations receive independent state from the same cold Feature definitions. */
     const connected = await listener.connect('frame-provider', {
-      plugins: [...(options.features ?? []), ...(providerProbe ? [providerProbe] : [])],
+      plugins: [
+        rpcFeaturesPlugin({ features: options.features ?? {} }),
+        ...(providerProbe ? [providerProbe] : [])
+      ],
       provide: { echo: options.echo ?? ((value: unknown) => value) }
     })
     options.events.length = 0
@@ -126,7 +133,10 @@ describe('probe-core outbound frames', () => {
       events: callerEvents,
       incoming: providerEvents,
       capture: ['frame', 'protected'],
-      features: [security(), chunkFeature({ chunkBytes: 1024, maxMessageBytes: 8192 })],
+      features: {
+        security: security(),
+        chunk: chunkFeature({ chunkBytes: 1024, maxMessageBytes: 8192 })
+      },
       json: true,
       echo: (value) => {
         calls += 1
@@ -197,14 +207,14 @@ describe('probe-core outbound frames', () => {
       events,
       capture: ['frame', 'protected'],
       json: true,
-      features: [
-        authFeature({
+      features: {
+        auth: authFeature({
           encodedType: 'string',
           sign: protect,
           verify: (value) => String(value).slice('protected:'.length)
         }),
-        chunkFeature({ chunkBytes: 768, maxMessageBytes: 8192 })
-      ]
+        chunk: chunkFeature({ chunkBytes: 768, maxMessageBytes: 8192 })
+      }
     })
     /** Original carrier writes remain genuine and independently countable. */
     const send = vi.spyOn(fixture.pair[0], 'write')
@@ -370,7 +380,7 @@ describe('probe-core outbound frames', () => {
     const fixture = await observedHosts({
       events,
       capture: ['envelope', 'frame'],
-      features: [batchFeature()],
+      features: { batch: batchFeature() },
       json: true
     })
     const send = vi.spyOn(fixture.pair[0], 'write')

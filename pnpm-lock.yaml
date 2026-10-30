@@ -473,6 +473,9 @@ importers:
 
   packages/rpc-contract:
     dependencies:
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
       '@migaia/serialize':
         specifier: workspace:^
         version: link:../serialize
@@ -730,13 +733,13 @@ importers:
       '@migaia/lifecycle':
         specifier: workspace:^
         version: link:../lifecycle
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
     devDependencies:
-      '@migaia/plugin-host':
-        specifier: workspace:^
-        version: link:../plugin-host
       '@migaia/rpc-contract':
         specifier: workspace:*
         version: link:../rpc-contract

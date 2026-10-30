@@ -7,10 +7,11 @@ import {
 } from '@migaia/utils/promise'
 import { UtilsAbortError } from '@migaia/utils/error'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
-import {
-  RpcCallFeatureKind,
-  type IRpcAttempt,
-  type IRpcTimeoutFeature
+import type {
+  IRpcAttempt,
+  IRpcTimeoutFeature,
+  IRpcTimeoutExecution,
+  ITimeoutFeatureOptions
 } from '@migaia/rpc-contract/interfaces'
 import { RpcAbortError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -22,13 +23,10 @@ import {
 } from '../host/error-owner.ts'
 import { defaultRpcReporter, reportDiagnostic } from '../host/report.ts'
 import { RpcTimeoutFeatureText } from './timeout-text.ts'
+import { defineFeature } from '@migaia/plugin-host'
+import { registerRpcFeature, RpcCallFeatureRole } from '../sdk/metadata.ts'
+export type { ITimeoutFeatureOptions } from '@migaia/rpc-contract/interfaces'
 
-/** Clock and reporting are explicit policy resources, independent from host call selection. */
-export type ITimeoutFeatureOptions = Readonly<{
-  ms: number
-  scheduler?: IScheduler
-  report?(error: unknown): void
-}>
 /** One factory snapshot prevents option getters from changing later attempts. */
 type ITimeoutPolicy = Readonly<{
   ms: number
@@ -140,9 +138,7 @@ class TimeoutAttempt<T> {
 }
 
 /** Complete executing policy; it contributes no numeric defaults or host configuration. */
-class TimeoutFeature implements IRpcTimeoutFeature {
-  /** The canonical interface discriminant participates in FeatureScope's sole selection rule. */
-  readonly kind = RpcCallFeatureKind.timeout
+class TimeoutExecution implements IRpcTimeoutExecution {
   /** Factory-captured configuration stays stable across originating attempts. */
   readonly #policy: ITimeoutPolicy
 
@@ -157,9 +153,19 @@ class TimeoutFeature implements IRpcTimeoutFeature {
   }
 }
 
-/** Create a complete finite non-negative timeout policy, including a zero pre-send deadline. */
+/** Create an internal execution owner for plain call parameters and non-disableable native caps. */
+export function createRpcTimeoutExecution(options: ITimeoutFeatureOptions): IRpcTimeoutExecution {
+  return Object.freeze(new TimeoutExecution(options))
+}
+
+/** Define a cold native timeout; every declaring plugin receives its own installed execution owner. */
 export function timeoutFeature(options: ITimeoutFeatureOptions): IRpcTimeoutFeature {
-  return Object.freeze(new TimeoutFeature(options))
+  /** Validate and snapshot the original descriptor before native installation can observe mutation. */
+  const policy = snapshotTimeout(options)
+  /** Native registration alone invokes the captured construction hook. */
+  const feature = defineFeature({ install: () => createRpcTimeoutExecution(policy) })
+  registerRpcFeature(feature, { role: RpcCallFeatureRole.timeout })
+  return feature
 }
 
 export default timeoutFeature

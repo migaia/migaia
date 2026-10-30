@@ -65,16 +65,16 @@ export async function openWorker(entry: URL) {
       observer,
       processPlugin({
         spawn: entry,
-        features: [
+        features: {
           flow,
-          sendQueueFeature({ flow }),
-          ipcLogFeature({
+          sendQueue: sendQueueFeature({ flow }),
+          ipcLog: ipcLogFeature({
             report(record) {
               console.error(record)
             }
           }),
-          timeoutFeature({ ms: 1500 })
-        ]
+          timeout: timeoutFeature({ ms: 1500 })
+        }
       })
     ]
   })
@@ -87,7 +87,7 @@ The caller eventually awaits `host.close()`. A standalone `flowControlFeature` i
 
 ## Options and deadlines
 
-`connect: { target, timeoutMs? }` selects an existing service; timeout-only connect also decorates spawn/listen/parent. Negotiation defaults to 10,000 ms; name admission then uses `connect.timeoutMs`, also 10,000 ms by default. `pending` carries the unspent negotiation time plus this one name-probe budget; only the first notice extends the deadline, and repeated notices never refresh it. `connectTimeoutMs` bounds named-local discovery. Business calls use a complete `timeoutFeature(...)` feature or `timeout: false`, with an optional `signal`; these deadlines remain independent.
+`connect: { target, timeoutMs? }` selects an existing service; timeout-only connect also decorates spawn/listen/parent. Negotiation defaults to 10,000 ms; name admission then uses `connect.timeoutMs`, also 10,000 ms by default. `pending` carries the unspent negotiation time plus this one name-probe budget; only the first notice extends the deadline, and repeated notices never refresh it. `connectTimeoutMs` bounds named-local discovery. Business calls use `timeout: { ms }` or `timeout: false`, with an optional `signal`; these deadlines remain independent.
 
 Spawn accepts the main entry, a path/URL, short options or a complete native recipe. See README for self-spawn. Native `supervision` retains restart, health and stop policy; reconnection does not replay unconfirmed work. stdout belongs to stdio RPC; application logs use stderr.
 

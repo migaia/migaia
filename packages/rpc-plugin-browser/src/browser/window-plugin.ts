@@ -15,10 +15,12 @@ import type { IBrowserFeature } from './plugin-types.ts'
 /** Capture the exact borrowed Window and required origin before installation can touch native IO. */
 export function windowPlugin<
   const N extends string = 'window',
-  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+  const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<
+    Record<string, IBrowserFeature>
+  >
 >(
   options: IWindowPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
-): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true> {
   if (!options?.window || typeof options.window.postMessage !== 'function')
     throw createBrowserPeerError(
       RpcBrowserErrorCode.invalidPeerSource,
@@ -54,5 +56,5 @@ export function windowPlugin<
         ),
         context
       )
-  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>
 }

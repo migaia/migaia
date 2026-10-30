@@ -1,4 +1,6 @@
 import { expect, it, vi } from 'vitest'
+import { nativeFeatureOutput } from '../native-feature.ts'
+import type { IFeatureOutput } from '@migaia/plugin-host'
 import { fileURLToPath } from 'node:url'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -95,23 +97,29 @@ it('applies explicit data capacity while preserving control capacity on one actu
   const definition = queueFeature(capacity)
   capacity.maxPendingData = 8
   /** Observe only the original complete feature's real installation and returned receipt. */
-  const queues = vi.fn(definition.install)
-  const queue = { ...definition, install: queues }
+  const queues = vi.spyOn(
+    Object.getPrototypeOf(await nativeFeatureOutput(definition)) as IFeatureOutput<
+      typeof definition
+    >,
+    'install'
+  )
+  const queue = definition
   const records: IIpcLogRecord[] = []
   const logging = logFeature({
     report: (record) => {
       records.push(record)
     }
   })
-  const logs = vi.fn(logging.install)
+  const logs = vi.spyOn(
+    Object.getPrototypeOf(await nativeFeatureOutput(logging)) as IFeatureOutput<typeof logging>,
+    'install'
+  )
   const released = deferred<void>()
   const started = deferred<void>()
   const reports: unknown[] = []
   const host = await createRpcHost({
     self: { name: 'feature-parent', instanceId: 'feature-parent' },
-    plugins: [
-      processPlugin({ spawn: { entry: child }, features: [queue, { ...logging, install: logs }] })
-    ],
+    plugins: [processPlugin({ spawn: { entry: child }, features: { queue, logging } })],
     report: (error) => reports.push(error)
   })
   try {
@@ -145,6 +153,8 @@ it('applies explicit data capacity while preserving control capacity on one actu
   } finally {
     released.resolve()
     await host.close()
+    queues.mockRestore()
+    logs.mockRestore()
   }
 })
 
@@ -164,15 +174,15 @@ it('keeps native stderr on the selected log and unsubscribes it before physical 
     plugins: [
       processPlugin({
         spawn: { entry: child },
-        features: [
-          logFeature({
+        features: {
+          log: logFeature({
             report(this: unknown, record) {
               receivers.push(this)
               records.push(record)
               if (record.name === IpcLogEventName['ipc.stderr']) observed.resolve()
             }
           })
-        ]
+        }
       })
     ],
     report: (error) => reports.push(error)

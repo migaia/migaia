@@ -1,6 +1,7 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost, type IRpcContext, type IRpcProvide } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { defineFlowFeature, RpcFlowPoint } from '@migaia/rpc-host/sdk'
 import {
@@ -162,12 +163,14 @@ class PeerBusinessState {
 /** One executable retains its original shared business state across connections. */
 const business = new PeerBusinessState()
 
-/** Application verification remains independent from native token admission on every real source. */
-function peerAuthentication(token: string | undefined) {
+/** Return original authentication roots so each real Host assembles one native feature carrier. */
+function peerAuthenticationFeatures(
+  token: string | undefined
+): Readonly<Record<string, ReturnType<typeof authFeature>>> {
   return token === undefined
-    ? []
-    : [
-        authFeature({
+    ? {}
+    : {
+        authentication: authFeature({
           credentials: token,
           verifyCredentials(received) {
             if (received !== token)
@@ -177,11 +180,12 @@ function peerAuthentication(token: string | undefined) {
               )
           }
         })
-      ]
+      }
 }
 
 /** The canonical listener owns physical IO; its real frame completion retains delayed native faults. */
 const listenerFaults = defineFlowFeature({
+  phase: 1000,
   name: 'ts-peer-after-write',
   setup: () => ({
     stages: {
@@ -230,7 +234,9 @@ class ForeignPeerSession {
       provide: { p: business.provide.p! },
       contract,
       plugins: [
-        ...peerAuthentication(token),
+        ...(token === undefined
+          ? []
+          : [rpcFeaturesPlugin({ features: peerAuthenticationFeatures(token) })]),
         processPlugin({
           name: 'foreign-native-peer',
           connect: {
@@ -301,8 +307,7 @@ async function main(): Promise<void> {
       provide: { p: business.provide.p! },
       contract,
       plugins: [
-        ...peerAuthentication(token),
-        listenerFaults,
+        rpcFeaturesPlugin({ features: { listenerFaults, ...peerAuthenticationFeatures(token) } }),
         processPlugin({ name: 'foreign-native-peer', listen: values['listen-unix'], token })
       ],
       report
@@ -324,7 +329,7 @@ async function main(): Promise<void> {
     const payload = { echo: 'typescript', number: 1 }
     try {
       const answer = await host.process.request(PeerMethod.echo, payload, {
-        timeout: timeoutFeature({ ms: 3000 })
+        timeout: { ms: 3000 }
       })
       if (JSON.stringify(answer) !== JSON.stringify(payload))
         throw peerDiagnosticError(RpcCoreErrorCode.internal, PeerText.mismatch)

@@ -147,7 +147,7 @@ type IProcessBindingOptions<TUnit extends object, TSpec> = Readonly<{
   childName?: string
   kind: 'spawn' | 'connect'
   scheduler: IScheduler
-  features?: readonly IProcessFeature[]
+  features?: Readonly<Record<string, IProcessFeature>>
   events?: IRpcNativePoolEvents
   create(ports: IProcessSupervisorPorts<TUnit, TSpec>): ISupervisor<TUnit, TSpec>
   openRaw(unit: TUnit, signal: IAbortSignal): Promise<IProcessByteChannel | IProcessMessageChannel>
@@ -556,7 +556,7 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
   source: ISpawnProcessPluginDeployment<THandle>,
   context: IRpcTransportSetupContext,
   name: string | undefined,
-  features?: readonly IProcessFeature[],
+  features?: Readonly<Record<string, IProcessFeature>>,
   events?: IRpcNativePoolEvents
 ): ProcessBinding<THandle, IProcessSpec> {
   validateSpawnProcessPluginDeployment(source)
@@ -746,7 +746,7 @@ export function createConnectProcessBinding(
   source: IConnectProcessPluginDeployment,
   context: IRpcTransportSetupContext,
   name: string,
-  features?: readonly IProcessFeature[],
+  features?: Readonly<Record<string, IProcessFeature>>,
   events?: IRpcNativePoolEvents
 ): ProcessBinding<IProcessConnectionHandle, string> {
   if (!source || source.kind !== 'connect' || !source.address) invalidOption('deployment.address')

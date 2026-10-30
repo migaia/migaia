@@ -1,3 +1,4 @@
+import { nativeFeatureOutput } from '../../../rpc-plugin-process/test/native-feature.ts'
 /** Process-owned feature execution replaces the removed host-multiplex/outbound-gate adapters. */
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
@@ -27,15 +28,17 @@ it('uses each original envelope gate and log once while an unrelated physical pe
   /** B owns one native feature installation; C has a separate original installation. */
   const bContext = nativeContext('b')
   /** Capacity lives in the genuine process feature, never a host-side shadow gate. */
-  const b = sendQueueFeature({ maxPendingData: 1, maxPendingControl: 1 }).install(bContext)
+  const b = (
+    await nativeFeatureOutput(sendQueueFeature({ maxPendingData: 1, maxPendingControl: 1 }))
+  ).install(bContext)
   /** The unrelated source keeps its own native identity and admission resources. */
-  const c = sendQueueFeature({ maxPendingData: 1, maxPendingControl: 1 }).install(
-    nativeContext('c')
-  )
+  const c = (
+    await nativeFeatureOutput(sendQueueFeature({ maxPendingData: 1, maxPendingControl: 1 }))
+  ).install(nativeContext('c'))
   /** Original logging observes the same actual executing gate. */
   const records = vi.fn()
   /** The real process logger borrows B's event stream without another capacity counter. */
-  const logging = ipcLogFeature({ report: records }).install({
+  const logging = (await nativeFeatureOutput(ipcLogFeature({ report: records }))).install({
     ...bContext,
     gate: b.value,
     onReportError: () => undefined

@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcSchemaValidationError } from '../../dist/host/error-owner.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -84,6 +85,7 @@ describe('safeString failure reporting', () => {
     })
     /** The fixed dispatch hook is the same validation failure boundary before business execution. */
     const validation = defineFlowFeature({
+      phase: 1000,
       name: 'original-schema-failure',
       setup: () => ({
         stages: {
@@ -100,7 +102,7 @@ describe('safeString failure reporting', () => {
     const host = await createRpcHost({
       ...server.options,
       provide: { test: () => null },
-      plugins: [validation, ...server.options.plugins!],
+      plugins: [rpcFeaturesPlugin({ features: { validation } }), ...server.options.plugins!],
       report: (error) => events.push({ error, code: Reflect.get(error as object, 'code') })
     })
     /** The accepted pair lends its original write only to inspect the actual flat terminal code. */

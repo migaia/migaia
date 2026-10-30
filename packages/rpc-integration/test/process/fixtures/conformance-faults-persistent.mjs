@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** One existing file-backed completed result survives the fixture's deliberate native crash. */
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -95,18 +96,22 @@ await createRpcHost({
   provide,
   contract,
   plugins: [
-    authFeature({
-      verifyCredentials(received) {
-        /** The native parent handshake authenticates bootstrap before semantic admission. */
-        assert.equal(typeof received, 'string')
-        return { principalId: principal }
-      }
-    }),
-    idempotencyFeature({
-      store,
-      scope(identity) {
-        assert.equal(identity.principalId, principal)
-        return identity.principalId
+    rpcFeaturesPlugin({
+      features: {
+        auth: authFeature({
+          verifyCredentials(received) {
+            /** The native parent handshake authenticates bootstrap before semantic admission. */
+            assert.equal(typeof received, 'string')
+            return { principalId: principal }
+          }
+        }),
+        idempotency: idempotencyFeature({
+          store,
+          scope(identity) {
+            assert.equal(identity.principalId, principal)
+            return identity.principalId
+          }
+        })
       }
     }),
     processPlugin({

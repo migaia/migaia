@@ -39,6 +39,7 @@ export class NativeInteropObservations {
 
   /** The real flow stages forward every original value unchanged. */
   readonly plugin = defineFlowFeature({
+    phase: 1000,
     name: 'native-interop-observation',
     setup: () => ({
       stages: {

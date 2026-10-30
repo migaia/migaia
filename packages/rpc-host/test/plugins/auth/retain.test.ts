@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public Auth requests distinguish active duplicate suppression from completed-ID retention. */
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
@@ -58,6 +59,7 @@ class ReissuedRequest {
   #reissue = false
   /** The ordinary native Feature owns this sole plaintext stage and its original continuation. */
   readonly feature = defineFlowFeature({
+    phase: 1000,
     name: 'a30-reissue-original-request',
     setup: () => ({ stages: { envelopeOutbound: this.#outbound } })
   })
@@ -104,15 +106,22 @@ class PublicRetentionPair {
   async open(options: IRpcAuthenticationOptions): Promise<void> {
     this.#server = await createRpcHost({
       ...this.listener.options,
-      plugins: [authFeature(options), this.listener.transport],
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature(options) } }),
+        this.listener.transport
+      ],
       report: (error) => this.reports.push(error),
       provide: { echo: this.#echo }
     })
     this.#client = (
       await this.listener.connect('retain-client', {
         plugins: [
-          this.replay.feature,
-          authFeature({ sign: (value) => value, verify: (value) => value })
+          rpcFeaturesPlugin({
+            features: {
+              feature: this.replay.feature,
+              auth: authFeature({ sign: (value) => value, verify: (value) => value })
+            }
+          })
         ],
         report: (error) => this.reports.push(error)
       })
@@ -565,8 +574,12 @@ it('gives the public transport connection retain precedence over its installed A
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      replay.feature,
-      authFeature({ sign: (value) => value, verify: (value) => value }),
+      rpcFeaturesPlugin({
+        features: {
+          feature: replay.feature,
+          auth: authFeature({ sign: (value) => value, verify: (value) => value })
+        }
+      }),
       listener.transport
     ]
   })
@@ -576,7 +589,11 @@ it('gives the public transport connection retain precedence over its installed A
     client = await createRpcHost({
       self: { name: 'retain-override-client', instanceId: 'retain-override-client' },
       plugins: [
-        authFeature({ sign: (value) => value, verify: (value) => value, retain: 1_000 }),
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({ sign: (value) => value, verify: (value) => value, retain: 1_000 })
+          }
+        }),
         connection.transport
       ],
       provide: {
@@ -633,7 +650,12 @@ it('rejects invalid public connection numbers, null and unsigned window as confi
   /** No signature callback can disguise the missing-signature window configuration failure. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [authFeature({ verifyCredentials: () => undefined }), listener.transport],
+    plugins: [
+      rpcFeaturesPlugin({
+        features: { auth: authFeature({ verifyCredentials: () => undefined }) }
+      }),
+      listener.transport
+    ],
     report: (error) => reports.push(error)
   })
   try {
@@ -644,7 +666,12 @@ it('rejects invalid public connection numbers, null and unsigned window as confi
         await expect(
           createRpcHost({
             self: { name: 'invalid-retain-client', instanceId: 'invalid-retain-client' },
-            plugins: [authFeature({ credentials: 'public-retain-fixture' }), connection.transport],
+            plugins: [
+              rpcFeaturesPlugin({
+                features: { auth: authFeature({ credentials: 'public-retain-fixture' }) }
+              }),
+              connection.transport
+            ],
             report: (error) => reports.push(error)
           })
         ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })

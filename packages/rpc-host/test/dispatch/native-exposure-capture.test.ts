@@ -37,13 +37,11 @@ it('captures one native output descriptor inventory for repeated exposure select
     install: () => ({})
   })
   /** Exposure selectors enter the same genuine RPC native installation. */
-  const server = coreMemoryServer(
-    'native-capture',
-    'native-capture',
-    'memory',
-    [],
-    ['app.a', 'app.b', 'app.a']
-  )
+  const server = coreMemoryServer('native-capture', 'native-capture', 'memory', {}, [
+    'app.a',
+    'app.b',
+    'app.a'
+  ])
   /** Final cleanup retains only the independently owned actual connecting Host. */
   let client: Awaited<ReturnType<typeof server.connect>> | undefined
   try {
@@ -104,13 +102,10 @@ it('keeps the first selector invalid descriptor ahead of later native output ref
     install: () => ({})
   })
   /** Exposure selectors enter the same genuine RPC native installation. */
-  const server = coreMemoryServer(
-    'native-selector-order',
-    'native-selector-order',
-    'memory',
-    [],
-    ['app.a', 'app.b']
-  )
+  const server = coreMemoryServer('native-selector-order', 'native-selector-order', 'memory', {}, [
+    'app.a',
+    'app.b'
+  ])
   try {
     /** The real Feature handle forces native publication before counting RPC reflection. */
     const [handle] = await host.use(app)

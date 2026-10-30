@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Uses one actual Process middle and one actual Worker leaf, with no synthetic routing. */
 import { isMainThread, workerData } from 'node:worker_threads'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
@@ -70,6 +71,7 @@ class ScopedEnvelopeObservation {
   constructor(scope: string) {
     this.#scope = scope
     this.feature = defineFlowFeature({
+      phase: 1000,
       name: `a25-forward-${scope}`,
       setup: () => ({
         stages: {
@@ -127,7 +129,9 @@ class FeatureScopeLeaf {
   constructor() {
     this.#opening = createRpcHost({
       plugins: [
-        featureScopeAuth(FeatureScopeFixture.hostKey),
+        rpcFeaturesPlugin({
+          features: { feature1: featureScopeAuth(FeatureScopeFixture.hostKey) }
+        }),
         threadPlugin({ namespace: 'native', connectToParent: true })
       ],
       provide: {
@@ -168,16 +172,18 @@ class FeatureScopeMiddle {
   constructor() {
     this.#opening = createRpcHost({
       plugins: [
-        featureScopeAuth(FeatureScopeFixture.hostKey),
+        rpcFeaturesPlugin({
+          features: { feature1: featureScopeAuth(FeatureScopeFixture.hostKey) }
+        }),
         processPlugin({
           namespace: FeatureScopeForwardFixture.up,
           connectToParent: true,
-          features: [this.#up.feature]
+          features: { feature: this.#up.feature }
         }),
         threadPlugin({
           name: FeatureScopeForwardFixture.leaf,
           namespace: FeatureScopeForwardFixture.down,
-          features: [this.#down.feature],
+          features: { feature: this.#down.feature },
           spawn: { entry: new URL(import.meta.url), data: FeatureScopeForwardFixture.leafRole }
         })
       ],

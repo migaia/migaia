@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original ingress rejection and late-verification business assertions use genuine native Sessions. */
 import { createRpcHost } from '@migaia/rpc-host'
 import auth from '@migaia/rpc-host/plugins/auth'
@@ -70,7 +71,12 @@ it('rejecting ingress verification releases the next call; close prevents a late
   /** The public host installs actual Auth and an actual provider without injecting dispatcher ports. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [auth({ sign: (value) => value, verify: verifier.verify }), ...server.options.plugins],
+    plugins: [
+      rpcFeaturesPlugin({
+        features: { feature0: auth({ sign: (value) => value, verify: verifier.verify }) }
+      }),
+      ...server.options.plugins
+    ],
     report: (error) => failures.push(error),
     provide: {
       barrier: (value, context) => context.success(value),
@@ -82,7 +88,11 @@ it('rejecting ingress verification releases the next call; close prevents a late
   })
   /** This original client completes both genuine handshakes through the same native pair. */
   const client = await server.connect('caller', {
-    plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+    plugins: [
+      rpcFeaturesPlugin({
+        features: { feature0: auth({ sign: (value) => value, verify: (value) => value }) }
+      })
+    ]
   })
   /** A finally release must never leave a configured verification callback retaining native leases. */
   const gates: IIngressVerification[] = []
@@ -163,6 +173,7 @@ it('authenticates two business arrivals concurrently, bypasses their ordered del
   }
   /** Native inbound ordering puts this actual observation before the builtin quota stage. */
   const arrivalWitness = defineFlowFeature({
+    phase: 1000,
     name: 'ingress-arrival-order',
     setup: () => ({
       stages: {
@@ -184,9 +195,13 @@ it('authenticates two business arrivals concurrently, bypasses their ordered del
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      auth({ sign: (value) => value, verify: verifier.verify }),
-      limits({ maxGlobal: 1, maxPerPeer: 1 }),
-      arrivalWitness,
+      rpcFeaturesPlugin({
+        features: {
+          arrivalWitness,
+          feature0: auth({ sign: (value) => value, verify: verifier.verify }),
+          feature1: limits({ maxGlobal: 1, maxPerPeer: 1 })
+        }
+      }),
       ...server.options.plugins
     ],
     report: (error) => failures.push(error),
@@ -200,7 +215,11 @@ it('authenticates two business arrivals concurrently, bypasses their ordered del
   })
   /** The opposite public Host uses independent original Auth and the same linked carrier pair. */
   const client = await server.connect('caller', {
-    plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+    plugins: [
+      rpcFeaturesPlugin({
+        features: { feature0: auth({ sign: (value) => value, verify: (value) => value }) }
+      })
+    ]
   })
   /** Finally releases only these two finite application-owned verification inputs. */
   const gates: IIngressVerification[] = []
@@ -281,7 +300,12 @@ it('bounds opaque ingress verification at three and releases the fourth without 
   /** The genuine receiving Auth and provider share the original native Session. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [auth({ sign: (value) => value, verify: verifier.verify }), ...server.options.plugins],
+    plugins: [
+      rpcFeaturesPlugin({
+        features: { feature0: auth({ sign: (value) => value, verify: verifier.verify }) }
+      }),
+      ...server.options.plugins
+    ],
     provide: {
       barrier: (value) => value,
       echo: (value) => {
@@ -292,7 +316,11 @@ it('bounds opaque ingress verification at three and releases the fourth without 
   })
   /** Each actual public request crosses the original linked carrier and sole codec. */
   const client = await server.connect('caller', {
-    plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+    plugins: [
+      rpcFeaturesPlugin({
+        features: { feature0: auth({ sign: (value) => value, verify: (value) => value }) }
+      })
+    ]
   })
   /** Finally settles at most four original application-held inputs, never generated traffic. */
   const gates: IIngressVerification[] = []

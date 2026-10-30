@@ -2,6 +2,9 @@
 import { defineFeature } from '@migaia/plugin-host'
 import type { IRpcFlowDefinition, IRpcFlowFeature } from './types.ts'
 import { registerRpcDefinition, RpcDefinitionKind } from './metadata.ts'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { tagRpcError } from '@migaia/rpc-contract/errors'
+import { HostErrorText } from '../host/error-text.ts'
 
 /** Private capability identities prevent a third-party display name from impersonating a builtin. */
 export const RpcBuiltinFeature = {
@@ -35,8 +38,10 @@ function flowFeature<E extends object>(
 
 /** Third-party information flow uses the same opaque Feature and the default plaintext position. */
 export function defineFlowFeature<E extends object = Record<never, never>>(
-  definition: IRpcFlowDefinition<E>
+  definition: IRpcFlowDefinition<E> & Readonly<{ phase: number }>
 ): IRpcFlowFeature<E> {
+  if (!Number.isInteger(definition.phase) || definition.phase < 0 || definition.phase > 65535)
+    throw tagRpcError(new TypeError(HostErrorText.flowPhaseInvalid), RpcCoreErrorCode.invalidConfig)
   return flowFeature(definition)
 }
 

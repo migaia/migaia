@@ -6,7 +6,7 @@ Contract 只定义纯协议和接口；Host 拥有会话、目录、provider 与
 
 ## 显式父子入口
 
-父入口使用真实 `worker.js`，并将完整策略实例装在 transport 的 `features`。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。
+父入口使用真实 `worker.js`，并将原生策略 token 放入 transport 的 `features` record。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。
 
 ```ts doc-test=check
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
@@ -23,7 +23,7 @@ const plugins = [
   threadPlugin({
     name: 'worker',
     spawn: new URL('./worker.js', import.meta.url),
-    features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })]
+    features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) }
   })
 ] as const
 
@@ -45,7 +45,7 @@ export async function firstValue(host: IThreadHost) {
 export function work(host: IThreadHost, signal: AbortSignal) {
   return host.thread.send('worker', 'wait', 21, {
     signal,
-    timeout: timeoutFeature({ ms: 500 }),
+    timeout: { ms: 500 },
     retry: false
   })
 }
@@ -85,7 +85,7 @@ await createRpcHost({
 
 `host.thread.request` 无目标时按当前直连集合调用；`send(nameOrId, method, payload, options)` 选择一个目标。`notify` 使用 `{ targetId }` 选择目标，只等实际物理写出，不等 provider 完成或 ACK。普通 namespace 有多个直连时，无目标调用返回各目标独立的结果。
 
-`timeoutFeature`、`retryFeature` 只能是完整 feature 实例或 `false`。优先级为单次调用、transport 安装值、链路策略 plugin。上例单次调用使用 500 ms timeout，并关闭该次 retry；没有选中的策略就不自动启用。原生启动、health、stop 与业务调用的期限各有原 owner，不能用业务 timeout 推断它们的时钟。
+单次 `timeout`、`retry` 接收策略配置对象或 `false`；传输的 `features` record 接收原生 feature token。优先级为单次调用、transport 安装值、链路策略 plugin。上例单次调用使用 500 ms timeout，并关闭该次 retry；没有选中的策略就不自动启用。原生启动、health、stop 与业务调用的期限各有原 owner，不能用业务 timeout 推断它们的时钟。
 
 Thread 的 `spec.limits.callWallTimeMs` 围住整个 originating 调用，包括 retry/backoff；同一原生 registration 保留其初始已准入 spec 的上限，重启或替换不会偷偷换掉该配置。较短的业务 timeout 仍可提前结束调用，`timeout: false` 不能取消该原生上限。未设置原生上限时，`timeout: false` 不自动添加期限。
 

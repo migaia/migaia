@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Uses genuine Process and Worker children, with no fabricated Session or close observer. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -39,6 +40,7 @@ class ClosingWriteGate {
   #held = false
   /** The normal SDK factory installs this exact stage, with no alternate send or codec path. */
   readonly plugin = defineFlowFeature({
+    phase: 1000,
     name: 'a23-closing-write-gate',
     setup: () => this.#installation()
   })
@@ -326,7 +328,10 @@ it.each(['process', 'thread'] as const)(
     /** This is a genuine optional stage in the Host's one declared outbound pipeline. */
     const gate = new ClosingWriteGate()
     const host = await createRpcHost({
-      plugins: [gate.plugin, transport(kind)] as const,
+      plugins: [
+        rpcFeaturesPlugin({ features: { feature1: gate.plugin } }),
+        transport(kind)
+      ] as const,
       report: () => undefined
     })
     /** The result is the actual child response, never a claimed byte counter. */

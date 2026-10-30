@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import {
@@ -237,9 +238,13 @@ it('retains the verifier failure locally and keeps it out of the unauthenticated
           plugins: [
             ...(index === 1
               ? [
-                  authFeature({
-                    verifyCredentials() {
-                      throw original
+                  rpcFeaturesPlugin({
+                    features: {
+                      authentication: authFeature({
+                        verifyCredentials() {
+                          throw original
+                        }
+                      })
                     }
                   })
                 ]

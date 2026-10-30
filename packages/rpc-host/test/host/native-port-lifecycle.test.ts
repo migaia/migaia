@@ -47,7 +47,7 @@ class NativeSourceResource {
   readonly #input: ISourceInput
   /** The original real listener open callback is lent unchanged, never reimplemented here. */
   readonly #openListener: IRpcTransportDefinition<
-    unknown,
+    import('@migaia/plugin-host').IFeatureRecord,
     object,
     IRpcTransportSetupContext
   >['open']

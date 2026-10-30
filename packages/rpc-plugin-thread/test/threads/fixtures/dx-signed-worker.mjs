@@ -23,7 +23,10 @@ await createRpcHost({
   },
   report: (error) => process.stderr.write(`${error?.stack ?? String(error)}\n`),
   plugins: [
-    ...(data.signed ? [authFeature(createFixtureAuthentication())] : []),
+    ...(data.signed
+      ? [rpcFeaturesPlugin({ features: { security: authFeature(createFixtureAuthentication()) } })]
+      : []),
     threadPlugin({ connectToParent: true })
   ]
 })
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'

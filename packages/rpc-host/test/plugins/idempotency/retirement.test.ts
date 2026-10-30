@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Carrier-owned idempotency entries retire with their connection; shared scopes retain outcomes. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -18,13 +19,21 @@ it.each(['carrier', 'principal', 'custom'] as const)(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        idempotencyFeature({
-          store,
-          ...(mode === 'custom' ? { scope: ({ token }) => (customScope ??= token) } : {})
+        rpcFeaturesPlugin({
+          features: {
+            idempotency: idempotencyFeature({
+              store,
+              ...(mode === 'custom' ? { scope: ({ token }) => (customScope ??= token) } : {})
+            }),
+            ...(mode === 'principal'
+              ? {
+                  authentication: authFeature({
+                    verifyCredentials: () => ({ principalId: 'verified-owner' })
+                  })
+                }
+              : {})
+          }
         }),
-        ...(mode === 'principal'
-          ? [authFeature({ verifyCredentials: () => ({ principalId: 'verified-owner' }) })]
-          : []),
         server.transport
       ],
       provide: { echo: () => ++calls }
@@ -33,7 +42,14 @@ it.each(['carrier', 'principal', 'custom'] as const)(
     const clients: Awaited<ReturnType<typeof server.connect>>[] = []
     try {
       const first = await server.connect('retirement-first', {
-        plugins: mode === 'principal' ? [authFeature({ credentials: 'fixture-credential' })] : []
+        plugins:
+          mode === 'principal'
+            ? [
+                rpcFeaturesPlugin({
+                  features: { authentication: authFeature({ credentials: 'fixture-credential' }) }
+                })
+              ]
+            : []
       })
       clients.push(first)
       expect(
@@ -43,7 +59,14 @@ it.each(['carrier', 'principal', 'custom'] as const)(
       ).toBe(1)
       await first.host.close()
       const second = await server.connect('retirement-second', {
-        plugins: mode === 'principal' ? [authFeature({ credentials: 'fixture-credential' })] : []
+        plugins:
+          mode === 'principal'
+            ? [
+                rpcFeaturesPlugin({
+                  features: { authentication: authFeature({ credentials: 'fixture-credential' }) }
+                })
+              ]
+            : []
       })
       clients.push(second)
       expect(

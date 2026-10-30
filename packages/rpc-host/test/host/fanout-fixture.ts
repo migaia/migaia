@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { createHmac } from 'node:crypto'
 import { expect, vi } from 'vitest'
@@ -126,7 +127,7 @@ export async function nativeHosts(provide: IRpcHostOptions['provide']) {
       createRpcHost({
         self: { name: `native-${index}`, instanceId: `native-${index}` },
         plugins: [
-          authFeature(authentication),
+          rpcFeaturesPlugin({ features: { auth: authFeature(authentication) } }),
           defineTransportPlugin({
             name: `native-transport-${index}`,
             namespace: 'native',

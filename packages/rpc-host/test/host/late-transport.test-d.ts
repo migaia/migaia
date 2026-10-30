@@ -11,6 +11,7 @@ const parent = defineTransportPlugin({
 })
 /** The real local Feature contributes a public extension only to its owning late namespace. */
 const extension = defineFlowFeature({
+  phase: 1000,
   name: 'late-typed-extension',
   setup: () => ({ stages: {}, namespaceExtensions: () => ({ answer: () => 42 }) })
 })
@@ -18,7 +19,7 @@ const extension = defineFlowFeature({
 const thread = defineTransportPlugin({
   name: 'thread',
   namespace: 'thread',
-  features: [extension],
+  features: { extension },
   open: () => ({ dispose: () => undefined })
 })
 

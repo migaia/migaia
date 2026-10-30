@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Children use the actual native source and the same canonical authentication Feature. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
@@ -46,7 +47,10 @@ export async function runFeatureScopeChild(
   key: string
 ): Promise<void> {
   await createRpcHost({
-    plugins: [featureScopeAuth(key), plugin] as const,
+    plugins: [
+      rpcFeaturesPlugin({ features: { feature1: featureScopeAuth(key) } }),
+      plugin
+    ] as const,
     provide: { echo: (value: unknown) => value },
     report: () => undefined
   })

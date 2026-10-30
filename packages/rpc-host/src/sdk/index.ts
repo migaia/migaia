@@ -9,7 +9,9 @@ export {
   defineLinkPolicy
 } from './define.ts'
 export type * from './types.ts'
-export { rpcFlowPlugin } from './flow-program.ts'
+export { rpcFeaturesPlugin } from './flow-program.ts'
+export { registerRpcNativeFeature, readRpcFeature, findRpcNativeFeatureOutput } from './metadata.ts'
+export type { IRpcFeatureMetadata } from './metadata.ts'
 export { defineRpcSourcePlugin } from './source.ts'
 export { RpcFlowPoint, RpcFlowLayer, rpcHostPipelines } from './flow-pipelines.ts'
 export type {
@@ -110,6 +112,6 @@ export type { IRpcMemberNativeUnit } from './native-members-resources.ts'
 export { IpcReporterContext } from './reporter-context.ts'
 export { resolveAbortReason } from '../host/abort-reason.ts'
 
-export { RpcNativeFeatureKind } from './native-feature-types.ts'
 export type * from './native-feature-types.ts'
+export { RpcNativeFeatureKind } from './native-feature-types.ts'
 export { RpcNativePoolMember } from './native-pool-member.ts'

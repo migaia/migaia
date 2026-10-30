@@ -191,10 +191,10 @@ async function verifyPackedHostContracts(): Promise<void> {
   // @ts-expect-error The iterable declaration cannot be invoked through a scalar call.
   host.process.send('worker', 'values', 1)
   /** The same timeout definition supports the aggregate and individual feature imports. */
-  const features: readonly IRpcCallFeature[] = [
-    namedTimeout({ ms: 1000 }),
-    retryFeature({ attempts: 2 })
-  ]
+  const features: Readonly<Record<string, IRpcCallFeature>> = {
+    deadline: namedTimeout({ ms: 1000 }),
+    replay: retryFeature({ attempts: 2 })
+  }
   /**
    * The direct timeout entry keeps the same complete feature contract without a duplicate
    * installation.
@@ -209,7 +209,7 @@ async function verifyPackedHostContracts(): Promise<void> {
   /** A pool definition exposes the original installation-specific controls. */
   const pooled = pool({ size: 3 })
   /** Controls use the actual Host identity and preserve their own terminal stats/close surface. */
-  const pooledTransport = coroutinePlugin({ spawn: async () => undefined, features: [pooled] })
+  const pooledTransport = coroutinePlugin({ spawn: async () => undefined, features: { pooled } })
   /** Only this actual transport's projected namespace exposes installed pool controls. */
   const pooledHost = undefined as unknown as IRpcHost<IWorkerApi, readonly [typeof pooledTransport]>
   const controls: IRpcPoolControls = pooledHost.coroutine.pool
@@ -245,13 +245,20 @@ async function verifyPackedHostContracts(): Promise<void> {
   await created.close()
   // @ts-expect-error Root call aliases were removed by .
   void created.request('echo', 1)
-  // @ts-expect-error Per-call timeout requires a complete feature or false.
+  // @ts-expect-error Per-call timeout accepts policy options or false, never a number.
   host.process.send('worker', 'echo', 1, { timeout: 100 })
-  // @ts-expect-error Per-call retry requires a complete feature or false.
-  host.process.send('worker', 'echo', 1, { retry: { attempts: 2 } })
+  host.process.send('worker', 'echo', 1, {
+    retry: {
+      // @ts-expect-error Per-call retry rejects handwritten execution objects.
+      kind: 'retry',
+      run() {
+        return Promise.resolve(1)
+      }
+    }
+  })
   void host.process.send('worker', 'echo', 1, {
     timeout: false,
-    retry: retryFeature({ attempts: 2 })
+    retry: { attempts: 2 }
   })
 }
 void verifyPackedHostContracts

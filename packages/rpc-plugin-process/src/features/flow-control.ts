@@ -4,8 +4,9 @@
  * owner.
  */
 import { hostRethrowReporter } from '@migaia/utils/promise'
+import { defineFeature, type IFeature } from '@migaia/plugin-host'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
-import { markRpcCarrierAdmissionFailure } from '@migaia/rpc-host/sdk'
+import { markRpcCarrierAdmissionFailure, registerRpcNativeFeature } from '@migaia/rpc-host/sdk'
 import {
   RpcError,
   RpcLifecycleError,
@@ -325,25 +326,39 @@ export class IpcFlowControl {
   }
 }
 
-/**
- * One complete definition creates one installation-local admission owner; no options registry
- * exists.
- */
-export function flowControlFeature(options: IIpcFlowControlOptions = {}) {
+/** Native Feature output creates a fresh admission owner for each actual physical connection. */
+class IpcFlowControlExecution {
+  /** Captured lane capacities belong to this native Feature installation. */
+  readonly #options: IIpcFlowControlOptions
+
+  /** Retain the factory snapshot without acquiring a physical resource. */
+  constructor(options: IIpcFlowControlOptions) {
+    this.#options = options
+  }
+
+  /** The concrete carrier supplies its own connection facts and owns the returned disposer. */
+  install(context: IProcessFeatureContext) {
+    /** Native ownership installs lane state once and lends it to the connection's actual queue. */
+    const value = new IpcFlowControl(this.#options, context)
+    return { value, dispose: value.close }
+  }
+}
+
+/** Concrete carriers consume the native output without exposing its constructor as public API. */
+export type IIpcFlowControlExecution = Pick<IpcFlowControlExecution, 'install'>
+
+/** One opaque native Feature creates installation-local admission controls without public fields. */
+export function flowControlFeature(options: IIpcFlowControlOptions = {}): IRpcFlowControlFeature {
   /** Capture both fields before a later caller mutation can reconfigure an open connection. */
   const captured = Object.freeze({
     maxPendingData: options.maxPendingData,
     maxPendingControl: options.maxPendingControl
   })
-  return Object.freeze({
-    kind: ProcessFeatureName.flowControl,
-    install: (context: IProcessFeatureContext) => {
-      /** Native ownership installs this exact lane state once and lends it to its actual queue. */
-      const value = new IpcFlowControl(captured, context)
-      return { value, dispose: value.close }
-    }
-  })
+  /** Only the real plugin-host installation constructs this reusable execution output. */
+  const feature = defineFeature(() => new IpcFlowControlExecution(captured))
+  registerRpcNativeFeature(feature, { role: ProcessFeatureName.flowControl })
+  return feature
 }
 /** The exact complete flow definition is used by concrete process installation identity checks. */
-export type IRpcFlowControlFeature = ReturnType<typeof flowControlFeature>
+export type IRpcFlowControlFeature = IFeature<Record<never, never>, IIpcFlowControlExecution>
 export default flowControlFeature

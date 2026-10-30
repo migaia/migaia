@@ -1,3 +1,5 @@
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
@@ -10,7 +12,7 @@ import {
 import { RpcStreamLimit } from '@migaia/rpc-contract'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { timeoutFeature } from '@migaia/rpc-host/features'
+
 import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Keep deadlines virtual while preserving the endpoint's ordinary zero-delay data handoff. */
@@ -362,22 +364,34 @@ describe('streaming cancellation', () => {
         }
       },
       {},
-      () => undefined
+      () => undefined,
+      undefined,
+      undefined,
+      [
+        rpcFeaturesPlugin({
+          features: { deadline: timeoutFeature({ ms: 50, scheduler: clientClock }) }
+        })
+      ]
     )
     try {
-      const iterator = client.memory.stream('count', null) as AsyncIterableIterator<unknown>
+      const iterator = client.memory.stream('count', null, {
+        timeout: false
+      }) as AsyncIterableIterator<unknown>
       expect(await iterator.next()).toEqual({ done: false, value: 'a' })
       expect(await iterator.return?.('local')).toEqual({ done: true, value: undefined })
       expect(cleaned).toBe(1)
       expect(await iterator.next()).toEqual({ done: true, value: undefined })
-      const thrown = client.memory.stream('count', null) as AsyncIterableIterator<unknown>
+      const thrown = client.memory.stream('count', null, {
+        timeout: false
+      }) as AsyncIterableIterator<unknown>
       expect(await thrown.next()).toEqual({ done: false, value: 'a' })
       const reason = new Error('caller stopped')
       await expect(thrown.throw?.(reason)).rejects.toBe(reason)
       expect(cleaned).toBe(2)
       const controller = new AbortController()
       const waiting = client.memory.stream('wait', null, {
-        signal: controller.signal
+        signal: controller.signal,
+        timeout: false
       }) as AsyncIterableIterator<unknown>
       expect(await waiting.next()).toEqual({ done: false, value: 'a' })
       const pending = waiting.next()
@@ -386,9 +400,7 @@ describe('streaming cancellation', () => {
       await expect(pending).rejects.toBe(abortReason)
       await expect(waiting.next()).rejects.toBe(abortReason)
       resume()
-      const timed = client.memory.stream('deadline', null, {
-        timeout: timeoutFeature({ ms: 50, scheduler: clientClock })
-      }) as AsyncIterableIterator<unknown>
+      const timed = client.memory.stream('deadline', null) as AsyncIterableIterator<unknown>
       expect(await timed.next()).toEqual({ done: false, value: 'a' })
       const pendingDeadline = timed.next()
       clientClock.advance(50)

@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Real batch ingress preserves each replay refusal and its original physical write failure. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
@@ -29,7 +30,7 @@ it('reports each native batch replay refusal and its exact physical write failur
     'batch-custody-server',
     'batch-custody-server',
     'memory',
-    [],
+    {},
     [],
     {
       create: () => new RpcJsonCarrierCodec(),
@@ -39,7 +40,10 @@ it('reports each native batch replay refusal and its exact physical write failur
   /** Native installation owns the sole Auth ledger, Batch owner and actual provider. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [authentication, batchFeature(), server.transport],
+    plugins: [
+      rpcFeaturesPlugin({ features: { authentication, batch: batchFeature() } }),
+      server.transport
+    ],
     report: (error) => failures.push(error),
     provide: {
       echo: (value: string) => {
@@ -50,7 +54,7 @@ it('reports each native batch replay refusal and its exact physical write failur
   })
   /** The client allocates every real task and retains both original caller operations. */
   const client = await server.connect('batch-custody-client', {
-    plugins: [authentication, batchFeature()]
+    plugins: [rpcFeaturesPlugin({ features: { authentication, batch: batchFeature() } })]
   })
   /** Both refused response writes must preserve this identical original native failure. */
   const cause = new Error('fixture refusal write failure')

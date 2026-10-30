@@ -14,10 +14,12 @@ import type { IBrowserFeature } from './plugin-types.ts'
 /** Capture one existing page port or native connect scope; no physical effect occurs cold. */
 export function sharedWorkerPlugin<
   const N extends string = 'sharedWorker',
-  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+  const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<
+    Record<string, IBrowserFeature>
+  >
 >(
   options: ISharedWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
-): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true> {
   if (
     !options ||
     Number(options.sharedWorker !== undefined) + Number(options.listen !== undefined) !== 1
@@ -55,5 +57,5 @@ export function sharedWorkerPlugin<
       scope
         ? listenBrowserPorts(scope, context)
         : attachBrowserCarrier(createSharedWorkerCarrier(port!, context), context)
-  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>
 }

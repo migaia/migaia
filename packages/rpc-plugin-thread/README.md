@@ -46,7 +46,7 @@ if (await isThreadChild()) {
 | `connectToParent: true` | 仅在真实线程子端连接父端，与 `spawn` 互斥                           |
 | `name`                  | 原生安装/注册名称；默认 `thread`                                    |
 | `namespace`             | 调用命名空间；默认 `thread`                                         |
-| `features`              | 完整 timeout、retry 或 pool feature 实例                            |
+| `features`              | `{ localName: nativeFeature }`，接收 timeout、retry 或 pool         |
 | `expose`                | 普通 PluginHost 安装时选择公开的本地 Feature 方法                   |
 | `report`                | 原生诊断报告回调                                                    |
 
@@ -56,7 +56,7 @@ if (await isThreadChild()) {
 
 ## 调用策略与生命周期
 
-单次调用传 `signal`，以及完整的 `timeoutFeature({ ms })`、`retryFeature({ attempts })` 实例或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。
+单次调用传 `signal`，以及 timeout `{ ms }`、retry `{ attempts }` 配置或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。
 
 Thread 的原生 `spec.limits.callWallTimeMs` 是独立硬上限；显式 `timeout: false` 只关闭可选业务 timeout，不能延长该上限。它由真实 launch spec 与同一 scheduler 创建的完整 timeout 实例执行。
 

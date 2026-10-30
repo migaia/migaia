@@ -254,7 +254,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
     ],
   'packages/web-rpc/test/middleware/timeout.test.ts::timeout middleware resolves per-call override before middleware default':
     [
-      'packages/rpc-host/test/host/core-public.test.ts::executes a supplied complete feature, honors false and rejects numeric policy syntax'
+      'packages/rpc-host/test/host/core-public.test.ts::executes installed timeout output and per-call options, honors false and rejects numeric policy syntax'
     ],
   'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts::retained and allocation attribution exercises composed discovery and chunk settlement through the shared kernel':
     [
@@ -713,7 +713,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
   // Pure contracts retain the original portable/error assertions under the current package boundary.
   'packages/rpc-contract/test/acceptance.test.ts::architecture and export boundary publishes only runtime-neutral root/framing exports and dependencies':
     [
-      'packages/rpc-contract/test/contract/acceptance.test.ts::pure contract acceptance publishes only runtime-neutral pure contract/protocol exports with an explicit dependency allowlist'
+      'packages/rpc-contract/test/contract/acceptance.test.ts::pure contract acceptance publishes runtime-neutral contract/protocol exports and native feature types with an explicit dependency allowlist'
     ],
   // Current metadata reads and supported portable admission replace the retired envelope snapshot facade.
   'packages/rpc-contract/test/acceptance.test.ts::hostile normalization snapshots every envelope getter once and fails closed with causes':

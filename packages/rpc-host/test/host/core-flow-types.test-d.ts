@@ -12,6 +12,7 @@ import type { IRpcOutcomeLookupResult } from '@migaia/rpc-contract/protocol'
 const replay = idempotencyFeature()
 /** Each actual generic flow contributes its own disjoint namespace method. */
 const extension = defineFlowFeature({
+  phase: 1000,
   name: 'typed-extension',
   setup: () => ({ stages: {}, namespaceExtensions: () => ({ answer: () => 42 }) })
 })
@@ -19,7 +20,7 @@ const extension = defineFlowFeature({
 const memory = defineTransportPlugin({
   name: 'typed-memory',
   namespace: 'memory',
-  features: [replay, extension],
+  features: { replay, extension },
   open: () => ({ dispose: () => undefined })
 })
 /** A different namespace receives no extension from another transport's local features. */

@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original observer business reaches real native Session, media and collector owners. */
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import {
@@ -380,7 +381,7 @@ it('keeps native business, exact codec traversal and released resources equal wi
       'observer-counter-provider',
       'observer-counter-provider',
       'memory',
-      [],
+      {},
       [],
       {
         create: () => new RpcJsonCarrierCodec(),
@@ -448,18 +449,20 @@ it('keeps the original large public payload fragmented on both actual native dir
   /** The canonical chunk Feature alone produces and assembles all fragments. */
   const fragments = chunk({ chunkBytes: 64 })
   /** Actual JSON media makes physical fragmentation observable without a fixture encoder. */
-  const listener = coreMemoryServer('native-copy-server', 'native-copy-server', 'memory', [], [], {
+  const listener = coreMemoryServer('native-copy-server', 'native-copy-server', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
   /** The provider has an independent genuine native chunk installation. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [fragments, listener.transport],
+    plugins: [rpcFeaturesPlugin({ features: { feature0: fragments } }), listener.transport],
     provide: { echo: unchanged }
   })
   /** The caller installs the same cold definition with separate runtime state. */
-  const connected = await listener.connect('native-copy-client', { plugins: [fragments] })
+  const connected = await listener.connect('native-copy-client', {
+    plugins: [rpcFeaturesPlugin({ features: { feature0: fragments } })]
+  })
   /** Only accepted client physical writes contribute to the original count. */
   const clientFrames = vi.spyOn(connected.pair[1], 'write')
   /** Reverse physical writes remain independently observable. */
@@ -493,14 +496,14 @@ it('keeps original control and payload order from two actual public chunk source
   /** Only the real admitted provider context supplies each sender's identity. */
   const sources: string[] = []
   /** The existing listener supplies distinct MemoryCarrier pairs and Sessions for both callers. */
-  const listener = coreMemoryServer('opaque-server', 'opaque-server', 'memory', [], [], {
+  const listener = coreMemoryServer('opaque-server', 'opaque-server', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
   /** The same actual server receives both original source payloads through public chunk. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [fragments, listener.transport],
+    plugins: [rpcFeaturesPlugin({ features: { feature0: fragments } }), listener.transport],
     provide: {
       echo: (value, context) => {
         received.push(value)
@@ -514,8 +517,12 @@ it('keeps original control and payload order from two actual public chunk source
   /** The second caller owns an independent actual transport and accepted Session. */
   let second: Awaited<ReturnType<typeof listener.connect>> | undefined
   try {
-    first = await listener.connect('opaque-a', { plugins: [fragments] })
-    second = await listener.connect('opaque-b', { plugins: [fragments] })
+    first = await listener.connect('opaque-a', {
+      plugins: [rpcFeaturesPlugin({ features: { feature0: fragments } })]
+    })
+    second = await listener.connect('opaque-b', {
+      plugins: [rpcFeaturesPlugin({ features: { feature0: fragments } })]
+    })
     expect(first.pair[0].id).not.toBe(second.pair[0].id)
     expect(listener.lookup('opaque-a')!.handle).not.toBe(listener.lookup('opaque-b')!.handle)
     await first.host.memory!.notify('echo', 'control-a', { targetId: 'opaque-server' })

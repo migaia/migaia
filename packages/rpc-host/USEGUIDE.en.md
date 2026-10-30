@@ -83,17 +83,17 @@ import { linkPolicy } from '@migaia/rpc-host/plugins'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
 export const policy = linkPolicy({
-  features: [timeoutFeature({ ms: 3000 }), retryFeature({ attempts: 2 })]
+  features: { timeout: timeoutFeature({ ms: 3000 }), retry: retryFeature({ attempts: 2 }) }
 })
 export const transport = threadPlugin({
   spawn: new URL('./worker.ts', import.meta.url),
-  features: [timeoutFeature({ ms: 1500 })]
+  features: { timeout: timeoutFeature({ ms: 1500 }) }
 })
 
-export const callOptions = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const
+export const callOptions = { timeout: { ms: 100 }, retry: false } as const
 ```
 
-Selection has one order: complete per-call instance or `false`, then the transport plugin's feature, then the link-policy default. Pass `callOptions` to `host.thread.request(method, payload, callOptions)` to override one call. Numeric `{ timeout: 100 }`, `timeoutMs`, and `defaultTimeoutMs` are removed.
+Selection has one order: per-call policy options or `false`, then the transport plugin's feature, then the link-policy default. Pass `callOptions` to `host.thread.request(method, payload, callOptions)` to override one call. Numeric `{ timeout: 100 }`, `timeoutMs`, and `defaultTimeoutMs` are removed.
 
 `timeout: false` waits for the response without a feature timeout; an upstream remaining deadline still decreases. `retry: false` disables retry. Downstream hops receive only the remaining budget and cannot extend it. Only the origin retries scalar calls and groups; streams never replay and use timeout only. Timeout or disconnection does not prove that business work never executed; reconcile uncertain non-idempotent work first. Transport handshake preparation deadlines are separate from the business timeout feature.
 
@@ -104,11 +104,14 @@ A call whose remaining deadline has expired before provider entry rejects with `
 The complete definition batch passed to `createRpcHost({ plugins })` either succeeds or rolls back together. After construction, each `host.use(...)` starts a separate native installation transaction. Failure rolls back only that batch's new resources; committed namespaces keep working. The returned value is the same public host. Assign it to a new variable to obtain the added namespaces in its static type.
 
 ```ts doc-test=check
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
 import { limitsFeature } from '@migaia/rpc-host/plugins'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-const host = await createRpcHost({ plugins: [limitsFeature({ maxGlobal: 256 })] })
+const host = await createRpcHost({
+  plugins: [rpcFeaturesPlugin({ features: { limits: limitsFeature({ maxGlobal: 256 }) } })]
+})
 try {
   const extended = await host.use(threadPlugin({ spawn: new URL('./worker.ts', import.meta.url) }))
   await extended.thread.notify('refresh')
@@ -133,7 +136,7 @@ An existing `defineHost` owner obtains `domainCore` from `rpcHostPipelines(getHo
 import { defineHost } from '@migaia/plugin-host'
 import {
   rpcHostPipelines,
-  rpcFlowPlugin,
+  rpcFeaturesPlugin,
   type IRpcFlowFeature,
   type IRpcFlowPlugin,
   type IRpcTransportPlugin
@@ -152,16 +155,16 @@ export const host = defineHost({
 
 /** Commit reusable flow definitions before opening any transport resource. */
 export async function installRpc(
-  features: readonly IRpcFlowFeature<object>[],
+  features: Readonly<Record<string, IRpcFlowFeature<object>>>,
   observers: readonly IRpcFlowPlugin[],
   transports: readonly IRpcTransportPlugin[]
 ) {
-  await host.use(...observers, rpcFlowPlugin(features))
+  await host.use(...observers, rpcFeaturesPlugin({ features }))
   await host.use(...transports)
 }
 ```
 
-`rpcFlowPlugin(features)` wraps shared flow Features for an ordinary native host. The native registration owns their actual setup and cleanup; Features such as `authFeature()` cannot be passed directly to native `host.use` as plugins. Commit this wrapper and readonly observers before transports so the first handshake already has its complete policy.
+`rpcFeaturesPlugin({ features })` wraps shared flow Features for an ordinary native host. The native registration owns their actual setup and cleanup; Features such as `authFeature()` cannot be passed directly to native `host.use` as plugins. Commit this wrapper and readonly observers before transports so the first handshake already has its complete policy.
 
 A class owner also reads `this` lazily through the helper. `createPluginDomainCore` must forward the current construction request without exposing protected `pipeline`. Install plugins in the same order after construction finishes.
 
@@ -206,7 +209,7 @@ Frame pipelines accept multiple submissions. The stage receives each `await next
 
 A cancelled `batchFeature` member submits no further downstream work. Its call settles with `CANCELLED` and the original reason on `cause`; other members complete normally. An inbound member failure reports only that member and does not prevent later members from being processed.
 
-Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound reverses the direction. Array order does not change these positions. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly.
+Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound reverses the direction. Record keys and insertion order do not determine execution order. Custom features require an integer `phase` from 0 through 65535; duplicate phases at the same stage point and layer reject. Native `dependencies` order installation; `phase` orders execution. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly.
 
 `authFeature` protects each complete message before `chunkFeature` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
 
@@ -263,6 +266,7 @@ Set a default with `authFeature({ retain })` or override it in a transport conne
 When a verifier or credential resolver throws or rejects, auth retains the original error on the local error's `cause`. Use `errorMapFeature(map)` to control what a peer learns, such as replacing credential details with a public message. Local thrown errors, `report`, warnings, and readonly observation plugins still receive the original errors, regardless of installation order. Install it in host `plugins` or transport `features`; transport placement overrides host placement.
 
 ```ts doc-test=check
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
 import { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/plugins'
 
@@ -274,7 +278,9 @@ const redact: IRpcErrorMap = (error) =>
       : 'request failed'
   )
 
-export const host = await createRpcHost({ plugins: [errorMapFeature(redact)] })
+export const host = await createRpcHost({
+  plugins: [rpcFeaturesPlugin({ features: { errorMap: errorMapFeature(redact) } })]
+})
 ```
 
 `map(error, context)` must synchronously return an `Error`, portable value, or `undefined`. That result becomes the error sent to the peer; the original cause chain is not appended automatically. If the callback throws or its result cannot be serialized, the mapping failure is reported and the original error is sent under the rules used without a mapper. Returning a Promise/thenable reports `INVALID_CONFIG` and immediately uses those original rules without waiting, so it cannot block later messages in the same Session. A late Promise rejection is still reported separately.
@@ -383,7 +389,7 @@ A launched child with actual native parent facts (process, thread, coroutine, de
 | `/probe` plus `defineFeaturePlugin`                         | `probe` / `defineProbe` from `/plugins/probe`                           |
 | `authFeature/chunkFeature/typegenFeature`                   | `auth/chunk/typegen` from `/plugins`                                    |
 | Root `defaultTimeoutMs` or numeric call timeout             | Plugin `features` and complete timeout instances                        |
-| `poolPlugin` or pool assembler                              | Transport `features: [pool({ size })]`                                  |
+| `poolPlugin` or pool assembler                              | Transport `features: { workers: pool({ size }) }`                       |
 | Endpoint, RuntimePeer, v1, JSON-RPC profile                 | One Host call owner and one new protocol, without compatibility entries |
 | Root `outcome` or idempotency store                         | Install `/plugins/idempotency`; query its namespace extension           |
 

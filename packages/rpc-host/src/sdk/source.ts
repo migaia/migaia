@@ -26,7 +26,7 @@ export function defineRpcSourcePlugin(
     original?.kind !== RpcDefinitionKind.transport ||
     typeof namespace !== 'string' ||
     !namespace ||
-    original.definition.features?.some((feature) => {
+    Object.values(original.definition.features ?? {}).some((feature) => {
       /** Native resource features stay source-owned; local flow definitions cannot change groups. */
       const kind = readRpcDefinition(feature)?.kind
       return (
@@ -47,6 +47,7 @@ export function defineRpcSourcePlugin(
   /** Only the shared native definition installer receives the genuine source metadata. */
   const plugin = definePlugin({
     name: original.definition.name,
+    features: original.definition.features,
     install: new RpcDefinition(metadata).install
   })
   registerRpcDefinition(plugin, metadata)

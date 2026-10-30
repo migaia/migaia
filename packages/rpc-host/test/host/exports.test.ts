@@ -95,7 +95,10 @@ const expectedSdk = [
   'defineRpcSourcePlugin',
   'isRpcCarrierAdmissionFailure',
   'markRpcCarrierAdmissionFailure',
-  'rpcFlowPlugin',
+  'rpcFeaturesPlugin',
+  'registerRpcNativeFeature',
+  'readRpcFeature',
+  'findRpcNativeFeatureOutput',
   'rpcHostPipelines'
 ]
 

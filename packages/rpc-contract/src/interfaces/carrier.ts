@@ -4,7 +4,7 @@
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcErrorWireMetadata } from '../contract/types.ts'
-import type { IRpcNativeGeneration, IRpcTimeoutFeature } from './feature.ts'
+import type { IRpcNativeGeneration, IRpcTimeoutExecution } from './feature.ts'
 import type {
   IRpcOriginBinding,
   IRpcOriginHandle,
@@ -249,7 +249,7 @@ export type IRpcSessionView = Readonly<{
   /** Dispatch samples the original native reader query, never a cached handshake qualification. */
   isExclusive?(): boolean
   /** A genuine native source may retain its existing complete execution-wall timeout. */
-  callTimeoutCap?: IRpcTimeoutFeature
+  callTimeoutCap?: IRpcTimeoutExecution
   /** Verified local authentication and the actual acquired Session identity remain off the wire. */
   authentication?: Readonly<{ principalId: string; sessionId: string }>
   /** Direct accepted node identity is descriptive loop information, never native authority. */
@@ -296,7 +296,7 @@ export type IRpcPingOptions = Readonly<{
 /** Trusted native launch facts do not come from decoded business messages or carry auth tokens. */
 export type IRpcLocalSourceFacts = Readonly<{
   /** Complete native wall protection remains local and cannot be granted through wire metadata. */
-  callTimeoutCap?: IRpcTimeoutFeature
+  callTimeoutCap?: IRpcTimeoutExecution
   /** An acquired native connection may already own a distinct stable session identifier. */
   sessionId?: string
   /** Query the original native source's current sole-reader ownership after subscription. */

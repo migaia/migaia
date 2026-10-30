@@ -64,7 +64,7 @@ One current direct task returns `42`. Task settlement ends that generation's rea
 | `spawn: task`                    | Create a supervised cooperative task                                            |
 | `connectToParent: connect`       | Use this task's exact opaque handle, not a boolean                              |
 | `name` / `namespace`             | Native registration name and call namespace; default `coroutine`                |
-| `features`                       | Complete timeout, retry, or pool features                                       |
+| `features`                       | `{ localName: nativeFeature }` for timeout, retry, or pool                                       |
 | `supervisor`                     | Original restart/terminalPolicy/startupTimeoutMs/stop/budget/heartbeat policies |
 | `context.signal` / `heartbeat()` | Whole-generation stop signal and native liveness report                         |
 | `host.coroutine.members`         | Actual member list/get/stop/kill/restart/replace/on/watch                       |
@@ -75,8 +75,8 @@ Choose exactly one of spawn and connectToParent. A handle belongs to the actual 
 
 ## Policies and composition
 
-Call options use complete `timeoutFeature({ ms })` and `retryFeature({ attempts })` instances, or `false`. Precedence is per-call, transport feature, then link-policy plugin. No selected policy means no automatic policy. Business timeout does not configure native startup or stop budgets.
+Call options use timeout `{ ms }`, retry `{ attempts }`, or `false`. Precedence is per-call, transport feature, then link-policy plugin. No selected policy means no automatic policy. Business timeout does not configure native startup or stop budgets.
 
-For several same-carrier tasks, use `coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })` with [rpc-plugin-pool](../rpc-plugin-pool/README.en.md). Flow plugins go in Host `plugins`; [Devtools](../rpc-plugin-devtools/README.en.md) observes messages through the canonical probe implementation.
+For several same-carrier tasks, use `coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })` with [rpc-plugin-pool](../rpc-plugin-pool/README.en.md). Flow plugins go in Host `plugins`; [Devtools](../rpc-plugin-devtools/README.en.md) observes messages through the canonical probe implementation.
 
 Custom deployment uses `@migaia/rpc-host/sdk`; readonly observation uses `@migaia/rpc-host/plugins/probe`. Invalid sources retain TypeError, `rpc.transport.coroutine`, and COROUTINE_SOURCE_INVALID. Business, handshake, and supervision errors keep their own source/code/cause. See the [usage guide](./USEGUIDE.en.md) for streams, cancellation, and replacement.

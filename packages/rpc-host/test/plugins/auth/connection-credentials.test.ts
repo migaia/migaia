@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Private connection credentials reach only the configured authentication resolver. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -51,6 +52,7 @@ it.each([false, true])(
     const server = coreMemoryServer('server', 'credential-server')
     /** Ordinary stages must never receive the private value, even by enumerating the full context. */
     const inspect = defineFlowFeature({
+      phase: 1000,
       name: 'inspect-credential-context',
       setup: () => ({
         stages: {
@@ -88,7 +90,11 @@ it.each([false, true])(
     /** Real public Host installation preserves native principal fallback without an app verifier. */
     const host = await createRpcHost({
       ...server.options,
-      plugins: [inspect, authentication, observation, server.transport],
+      plugins: [
+        rpcFeaturesPlugin({ features: { inspect, authentication } }),
+        observation,
+        server.transport
+      ],
       provide: { echo: (value: unknown) => value },
       report: (error) => observed.reports.push(error)
     })
@@ -99,7 +105,11 @@ it.each([false, true])(
         /** No auth dependency or capability is declared by this actual transport definition. */
         const client = await createRpcHost({
           self: { name: label, instanceId: `credential-${label}` },
-          plugins: [authentication, observation, credentialTransport(server, label)],
+          plugins: [
+            rpcFeaturesPlugin({ features: { authentication } }),
+            observation,
+            credentialTransport(server, label)
+          ],
           report: (error) => observed.reports.push(error)
         })
         clients.push(client)

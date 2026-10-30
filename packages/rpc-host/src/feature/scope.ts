@@ -2,64 +2,60 @@
  * Resolve complete call features once per namespace; concrete timeout/retry behavior stays outside
  * host.
  */
-import {
-  RpcCallFeatureKind,
-  type IRpcAttempt,
-  type IRpcCallFeature,
-  type IRpcCallFeatures,
-  type IRpcRetryFeature,
-  type IRpcTimeoutFeature
+import type {
+  IRpcAttempt,
+  IRpcCallFeatures,
+  IRpcRetryExecution,
+  IRpcTimeoutExecution
 } from '@migaia/rpc-contract/interfaces'
+import type { IFeatureRecord } from '@migaia/plugin-host'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { HostErrorText } from '../host/error-text.ts'
+import { readRpcFeature, RpcCallFeatureRole } from '../sdk/metadata.ts'
+import { createRpcTimeoutExecution } from '../features/timeout.ts'
+import { createRpcRetryExecution } from '../features/retry.ts'
 
-/** Reject unsupported policy syntax at the boundary without constructing a policy in host. */
-function validateFeature(
-  value: unknown,
-  kind: (typeof RpcCallFeatureKind)[keyof typeof RpcCallFeatureKind]
-): void {
-  if (value === undefined || value === false) return
-  if (
-    value === null ||
-    typeof value !== 'object' ||
-    (value as IRpcCallFeature).kind !== kind ||
-    typeof (value as IRpcCallFeature).run !== 'function'
-  )
-    throw tagRpcError(
-      new TypeError(HostErrorText.callFeatureInvalid),
-      RpcCoreErrorCode.invalidConfig
-    )
+/** Compiled installations retain execution owners; calls never hold a native Feature token. */
+export type ISelectedCallFeatures = Readonly<{
+  timeout?: IRpcTimeoutExecution | false
+  retry?: IRpcRetryExecution | false
+}>
+
+/** Reject malformed call data or an inconsistent native installation with the established error. */
+function invalidCallFeature(): never {
+  throw tagRpcError(new TypeError(HostErrorText.callFeatureInvalid), RpcCoreErrorCode.invalidConfig)
 }
 
-/** Capture one plugin's two kinds in installation order and reject duplicate implementations. */
+/** Keep malformed role containers on the original native TypeError admission boundary. */
+function validateCallParameters(value: unknown): void {
+  if (value === undefined || value === false) return
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) invalidCallFeature()
+}
+
+/** Resolve role metadata once while consuming outputs from the original native registration. */
 function captureFeatures(
-  features: readonly unknown[],
-  allowTransportFeatures = false
-): IRpcCallFeatures {
-  /** The result holds executing instances, never a second numeric configuration syntax. */
-  const selected: { timeout?: IRpcTimeoutFeature; retry?: IRpcRetryFeature } = {}
-  for (const feature of features) {
-    /** Native transports may also contribute carrier and pool features owned elsewhere. */
-    const kind =
-      feature !== null && typeof feature === 'object'
-        ? (feature as IRpcCallFeature).kind
-        : undefined
-    if (kind !== RpcCallFeatureKind.timeout && kind !== RpcCallFeatureKind.retry) {
-      if (allowTransportFeatures) continue
-      throw tagRpcError(
-        new TypeError(HostErrorText.callFeatureInvalid),
-        RpcCoreErrorCode.invalidConfig
-      )
-    }
-    validateFeature(feature, kind)
-    if (selected[kind] !== undefined)
+  features: IFeatureRecord,
+  outputs: Readonly<Record<string, unknown>>
+): ISelectedCallFeatures {
+  /** Only the two fixed call roles survive cold compilation into the namespace cache. */
+  const selected: { timeout?: IRpcTimeoutExecution; retry?: IRpcRetryExecution } = {}
+  for (const [name, feature] of Object.entries(features)) {
+    /** Native admission has already authenticated every token; this metadata only selects its role. */
+    const metadata = readRpcFeature(feature)
+    if (metadata?.category !== 'call') continue
+    /** Role keys never derive from caller aliases, which remain free for addressing and inference. */
+    const role = metadata.role
+    if (role !== RpcCallFeatureRole.timeout && role !== RpcCallFeatureRole.retry) continue
+    if (selected[role] !== undefined)
       throw tagRpcError(
         new TypeError(HostErrorText.featureCombinationConflict),
         RpcCoreErrorCode.featureCombinationConflict
       )
-    if (kind === RpcCallFeatureKind.timeout) selected.timeout = feature as IRpcTimeoutFeature
-    else selected.retry = feature as IRpcRetryFeature
+    /** The executing object comes from the real registration, never from public token fields. */
+    const output = outputs[name] as IRpcTimeoutExecution | IRpcRetryExecution | undefined
+    if (!output || typeof output.run !== 'function') invalidCallFeature()
+    selected[role] = output
   }
   return Object.freeze(selected)
 }
@@ -69,10 +65,10 @@ class ScopedAttempt<T> {
   /** The originating owner retains payload/retry lifetime and enforces its shrinking deadline. */
   readonly #attempt: IRpcAttempt<T>
   /** This instance owns any actual timer; false/undefined means host adds no timer. */
-  readonly #timeout: IRpcTimeoutFeature | false | undefined
+  readonly #timeout: IRpcTimeoutExecution | false | undefined
 
   /** Retain only the explicit attempt port and already selected policy for this invocation. */
-  constructor(attempt: IRpcAttempt<T>, timeout: IRpcTimeoutFeature | false | undefined) {
+  constructor(attempt: IRpcAttempt<T>, timeout: IRpcTimeoutExecution | false | undefined) {
     this.#attempt = attempt
     this.#timeout = timeout
   }
@@ -90,7 +86,7 @@ class ScopedAttempt<T> {
   }
 
   /** Retry owns repeated attempts and backoff; a host without it executes exactly once. */
-  run(retry: IRpcRetryFeature | false | undefined): Promise<T> {
+  run(retry: IRpcRetryExecution | false | undefined): Promise<T> {
     if (retry)
       return retry.run({
         signal: this.#attempt.signal,
@@ -105,19 +101,30 @@ class ScopedAttempt<T> {
 /** Own installation caches and the sole call > transport > link-policy precedence rule. */
 export class FeatureScope {
   /** Link policy contributes executing instances before transport startup. */
-  #defaults: IRpcCallFeatures = Object.freeze({})
+  #defaults: ISelectedCallFeatures = Object.freeze({})
   /** Native receipts withdraw failed or uninstalled policies without reviving a disposed default. */
-  readonly #policies = new Map<object, IRpcCallFeatures>()
+  readonly #policies = new Map<object, ISelectedCallFeatures>()
   /** Each namespace stores its resolved installation overlay for O(1) call selection. */
-  readonly #namespaces = new Map<string, IRpcCallFeatures>()
+  readonly #namespaces = new Map<string, ISelectedCallFeatures>()
   /** Raw transport selections allow defaults to be compiled once after cold registration. */
-  readonly #installed = new Map<string, IRpcCallFeatures>()
+  readonly #installed = new Map<string, ISelectedCallFeatures>()
 
   /** Capture one link-policy plugin's complete instances and refresh cold namespace caches. */
-  setDefaults(features: readonly IRpcCallFeature[]): () => void {
+  setDefaults(features: IFeatureRecord, outputs: Readonly<Record<string, unknown>>): () => void {
     /** The receipt identifies only this native installation, including reuse of one definition. */
     const token = {}
-    this.#policies.set(token, captureFeatures(features))
+    /** Policies from link-policy and feature carriers share one host-wide default layer. */
+    const captured = captureFeatures(features, outputs)
+    for (const policy of this.#policies.values())
+      if (
+        (captured.timeout !== undefined && policy.timeout !== undefined) ||
+        (captured.retry !== undefined && policy.retry !== undefined)
+      )
+        throw tagRpcError(
+          new TypeError(HostErrorText.featureCombinationConflict),
+          RpcCoreErrorCode.featureCombinationConflict
+        )
+    this.#policies.set(token, captured)
     this.#refreshDefaults()
     return () => {
       this.#policies.delete(token)
@@ -126,15 +133,23 @@ export class FeatureScope {
   }
 
   /** Cold candidate admission captures policies without changing the still-published namespace. */
-  prepare(namespace: string, features: readonly unknown[] = []): () => void {
+  prepare(
+    namespace: string,
+    features: IFeatureRecord = {},
+    outputs: Readonly<Record<string, unknown>> = {}
+  ): () => void {
     /** One explicit commit input holds captured instances, never another policy registry. */
-    const input = { namespace, installed: captureFeatures(features, true) }
+    const input = { namespace, installed: captureFeatures(features, outputs) }
     return () => this.#commit(input)
   }
 
   /** Direct owner installation uses the same cold parse and publication operation. */
-  register(namespace: string, features: readonly IRpcCallFeature[] = []): void {
-    this.prepare(namespace, features)()
+  register(
+    namespace: string,
+    features: IFeatureRecord = {},
+    outputs: Readonly<Record<string, unknown>> = {}
+  ): void {
+    this.prepare(namespace, features, outputs)()
   }
 
   /** A retiring namespace relinquishes its installation cache without retaining plugin instances. */
@@ -144,14 +159,31 @@ export class FeatureScope {
   }
 
   /** Merge only two fixed fields; false disables while undefined inherits the next owner. */
-  resolve(namespace: string, options: IRpcCallFeatures = {}): IRpcCallFeatures {
-    validateFeature(options.timeout, RpcCallFeatureKind.timeout)
-    validateFeature(options.retry, RpcCallFeatureKind.retry)
+  resolve(namespace: string, options: IRpcCallFeatures = {}): ISelectedCallFeatures {
+    if (!options || typeof options !== 'object' || Array.isArray(options)) invalidCallFeature()
+    /** Admission captures each caller choice before reading any execution policy parameters. */
+    const timeout = options.timeout
+    /** Retry uses the same data-container rule while retaining its existing option fields. */
+    const retry = options.retry
+    validateCallParameters(timeout)
+    validateCallParameters(retry)
     /** Cached defaults are immutable; a call overlay never changes the next call's policy. */
     const installed = this.#namespaces.get(namespace) ?? this.#defaults
+    /** Without call overrides the frozen installed selection is reused, allocating nothing. */
+    if (timeout === undefined && retry === undefined) return installed
     return {
-      timeout: options.timeout === undefined ? installed.timeout : options.timeout,
-      retry: options.retry === undefined ? installed.retry : options.retry
+      timeout:
+        timeout === undefined
+          ? installed.timeout
+          : timeout === false
+            ? false
+            : createRpcTimeoutExecution(timeout),
+      retry:
+        retry === undefined
+          ? installed.retry
+          : retry === false
+            ? false
+            : createRpcRetryExecution(retry)
     }
   }
 
@@ -160,10 +192,17 @@ export class FeatureScope {
     namespace: string,
     options: IRpcCallFeatures,
     attempt: IRpcAttempt<T>,
-    cap: IRpcTimeoutFeature | undefined = attempt.facts?.callTimeoutCap
+    cap: IRpcTimeoutExecution | undefined = attempt.facts?.callTimeoutCap
   ): Promise<T> {
-    /** A call-only supplied feature works even when the installation has no same-kind instance. */
-    const selected = this.resolve(namespace, options)
+    return this.executeSelected(this.resolve(namespace, options), attempt, cap)
+  }
+
+  /** Execute one admission's captured owners without resolving plain parameters a second time. */
+  executeSelected<T>(
+    selected: ISelectedCallFeatures,
+    attempt: IRpcAttempt<T>,
+    cap: IRpcTimeoutExecution | undefined = attempt.facts?.callTimeoutCap
+  ): Promise<T> {
     /** Native execution limits surround the entire origin, independently of optional call policies. */
     if (!cap) return new ScopedAttempt(attempt, selected.timeout).run(selected.retry)
     return cap.run({
@@ -186,20 +225,22 @@ export class FeatureScope {
     this.#defaults = Object.freeze({})
   }
 
-  /** Cold installation order selects the last live complete policy; no hot call scans policies. */
+  /** Merge every live policy's disjoint roles cold; no hot call scans policies. */
   #refreshDefaults(): void {
-    this.#defaults = Object.freeze({})
-    for (const features of this.#policies.values()) this.#defaults = features
+    /** SetDefaults keeps roles disjoint across policies, so merging never drops a role. */
+    const defaults: { timeout?: IRpcTimeoutExecution; retry?: IRpcRetryExecution } = {}
+    for (const features of this.#policies.values()) Object.assign(defaults, features)
+    this.#defaults = Object.freeze(defaults)
     for (const [namespace, installed] of this.#installed) this.#cache(namespace, installed)
   }
 
   /** Compile installed precedence once; the hot path never scans plugins or feature arrays. */
-  #cache(namespace: string, installed: IRpcCallFeatures): void {
+  #cache(namespace: string, installed: ISelectedCallFeatures): void {
     this.#namespaces.set(namespace, Object.freeze({ ...this.#defaults, ...installed }))
   }
 
   /** Native commit publishes only its already captured candidate policies. */
-  #commit(input: Readonly<{ namespace: string; installed: IRpcCallFeatures }>): void {
+  #commit(input: Readonly<{ namespace: string; installed: ISelectedCallFeatures }>): void {
     this.#installed.set(input.namespace, input.installed)
     this.#cache(input.namespace, input.installed)
   }

@@ -7,11 +7,10 @@ import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import {
   createRpcByteCarrier,
   createRpcMessageCarrier,
+  readRpcFeature,
   RpcCarrierObservation,
   type IRpcTransportSetupContext
 } from '@migaia/rpc-host/sdk'
-import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { RpcCoreErrorText, tagRpcError } from '@migaia/rpc-contract/errors'
 import {
   RpcCarrierPlatform,
   RpcCarrierTopology,
@@ -22,8 +21,13 @@ import {
   type IRpcCarrierWriteOptions,
   type IRpcWriteAdmission
 } from '@migaia/rpc-contract/interfaces'
-import { type IpcFlowControl } from '../features/flow-control.ts'
-import type { IpcSendQueue } from '../features/send-queue.ts'
+import type {
+  IpcFlowControl,
+  IIpcFlowControlExecution,
+  IRpcFlowControlFeature
+} from '../features/flow-control.ts'
+import type { IpcSendQueue, IIpcSendQueueExecution } from '../features/send-queue.ts'
+import type { IIpcLogExecution } from '../features/log.ts'
 import { ProcessFeatureName } from '../features/text.ts'
 import type { IProcessFeatureContext } from '../features/metadata.ts'
 import type { IProcessFeature } from './plugin/types.ts'
@@ -39,7 +43,7 @@ import type { IProcessByteChannel, IProcessMessageChannel, IProcessCommonOptions
 /** One actual native connection owns its installed feature resources and diagnostic labels. */
 export type IProcessCarrierOptions = Readonly<{
   id: string
-  features?: readonly IProcessFeature[]
+  features?: Readonly<Record<string, IProcessFeature>>
   ipc?: IProcessCommonOptions['ipc']
   /** Only actual spawned units lend their original native exit receipt to Session's close budget. */
   terminalReason?: IRpcCarrier['terminalReason']
@@ -85,15 +89,12 @@ class ProcessCarrierFeatures {
     this.#raw = raw
     this.#context = context
     /** One cold selection avoids installing a feature or shared flow more than once. */
-    const selected = new Map<string, Extract<IProcessFeature, { kind: string }>>()
-    for (const feature of options.features ?? []) {
-      if (!('kind' in feature)) continue
-      if (selected.has(feature.kind))
-        throw tagRpcError(
-          new TypeError(RpcCoreErrorText.ipcGateDuplicated),
-          RpcCoreErrorCode.invalidConfig
-        )
-      selected.set(feature.kind, feature)
+    const selected = new Map<PropertyKey, string>()
+    for (const [alias, feature] of Object.entries(options.features ?? {})) {
+      /** Only native Feature metadata grants a process role, independent of the caller's alias. */
+      const metadata = readRpcFeature(feature)
+      if (metadata?.category !== 'native') continue
+      selected.set(metadata.role, alias)
     }
     /** Feature owner identity remains the concrete transport's actual host-local namespace. */
     const facts: IProcessFeatureContext = {
@@ -111,27 +112,38 @@ class ProcessCarrierFeatures {
       const queue = selected.get(ProcessFeatureName.sendQueue)
       /** Log borrows the same admission events and has no independent native reader. */
       const log = selected.get(ProcessFeatureName.log)
-      if (flow?.kind === ProcessFeatureName.flowControl) {
+      if (flow !== undefined) {
+        /** The actual plugin registration supplies this caller alias's native factory output. */
+        const execution = context.owner.features[flow] as IIpcFlowControlExecution
         /** One installation owns the original lane state. */
-        const installed = flow.install(facts)
+        const installed = execution.install(facts)
         this.#flow = installed.value
         this.#disposers.push(installed.dispose)
       }
-      if (queue?.kind === ProcessFeatureName.sendQueue) {
+      if (queue !== undefined) {
+        /** Queue dependency construction belongs to the same native registration. */
+        const execution = context.owner.features[queue] as IIpcSendQueueExecution
         /** The concrete process explicitly lends the exact selected definition/value pair. */
-        const installed = queue.install({
+        const installed = execution.install({
           ...facts,
-          ...(flow?.kind === ProcessFeatureName.flowControl && this.#flow
-            ? { flow: { feature: flow, value: this.#flow } }
+          ...(flow !== undefined && this.#flow
+            ? {
+                flow: {
+                  feature: options.features![flow] as IRpcFlowControlFeature,
+                  value: this.#flow
+                }
+              }
             : {})
         })
         this.#queue = installed.value
         this.#flow = installed.value.flow
         this.#disposers.push(installed.dispose)
       }
-      if (log?.kind === ProcessFeatureName.log) {
+      if (log !== undefined) {
+        /** Log controls exist only in the real native Feature installation output. */
+        const execution = context.owner.features[log] as IIpcLogExecution
         /** Only this physical connection's original gate publishes its logging records. */
-        const installed = log.install({
+        const installed = execution.install({
           ...facts,
           gate: this.#flow,
           onReportError: (error) => context.report(error)

@@ -3,6 +3,8 @@
  * flow-admission owner. Queued cancellation and close do not create a second RPC execution queue.
  */
 import { createConcurrencyLimiter } from '@migaia/utils/promise'
+import { defineFeature, type IFeature } from '@migaia/plugin-host'
+import { registerRpcNativeFeature } from '@migaia/rpc-host/sdk'
 import type { IRpcWriteAdmission } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorText, RpcLifecycleError, tagRpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -10,6 +12,7 @@ import {
   flowControlFeature,
   type IIpcFlowControlOptions,
   type IRpcFlowControlFeature,
+  type IIpcFlowControlExecution,
   type IpcFlowControl
 } from './flow-control.ts'
 import { ProcessFeatureName } from './text.ts'
@@ -39,14 +42,18 @@ export class IpcSendQueue {
   #closeReason: unknown
 
   /** Native installation supplies the exact same feature/value receipt when flow is shared. */
-  constructor(feature: IRpcFlowControlFeature, context: IProcessFeatureContext) {
+  constructor(
+    feature: IRpcFlowControlFeature,
+    execution: IIpcFlowControlExecution,
+    context: IProcessFeatureContext
+  ) {
     if (context.flow && context.flow.feature !== feature)
       throw tagRpcError(
         new TypeError(RpcCoreErrorText.ipcGateDuplicated),
         RpcCoreErrorCode.invalidConfig
       )
     this.#ownedFlow = context.flow === undefined
-    this.flow = context.flow?.value ?? feature.install(context).value
+    this.flow = context.flow?.value ?? execution.install(context).value
     this.#limiter = createConcurrencyLimiter({
       concurrency: 1,
       report: (error) => this.flow.reportFailure(error)
@@ -109,8 +116,38 @@ export class IpcSendQueue {
   readonly whenIdle = (): Promise<void> => this.flow.whenIdle()
 }
 
-/** A complete queue definition executes FIFO policy, rather than supplying a configuration switch. */
-export function sendQueueFeature(options: ISendQueueOptions = {}) {
+/** Native Feature output lends its exact dependency to each concrete connection's FIFO owner. */
+class IpcSendQueueExecution {
+  /** Definition identity prevents an unrelated explicit flow from replacing the dependency. */
+  readonly #feature: IRpcFlowControlFeature
+  /** The native dependency graph constructs this same cold flow output once per registration. */
+  readonly #flow: IIpcFlowControlExecution
+
+  /** Borrow the native flow output without opening a connection or queue. */
+  constructor(feature: IRpcFlowControlFeature, flow: IIpcFlowControlExecution) {
+    this.#feature = feature
+    this.#flow = flow
+  }
+
+  /** The carrier owns the returned queue and supplies an already-installed explicit flow if any. */
+  install(context: IProcessFeatureContext) {
+    /** The connection retains its exact FIFO and one shared lane-admission instance. */
+    const value = new IpcSendQueue(this.#feature, this.#flow, context)
+    return { value, dispose: value.close }
+  }
+}
+
+/** Native carriers consume this output through the actual plugin registration's feature aliases. */
+export type IIpcSendQueueExecution = Pick<IpcSendQueueExecution, 'install'>
+
+/** An opaque queue Feature declares its exact flow dependency and keeps controls in its output. */
+export function sendQueueFeature(
+  options: ISendQueueOptions = {}
+): IFeature<
+  Record<never, never>,
+  IIpcSendQueueExecution,
+  Readonly<{ flow: IRpcFlowControlFeature }>
+> {
   if (
     options.flow &&
     (options.maxPendingData !== undefined || options.maxPendingControl !== undefined)
@@ -121,14 +158,12 @@ export function sendQueueFeature(options: ISendQueueOptions = {}) {
     )
   /** One exact cold definition is installed once by the concrete native process source. */
   const flow = options.flow ?? flowControlFeature(options)
-  return Object.freeze({
-    kind: ProcessFeatureName.sendQueue,
-    flow,
-    install: (context: IProcessFeatureContext) => {
-      /** Each native connection owns its own FIFO while sharing its one actual admission instance. */
-      const value = new IpcSendQueue(flow, context)
-      return { value, dispose: value.close }
-    }
+  /** Native dependency injection retains identity even when the same flow also has a caller alias. */
+  const feature = defineFeature({
+    dependencies: { flow },
+    install: (_core, dependencies) => new IpcSendQueueExecution(flow, dependencies.flow)
   })
+  registerRpcNativeFeature(feature, { role: ProcessFeatureName.sendQueue })
+  return feature
 }
 export default sendQueueFeature

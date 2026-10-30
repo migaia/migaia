@@ -1,3 +1,5 @@
+import { createRpcTimeoutExecution, timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Actual feature and native Host clocks replace the removed kernel/time-port configuration. */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -5,7 +7,7 @@ import { parseSync, Visitor } from 'oxc-parser'
 import { expect, it, vi } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { deferred } from '@migaia/utils/promise'
@@ -28,13 +30,16 @@ it('injects manual time into a real public RPC attempt deadline', async () => {
         await finish.promise
         return 'done'
       }
-    }
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    { deadline: timeoutFeature({ ms: 50, scheduler, report: () => undefined }) }
   )
   try {
     /** Only this one actual attempt uses the explicitly supplied feature clock. */
-    const pending = peers.a.memory.send('b', 'echo', null, {
-      timeout: timeoutFeature({ ms: 50, scheduler, report: () => undefined })
-    })
+    const pending = peers.a.memory.send('b', 'echo', null)
     /** Observe the original failure before any timer fires. */
     const result = pending.catch((error: unknown) => error)
     await entered.promise
@@ -135,7 +140,10 @@ it('timestamps failed responses and expires installed replay policy using manual
   /** A real accepted contract grants only this genuine idempotent operation. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotencyFeature(), server.transport],
+    plugins: [
+      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+      server.transport
+    ],
     provide: { api: { fail: business } },
     contract: {
       schemaVersion: 1,
@@ -211,7 +219,11 @@ it('retains very long attempt deadlines', async () => {
   /** Completion remains the actual native operation, independent from the feature's timer. */
   const finish = deferred<string>()
   /** Only a real complete timeout feature owns this timer and original call Promise. */
-  const feature = timeoutFeature({ ms: 2_147_483_648, scheduler, report: () => undefined })
+  const feature = createRpcTimeoutExecution({
+    ms: 2_147_483_648,
+    scheduler,
+    report: () => undefined
+  })
   /** The existing feature boundary directly consumes its genuine attempt execution port. */
   const pending = feature.run({
     signal: new AbortController().signal,

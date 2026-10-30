@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import assert from 'node:assert/strict'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -10,7 +10,7 @@ import {
 } from '@migaia/rpc-contract/protocol'
 import type {
   IRpcAttempt,
-  IRpcRetryFeature,
+  IRpcRetryExecution,
   IRpcSessionSelection
 } from '@migaia/rpc-contract/interfaces'
 import { FeatureScope } from '../../dist/feature/scope.js'
@@ -439,8 +439,7 @@ describe('CallTable owner transitions (public Namespace migration is tracked sep
     fixture.synchronousReply = true
     fixture.failure = new Error('fixture first write')
     /** This complete caller feature, rather than CallTable, chooses exactly two attempts. */
-    const retry: IRpcRetryFeature = {
-      kind: 'retry',
+    const retry: IRpcRetryExecution = {
       run: async <T>(attempt: IRpcAttempt<T>): Promise<T> => {
         try {
           return await attempt.invoke(attempt.signal, 80)
@@ -456,11 +455,13 @@ describe('CallTable owner transitions (public Namespace migration is tracked sep
         }
       }
     }
+    /** The existing execution-owner seam isolates CallTable deadline and target refresh behavior. */
+    vi.spyOn(fixture.features, 'resolve').mockReturnValue({ retry })
     await expect(
       fixture.table.invoke(
         fixture.target,
         { mode: 'request', method: 'read' },
-        { retry, remainingMs: 100 }
+        { remainingMs: 100 }
       )
     ).resolves.toBe(7)
     expect(fixture.frames.map((frame) => frame.route.remainingMs)).toEqual([80, 75])

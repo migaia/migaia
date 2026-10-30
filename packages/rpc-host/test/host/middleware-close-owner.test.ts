@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original middleware disposal assertions now exercise the public Host and its real native IO. */
 import { expect, it, vi } from 'vitest'
 import { defineHost } from '@migaia/plugin-host'
@@ -10,7 +11,7 @@ import { coreMemoryServer } from './core-fixture.ts'
 /** Install the original identity authentication over the existing physical carrier and JSON codec. */
 async function authenticatedConnection(plugins: IRpcHostOptions['plugins'] = []) {
   /** Both actual native endpoints borrow the canonical executing codec, without an adapter. */
-  const listener = coreMemoryServer('close-owner-server', 'close-owner-server', 'memory', [], [], {
+  const listener = coreMemoryServer('close-owner-server', 'close-owner-server', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
@@ -18,11 +19,15 @@ async function authenticatedConnection(plugins: IRpcHostOptions['plugins'] = [])
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      authFeature({
-        encrypt: (value) => value,
-        decrypt: (value) => value,
-        sign: (value) => value,
-        verify: (value) => value
+      rpcFeaturesPlugin({
+        features: {
+          auth: authFeature({
+            encrypt: (value) => value,
+            decrypt: (value) => value,
+            sign: (value) => value,
+            verify: (value) => value
+          })
+        }
       }),
       listener.transport
     ]
@@ -31,11 +36,15 @@ async function authenticatedConnection(plugins: IRpcHostOptions['plugins'] = [])
     /** Completion joins the actual handshake before the disposal assertion can run. */
     const client = await listener.connect('close-owner-client', {
       plugins: [
-        authFeature({
-          encrypt: (value) => value,
-          decrypt: (value) => value,
-          sign: (value) => value,
-          verify: (value) => value
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              encrypt: (value) => value,
+              decrypt: (value) => value,
+              sign: (value) => value,
+              verify: (value) => value
+            })
+          }
         }),
         ...plugins
       ]

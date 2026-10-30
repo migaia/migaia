@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
@@ -38,7 +39,7 @@ async function fixture() {
   /** Only prepared original groups contribute namespace facts to this fixture. */
   const groups = new Map<string, IRpcFlowGroup>()
   /** Canonical native Feature inspection owns the local setup and its dependency closure. */
-  const program = new RpcTransportFlowProgram([feature])
+  const program = new RpcTransportFlowProgram({ feature })
   /** Qualified declarations and execution authority come from the same canonical SDK owner. */
   const rpc = rpcHostPipelines(
     () => flow,
@@ -416,16 +417,18 @@ it.each(['single', 'batch'] as const)(
   'retires a real accepted Session after malformed encoded input in a %s frame',
   async (mode) => {
     /** A genuine text codec makes batch members opaque encoded messages until Session admission. */
-    const server = coreMemoryServer('malformed-batch', 'malformed-batch', 'memory', [], [], {
+    const server = coreMemoryServer('malformed-batch', 'malformed-batch', 'memory', {}, [], {
       create: () => new RpcJsonCarrierCodec(),
       nativeBinary: false
     })
     /** The real optional extension is negotiated by both public hosts. */
     const host = await createRpcHost({
       ...server.options,
-      plugins: [batchFeature(), server.transport]
+      plugins: [rpcFeaturesPlugin({ features: { batch: batchFeature() } }), server.transport]
     })
-    const client = await server.connect('malformed-source', { plugins: [batchFeature()] })
+    const client = await server.connect('malformed-source', {
+      plugins: [rpcFeaturesPlugin({ features: { batch: batchFeature() } })]
+    })
     try {
       /** The existing native write port injects one malformed message without a fake Session. */
       const malformed = { kind: 'message', data: '{malformed-batch' } as const

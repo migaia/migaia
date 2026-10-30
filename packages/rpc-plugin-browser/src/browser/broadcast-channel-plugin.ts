@@ -261,10 +261,12 @@ class BroadcastChannelListener {
 /** Capture a borrowed native channel; each real installation owns independent discovery membership. */
 export function broadcastChannelPlugin<
   const N extends string = 'broadcastChannel',
-  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+  const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<
+    Record<string, IBrowserFeature>
+  >
 >(
   options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
-): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true> {
   /** Native source shape is admitted before subscribing or publishing any discovery frame. */
   const channel = options?.channel
   if (
@@ -290,5 +292,5 @@ export function broadcastChannelPlugin<
       const listener = new BroadcastChannelListener(channel, context)
       return { dispose: listener.close }
     }
-  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>
 }

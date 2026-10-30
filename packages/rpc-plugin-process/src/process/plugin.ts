@@ -3,6 +3,7 @@ import { detectServerRuntime } from '@migaia/utils'
 import {
   defineTransportPlugin,
   RpcNativeFeatureKind,
+  findRpcNativeFeatureOutput,
   RpcNativePoolMember,
   type IRpcTransportSetupContext,
   type IRpcTransportPlugin,
@@ -46,7 +47,7 @@ export type IProcessPluginCommonOptions = Omit<IProcessShortSpawn, 'entry'> &
     name?: string
     namespace?: string
     expose?: readonly string[]
-    features?: readonly IProcessFeature[]
+    features?: Readonly<Record<string, IProcessFeature>>
     report?(error: unknown): void
     parentLoss?: IProcessServeChildIngress['parentLoss']
   }>
@@ -119,12 +120,12 @@ class ProcessInstallation {
       ? { ...context, report: this.#options.report }
       : context
     /** Unsupported parent/listener sources expose no repeatable acquisition capability. */
-    const feature = this.#options.features?.find(
-      (value) => 'kind' in value && value.kind === RpcNativeFeatureKind.pool
-    )
-    if (feature && 'kind' in feature && feature.kind === RpcNativeFeatureKind.pool) {
+    const execution = findRpcNativeFeatureOutput<
+      import('@migaia/plugin-host').IFeatureOutput<IRpcNativeTransportFeature>
+    >(this.#options.features, context.owner, RpcNativeFeatureKind.pool)
+    if (execution) {
       /** The complete feature returns its original controls and one resource disposer. */
-      const installed = await feature.install({
+      const installed = await execution.install({
         ...nativeContext,
         memberKind: 'process',
         ...(this.#options.spawn || (this.#options.connect && 'target' in this.#options.connect)
@@ -267,20 +268,24 @@ class ProcessInstallation {
 export function processPlugin<
   const N extends string = typeof PROCESS_NAMESPACE,
   E extends object = Record<never, never>,
-  const TFeatures extends readonly IProcessFeature[] = readonly IProcessFeature[]
+  const TFeatures extends Readonly<Record<string, IProcessFeature>> = Readonly<
+    Record<string, IProcessFeature>
+  >
 >(
   options: IProcessPluginOptions &
     Readonly<{
       namespace?: N
       features?: TFeatures &
-        readonly (
-          | Exclude<IProcessFeature, IRpcNativeTransportFeature>
-          | IRpcNativeTransportFeature<E>
-        )[]
+        Readonly<
+          Record<
+            string,
+            Exclude<IProcessFeature, IRpcNativeTransportFeature> | IRpcNativeTransportFeature<E>
+          >
+        >
     }>
 ): IRpcTransportPlugin<
   N,
-  IProcessNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+  IProcessNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>,
   true
 > {
   /** Runtime input may arrive from plain JavaScript; capture its four existing physical source arms. */
@@ -313,7 +318,7 @@ export function processPlugin<
     open: installation.open
   }) as IRpcTransportPlugin<
     N,
-    IProcessNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+    IProcessNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>,
     true
   >
 }

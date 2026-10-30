@@ -26,7 +26,7 @@ function taskPlugins(task: ICoroutineUserTask) {
   return [
     coroutinePlugin({
       spawn: task,
-      features: [timeoutFeature({ ms: 1000 }), retryFeature({ attempts: 2 })],
+      features: { timeout: timeoutFeature({ ms: 1000 }), retry: retryFeature({ attempts: 2 }) },
       supervisor: { startupTimeoutMs: 1500 }
     })
   ] as const
@@ -42,7 +42,7 @@ export function open(task: ICoroutineUserTask) {
 export function call(host: ITaskHost, target: string, signal: AbortSignal) {
   return host.coroutine.send(target, 'echo', 'hello', {
     signal,
-    timeout: timeoutFeature({ ms: 500 }),
+    timeout: { ms: 500 },
     retry: false
   })
 }
@@ -61,13 +61,13 @@ export function replace(host: ITaskHost, target: string, task: ICoroutineUserTas
 }
 
 export function pooled(task: ICoroutineUserTask) {
-  return coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })
+  return coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })
 }
 ```
 
 `host.coroutine.request/notify/stream/group/send/dispatch` uses common namespace semantics. Notify waits only for actual write; request/send waits for business results. Target notify with `{ targetId }`. Untargeted calls use the current direct set, retaining independent outcomes for several ordinary direct targets.
 
-Policy precedence is per-call options, transport features, then link-policy plugin. Per-call timeout/retry takes a complete instance or false. The example selects a 500 ms timeout and disables retry for that call. An absent policy adds no implicit timeout or retry loop. supervisor.startupTimeoutMs is the native task startup budget, separate from business timeout.
+Policy precedence is per-call options, transport features, then link-policy plugin. Per-call timeout/retry takes policy options or false. The example selects a 500 ms timeout and disables retry for that call. An absent policy adds no implicit timeout or retry loop. supervisor.startupTimeoutMs is the native task startup budget, separate from business timeout.
 
 Read generation-bound streams through `host.coroutine.peers[target]`. Finish them or call return on early exit; this ends that stream rather than the task generation. Read the current directory again after restart; an old method does not silently point at a new task.
 

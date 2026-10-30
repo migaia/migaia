@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original custom Feature values and lifecycle effects belong to the genuine receiving Host. */
 import {
   defineFeature,
@@ -143,7 +144,7 @@ async function closeFirstPartyFramer(): Promise<void> {
   /** The ordinary public RPC factory installs real chunk resources through genuine native setup. */
   const endpoint = await createRpcHost({
     ...server.options,
-    plugins: [chunkFeature(), server.transport]
+    plugins: [rpcFeaturesPlugin({ features: { chunk: chunkFeature() } }), server.transport]
   })
   try {
     await endpoint.close()

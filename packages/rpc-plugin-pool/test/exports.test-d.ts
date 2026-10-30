@@ -13,7 +13,7 @@ import type * as Pool from '../dist/index.js'
 declare const task: Parameters<typeof coroutinePlugin>[0]['spawn']
 const options: IPoolPluginOptions = { size: 3, maxQueue: 6 }
 const host = await createRpcHost({
-  plugins: [coroutinePlugin({ spawn: task!, features: [pool(options)] })]
+  plugins: [coroutinePlugin({ spawn: task!, features: { workers: pool(options) } })]
 })
 const controls: IRpcPoolControls = host.coroutine.pool
 const stats: IRpcPoolStats = controls.stats()

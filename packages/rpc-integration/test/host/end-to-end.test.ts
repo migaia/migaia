@@ -373,7 +373,10 @@ it('observes scalar process pool work while each public host retains one logical
       hosts.push(
         await createRpcHost<IChildApi>({
           self: { name, instanceId: name },
-          plugins: [processPlugin({ spawn: processEntry, features: [pool({ size: 2 })] }), value],
+          plugins: [
+            processPlugin({ spawn: processEntry, features: { workers: pool({ size: 2 }) } }),
+            value
+          ],
           provide: parentService
         })
       )

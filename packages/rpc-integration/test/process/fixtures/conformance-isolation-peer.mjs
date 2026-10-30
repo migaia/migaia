@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { readFileSync } from 'node:fs'
 import { inspect } from 'node:util'
 import { randomUUID } from 'node:crypto'
@@ -192,26 +193,37 @@ class IsolationService {
         }
       },
       plugins: [
-        authFeature({
-          ...(mode === 'stderr'
-            ? {
-                /**
-                 * The production parent bootstrap lends its real private token through this public
-                 * resolver.
-                 */
-                credentials(context) {
-                  credentials.alice = context.credentials
-                  return context.credentials
-                }
-              }
-            : {}),
-          verifyCredentials: authenticateCredentials,
-          /** This completed-frame replay case explicitly selects the documented retained-ID mode. */
-          retain: mode === 'replay' ? 310_000 : false
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              ...(mode === 'stderr'
+                ? {
+                    /**
+                     * The production parent bootstrap lends its real private token through this
+                     * public resolver.
+                     */
+                    credentials(context) {
+                      credentials.alice = context.credentials
+                      return context.credentials
+                    }
+                  }
+                : {}),
+              verifyCredentials: authenticateCredentials,
+              /**
+               * This completed-frame replay case explicitly selects the documented retained-ID
+               * mode.
+               */
+              retain: mode === 'replay' ? 310_000 : false
+            }),
+            idempotency: idempotencyFeature(),
+            limits: limitsFeature({ maxConsecutiveTimeouts: 3 }),
+            defineFlow: defineFlowFeature({
+              phase: 1000,
+              name: 'isolation-envelope-observer',
+              setup: observeFrames
+            })
+          }
         }),
-        idempotencyFeature(),
-        limitsFeature({ maxConsecutiveTimeouts: 3 }),
-        defineFlowFeature({ name: 'isolation-envelope-observer', setup: observeFrames }),
         processPlugin({
           name: 'p',
           report,

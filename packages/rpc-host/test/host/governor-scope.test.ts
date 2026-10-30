@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
@@ -16,8 +17,12 @@ describe('accepted host session provider policy', () => {
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        authFeature({ verifyCredentials: (value) => ({ principalId: String(value) }) }),
-        idempotencyFeature(),
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({ verifyCredentials: (value) => ({ principalId: String(value) }) }),
+            idempotency: idempotencyFeature()
+          }
+        }),
         server.transport
       ],
       provide: { service: { business } },
@@ -29,7 +34,9 @@ describe('accepted host session provider policy', () => {
     })
     /** Each actual client sends its own credential through the real handshake verification path. */
     const first = await server.connect('first', {
-      plugins: [authFeature({ credentials: 'principal-a' })]
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: 'principal-a' }) } })
+      ]
     })
     try {
       expect(
@@ -41,7 +48,9 @@ describe('accepted host session provider policy', () => {
        * principal.
        */
       const replacement = await server.connect('replacement', {
-        plugins: [authFeature({ credentials: 'principal-a' })]
+        plugins: [
+          rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: 'principal-a' }) } })
+        ]
       })
       try {
         expect(
@@ -52,7 +61,9 @@ describe('accepted host session provider policy', () => {
         expect(business).toHaveBeenCalledTimes(1)
         /** A separately verified principal cannot borrow the first principal's retained outcome. */
         const other = await server.connect('other', {
-          plugins: [authFeature({ credentials: 'principal-b' })]
+          plugins: [
+            rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: 'principal-b' }) } })
+          ]
         })
         try {
           expect(

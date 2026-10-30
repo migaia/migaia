@@ -16,7 +16,7 @@ export type IProcessServeFallback = Readonly<{
 }>
 /** Only concrete process behavior and native resource policy reach the serve owner. */
 export type IProcessServeOptions = Readonly<{
-  features?: readonly IProcessFeature[]
+  features?: Readonly<Record<string, IProcessFeature>>
   maxConnections?: number
   /** Existing shared resilience scopes lend their one actual native capacity instance. */
   connections?: ProcessConnectionCapacity

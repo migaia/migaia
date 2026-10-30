@@ -1,11 +1,7 @@
 /** Keeps the original one-consumption stream even when complete retry instances are selected. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import {
-  RpcCallFeatureKind,
-  type IRpcRetryFeature,
-  type IRpcAttempt
-} from '@migaia/rpc-contract/interfaces'
+import { retryFeature } from '@migaia/rpc-host/features/retry'
 import { coreMemoryServer } from '../host/core-fixture.ts'
 
 it.each(['before-value', 'after-value'] as const)(
@@ -19,16 +15,17 @@ it.each(['before-value', 'after-value'] as const)(
       failure: new Error('stream provider failed'),
       reports: [] as Array<{ error: unknown; code: unknown }>
     }
-    /** A complete caller-owned policy would visibly enter if StreamChannel selected retry. */
-    const retry: IRpcRetryFeature = {
-      kind: RpcCallFeatureKind.retry,
-      run<T>(attempt: IRpcAttempt<T>): Promise<T> {
+    /** Consuming the call's retry options would expose an unintended scalar-policy selection. */
+    const retry = {
+      get attempts(): number {
         state.retryEntries += 1
-        return attempt.invoke(attempt.signal, attempt.remainingMs)
+        return 2
       }
     }
     /** The actual transport also supplies the policy; stream must suppress both selection levels. */
-    const server = coreMemoryServer('caller', 'stream-retry-caller', 'memory', [retry])
+    const server = coreMemoryServer('caller', 'stream-retry-caller', 'memory', {
+      replay: retryFeature({ attempts: 2 })
+    })
     /** Both public Hosts retain their original native Session and stream producer. */
     const host = await createRpcHost(server.options)
     /** The provider owns its one generator and its original failure value. */

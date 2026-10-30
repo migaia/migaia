@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /**
  * Mixed-carrier forwarding through one process: origin a calls through forwarding process b into
  * b's thread c, child process d, thread pool and coroutine co, using only public entries.
@@ -10,7 +11,7 @@ import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { TopologyLeaf } from './fixtures/topology-leaf.ts'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import {
@@ -255,7 +256,7 @@ describe('forwarding through process b to its thread, pool and coroutine', () =>
   it('carries the remaining deadline to the leaf without growing it', async () => {
     /** Remaining time the leaf observed for a 5 s caller budget. */
     const seen = (await viaB(host, Topology.c, Topology.remaining, undefined, {
-      timeout: timeoutFeature({ ms: 5000 })
+      timeout: { ms: 5000 }
     })) as { timeoutMs: number | null }
     expect(seen.timeoutMs).toEqual(expect.any(Number))
     expect(seen.timeoutMs).toBeGreaterThan(0)
@@ -355,7 +356,7 @@ it('host-level auth applies to a late thread while the authenticated coroutine r
   const task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {
     const child = await createRpcHost({
       plugins: [
-        authFeature(leaf.auth.options(HopSecret.shared)),
+        rpcFeaturesPlugin({ features: { auth: authFeature(leaf.auth.options(HopSecret.shared)) } }),
         coroutinePlugin({ connectToParent: connect })
       ],
       provide: leaf.providers()
@@ -375,7 +376,7 @@ it('host-level auth applies to a late thread while the authenticated coroutine r
   const host = await createRpcHost({
     self: { name: Topology.b, instanceId: 'topology-late-auth-b' },
     plugins: [
-      authFeature(counter.options(HopSecret.shared)),
+      rpcFeaturesPlugin({ features: { auth: authFeature(counter.options(HopSecret.shared)) } }),
       coroutinePlugin({ namespace: 'baseline', name: Topology.coroutine, spawn: task })
     ],
     report: () => undefined

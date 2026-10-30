@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Proves transport override with genuine Process and Worker children at the public boundary. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -14,19 +15,23 @@ it('Process overrides Host auth once and scopes schema independently from Thread
   /** Native children verify the exact expected key, so successful echo is independent proof. */
   const host = await createRpcHost({
     plugins: [
-      featureScopeAuth(Fixture.hostKey, (value, context) => {
-        if (value.includes(Fixture.marker))
-          signed.push({ key: Fixture.hostKey, namespace: context.namespace })
+      rpcFeaturesPlugin({
+        features: {
+          feature1: featureScopeAuth(Fixture.hostKey, (value, context) => {
+            if (value.includes(Fixture.marker))
+              signed.push({ key: Fixture.hostKey, namespace: context.namespace })
+          })
+        }
       }),
       processPlugin({
         name: 'process-child',
         namespace: 'process',
-        features: [
-          featureScopeAuth(Fixture.processKey, (value, context) => {
+        features: {
+          featureScopeAuth: featureScopeAuth(Fixture.processKey, (value, context) => {
             if (value.includes(Fixture.marker))
               signed.push({ key: Fixture.processKey, namespace: context.namespace })
           }),
-          schemaFeature({
+          schema: schemaFeature({
             schemas: {
               echo: {
                 params: {
@@ -39,7 +44,7 @@ it('Process overrides Host auth once and scopes schema independently from Thread
               }
             }
           })
-        ],
+        },
         spawn: {
           entry: new URL('./fixtures/feature-scope-process-child.ts', import.meta.url),
           args: [Fixture.processKey]

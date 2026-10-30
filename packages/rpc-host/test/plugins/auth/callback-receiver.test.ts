@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Credential verification follows the receiver-free contract used by other Auth callbacks. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -18,14 +19,19 @@ it('calls verifyCredentials without a receiver through a public connection', asy
   /** Host-level Auth verifies the real client hello before business calls are admitted. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [authFeature({ verifyCredentials }), ...server.options.plugins],
+    plugins: [
+      rpcFeaturesPlugin({ features: { auth: authFeature({ verifyCredentials }) } }),
+      ...server.options.plugins
+    ],
     provide: { echo: (value) => value }
   })
   /** Cleanup owns a client only after its public construction has completed. */
   let client: Awaited<ReturnType<typeof server.connect>> | undefined
   try {
     client = await server.connect('receiver-client', {
-      plugins: [authFeature({ credentials: 'receiver-token' })]
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: 'receiver-token' }) } })
+      ]
     })
     expect(await client.host.memory.send('receiver-server', 'echo', 42)).toBe(42)
     expect(receivers).not.toHaveLength(0)

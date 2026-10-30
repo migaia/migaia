@@ -111,7 +111,7 @@ class Host {
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     /** The genuine Feature exposes only these original hook and observation callbacks. */
-    const feature = defineFlowFeature({ name: 'session-flow', setup: () => installed })
+    const feature = defineFlowFeature({ phase: 1000, name: 'session-flow', setup: () => installed })
     /** Source lifetime is explicitly borrowed by canonical native preparation. */
     const setup = new AbortController()
     /** Host observations and scoped negotiation share the original report callback. */
@@ -120,7 +120,7 @@ class Host {
     const flowReport = this.report
     for (const namespace of sessionNamespaces) {
       /** Each actual namespace selects the same original fixture Feature under its own native core. */
-      const program = new RpcTransportFlowProgram([feature])
+      const program = new RpcTransportFlowProgram({ feature })
       await native.use(
         definePlugin({
           name: namespace,

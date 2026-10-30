@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Uses actual public Hosts, JSON capture and HMAC to prove conditional backing integrity. */
 import { createHmac } from 'node:crypto'
 import { expect, it, vi } from 'vitest'
@@ -89,7 +90,7 @@ class BinaryIntegrityPair {
 
   /** Install no additional carrier, transport, registry or alternate binary codec. */
   constructor() {
-    this.#listener = coreMemoryServer('a33-server', 'a33-server', 'memory', [], [], {
+    this.#listener = coreMemoryServer('a33-server', 'a33-server', 'memory', {}, [], {
       nativeBinary: true,
       create: () => {
         /** Both endpoints execute original public codec operations independently. */
@@ -134,10 +135,12 @@ class BinaryIntegrityPair {
   /** Public Auth factories and original transport installs establish real accepted readiness. */
   async open(signed: boolean): Promise<void> {
     /** Each actual Host installs its independent Auth lifetime when integrity is requested. */
-    const plugins = signed ? [authFeature({ sign: this.#sign, verify: this.#verify })] : []
+    const features: import('@migaia/plugin-host').IFeatureRecord = signed
+      ? { authentication: authFeature({ sign: this.#sign, verify: this.#verify }) }
+      : {}
     this.#server = await createRpcHost({
       ...this.#listener.options,
-      plugins: [...plugins, this.#listener.transport],
+      plugins: [rpcFeaturesPlugin({ features }), this.#listener.transport],
       report: (error) => this.failure.resolve(error),
       provide: {
         echo: (value) => {
@@ -148,7 +151,13 @@ class BinaryIntegrityPair {
     })
     /** A distinct Auth definition keeps replay state owned by the actual connecting Host. */
     const connected = await this.#listener.connect('a33-client', {
-      plugins: signed ? [authFeature({ sign: this.#sign, verify: this.#verify })] : []
+      plugins: signed
+        ? [
+            rpcFeaturesPlugin({
+              features: { authentication: authFeature({ sign: this.#sign, verify: this.#verify }) }
+            })
+          ]
+        : []
     })
     this.#client = connected.host
     /** This is the client's actual physical write, after codec capture and Auth transformation. */

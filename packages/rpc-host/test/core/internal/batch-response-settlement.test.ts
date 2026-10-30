@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Real public callers retain both correlations when one native batch carries their replies. */
 import { Session as InspectorSession } from 'node:inspector/promises'
 import type { Runtime } from 'node:inspector'
@@ -93,6 +94,7 @@ class ResponseBatchWitness {
   #submitted = 0
   /** The actual opaque Feature registers this original stage in its native namespace group. */
   readonly feature = defineFlowFeature({
+    phase: 1000,
     name: 'batch-response-submissions',
     setup: () => ({ stages: { [RpcFlowPoint.frameOutbound]: this.#outbound } })
   })
@@ -199,7 +201,10 @@ for (const customCodec of [false, true]) {
       /** Actual public provider execution supplies both original values through the native group. */
       const provider = await createRpcHost({
         ...server.options,
-        plugins: [batchFeature(), witness.feature, server.transport],
+        plugins: [
+          rpcFeaturesPlugin({ features: { batch: batchFeature(), feature: witness.feature } }),
+          server.transport
+        ],
         provide: {
           echo: (value: string) => {
             providerCalls += 1
@@ -239,7 +244,12 @@ for (const customCodec of [false, true]) {
       /** The fixed-path inspector is disconnected after this one Root's final resource sample. */
       let inspector: PendingInspector | undefined
       try {
-        const caller = await owner.open(new RpcFlowProgram([batchFeature(), transport]))
+        const caller = await owner.open(
+          new RpcFlowProgram([
+            rpcFeaturesPlugin({ features: { batch: batchFeature() } }),
+            transport
+          ])
+        )
         inspector = new PendingInspector(owner)
         // Bilateral handshake writes precede the independent busy-call setup boundary below.
         writing.mockClear()

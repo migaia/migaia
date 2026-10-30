@@ -1,3 +1,4 @@
+import { nativeFeatureOutput } from '../native-feature.ts'
 /** Exercises original Process capacity/FIFO owners with logical credits shared by physical writes. */
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
@@ -28,9 +29,9 @@ const data = { sendClass: IpcSendClass.data }
 describe('logical native write admission', () => {
   it('rejects admission when its high-watermark listener synchronously closes the original flow', async () => {
     /** Capacity one publishes its first high crossing during the reservation itself. */
-    const installed = flowControlFeature({ maxPendingData: 1 }).install(
-      context('logical-reentrant-close')
-    )
+    const installed = (
+      await nativeFeatureOutput(flowControlFeature({ maxPendingData: 1 }))
+    ).install(context('logical-reentrant-close'))
     /** The first close reason must survive the pre-frame admission boundary. */
     const reason = new Error('close during high-watermark delivery')
     installed.value.onEvent((event) => {
@@ -44,9 +45,9 @@ describe('logical native write admission', () => {
     /** This exact complete definition owns capacity independently from its borrowing queue. */
     const feature = flowControlFeature({ maxPendingData: 1 })
     /** The explicit shared installation must remain usable after its queue closes. */
-    const shared = feature.install(context('logical-shared-close'))
+    const shared = (await nativeFeatureOutput(feature)).install(context('logical-shared-close'))
     /** Native queue borrows the original definition and value, without installing another flow. */
-    const queue = sendQueueFeature({ flow: feature }).install({
+    const queue = (await nativeFeatureOutput(sendQueueFeature({ flow: feature }))).install({
       ...context('logical-shared-close'),
       flow: { feature, value: shared.value }
     })
@@ -66,7 +67,9 @@ describe('logical native write admission', () => {
 
   it('holds three logical credits for one physical flush and rejects the fourth', async () => {
     /** The original queue owns all three admitted messages and their shared physical completion. */
-    const installed = sendQueueFeature({ maxPendingData: 3 }).install(context('logical-batch'))
+    const installed = (await nativeFeatureOutput(sendQueueFeature({ maxPendingData: 3 }))).install(
+      context('logical-batch')
+    )
     /** Actual native completion remains unresolved while capacity is inspected. */
     const native = deferred<void>()
     /** The Utils limiter exposes actual sender entry separately from scheduling admission. */
@@ -120,7 +123,9 @@ describe('logical native write admission', () => {
 
   it('shares one credit across several physical fragments and releases it exactly once', async () => {
     /** Capacity one would reject a fragment if any physical write were counted again. */
-    const installed = sendQueueFeature({ maxPendingData: 1 }).install(context('logical-chunks'))
+    const installed = (await nativeFeatureOutput(sendQueueFeature({ maxPendingData: 1 }))).install(
+      context('logical-chunks')
+    )
     /** Existing events expose actual logical high/low crossings, not a parallel counter. */
     const events: IIpcBacklogEvent[] = []
     installed.value.onEvent((event) => {
@@ -164,7 +169,9 @@ describe('logical native write admission', () => {
 
   it('cancels an unflushed member through the original queue guard with the exact close reason', async () => {
     /** The native queue owns cancellation while the batch member has no physical write yet. */
-    const installed = sendQueueFeature({ maxPendingData: 1 }).install(context('logical-close'))
+    const installed = (await nativeFeatureOutput(sendQueueFeature({ maxPendingData: 1 }))).install(
+      context('logical-close')
+    )
     /** Logical completion is supplied by the real batch-member owner. */
     const member = deferred<void>()
     /** One accepted member borrows the existing queued-cancellation registration. */
@@ -184,7 +191,7 @@ describe('logical native write admission', () => {
 
   it('keeps active physical completion in drain after close and preserves its original failure once', async () => {
     /** A borrowed shared flow still owns the original pending native write. */
-    const installed = sendQueueFeature({ maxPendingData: 1 }).install(
+    const installed = (await nativeFeatureOutput(sendQueueFeature({ maxPendingData: 1 }))).install(
       context('logical-native-failure')
     )
     /** Native write completion remains strict even after local queue closure. */

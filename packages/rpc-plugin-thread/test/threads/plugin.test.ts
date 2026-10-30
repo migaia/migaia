@@ -71,7 +71,7 @@ describe('native thread transport plugin', () => {
 
   it('opens the same cold spawn definition as three independently owned native Workers', async () => {
     const host = await createRpcHost({
-      plugins: [threadPlugin({ spawn: child, features: [pool({ size: 3 })] })],
+      plugins: [threadPlugin({ spawn: child, features: { workers: pool({ size: 3 }) } })],
       report: () => undefined
     })
     try {

@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original authentication transforms run through the public Host and the sole native codec. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
@@ -30,7 +31,7 @@ it('preserves original authentication transform order and values through actual 
     'auth-order-provider',
     'auth-order-provider',
     'memory',
-    [],
+    {},
     [],
     {
       create: () => new RpcJsonCarrierCodec(),
@@ -41,18 +42,22 @@ it('preserves original authentication transform order and values through actual 
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      authFeature({
-        encrypt: (value) => value,
-        sign: (value) => value,
-        verify: (value) => {
-          if (!state.armed) return value
-          state.calls.push({ name: 'verify', value })
-          return state.encrypted
-        },
-        decrypt: (value) => {
-          if (!state.armed) return value
-          state.calls.push({ name: 'decrypt', value })
-          return state.boundFrame
+      rpcFeaturesPlugin({
+        features: {
+          auth: authFeature({
+            encrypt: (value) => value,
+            sign: (value) => value,
+            verify: (value) => {
+              if (!state.armed) return value
+              state.calls.push({ name: 'verify', value })
+              return state.encrypted
+            },
+            decrypt: (value) => {
+              if (!state.armed) return value
+              state.calls.push({ name: 'decrypt', value })
+              return state.boundFrame
+            }
+          })
         }
       }),
       listener.transport
@@ -67,20 +72,24 @@ it('preserves original authentication transform order and values through actual 
     /** Real ready handshakes precede the one original business transform sequence. */
     const client = await listener.connect('auth-order-client', {
       plugins: [
-        authFeature({
-          encrypt: (value) => {
-            if (!state.armed) return value
-            state.boundFrame = value
-            state.calls.push({ name: 'encrypt', value })
-            return state.encrypted
-          },
-          sign: (value) => {
-            if (!state.armed) return value
-            state.calls.push({ name: 'sign', value })
-            return state.signed
-          },
-          verify: (value) => value,
-          decrypt: (value) => value
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              encrypt: (value) => {
+                if (!state.armed) return value
+                state.boundFrame = value
+                state.calls.push({ name: 'encrypt', value })
+                return state.encrypted
+              },
+              sign: (value) => {
+                if (!state.armed) return value
+                state.calls.push({ name: 'sign', value })
+                return state.signed
+              },
+              verify: (value) => value,
+              decrypt: (value) => value
+            })
+          }
         })
       ]
     })

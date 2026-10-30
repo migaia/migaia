@@ -1,17 +1,19 @@
 /** Build genuine native definitions; their install hooks join the receiving host's single RPC owner. */
 import {
   definePlugin,
+  type IFeatureRecord,
+  type IFeatureOutputs,
   type IPluginHostCore,
   type IPluginBeforeReleaseContext
 } from '@migaia/plugin-host'
-import type { IRpcTransportDefinition } from '@migaia/rpc-contract/interfaces'
+import type { IRpcCallFeature, IRpcTransportDefinition } from '@migaia/rpc-contract/interfaces'
 import {
   registerRpcDefinition,
   RpcDefinitionKind,
   type IRpcDefinitionMetadata
 } from './metadata.ts'
 import { RpcFlowSetup } from './flow-setup.ts'
-import { RpcTransportFlowProgram } from './flow-program.ts'
+import { inspectRpcFeatures, RpcTransportFlowProgram } from './flow-program.ts'
 import { RpcFlowPipelines } from './flow-pipelines.ts'
 import type {
   IRpcFlowDefinition,
@@ -49,7 +51,7 @@ export class RpcDefinition {
 /** Define one cold transport with its actual codec/carrier acquisition and plugin-owned features. */
 export function defineTransportPlugin<
   const N extends string,
-  F,
+  const F extends IFeatureRecord = Record<never, never>,
   E extends object = Record<never, never>,
   A extends boolean = false
 >(
@@ -58,19 +60,20 @@ export function defineTransportPlugin<
 ): IRpcTransportPlugin<N, E & IRpcTransportFeatureExtensions<F>, A> {
   /** Capture only the generic local policy; native token and acquisition objects never enter it. */
   const { connect, ...configuration } = definition
+  /** Native inspection snapshots original root aliases and rejects arrays before copying input. */
+  const program = new RpcTransportFlowProgram(definition.features ?? {})
   /** Capture caller configuration once; installed feature instances retain their original identity. */
   const captured = Object.freeze({
     ...configuration,
     connect: connect === undefined ? undefined : Object.freeze({ retain: connect.retain }),
     expose: definition.expose === undefined ? undefined : Object.freeze([...definition.expose]),
-    features:
-      definition.features === undefined ? undefined : Object.freeze([...definition.features])
+    features: program.roots
   })
   /** The native object alone receives metadata; a declaration-only marker adds no runtime property. */
   const metadata: IRpcDefinitionMetadata = {
     kind: RpcDefinitionKind.transport,
     definition: captured,
-    flows: new RpcTransportFlowProgram(captured.features ?? [])
+    flows: program
   }
   /** Native admission determines definition identity and public metadata semantics. */
   const owner = new RpcDefinition(metadata)
@@ -114,16 +117,22 @@ export function defineFlowPlugin<
 }
 
 /** Link policy composes complete feature behavior without introducing another intervention stage. */
-export function defineLinkPolicy(definition: IRpcLinkPolicyDefinition): IRpcFlowPlugin {
+export function defineLinkPolicy<const F extends Readonly<Record<string, IRpcCallFeature>>>(
+  definition: IRpcLinkPolicyDefinition<F>
+): IRpcFlowPlugin<Readonly<{ features: IFeatureOutputs<F> }>> {
   /** One captured list is read by FeatureScope during native installation. */
   const captured = Object.freeze({
     ...definition,
-    features: Object.freeze([...definition.features])
+    features: inspectRpcFeatures(definition.features, true).roots
   })
   /** Policy metadata is cold; no timers, retries or host scopes are created by the factory. */
   const metadata: IRpcDefinitionMetadata = { kind: RpcDefinitionKind.policy, definition: captured }
   /** The actual native install supplies the policy to the receiving runtime. */
-  const plugin = definePlugin({ name: captured.name, install: new RpcDefinition(metadata).install })
+  const plugin = definePlugin({
+    name: captured.name,
+    features: captured.features as IFeatureRecord,
+    install: new RpcDefinition(metadata).install
+  })
   registerRpcDefinition(plugin, metadata)
-  return plugin as unknown as IRpcFlowPlugin
+  return plugin as unknown as IRpcFlowPlugin<Readonly<{ features: IFeatureOutputs<F> }>>
 }

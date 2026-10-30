@@ -2,14 +2,10 @@
  * Defines executing call features and plugin-owned feature installation contracts. FeatureScope
  * selects instances; timeout, retry, pool, and media features own their own behavior.
  */
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, IRetryFailureContext } from '@migaia/utils/promise'
+import type { IScheduler } from '@migaia/utils/scheduler'
+import type { IFeature, IFeatureRecord } from '@migaia/plugin-host'
 import type { IRpcAuthenticationRetain, IRpcDispose, IRpcTransportContext } from './carrier.ts'
-
-/** Canonical executing-policy discriminants are shared by factories and the sole feature selector. */
-export const RpcCallFeatureKind = {
-  /** One complete instance owns an individual attempt deadline. */ timeout: 'timeout',
-  /** One complete instance owns originating generation replay. */ retry: 'retry'
-} as const
 
 /** The actual native member supplies generation observation; features never create supervision. */
 export type IRpcNativeGeneration = Readonly<{
@@ -39,7 +35,7 @@ export type IRpcAttemptFacts = Readonly<{
   idempotencyKey?: string
   availability?: IRpcAttemptAvailability
   /** A real native execution owner may lend its complete, non-disableable call wall-time cap. */
-  callTimeoutCap?: IRpcTimeoutFeature
+  callTimeoutCap?: IRpcTimeoutExecution
 }>
 
 /** A strategy passes selected generation/key and observes only the real physical write handoff. */
@@ -65,31 +61,45 @@ export type IRpcAttempt<T> = Readonly<{
   invoke(signal: IAbortSignal, remainingMs?: number, options?: IRpcAttemptOptions): Promise<T>
 }>
 
-/** A timeout instance carries complete execution logic and its captured configuration. */
-export type IRpcTimeoutFeature = Readonly<{
-  /** Distinguishes timeout from other plugin-owned execution features. */
-  kind: typeof RpcCallFeatureKind.timeout
-  /** Apply one attempt deadline and remove every installed timer/listener on settlement. */
+/** Parameters captured by a timeout owner; per-call data selects only its duration. */
+export type ITimeoutFeatureOptions = Readonly<{
+  ms: number
+  scheduler?: IScheduler
+  report?(error: unknown): void
+}>
+
+/** Origin retry parameters retain the existing strategy controls without carrying a Feature. */
+export type IRetryFeatureOptions = Readonly<{
+  attempts?: number
+  backoff?: number | ((error: unknown, context: IRetryFailureContext) => number)
+  keyFactory?(): string
+  scheduler?: IScheduler
+  report?(error: unknown): void
+}>
+
+/** Installed timeout behavior owns each attempt's timer and cancellation cleanup. */
+export type IRpcTimeoutExecution = Readonly<{
   run<T>(attempt: IRpcAttempt<T>): Promise<T>
 }>
 
-/** A retry instance owns retry decisions and backoff, not host session or provider state. */
-export type IRpcRetryFeature = Readonly<{
-  /** Distinguishes retry from timeout when FeatureScope selects installed instances. */
-  kind: typeof RpcCallFeatureKind.retry
-  /** Execute originating attempts; cancellation and final settlement release owned resources. */
+/** Installed retry behavior owns origin replay while borrowing actual generation facts. */
+export type IRpcRetryExecution = Readonly<{
   run<T>(attempt: IRpcAttempt<T>): Promise<T>
 }>
 
-/** The same instance may be installed on a plugin or supplied to one originating call. */
+/** Timeout definitions are native opaque tokens; behavior exists only in installation output. */
+export type IRpcTimeoutFeature = IFeature<Record<never, never>, IRpcTimeoutExecution>
+
+/** Retry definitions are native opaque tokens, never an executing per-call option. */
+export type IRpcRetryFeature = IFeature<Record<never, never>, IRpcRetryExecution>
+
+/** The role is private metadata; both supported definitions use native Feature identity. */
 export type IRpcCallFeature = IRpcTimeoutFeature | IRpcRetryFeature
 
-/** False explicitly disables an inherited instance; omission inherits the next precedence level. */
+/** Fixed role keys select execution parameters; false disables an inherited optional policy. */
 export type IRpcCallFeatures = Readonly<{
-  /** Selected before a transport-installed and chain-policy timeout instance. */
-  timeout?: IRpcTimeoutFeature | false
-  /** Selected before a transport-installed and chain-policy retry instance. */
-  retry?: IRpcRetryFeature | false
+  timeout?: Readonly<{ ms: number }> | false
+  retry?: IRetryFeatureOptions | false
 }>
 
 /** Non-call features receive only the context offered by the plugin that owns them. */
@@ -104,17 +114,17 @@ export type IRpcFeatureContext = Readonly<{
   report(error: unknown): void
 }>
 
-/** A plugin supplies its concrete extension context without giving features host internals. */
-export type IRpcFeatureDefinition<TContext = IRpcFeatureContext, TValue = unknown> = Readonly<{
-  /** Identifies this feature within its actual plugin owner. */
-  kind: string
-  /** Install complete behavior, returning its value and exact rollback/shutdown cleanup. */
-  install(
-    context: TContext
-  ):
-    | Readonly<{ value: TValue; dispose: IRpcDispose }>
-    | Promise<Readonly<{ value: TValue; dispose: IRpcDispose }>>
-}>
+/** A native definition may output a deferred installer for a real transport connection. */
+export type IRpcFeatureDefinition<TContext = IRpcFeatureContext, TValue = unknown> = IFeature<
+  Record<never, never>,
+  Readonly<{
+    install(
+      context: TContext
+    ):
+      | Readonly<{ value: TValue; dispose: IRpcDispose }>
+      | Promise<Readonly<{ value: TValue; dispose: IRpcDispose }>>
+  }>
+>
 
 /** The native install result is the only namespace extension publication path. */
 export type IRpcTransportInstallation<TExtensions extends object = Record<never, never>> =
@@ -130,7 +140,7 @@ export type IRpcTransportInstallation<TExtensions extends object = Record<never,
 
 /** Cold transport definitions are registered by the one native plugin-host installation. */
 export type IRpcTransportDefinition<
-  TFeature = IRpcCallFeature,
+  TFeatures extends IFeatureRecord = Readonly<Record<string, IRpcCallFeature>>,
   TExtensions extends object = Record<never, never>,
   TContext extends IRpcTransportContext = IRpcTransportContext
 > = Readonly<{
@@ -146,7 +156,7 @@ export type IRpcTransportDefinition<
    */
   expose?: readonly string[]
   /** The transport owns installation and disposal of each supplied feature. */
-  features?: readonly TFeature[]
+  features?: TFeatures
   /** Only generic local connection policy reaches Host; native acquisition options stay native. */
   connect?: Readonly<{ retain?: IRpcAuthenticationRetain }>
   /** Bound each physical handshake with the existing Session clock; omission keeps its default. */

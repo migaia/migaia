@@ -1,6 +1,7 @@
 /** Public new-profile hosts use real SDK transport installation and the existing test carrier. */
 import { createRpcHost, defaultRpcReporter, type IRpcHostOptions } from '@migaia/rpc-host'
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import type { IFeatureRecord } from '@migaia/plugin-host'
 import { assert } from 'vitest'
 import type {
   IRpcTransportContext,
@@ -110,7 +111,7 @@ class CoreMemoryServer {
     name: string,
     instanceId: string,
     namespace: string,
-    features: readonly unknown[],
+    features: IFeatureRecord,
     expose: readonly string[],
     codec?: ICoreCodec
   ) {
@@ -182,7 +183,7 @@ export function coreMemoryServer(
   name: string,
   instanceId = name,
   namespace = 'memory',
-  features: readonly unknown[] = [],
+  features: IFeatureRecord = {},
   expose: readonly string[] = [],
   codec?: ICoreCodec
 ) {
@@ -196,10 +197,11 @@ export async function connectedCoreHosts(
   report?: (error: unknown) => void,
   codec?: ICoreCodec,
   remoteReport = report,
-  remotePlugins?: IRpcHostOptions['plugins']
+  remotePlugins?: IRpcHostOptions['plugins'],
+  localFeatures: IFeatureRecord = {}
 ) {
   /** The first actual native installation accepts the second without another carrier abstraction. */
-  const server = coreMemoryServer('a', 'test-pair-a', 'memory', [], [], codec)
+  const server = coreMemoryServer('a', 'test-pair-a', 'memory', localFeatures, [], codec)
   /** Undefined report intentionally exercises the real host's default reporter. */
   const a = await createRpcHost({ ...server.options, provide: local, report })
   try {

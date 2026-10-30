@@ -4,7 +4,11 @@ import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
 import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import { defaultRpcId, type IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
+import {
+  defaultRpcId,
+  rpcFeaturesPlugin,
+  type IRpcTransportSetupContext
+} from '@migaia/rpc-host/sdk'
 import { RpcProbeDirection } from '@migaia/rpc-contract/interfaces'
 import * as carrierOwner from '../../../dist/process/carrier.js'
 import {
@@ -140,12 +144,16 @@ export class NativeSocketAuth {
       plugins: [
         ...(this.#applicationAuth
           ? [
-              authFeature({
-                encodedType: 'string',
-                sign: (value) => value,
-                verify: (value) => value,
-                credentials: (context) => context.credentials,
-                verifyCredentials: this.#applicationVerifier
+              rpcFeaturesPlugin({
+                features: {
+                  auth: authFeature({
+                    encodedType: 'string',
+                    sign: (value) => value,
+                    verify: (value) => value,
+                    credentials: (context) => context.credentials,
+                    verifyCredentials: this.#applicationVerifier
+                  })
+                }
               })
             ]
           : []),
@@ -196,11 +204,15 @@ export class NativeSocketAuth {
       plugins: [
         ...(this.#applicationAuth
           ? [
-              authFeature({
-                encodedType: 'string',
-                sign: (value) => value,
-                verify: (value) => value,
-                credentials: (context) => context.credentials
+              rpcFeaturesPlugin({
+                features: {
+                  auth: authFeature({
+                    encodedType: 'string',
+                    sign: (value) => value,
+                    verify: (value) => value,
+                    credentials: (context) => context.credentials
+                  })
+                }
               })
             ]
           : []),

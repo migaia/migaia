@@ -6,6 +6,7 @@
 import {
   defineTransportPlugin,
   RpcNativeFeatureKind,
+  findRpcNativeFeatureOutput,
   RpcNativePoolMember,
   type IRpcNativePoolEvents,
   type IRpcNativeTransportFeature,
@@ -30,7 +31,9 @@ export type ICoroutineCommonOptions = Readonly<{
   name?: string
   namespace?: string
   expose?: readonly string[]
-  features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]
+  features?: Readonly<
+    Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>
+  >
   /** The native task or parent token borrows this exact connection's auth retention policy. */
   connect?: Readonly<{ retain?: IRpcAuthenticationRetain }>
   report?(error: unknown): void
@@ -67,12 +70,12 @@ class CoroutineInstallation {
   /** Complete native features own their scheduling; parent tokens expose no repeatable opener. */
   readonly open = async (context: IRpcTransportSetupContext) => {
     /** Native selection is cold; call timeout/retry definitions stay untouched. */
-    const feature = this.#options.features?.find(
-      (value) => 'kind' in value && value.kind === RpcNativeFeatureKind.pool
-    )
-    if (feature && 'kind' in feature && feature.kind === RpcNativeFeatureKind.pool) {
+    const execution = findRpcNativeFeatureOutput<
+      import('@migaia/plugin-host').IFeatureOutput<IRpcNativeTransportFeature>
+    >(this.#options.features, context.owner, RpcNativeFeatureKind.pool)
+    if (execution) {
       /** The complete feature returns its original controls and one resource disposer. */
-      const installed = await feature.install({
+      const installed = await execution.install({
         ...context,
         memberKind: 'coroutine',
         ...(this.#source.task ? { openMember: this.#openMember } : {})
@@ -104,21 +107,23 @@ class CoroutineInstallation {
 export function coroutinePlugin<
   const N extends string = typeof CoroutineText.namespace,
   E extends object = Record<never, never>,
-  const TFeatures extends readonly (
-    | IRpcCallFeature
-    | IRpcNativeTransportFeature
-    | IRpcFlowFeature<object>
-  )[] = readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]
+  const TFeatures extends Readonly<
+    Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>
+  > = Readonly<
+    Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>
+  >
 >(
   options: ICoroutinePluginOptions &
     Readonly<{
       namespace?: N
       features?: TFeatures &
-        readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]
+        Readonly<
+          Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>
+        >
     }>
 ): IRpcTransportPlugin<
   N,
-  ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+  ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>,
   true
 > {
   /** Source selection retains native TypeError/source/code and does no IO. */
@@ -145,7 +150,7 @@ export function coroutinePlugin<
     open: installation.open
   }) as IRpcTransportPlugin<
     N,
-    ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+    ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>,
     true
   >
 }

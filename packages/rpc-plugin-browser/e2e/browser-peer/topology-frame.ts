@@ -3,7 +3,6 @@
  * window's dedicated worker through the top window.
  */
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { windowPlugin } from '@migaia/rpc-plugin-browser'
 import {
   Topology,
@@ -104,7 +103,7 @@ globalThis.topologyFrame = {
     controller.abort(new Error('caller stopped'))
     return pending
   },
-  deadline: () => settle(viaTop(Topology.remaining, undefined, { timeout: timeoutFeature({ ms: 5000 }) })),
+  deadline: () => settle(viaTop(Topology.remaining, undefined, { timeout: { ms: 5000 } })),
   bytes: () => settle(viaTop(Topology.bytes, binaryPattern(1 << 20))),
   /** Keep a wait in flight, have the top window close its worker namespace, and settle. */
   closeMiddle: async () => {

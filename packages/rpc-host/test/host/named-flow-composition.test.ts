@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -15,6 +16,18 @@ import {
 import { coreMemoryServer } from './core-fixture.ts'
 import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.ts'
 
+/** Each real host receives independent authentication and chunk installations. */
+function compositionFeatures() {
+  return {
+    authentication: authFeature({
+      encodedType: 'string',
+      sign: (value) => value,
+      verify: (value) => value
+    }),
+    chunks: chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 })
+  }
+}
+
 /** Keep all three genuine transformations installed on both actual public host owners. */
 async function composition(
   provide: Parameters<typeof createRpcHost>[0]['provide'],
@@ -22,28 +35,37 @@ async function composition(
   wireFeatures: readonly IRpcFlowFeature[] = []
 ) {
   /** Physical string output exercises actual batching while long strings still use real chunks. */
-  const server = coreMemoryServer('composition-server', 'composition-server', 'memory', [], [], {
+  const server = coreMemoryServer('composition-server', 'composition-server', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
-  /** Every host owns independent nonce, assembler and batch state from the real factories. */
-  const plugins = () => [
-    authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
-    chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 })
-  ]
   /** Provider errors remain on the actual business diagnostic outlet. */
   const reports: unknown[] = []
   /** The real public root owns native installation, Session, dispatch and close. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [...plugins(), batchFeature(), server.transport],
+    plugins: [
+      rpcFeaturesPlugin({ features: { ...compositionFeatures(), batching: batchFeature() } }),
+      server.transport
+    ],
     report: (error) => reports.push(error),
     provide
   })
   try {
     /** These extra genuine stages observe real suffix composition without replacing execution. */
     const client = await server.connect('composition-client', {
-      plugins: [...plugins(), ...plaintextFeatures, batchFeature(), ...wireFeatures],
+      plugins: [
+        rpcFeaturesPlugin({
+          features: {
+            ...compositionFeatures(),
+            batching: batchFeature(),
+            ...Object.fromEntries(
+              plaintextFeatures.map((feature, index) => [`plaintext${index}`, feature])
+            ),
+            ...Object.fromEntries(wireFeatures.map((feature, index) => [`wire${index}`, feature]))
+          }
+        })
+      ],
       report: (error) => reports.push(error)
     })
     return { host, client, reports }
@@ -61,6 +83,7 @@ function admissionWitness(expected = 3) {
   let count = 0
   /** This is a real flow definition using the production named-stage authoring boundary. */
   const plugin = defineFlowFeature({
+    phase: 1000,
     name: 'composition-admission-witness',
     setup: () => ({
       stages: {
@@ -197,6 +220,7 @@ it('public late batch cancellation keeps CANCELLED cause while the surviving mem
   const release = deferred<void>()
   /** No substitute continuation is used; native next owns the actual downstream branch. */
   const delayed = defineFlowFeature({
+    phase: 1001,
     name: 'composition-held-batch-suffix',
     setup: () => ({
       stages: {

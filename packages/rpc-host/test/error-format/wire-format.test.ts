@@ -1,7 +1,7 @@
 /** Original wire-error business graphs use genuine public namespaces and canonical serialization. */
 import { describe, expect, it, vi } from 'vitest'
 import { serializeRpcError, RpcLifecycleError } from '@migaia/rpc-contract/errors'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** The actual public report port lends native coded errors directly, without a retired hook wrapper. */
@@ -53,7 +53,7 @@ describe('one RPC wire error format', () => {
       for (let index = 0; index < originals.length; index += 1) {
         let received: unknown
         try {
-          await client.memory.send('a', 'fail', index, { timeout: timeoutFeature({ ms: 2000 }) })
+          await client.memory.send('a', 'fail', index, { timeout: { ms: 2000 } })
         } catch (error) {
           received = error
         }
@@ -146,11 +146,11 @@ describe('one RPC wire error format', () => {
     })
     try {
       await expect(
-        client.memory.send('a', 'plain', null, { timeout: timeoutFeature({ ms: 2000 }) })
+        client.memory.send('a', 'plain', null, { timeout: { ms: 2000 } })
       ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'INTERNAL' })
       let received: unknown
       try {
-        await client.memory.send('a', 'deep', null, { timeout: timeoutFeature({ ms: 2000 }) })
+        await client.memory.send('a', 'deep', null, { timeout: { ms: 2000 } })
       } catch (error) {
         received = error
       }
@@ -204,7 +204,7 @@ describe('one RPC wire error format', () => {
     })
     try {
       const response = client.memory.send('a', 'fail', null, {
-        timeout: timeoutFeature({ ms: 2000 })
+        timeout: { ms: 2000 }
       })
       let received: unknown
       try {

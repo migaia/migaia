@@ -69,8 +69,8 @@ class RepeatableConnectFixture {
           dial: this.#dial
         }
       },
-      features: [
-        observingPool(feature, this.members, {
+      features: {
+        observingPool: observingPool(feature, this.members, {
           beforeOpen: this.#options.beforeOpen,
           closeErrors: this.#options.closeErrors,
           closeOrder: this.closeOrder,
@@ -79,7 +79,7 @@ class RepeatableConnectFixture {
             this.#opens++
           }
         })
-      ],
+      },
       report: this.#report
     })
   }

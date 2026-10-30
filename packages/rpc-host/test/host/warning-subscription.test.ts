@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public warning subscriptions observe real trusted native parent admission. */
 import { expect, expectTypeOf, it, vi } from 'vitest'
 import {
@@ -196,19 +197,24 @@ it('calls SDK setup and observation callbacks without a configuration receiver',
   try {
     await pair.open({
       plugins: [
+        rpcFeaturesPlugin({
+          features: {
+            defineFlow: defineFlowFeature({
+              phase: 1000,
+              name: 'receiver-feature',
+              setup: function (this: unknown) {
+                receivers.push({ callback: 'feature setup', receiver: this })
+                return {}
+              }
+            })
+          }
+        }),
         defineTransportPlugin({
           name: 'receiver-transport',
           namespace: 'other',
           open: function (this: unknown) {
             receivers.push({ callback: 'transport open', receiver: this })
             return { dispose: () => undefined }
-          }
-        }),
-        defineFlowFeature({
-          name: 'receiver-feature',
-          setup: function (this: unknown) {
-            receivers.push({ callback: 'feature setup', receiver: this })
-            return {}
           }
         }),
         defineFlowPlugin({
@@ -418,6 +424,7 @@ it('rejects local subscriber plugins and host-only warning callbacks returned by
   })
   /** Returning a host-only subscription does not turn an actual Feature into a host observer. */
   const feature = defineFlowFeature({
+    phase: 1001,
     name: 'warning-misplaced-feature',
     setup: () => ({ onWarning() {} })
   })
@@ -433,7 +440,7 @@ it('rejects local subscriber plugins and host-only warning callbacks returned by
           defineTransportPlugin({
             name: 'warning-invalid-placement',
             namespace: 'memory',
-            features: [subscriber],
+            features: { subscriber: subscriber as never },
             open
           })
         ]
@@ -448,7 +455,7 @@ it('rejects local subscriber plugins and host-only warning callbacks returned by
     createRpcHost({
       report: () => undefined,
       plugins: [
-        feature,
+        rpcFeaturesPlugin({ features: { feature } }),
         defineTransportPlugin({
           name: 'warning-invalid-host-feature',
           namespace: 'memory',
@@ -536,7 +543,9 @@ it.each([false, true])(
           warnings.push(warning)
           throw recipientFailure
         },
-        plugins: subscriberFirst ? [subscriber, mapping] : [mapping, subscriber],
+        plugins: subscriberFirst
+          ? [subscriber, rpcFeaturesPlugin({ features: { mapping } })]
+          : [rpcFeaturesPlugin({ features: { mapping } }), subscriber],
         report: (error) => reports.push(error)
       })
       expect(await pair.send(42)).toBe(42)

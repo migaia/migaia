@@ -30,7 +30,7 @@ function rejection(action: () => unknown): { ctor: Function; code: unknown } {
 }
 
 describe('contract utility ownership', () => {
-  it('uses only serialize and canonical utils boundaries and preserves native error identity', () => {
+  it('uses serialize, canonical utils and native feature types while preserving native error identity', () => {
     const bare = new Set<string>()
     for (const path of sourceFiles(contractRoot)) {
       for (const statement of parseSync(path, readFileSync(path, 'utf8')).program.body) {
@@ -42,12 +42,14 @@ describe('contract utility ownership', () => {
     /** Set equality proves the entire dynamic dependency domain without comparison sorting. */
     expect(bare).toEqual(
       new Set([
+        '@migaia/plugin-host',
         '@migaia/serialize',
         '@migaia/serialize/core',
         '@migaia/utils/bytes',
         '@migaia/utils/error',
         '@migaia/utils/string',
-        '@migaia/utils/promise'
+        '@migaia/utils/promise',
+        '@migaia/utils/scheduler'
       ])
     )
     const normalizeSource = readFileSync(join(contractRoot, 'portable/normalize.ts'), 'utf8')

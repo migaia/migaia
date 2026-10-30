@@ -67,6 +67,7 @@
     "typecheck:contract": "bun check -p tsconfig.contract.json"
   },
   "dependencies": {
+    "@migaia/plugin-host": "workspace:^",
     "@migaia/serialize": "workspace:^",
     "@migaia/utils": "workspace:^"
   },

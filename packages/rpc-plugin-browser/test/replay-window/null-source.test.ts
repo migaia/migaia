@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { describe, it } from 'vitest'
@@ -21,7 +22,9 @@ describe('replay-window r12 absent browser message source', () => {
       createRpcHost({
         self: { name: 'null-source-client', instanceId: 'null-source-client' },
         plugins: [
-          authFeature({ sign: (value) => value, verify: (value) => value }),
+          rpcFeaturesPlugin({
+            features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+          }),
           sharedWorkerPlugin({ sharedWorker: { port: port1 } })
         ],
         report: () => undefined
@@ -29,7 +32,9 @@ describe('replay-window r12 absent browser message source', () => {
       createRpcHost({
         self: { name: 'null-source-server', instanceId: 'null-source-server' },
         plugins: [
-          authFeature({ sign: (value) => value, verify: (value) => value }),
+          rpcFeaturesPlugin({
+            features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+          }),
           sharedWorkerPlugin({ sharedWorker: { port: port2 } })
         ],
         provide: {

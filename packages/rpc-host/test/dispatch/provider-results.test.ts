@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original provider failure cleanup is observed through actual public hosts and native flows. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowFeature, type IRpcFlowStages } from '@migaia/rpc-host/sdk'
@@ -15,6 +16,7 @@ it('releases admission and the original request identity when params validation 
   const validation = createRpcSchemaValidationError('invalid params', { field: 'data' })
   /** The real optional plugin performs validation after the actual limits admission hook. */
   const validator = defineFlowFeature({
+    phase: 1000,
     name: 'provider-result-validation',
     setup: () => ({
       stages: {
@@ -37,8 +39,9 @@ it('releases admission and the original request identity when params validation 
   const host = await createRpcHost({
     ...listener.options,
     plugins: [
-      limitsFeature({ maxGlobal: 1, maxPerPeer: 1 }),
-      validator,
+      rpcFeaturesPlugin({
+        features: { limits: limitsFeature({ maxGlobal: 1, maxPerPeer: 1 }), validator }
+      }),
       ...listener.options.plugins!
     ],
     provide: { test: provider },
@@ -79,6 +82,7 @@ it('releases same-session capacity when the validation error reply write fails',
   }
   /** The complete native definition adds validation without another provider or lease. */
   const validator = defineFlowFeature({
+    phase: 1001,
     name: 'provider-result-write-failure-validation',
     setup: () => ({ stages })
   })
@@ -92,8 +96,9 @@ it('releases same-session capacity when the validation error reply write fails',
   const host = await createRpcHost({
     ...listener.options,
     plugins: [
-      limitsFeature({ maxGlobal: 1, maxPerPeer: 1 }),
-      validator,
+      rpcFeaturesPlugin({
+        features: { limits: limitsFeature({ maxGlobal: 1, maxPerPeer: 1 }), validator }
+      }),
       ...listener.options.plugins!
     ],
     provide: { test: provider },

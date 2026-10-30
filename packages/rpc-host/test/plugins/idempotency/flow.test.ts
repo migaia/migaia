@@ -48,7 +48,7 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
   /** Only prepared original groups contribute namespace facts to this fixture. */
   const groups = new Map<string, IRpcFlowGroup>()
   /** Canonical native Feature inspection owns the local setup and its dependency closure. */
-  const program = new RpcTransportFlowProgram([feature])
+  const program = new RpcTransportFlowProgram({ feature })
   /** Both actual namespace declarations use the same native owner lookup as public SDK hosts. */
   const rpc = rpcHostPipelines(
     () => flow,

@@ -19,11 +19,11 @@ type IWorkerApi = { work(value: number): number; values(end: number): AsyncItera
 const plugins = [
   threadPlugin({
     spawn: new URL('./worker.js', import.meta.url),
-    features: [
-      pool({ size: 3, maxQueue: 32 }),
-      timeoutFeature({ ms: 1500 }),
-      retryFeature({ attempts: 2 })
-    ]
+    features: {
+      workers: pool({ size: 3, maxQueue: 32 }),
+      timeout: timeoutFeature({ ms: 1500 }),
+      retry: retryFeature({ attempts: 2 })
+    }
   })
 ] as const
 
@@ -36,7 +36,7 @@ export function open() {
 export function work(host: IPoolHost, signal: AbortSignal) {
   return host.thread.send(RPC_POOL_PEER_ID, 'work', 21, {
     signal,
-    timeout: timeoutFeature({ ms: 1000 }),
+    timeout: { ms: 1000 },
     retry: false
   })
 }
@@ -78,7 +78,7 @@ await createRpcHost({
 })
 ```
 
-工厂是 `pool(options)`，控制入口是该安装的 `host.thread.pool` 和 `host.thread.members`，不是工厂对象上的宿主查询方法。`features` 同时接收完整 pool、timeout、retry 实例；单次调用 timeout/retry 可用完整实例或 `false` 覆盖。
+工厂是 `pool(options)`，控制入口是该安装的 `host.thread.pool` 和 `host.thread.members`，不是工厂对象上的宿主查询方法。`features` 使用 `{ name: feature }` 接收原生 pool、timeout、retry token；单次调用 timeout/retry 使用策略配置对象或 `false` 覆盖。
 
 ## 一个逻辑目标
 

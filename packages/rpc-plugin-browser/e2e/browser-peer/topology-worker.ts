@@ -43,7 +43,9 @@ const opening: Promise<IRpcHost> = createRpcHost({
     leaf.recorder.plugin,
     dedicatedWorkerPlugin({
       worker: self as never,
-      features: configuration.hopAuth ? [authFeature(leaf.auth.options(HopSecret.shared))] : []
+      features: configuration.hopAuth
+        ? { auth: authFeature(leaf.auth.options(HopSecret.shared)) }
+        : {}
     }),
     ...(sharedPort ? [sharedWorkerPlugin({ sharedWorker: { port: sharedPort } })] : [])
   ],

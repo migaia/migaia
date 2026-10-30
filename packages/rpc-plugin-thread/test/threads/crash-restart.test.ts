@@ -6,7 +6,11 @@ import { describe, expect, it } from 'vitest'
 /** Real Worker entry whose generations can crash on request. */
 const entry = new URL('./fixtures/crash-worker.ts', import.meta.url)
 /** Each genuine transport generation owns its actual outcome feature installation. */
-const transport = threadPlugin({ name: 'thread', spawn: entry, features: [idempotencyFeature()] })
+const transport = threadPlugin({
+  name: 'thread',
+  spawn: entry,
+  features: { idempotency: idempotencyFeature() }
+})
 
 type ICrashApi = {
   thread(): number

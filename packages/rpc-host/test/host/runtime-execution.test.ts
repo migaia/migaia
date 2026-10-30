@@ -1,6 +1,7 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Retained execution business uses actual public namespaces and the existing native carrier. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import limits from '@migaia/rpc-host/plugins/limits'
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -108,7 +109,7 @@ it('a queued public group preserves its original deadline code across the physic
       client.host.memory.group([{ method: 'queued' }], {
         orderKey: 'same',
         cancel: 'before-start',
-        timeout: timeoutFeature({ ms: 5 })
+        timeout: { ms: 5 }
       })
     ])
     /** Only the real correlated remote terminal supplies this original error-code expectation. */
@@ -269,7 +270,10 @@ it('public groups reject unknown or over-budget work and retain the original fai
   /** Complete limits installation owns the original whole-group concurrency capacity. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [limits({ maxGlobal: 3, maxPerPeer: 3 }), ...server.options.plugins],
+    plugins: [
+      rpcFeaturesPlugin({ features: { feature0: limits({ maxGlobal: 3, maxPerPeer: 3 }) } }),
+      ...server.options.plugins
+    ],
     provide: {
       first: (_value, context) => {
         effects += 1

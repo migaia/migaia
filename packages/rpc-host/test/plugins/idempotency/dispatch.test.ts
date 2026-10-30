@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Actual public dispatch consumes the sole keyed store and verified principal/Session facts. */
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
@@ -40,7 +41,10 @@ it('withdraws cancelled pending claims without retaining their waiters or cancel
   let calls = 0
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotencyFeature({ store }), server.transport],
+    plugins: [
+      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature({ store }) } }),
+      server.transport
+    ],
     provide: {
       hold: async () => {
         calls += 1
@@ -109,8 +113,14 @@ it('claims once across one principal and treats a different own-key order as a c
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      idempotencyFeature(),
-      authFeature({ verifyCredentials: (credential) => ({ principalId: String(credential) }) }),
+      rpcFeaturesPlugin({
+        features: {
+          idempotency: idempotencyFeature(),
+          auth: authFeature({
+            verifyCredentials: (credential) => ({ principalId: String(credential) })
+          })
+        }
+      }),
       server.transport
     ],
     provide: {
@@ -131,11 +141,15 @@ it('claims once across one principal and treats a different own-key order as a c
   let joined: Promise<unknown> | undefined
   try {
     const alice = await server.connect('alice-one', {
-      plugins: [authFeature({ credentials: principals.alice })]
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: principals.alice }) } })
+      ]
     })
     clients.push(alice)
     const sibling = await server.connect('alice-two', {
-      plugins: [authFeature({ credentials: principals.alice })]
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: principals.alice }) } })
+      ]
     })
     clients.push(sibling)
     const first = alice.host.memory.send(
@@ -184,7 +198,9 @@ it('claims once across one principal and treats a different own-key order as a c
       )
     ).toBe(2)
     const bob = await server.connect('bob', {
-      plugins: [authFeature({ credentials: principals.bob })]
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: principals.bob }) } })
+      ]
     })
     clients.push(bob)
     expect(
@@ -216,8 +232,12 @@ it('keeps concurrency local to each real Session even when their authenticated p
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      limitsFeature({ maxGlobal: 2, maxPerPeer: 1 }),
-      authFeature({ verifyCredentials: () => ({ principalId: principals.alice }) }),
+      rpcFeaturesPlugin({
+        features: {
+          limits: limitsFeature({ maxGlobal: 2, maxPerPeer: 1 }),
+          auth: authFeature({ verifyCredentials: () => ({ principalId: principals.alice }) })
+        }
+      }),
       server.transport
     ],
     provide: {
@@ -243,11 +263,15 @@ it('keeps concurrency local to each real Session even when their authenticated p
   const pending: Promise<unknown>[] = []
   try {
     const first = await server.connect('first-session', {
-      plugins: [authFeature({ credentials: principals.alice })]
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: principals.alice }) } })
+      ]
     })
     clients.push(first)
     const second = await server.connect('second-session', {
-      plugins: [authFeature({ credentials: principals.alice })]
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: principals.alice }) } })
+      ]
     })
     clients.push(second)
     pending.push(first.host.memory.send('session-limit-server', 'hold'))
@@ -286,10 +310,13 @@ it('seals and replays only the original actual stream final completion without r
   const server = coreMemoryServer('stream-key-server')
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotencyFeature(), server.transport]
+    plugins: [
+      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+      server.transport
+    ]
   })
   const client = await server.connect('stream-caller', {
-    plugins: [idempotencyFeature()],
+    plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
     provide: {
       values: async function* () {
         starts += 1

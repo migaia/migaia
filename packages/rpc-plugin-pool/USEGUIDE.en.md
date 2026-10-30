@@ -19,11 +19,11 @@ type IWorkerApi = { work(value: number): number; values(end: number): AsyncItera
 const plugins = [
   threadPlugin({
     spawn: new URL('./worker.js', import.meta.url),
-    features: [
-      pool({ size: 3, maxQueue: 32 }),
-      timeoutFeature({ ms: 1500 }),
-      retryFeature({ attempts: 2 })
-    ]
+    features: {
+      workers: pool({ size: 3, maxQueue: 32 }),
+      timeout: timeoutFeature({ ms: 1500 }),
+      retry: retryFeature({ attempts: 2 })
+    }
   })
 ] as const
 
@@ -36,7 +36,7 @@ export function open() {
 export function work(host: IPoolHost, signal: AbortSignal) {
   return host.thread.send(RPC_POOL_PEER_ID, 'work', 21, {
     signal,
-    timeout: timeoutFeature({ ms: 1000 }),
+    timeout: { ms: 1000 },
     retry: false
   })
 }
@@ -78,7 +78,7 @@ await createRpcHost({
 })
 ```
 
-The factory is `pool(options)`. Controls are published on that installation's `host.thread.pool` and `host.thread.members`, rather than queried from the factory object. `features` accepts complete pool, timeout, and retry instances; per-call timeout/retry accepts complete instances or `false`.
+The factory is `pool(options)`. Controls are published on that installation's `host.thread.pool` and `host.thread.members`, rather than queried from the factory object. `features` uses `{ name: feature }` for native pool, timeout, and retry tokens; per-call timeout/retry accepts policy options or `false`.
 
 ## One logical target
 

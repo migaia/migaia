@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
 import {
   probe,
@@ -9,7 +10,6 @@ import {
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
 import limits from '@migaia/rpc-host/plugins/limits'
-import timeout from '@migaia/rpc-host/features/timeout'
 import { describe, expect, it, vi } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.ts'
 
@@ -43,7 +43,7 @@ describe('probe logical observations', () => {
       ...listener.options,
       plugins: [
         probe(rightProbe),
-        limits({ maxGlobal: 1, maxPerPeer: 1 }),
+        rpcFeaturesPlugin({ features: { feature0: limits({ maxGlobal: 1, maxPerPeer: 1 }) } }),
         ...listener.options.plugins!
       ],
       provide: {
@@ -149,7 +149,7 @@ describe('probe logical observations', () => {
       ).toBe(true)
       /** Timeout wins locally while the same genuine lease prevents another provider admission. */
       await expect(
-        client.memory.send('probe-provider', 'hold', undefined, { timeout: timeout({ ms: 10 }) })
+        client.memory.send('probe-provider', 'hold', undefined, { timeout: { ms: 10 } })
       ).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
       await expect(client.memory.send('probe-provider', 'echo', undefined)).rejects.toMatchObject({
         code: 'OVERLOADED'

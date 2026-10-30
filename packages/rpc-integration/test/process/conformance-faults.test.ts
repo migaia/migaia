@@ -10,9 +10,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import type { IRpcRetryFeature, IRpcAttempt } from '@migaia/rpc-contract/interfaces'
 import { retryFeature } from '@migaia/rpc-host/features/retry'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { sendQueueFeature } from '@migaia/rpc-plugin-process/features/send-queue'
 import { ipcLogFeature } from '@migaia/rpc-plugin-process/features/log'
 import type {
@@ -21,6 +21,9 @@ import type {
 } from '@migaia/rpc-plugin-process'
 import {
   createRpcStreamFrameDecoder,
+  defineFlowFeature,
+  RpcFlowPoint,
+  type IRpcFlowFeature,
   encodeRpcStreamFrame,
   RPC_STREAM_MAX_FRAME_BYTES
 } from '@migaia/rpc-host/sdk'
@@ -43,7 +46,8 @@ type IFaultOptions = {
   maxPendingData?: number
   address?: string
   token?: string
-  retry?: IRpcRetryFeature
+  outbound?: IRpcFlowFeature<object>
+  timeoutMs?: number
 }
 
 /** Inspect only the genuine current peer catalog, without issuing another business call. */
@@ -124,20 +128,25 @@ class FaultClient {
             supervision: { ...source.supervision, scheduler, restart: this.#options.restart }
           }
     try {
-      this.#installed = await installBusinessClient(this.#fixture, selected, [
-        this.#options.retry ??
-          retryFeature({ scheduler, report: (error) => this.reports.push(error) }),
+      this.#installed = await installBusinessClient(this.#fixture, selected, {
+        replay: retryFeature({ scheduler, report: (error) => this.reports.push(error) }),
+        ...(this.#options.timeoutMs === undefined
+          ? {}
+          : {
+              deadline: timeoutFeature({ ms: this.#options.timeoutMs, scheduler })
+            }),
+        ...(this.#options.outbound === undefined ? {} : { admission: this.#options.outbound }),
         ...(this.#options.maxPendingData === undefined
-          ? []
-          : [
-              sendQueueFeature({ maxPendingData: this.#options.maxPendingData }),
-              ipcLogFeature({
+          ? {}
+          : {
+              queue: sendQueueFeature({ maxPendingData: this.#options.maxPendingData }),
+              logging: ipcLogFeature({
                 report: (record) => {
                   this.backlog.push(record)
                 }
               })
-            ])
-      ])
+            })
+      })
       /** Contract-scoped p methods and independent TS peer methods have separate public catalogs. */
       if (this.#independentMethods)
         await vi.waitFor(() => expect(hasPeerWait(this.namespace)).toBe(true))
@@ -496,13 +505,13 @@ describe('real native business budget and independent session', () => {
         const payload = 'x'.repeat(RPC_STREAM_MAX_FRAME_BYTES - 4096)
         expect(
           await active.namespace.request('p.f.request', [payload], {
-            timeout: timeoutFeature({ ms: 10000, scheduler: systemScheduler })
+            timeout: { ms: 10000 }
           })
         ).toBe(payload)
         const writes = active.sent.length
         await expect(
           active.namespace.request('p.f.request', ['x'.repeat(RPC_STREAM_MAX_FRAME_BYTES)], {
-            timeout: timeoutFeature({ ms: 10000, scheduler: systemScheduler })
+            timeout: { ms: 10000 }
           })
         ).rejects.toMatchObject({
           name: 'RangeError',
@@ -657,7 +666,7 @@ describe('explicit persistent authenticated scope', () => {
       })
       expect(
         await active.namespace.request('p.f.request', [], {
-          timeout: timeoutFeature({ ms: 5000 }),
+          timeout: { ms: 5000 },
           idempotencyKey: 'hf-original-key'
         })
       ).toBe('committed')
@@ -695,36 +704,44 @@ describe('explicit persistent authenticated scope', () => {
   }, 15000)
 })
 
-describe('physical departure before sendOnce admission', () => {
+describe('physical departure before the original physical write handoff', () => {
   for (const peer of peers)
     it(`${peer.language} returns REMOTE_CLOSED with zero business frames`, async () => {
       const scheduler = createManualScheduler()
       let admit!: () => void
       let entered!: () => void
-      /** The public injected retry port delays admission, then delegates every state decision. */
+      /** The existing outgoing flow stage delays physical handoff without replacing retry logic. */
       const barrier = new Promise<void>((resolve) => {
         admit = resolve
       })
       const waiting = new Promise<void>((resolve) => {
         entered = resolve
       })
-      /** The original barrier surrounds the complete retry policy's one actual attempt. */
+      /** Only the real business envelope waits; handshakes and directory frames remain unchanged. */
       const admission = {
         entered,
-        barrier,
-        policy: retryFeature({ scheduler, report: () => undefined })
+        barrier
       }
-      const retryPort: IRpcRetryFeature = {
-        kind: 'retry',
-        async run<T>(attempt: IRpcAttempt<T>): Promise<T> {
-          admission.entered()
-          await admission.barrier
-          return admission.policy.run(attempt)
-        }
-      }
+      /** A genuine native token installs the existing supported flow intervention. */
+      const outbound = defineFlowFeature({
+        name: 'fault-before-physical-write',
+        phase: 1000,
+        setup: () => ({
+          stages: {
+            [RpcFlowPoint.envelopeOutbound]: async (payload, next) => {
+              const message = await payload.context.restore(payload.prepared)
+              if (message?.kind === 'call' && message.task.method === 'p.f.request') {
+                admission.entered()
+                await admission.barrier
+              }
+              await next(payload)
+            }
+          }
+        })
+      })
       const active = await faultClient(peer, {
         scheduler,
-        retry: retryPort,
+        outbound,
         restart: { mode: 'on-failure', initialDelayMs: 100, maxDelayMs: 100, maxRestarts: 1 }
       })
       let call: Promise<unknown> | undefined
@@ -844,7 +861,7 @@ describe('capacity one real stopped reader', () => {
         paused = true
         /** This real pipe write exceeds the OS pipe buffer while remaining below the frame budget. */
         blocked = active.namespace.request('p.f.request', ['x'.repeat(2 * 1024 * 1024)], {
-          timeout: timeoutFeature({ ms: 10000, scheduler: systemScheduler }),
+          timeout: { ms: 10000 },
           trace: 'h-backlog-trace'
         })
         let settled = false
@@ -904,6 +921,7 @@ describe('real owned crash retry eligibility', () => {
         const scheduler = createManualScheduler()
         const active = await faultClient(peer, {
           scheduler,
+          timeoutMs: 500,
           restart: {
             mode: 'on-failure',
             initialDelayMs: 100,
@@ -917,7 +935,6 @@ describe('real owned crash retry eligibility', () => {
           expect(await active.namespace.request('peer.pause', [])).toBe('ACK')
           pending = active.namespace.request('p.f.request', ['replayed-value'], {
             idempotencyKey: 'hf-crash-original-key',
-            timeout: timeoutFeature({ ms: 500, scheduler }),
             signal: controller.signal
           })
           /**

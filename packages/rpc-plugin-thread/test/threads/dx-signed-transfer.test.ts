@@ -1,6 +1,7 @@
+import { rpcFeaturesPlugin, type IRpcFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { fileURLToPath } from 'node:url'
 import { createUnitBudget } from '@migaia/supervision'
@@ -44,11 +45,11 @@ describe('ordinary signed native-binary thread profile', () => {
     /** The public thread factory owns its real Worker and the existing default endpoint. */
     const peer = await createRpcHost<
       { thread: IBytesApi },
-      readonly [ReturnType<typeof authFeature>, ReturnType<typeof threadPlugin<'thread'>>]
+      readonly [IRpcFlowPlugin, ReturnType<typeof threadPlugin<'thread'>>]
     >({
       report: (error) => reported.push(error),
       plugins: [
-        authFeature(options.authentication),
+        rpcFeaturesPlugin({ features: { auth: authFeature(options.authentication) } }),
         threadPlugin({ name: 'thread', spawn: source(true, (error) => reported.push(error)) })
       ]
     })
@@ -119,11 +120,11 @@ describe('ordinary signed native-binary thread profile', () => {
     /** Canonical default factories must retain the same signature barrier as custom endpoints. */
     const peer = await createRpcHost<
       { thread: IBytesApi },
-      readonly [ReturnType<typeof authFeature>, ReturnType<typeof threadPlugin<'thread'>>]
+      readonly [IRpcFlowPlugin, ReturnType<typeof threadPlugin<'thread'>>]
     >({
       report: () => undefined,
       plugins: [
-        authFeature(options.authentication),
+        rpcFeaturesPlugin({ features: { auth: authFeature(options.authentication) } }),
         threadPlugin({ name: 'thread', spawn: source(true, () => undefined) })
       ]
     })
@@ -136,7 +137,7 @@ describe('ordinary signed native-binary thread profile', () => {
       await expect(
         peer.thread.send('thread', 'bytes.inspect', buffer, {
           transfer: [buffer],
-          timeout: timeoutFeature({ ms: 100 })
+          timeout: { ms: 100 }
         })
       ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'DEADLINE_EXCEEDED' })
       expect(buffer.byteLength).toBe(0)

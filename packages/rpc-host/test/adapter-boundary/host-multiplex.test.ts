@@ -51,7 +51,7 @@ class FailingMessageIO implements IRpcMessageIO {
 
 it('routes two actual physical codec selections without sharing peer identity or business data', async () => {
   /** Actual JSON execution remains on the text carrier's codec rather than a mux projection. */
-  const text = coreMemoryServer('host', 'host', 'text', [], [], {
+  const text = coreMemoryServer('host', 'host', 'text', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })

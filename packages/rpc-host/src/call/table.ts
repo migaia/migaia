@@ -1,3 +1,4 @@
+import type { ISelectedCallFeatures } from '../feature/scope.ts'
 /** Outbound call ids, source-fenced settlement and cancellation have one runtime owner. */
 import {
   RpcWireKind,
@@ -221,7 +222,7 @@ export class CallTable {
     target: ICallTargetRef,
     command: ICallCommand,
     options: ICallLocalOptions,
-    selected: import('@migaia/rpc-contract/interfaces').IRpcCallFeatures
+    selected: ISelectedCallFeatures
   ): Promise<unknown> {
     const invocation = new CallInvocation(
       this.#invocationOwner,

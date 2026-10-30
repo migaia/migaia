@@ -1,10 +1,12 @@
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { it, vi } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.ts'
@@ -85,14 +87,26 @@ for (const control of ['abort', 'deadline', 'late-failure'] as const) {
     /** One named owner retains only this original sign callback's controlled resources. */
     const signing = new SigningControl(control)
     /** Cold inline storage selects real SDK JSON capture on the original existing carrier pair. */
-    const server = coreMemoryServer('caller', 'signing-caller', 'memory', [], [], {
-      create: () => new RpcJsonCarrierCodec(),
-      nativeBinary: false
-    })
+    const server = coreMemoryServer(
+      'caller',
+      'signing-caller',
+      'memory',
+      control === 'deadline'
+        ? { deadline: timeoutFeature({ ms: 10, report: signing.report }) }
+        : {},
+      [],
+      {
+        create: () => new RpcJsonCarrierCodec(),
+        nativeBinary: false
+      }
+    )
     /** Native plugin installation owns real auth setup before the same original transport starts. */
     const caller = await createRpcHost({
       ...server.options,
-      plugins: [signing.protection(true), ...server.options.plugins!],
+      plugins: [
+        rpcFeaturesPlugin({ features: { feature0: signing.protection(true) } }),
+        ...server.options.plugins!
+      ],
       report: signing.report
     })
     /** A partially acquired provider remains available to the same final cleanup owner. */
@@ -101,11 +115,11 @@ for (const control of ['abort', 'deadline', 'late-failure'] as const) {
       /** The original native connection performs both authenticating handshakes and deliveries. */
       const connected = await server.connect('provider', {
         provide: { ready: () => 'ready' },
-        plugins: [signing.protection(false)],
+        plugins: [rpcFeaturesPlugin({ features: { feature0: signing.protection(false) } })],
         report: signing.report
       })
       provider = connected.host
-      assert.equal(await caller.memory.send('provider', 'ready', null), 'ready')
+      assert.equal(await caller.memory.send('provider', 'ready', null, { timeout: false }), 'ready')
       /** Observe actual physical writes after baseline; no fixture queue or receipt is introduced. */
       const writing = vi.spyOn(connected.pair[0], 'write')
       try {
@@ -118,9 +132,7 @@ for (const control of ['abort', 'deadline', 'late-failure'] as const) {
         const pending = caller.memory.notify(
           'ready',
           null,
-          control !== 'deadline'
-            ? { signal: controller.signal }
-            : { timeout: timeoutFeature({ ms: 10, report: signing.report }) }
+          control !== 'deadline' ? { signal: controller.signal } : {}
         )
         /** Observe before abort so the original expected rejection cannot become detached. */
         const settlement = Promise.allSettled([pending])
@@ -129,7 +141,10 @@ for (const control of ['abort', 'deadline', 'late-failure'] as const) {
         await settlement
         signing.release()
         await nextTurn()
-        assert.equal(await caller.memory.send('provider', 'ready', null), 'ready')
+        assert.equal(
+          await caller.memory.send('provider', 'ready', null, { timeout: false }),
+          'ready'
+        )
         assert.equal(
           writing.mock.calls.length,
           1,

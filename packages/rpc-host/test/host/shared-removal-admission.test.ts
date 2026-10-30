@@ -1,7 +1,7 @@
 /** A public native removal and a genuine arriving connection share the original Feature lifetime. */
 import { defineHost } from '@migaia/plugin-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { defineFlowFeature, rpcFlowPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
+import { defineFlowFeature, rpcFeaturesPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from './core-fixture.ts'
@@ -13,6 +13,7 @@ it('F3 refuses a new connection or shared Auth removal while its accepted cleanu
   const released = deferred<void>()
   /** This real shared Feature contributes no replacement stage, queue or admission authority. */
   const held = defineFlowFeature({
+    phase: 1000,
     name: 'f3-held-shared-cleanup',
     setup: () => ({
       dispose: async () => {
@@ -22,10 +23,9 @@ it('F3 refuses a new connection or shared Auth removal while its accepted cleanu
     })
   })
   /** Both Features use the ordinary SDK wrapper and its actual native registration lifetime. */
-  const flows = rpcFlowPlugin([
-    authFeature({ sign: (value) => value, verify: (value) => value }),
-    held
-  ])
+  const flows = rpcFeaturesPlugin({
+    features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }), held }
+  })
   /** Only this native Host lends candidate and committed pipeline execution authority. */
   const rpc = rpcHostPipelines(
     () => host,
@@ -56,7 +56,11 @@ it('F3 refuses a new connection or shared Auth removal while its accepted cleanu
     /** The opposite public Host completes real signed handshakes while that disposer stays held. */
     const [connection] = await Promise.allSettled([
       server.connect('f3-arriving-client', {
-        plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
+        plugins: [
+          rpcFeaturesPlugin({
+            features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+          })
+        ]
       })
     ])
     if (connection!.status === 'fulfilled') client = connection.value

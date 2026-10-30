@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Derived policy effects execute in their installed flow owners over actual Process native IO. */
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { expect, it, vi } from 'vitest'
@@ -89,12 +90,16 @@ class NativePolicyServer {
     const host = await createRpcHost({
       self: { name: this.#name, instanceId: this.#name },
       plugins: [
-        idempotencyFeature({ store: this.#store }),
-        limitsFeature({ maxGlobal: 3, maxPerPeer: 3 }),
-        authFeature({
-          verifyCredentials: (credential) => ({
-            principalId: credential === 'bob-token' ? 'bob' : 'alice'
-          })
+        rpcFeaturesPlugin({
+          features: {
+            idempotency: idempotencyFeature({ store: this.#store }),
+            limits: limitsFeature({ maxGlobal: 3, maxPerPeer: 3 }),
+            auth: authFeature({
+              verifyCredentials: (credential) => ({
+                principalId: credential === 'bob-token' ? 'bob' : 'alice'
+              })
+            })
+          }
         }),
         source
       ],
@@ -143,7 +148,10 @@ class NativePolicyServer {
     /** Explicit credentials receive the old unit's explicitly supplied identity input only. */
     const client = await createRpcHost({
       self: { name, instanceId: name },
-      plugins: [authFeature({ credentials: credential }), source],
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: credential }) } }),
+        source
+      ],
       report: (error) => this.reports.push(error)
     })
     this.#hosts.push(client)

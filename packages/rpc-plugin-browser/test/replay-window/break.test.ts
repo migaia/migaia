@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { describe, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -9,7 +10,7 @@ import { RpcAuthenticationEnvelope } from '../../../rpc-host/dist/features/auth/
 describe('replay-window r12 authentication break', () => {
   it('rejects a successfully verified legacy frame without replay binding', async () => {
     /** The real JSON carrier and installed auth hook own binding admission after verification. */
-    const source = coreMemoryServer('receiver', 'receiver', 'memory', [], [], {
+    const source = coreMemoryServer('receiver', 'receiver', 'memory', {}, [], {
       create: () => new RpcJsonCarrierCodec(),
       nativeBinary: false
     })
@@ -24,11 +25,15 @@ describe('replay-window r12 authentication break', () => {
     const server = await createRpcHost({
       ...source.options,
       plugins: [
-        authFeature({
-          sign: (value) => value,
-          verify: (value) => {
-            verified = value
-            return value
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              sign: (value) => value,
+              verify: (value) => {
+                verified = value
+                return value
+              }
+            })
           }
         }),
         source.transport
@@ -44,9 +49,13 @@ describe('replay-window r12 authentication break', () => {
     /** The signer deliberately emits the same successfully verified old unbound value. */
     const client = await source.connect('sender', {
       plugins: [
-        authFeature({
-          sign: (value) => (legacy ? { legacy: true } : value),
-          verify: (value) => value
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              sign: (value) => (legacy ? { legacy: true } : value),
+              verify: (value) => value
+            })
+          }
         })
       ]
     })
@@ -98,31 +107,37 @@ describe('replay-window r12 authentication break', () => {
     let encryptedInput: unknown
     /** The signer must receive exactly the encryption output, including its replay binding. */
     let signedInput: unknown
-    const source = coreMemoryServer('receiver', 'receiver', 'memory', [], [], {
+    const source = coreMemoryServer('receiver', 'receiver', 'memory', {}, [], {
       create: () => new RpcJsonCarrierCodec(),
       nativeBinary: false
     })
     const server = await createRpcHost({
       ...source.options,
       plugins: [
-        authFeature({ sign: (value) => value, verify: (value) => value }),
+        rpcFeaturesPlugin({
+          features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+        }),
         source.transport
       ],
       provide: { echo: (value: unknown) => value }
     })
     const client = await source.connect('sender', {
       plugins: [
-        authFeature({
-          encrypt: (value) => {
-            encryptedInput = value
-            return value
-          },
-          decrypt: (value) => value,
-          sign: (value) => {
-            signedInput = value
-            return value
-          },
-          verify: (value) => value
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              encrypt: (value) => {
+                encryptedInput = value
+                return value
+              },
+              decrypt: (value) => value,
+              sign: (value) => {
+                signedInput = value
+                return value
+              },
+              verify: (value) => value
+            })
+          }
         })
       ]
     })

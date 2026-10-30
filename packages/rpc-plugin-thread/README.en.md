@@ -46,7 +46,7 @@ One current direct Worker returns `42`. A separate child entry can use `spawn: n
 | `connectToParent: true` | Join the parent from a real child thread; mutually exclusive with `spawn`      |
 | `name`                  | Native installation/registration name; defaults to `thread`                    |
 | `namespace`             | Call namespace; defaults to `thread`                                           |
-| `features`              | Complete timeout, retry, or pool feature instances                             |
+| `features`              | `{ localName: nativeFeature }` for timeout, retry, or pool                     |
 | `expose`                | Select local Feature methods when installed on an ordinary PluginHost          |
 | `report`                | Native diagnostic callback                                                     |
 
@@ -56,9 +56,9 @@ Use [rpc-plugin-browser](../rpc-plugin-browser/README.en.md) in browser pages an
 
 ## Policies and lifetime
 
-Calls accept `signal`, complete `timeoutFeature({ ms })` and `retryFeature({ attempts })` instances, or `false`. Selection precedence is per-call options, transport features, then link-policy plugin. An absent policy adds no automatic timeout or retry. Cancellation is cooperative and cannot preempt a synchronous loop.
+Calls accept `signal`, timeout `{ ms }`, retry `{ attempts }`, or `false`. Selection precedence is per-call options, transport features, then link-policy plugin. An absent policy adds no automatic timeout or retry. Cancellation is cooperative and cannot preempt a synchronous loop.
 
-The native Thread `spec.limits.callWallTimeMs` is a separate hard cap. Explicit `timeout: false` disables the optional business timeout without extending that cap. A complete timeout instance uses the actual launch spec and its original scheduler.
+The native Thread `spec.limits.callWallTimeMs` is a separate hard cap. Explicit `timeout: false` disables the optional business timeout without extending that cap. An independent timeout execution uses the actual launch spec and its original scheduler.
 
 `notify` waits for physical write; `request` waits for the business result. Native supervision owns restart and replacement. A restored connection does not establish that work can safely be replayed. Native, call, and remote errors retain their own source/code/cause; transferred error graphs preserve name/message/stack and aggregate members.
 

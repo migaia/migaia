@@ -60,7 +60,7 @@ After the Worker provides `double`, the compatible page call can receive `42`. A
 | `rtcDataChannelPlugin`   | `{ rtcDataChannel }`                                  | `rtcDataChannel`   |
 | `webTransportPlugin`     | `{ session }`                                         | `webTransport`     |
 
-Common options include `name`, `namespace`, `expose`, `connect: { timeoutMs }` and complete business `features`. SharedWorker/ServiceWorker source alternatives are exclusive. Root exports are these factories, their option types, `RpcBrowserErrorCode` and `RPC_BROWSER_ERROR_SOURCE`.
+Common options include `name`, `namespace`, `expose`, `connect: { timeoutMs }` and business `features: { localName: feature }`. SharedWorker/ServiceWorker source alternatives are exclusive. Root exports are these factories, their option types, `RpcBrowserErrorCode` and `RPC_BROWSER_ERROR_SOURCE`.
 
 Prefer one transport kind per Host rather than mixed media. Several ports or participants may belong to that one kind. If mixing is necessary, define namespaces, routing and permissions explicitly; heterogeneous media are not a homogeneous member pool.
 

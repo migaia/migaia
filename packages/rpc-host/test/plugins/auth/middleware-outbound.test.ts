@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { assert, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
@@ -32,7 +33,7 @@ it('hostile outbound authentication preserves native source/code/cause identity'
   /** Canonical v2 negotiation completes before the original business-write failure is armed. */
   const state = { armed: false }
   /** Both original physical endpoints borrow the executing SDK JSON codec, without a new codec. */
-  const listener = coreMemoryServer('target', 'target', 'memory', [], [], {
+  const listener = coreMemoryServer('target', 'target', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
@@ -40,7 +41,9 @@ it('hostile outbound authentication preserves native source/code/cause identity'
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      authFeature({ sign: (value) => value, verify: (value) => value }),
+      rpcFeaturesPlugin({
+        features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+      }),
       listener.transport
     ],
     provide: { method: (value) => value }
@@ -49,14 +52,18 @@ it('hostile outbound authentication preserves native source/code/cause identity'
     /** The public auth plugin owns the original throwing encrypt callback and its error boundary. */
     const client = await listener.connect('hostile-auth-client', {
       plugins: [
-        authFeature({
-          encrypt: (value) => {
-            if (state.armed) throw hostile
-            return value
-          },
-          decrypt: (value) => value,
-          sign: (value) => value,
-          verify: (value) => value
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              encrypt: (value) => {
+                if (state.armed) throw hostile
+                return value
+              },
+              decrypt: (value) => value,
+              sign: (value) => value,
+              verify: (value) => value
+            })
+          }
         })
       ]
     })
@@ -89,7 +96,7 @@ it.each(['throws synchronously', 'rejects asynchronously', 'returns an invalid e
     /** Real bilateral ready completes before the original one-shot business failure is armed. */
     const state = { armed: false }
     /** The actual JSON media codec supplies strings to the installed explicit-string transform. */
-    const listener = coreMemoryServer('outbound-auth-provider', undefined, 'memory', [], [], {
+    const listener = coreMemoryServer('outbound-auth-provider', undefined, 'memory', {}, [], {
       create: () => new RpcJsonCarrierCodec(),
       nativeBinary: false
     })
@@ -97,7 +104,15 @@ it.each(['throws synchronously', 'rejects asynchronously', 'returns an invalid e
     const server = await createRpcHost({
       ...listener.options,
       plugins: [
-        authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              encodedType: 'string',
+              sign: (value) => value,
+              verify: (value) => value
+            })
+          }
+        }),
         listener.transport
       ],
       provide: { read: () => 42 }
@@ -106,15 +121,19 @@ it.each(['throws synchronously', 'rejects asynchronously', 'returns an invalid e
       /** Only the public authentication plugin executes the original protect failure conditions. */
       const client = await listener.connect('outbound-auth-client', {
         plugins: [
-          authFeature({
-            encodedType: 'string',
-            sign: (value) => {
-              if (!state.armed) return value
-              if (label === 'throws synchronously') throw cause
-              if (label === 'rejects asynchronously') return Promise.reject(cause)
-              return 42
-            },
-            verify: (value) => value
+          rpcFeaturesPlugin({
+            features: {
+              auth: authFeature({
+                encodedType: 'string',
+                sign: (value) => {
+                  if (!state.armed) return value
+                  if (label === 'throws synchronously') throw cause
+                  if (label === 'rejects asynchronously') return Promise.reject(cause)
+                  return 42
+                },
+                verify: (value) => value
+              })
+            }
           })
         ]
       })
@@ -151,7 +170,7 @@ it('keeps the original locally owned authentication failure identity through a p
   /** Only the original business protect callback rejects, after real handshake admission. */
   const state = { armed: false }
   /** The existing JSON codec and native fixture retain the same ordinary physical connection. */
-  const listener = coreMemoryServer('owned-auth-provider', undefined, 'memory', [], [], {
+  const listener = coreMemoryServer('owned-auth-provider', undefined, 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
@@ -159,7 +178,9 @@ it('keeps the original locally owned authentication failure identity through a p
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      authFeature({ sign: (value) => value, verify: (value) => value }),
+      rpcFeaturesPlugin({
+        features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+      }),
       listener.transport
     ],
     provide: { read: () => 42 }
@@ -168,9 +189,13 @@ it('keeps the original locally owned authentication failure identity through a p
     /** Original factory-minted Error enters the real public hook rather than a private sender call. */
     const client = await listener.connect('owned-auth-client', {
       plugins: [
-        authFeature({
-          sign: (value) => (state.armed ? Promise.reject(authenticationError) : value),
-          verify: (value) => value
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              sign: (value) => (state.armed ? Promise.reject(authenticationError) : value),
+              verify: (value) => value
+            })
+          }
         })
       ]
     })
@@ -225,7 +250,7 @@ it('preserves the original inbound decrypt failure through the public authentica
   /** The public reporter supplies a barrier for this original native failure, without fixed sleeps. */
   const observed = deferred<unknown>()
   /** Both real endpoints use the existing executing JSON codec and physical MemoryCarrier pair. */
-  const listener = coreMemoryServer('inbound-auth-provider', undefined, 'memory', [], [], {
+  const listener = coreMemoryServer('inbound-auth-provider', undefined, 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
@@ -233,13 +258,17 @@ it('preserves the original inbound decrypt failure through the public authentica
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      authFeature({
-        encrypt: (value) => value,
-        sign: (value) => value,
-        verify: (value) => value,
-        decrypt: (value) => {
-          if (state.armed) throw hostile
-          return value
+      rpcFeaturesPlugin({
+        features: {
+          auth: authFeature({
+            encrypt: (value) => value,
+            sign: (value) => value,
+            verify: (value) => value,
+            decrypt: (value) => {
+              if (state.armed) throw hostile
+              return value
+            }
+          })
         }
       }),
       listener.transport
@@ -252,7 +281,11 @@ it('preserves the original inbound decrypt failure through the public authentica
   try {
     /** A normal authenticated caller supplies genuine protected metadata to the failing decryptor. */
     const client = await listener.connect('inbound-auth-client', {
-      plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
+      plugins: [
+        rpcFeaturesPlugin({
+          features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+        })
+      ]
     })
     try {
       state.armed = true
@@ -286,7 +319,7 @@ it('isolates a public signing failure while the native batch writer is busy and 
   /** Real provider effects identify delivered traffic without decoding physical frames again. */
   const calls: string[] = []
   /** Both native endpoints use the existing JSON codec before their genuine physical Batch owner. */
-  const listener = coreMemoryServer('busy-auth-provider', undefined, 'memory', [], [], {
+  const listener = coreMemoryServer('busy-auth-provider', undefined, 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
@@ -294,8 +327,16 @@ it('isolates a public signing failure while the native batch writer is busy and 
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
-      batchFeature(),
+      rpcFeaturesPlugin({
+        features: {
+          auth: authFeature({
+            encodedType: 'string',
+            sign: (value) => value,
+            verify: (value) => value
+          }),
+          batch: batchFeature()
+        }
+      }),
       listener.transport
     ],
     provide: {
@@ -309,16 +350,20 @@ it('isolates a public signing failure while the native batch writer is busy and 
     /** Real handshakes complete before the selected per-envelope signing rejection is armed. */
     const client = await listener.connect('busy-auth-client', {
       plugins: [
-        authFeature({
-          encodedType: 'string',
-          sign: (value) => {
-            if (!state.failNext) return value
-            state.failNext = false
-            return Promise.reject(cause)
-          },
-          verify: (value) => value
-        }),
-        batchFeature()
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              encodedType: 'string',
+              sign: (value) => {
+                if (!state.failNext) return value
+                state.failNext = false
+                return Promise.reject(cause)
+              },
+              verify: (value) => value
+            }),
+            batch: batchFeature()
+          }
+        })
       ]
     })
     /** Existing native write facts exclude directory/control traffic without inspecting ciphertext. */
@@ -402,11 +447,12 @@ it('coalesces two separately authenticated public calls on the same actual sourc
   }
   /** Actual native setup publishes the original named callback without another closure backbone. */
   const witness = defineFlowFeature({
+    phase: 1000,
     name: 'authenticated-batch-member-witness',
     setup: () => ({ stages: { [RpcFlowPoint.frameOutbound]: observeFrame } })
   })
   /** Both endpoints reuse the actual JSON codec and existing physical MemoryCarrier pair. */
-  const listener = coreMemoryServer('authenticated-batch-provider', undefined, 'memory', [], [], {
+  const listener = coreMemoryServer('authenticated-batch-provider', undefined, 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false
   })
@@ -414,8 +460,16 @@ it('coalesces two separately authenticated public calls on the same actual sourc
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
-      batchFeature(),
+      rpcFeaturesPlugin({
+        features: {
+          auth: authFeature({
+            encodedType: 'string',
+            sign: (value) => value,
+            verify: (value) => value
+          }),
+          batch: batchFeature()
+        }
+      }),
       listener.transport
     ],
     provide: {
@@ -429,16 +483,20 @@ it('coalesces two separately authenticated public calls on the same actual sourc
     /** The configured canonical signer returns the same actual input without a new group format. */
     const client = await listener.connect('authenticated-batch-client', {
       plugins: [
-        authFeature({
-          encodedType: 'string',
-          sign: (value, context) => {
-            if (observation.enabled) observation.contexts.push(context)
-            return value
-          },
-          verify: (value) => value
-        }),
-        witness,
-        batchFeature()
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              encodedType: 'string',
+              sign: (value, context) => {
+                if (observation.enabled) observation.contexts.push(context)
+                return value
+              },
+              verify: (value) => value
+            }),
+            witness,
+            batch: batchFeature()
+          }
+        })
       ]
     })
     /** Existing write facts distinguish actual data frames without decoding the signed payload. */

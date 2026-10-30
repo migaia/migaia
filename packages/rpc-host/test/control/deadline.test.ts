@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original relative-deadline oracles cross genuine namespaces, timeout features and native IO. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
@@ -39,6 +40,7 @@ class ReceiverResolution {
   readonly released = deferred<void>()
   /** The existing fixed dispatch group lends this exact stage to the real relay invocation. */
   readonly feature = defineFlowFeature({
+    phase: 1000,
     name: 'deadline-receiver-resolution',
     setup: () => ({
       stages: {
@@ -65,7 +67,7 @@ async function subtractReceiverResolutionDelay(): Promise<void> {
   /** The complete native Feature precedes transport startup through the ordinary public factory. */
   const relay = await createRpcHost({
     ...server.options,
-    plugins: [resolution.feature, server.transport]
+    plugins: [rpcFeaturesPlugin({ features: { feature: resolution.feature } }), server.transport]
   })
   /** The real provider stays pending until the original deadline oracle has completed. */
   const finished = deferred<null>()
@@ -74,7 +76,13 @@ async function subtractReceiverResolutionDelay(): Promise<void> {
     provide: { check: () => finished.promise }
   })
   /** The provider is present in the original directory before the client captures its ready view. */
-  const client = await server.connect('client')
+  const client = await server.connect('client', {
+    plugins: [
+      linkPolicy({
+        features: { deadline: timeoutFeature({ ms: 100, scheduler: clock.scheduler }) }
+      })
+    ]
+  })
   /** The original client must receive the relay's real forwarded capability before starting100ms. */
   await vi.waitFor(() => {
     /** Namespace.accepted publishes qualified methods as ordinary own-data capability groups. */
@@ -85,9 +93,7 @@ async function subtractReceiverResolutionDelay(): Promise<void> {
     expect(Object.getOwnPropertyDescriptor(offered ?? {}, 'check')?.value).toBeTypeOf('function')
   })
   /** Observe rejection immediately so advancing the genuine timer cannot create an unhandled error. */
-  const pending = client.host.memory.send('relay', 'provider.check', null, {
-    timeout: timeoutFeature({ ms: 100, scheduler: clock.scheduler })
-  })
+  const pending = client.host.memory.send('relay', 'provider.check', null)
   void pending.catch(() => undefined)
   try {
     await resolution.entered.promise
@@ -129,7 +135,9 @@ async function omitDisabledDeadline(): Promise<void> {
   })
   /** Moves the original timeout default into an installed complete link-policy feature. */
   const client = await server.connect('client', {
-    plugins: [linkPolicy({ features: [timeoutFeature({ ms: 100, scheduler: clientScheduler })] })]
+    plugins: [
+      linkPolicy({ features: { timeout: timeoutFeature({ ms: 100, scheduler: clientScheduler }) } })
+    ]
   })
   try {
     expect(await client.host.memory.send('provider', 'check', null, { timeout: false })).toBe(false)
@@ -143,11 +151,7 @@ async function omitDisabledDeadline(): Promise<void> {
     expect(providerSignal?.aborted).toBe(false)
     /** A completed provider must release its real deadline timer before a later call is admitted. */
     const baseline = clock.scheduler.pendingCount
-    expect(
-      await client.host.memory.send('provider', 'check', null, {
-        timeout: timeoutFeature({ ms: 100, scheduler: clientScheduler })
-      })
-    ).toBe(false)
+    expect(await client.host.memory.send('provider', 'check', null)).toBe(false)
     await vi.waitFor(() => expect(clock.scheduler.pendingCount).toBe(baseline))
   } finally {
     await client.host.close()
@@ -222,7 +226,13 @@ async function abortAtMonotonicDeadline(): Promise<void> {
     }
   })
   /** The originating complete timeout owns exactly its real client deadline. */
-  const client = await server.connect('client')
+  const client = await server.connect('client', {
+    plugins: [
+      linkPolicy({
+        features: { deadline: timeoutFeature({ ms: 100, scheduler: clock.scheduler }) }
+      })
+    ]
+  })
   /** Hold the original physical writer so only cancel delivery is absent, never provider timers. */
   const write = client.pair[1].write
   /** Makes cancel a core frame; dropping it at real IO preserves the old absent-control vector. */
@@ -231,9 +241,7 @@ async function abortAtMonotonicDeadline(): Promise<void> {
     return write(frame, options)
   })
   /** Observe the originating result before any actual deadline callback runs. */
-  const result = client.host.memory.send('provider', 'hang', null, {
-    timeout: timeoutFeature({ ms: 100, scheduler: clock.scheduler })
-  })
+  const result = client.host.memory.send('provider', 'hang', null)
   void result.catch(() => undefined)
   try {
     await providerStarted.promise

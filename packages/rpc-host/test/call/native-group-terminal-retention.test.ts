@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original keyed-group completion survives a refusal by the genuine installed signer. */
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
@@ -5,7 +6,7 @@ import { it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { coreMemoryServer } from '../host/core-fixture.ts'
 import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.ts'
@@ -39,17 +40,21 @@ it('a genuine response signing failure retains the completed keyed group', async
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      authFeature({
-        sign: (value) => {
-          if (state.refuse && state.effects === 2) {
-            state.refuse = false
-            throw state.signFailure
-          }
-          return { value, signature: signature(value) }
-        },
-        verify
+      rpcFeaturesPlugin({
+        features: {
+          auth: authFeature({
+            sign: (value) => {
+              if (state.refuse && state.effects === 2) {
+                state.refuse = false
+                throw state.signFailure
+              }
+              return { value, signature: signature(value) }
+            },
+            verify
+          }),
+          idempotency: idempotencyFeature()
+        }
       }),
-      idempotencyFeature(),
       server.transport
     ],
     provide: { value: () => ++state.effects },
@@ -58,8 +63,12 @@ it('a genuine response signing failure retains the completed keyed group', async
   /** The caller uses the same real paired transform and normal namespace outcome extension. */
   const client = await server.connect('terminal-caller', {
     plugins: [
-      authFeature({ sign: (value) => ({ value, signature: signature(value) }), verify }),
-      idempotencyFeature()
+      rpcFeaturesPlugin({
+        features: {
+          auth: authFeature({ sign: (value) => ({ value, signature: signature(value) }), verify }),
+          idempotency: idempotencyFeature()
+        }
+      })
     ],
     report: (error) => state.failures.push(error)
   })
@@ -69,7 +78,7 @@ it('a genuine response signing failure retains the completed keyed group', async
     await assert.rejects(
       client.host.memory.group([{ method: 'value' }, { method: 'value' }], {
         idempotencyKey: 'completed-without-reply',
-        timeout: timeoutFeature({ ms: 50 })
+        timeout: { ms: 50 }
       }),
       { code: RpcCoreErrorCode.deadlineExceeded }
     )

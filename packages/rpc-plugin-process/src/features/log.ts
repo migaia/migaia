@@ -3,6 +3,8 @@
  * retirement and reporter-failure isolation stay with this per-installation log owner.
  */
 import { hostRethrowReporter } from '@migaia/utils/promise'
+import { defineFeature, type IFeature } from '@migaia/plugin-host'
+import { registerRpcNativeFeature } from '@migaia/rpc-host/sdk'
 import { IpcReporterContext, ProcessFeatureName } from './text.ts'
 import type { IProcessFeatureContext } from './metadata.ts'
 import type { IIpcLogRecord, IpcFlowControl } from './flow-control.ts'
@@ -77,17 +79,36 @@ class IpcLog {
     this.#release?.()
   }
 }
-/** Complete log execution is installed with the physical owner's existing gate and reporter ports. */
-export function ipcLogFeature(options: IIpcLogOptions) {
+/** Native Feature output opens observers only when the concrete carrier supplies its real gate. */
+class IpcLogExecution {
+  /** The original captured sink is shared by resources from this native Feature installation. */
+  readonly #options: IIpcLogOptions
+
+  /** Capture the sink without subscribing to stderr or flow events. */
+  constructor(options: IIpcLogOptions) {
+    this.#options = options
+  }
+
+  /** The connection owns this observer and retires it before closing the physical resource. */
+  install(context: IIpcLogContext) {
+    /** Live subscriptions belong only to this actual physical installation. */
+    const logging = new IpcLog(this.#options, context)
+    return { value: logging.value, dispose: logging.close }
+  }
+}
+
+/** Stderr and carrier owners borrow this native output without a second public constructor. */
+export type IIpcLogExecution = Pick<IpcLogExecution, 'install'>
+
+/** Opaque native identity keeps log controls solely on the actual installation output. */
+export function ipcLogFeature(
+  options: IIpcLogOptions
+): IFeature<Record<never, never>, IIpcLogExecution> {
   /** Later mutation cannot replace the actual selected native sink. */
   const captured = Object.freeze({ report: options.report })
-  return Object.freeze({
-    kind: ProcessFeatureName.log,
-    install: (context: IIpcLogContext) => {
-      /** All live state remains on this installation-local owner. */
-      const logging = new IpcLog(captured, context)
-      return { value: logging.value, dispose: logging.close }
-    }
-  })
+  /** The same sink enters each independently installed native output. */
+  const feature = defineFeature(() => new IpcLogExecution(captured))
+  registerRpcNativeFeature(feature, { role: ProcessFeatureName.log })
+  return feature
 }
 export default ipcLogFeature

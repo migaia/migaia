@@ -1,13 +1,14 @@
 /** The original generation retry transaction now belongs to the executing origin feature. */
 import { createAbortController } from '@migaia/lifecycle'
-import { sleep, type IAbortSignal, type IRetryFailureContext } from '@migaia/utils/promise'
+import { sleep, type IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
 import {
-  RpcCallFeatureKind,
   type IRpcAttempt,
   type IRpcAttemptAvailability,
   type IRpcAvailableAttempt,
-  type IRpcRetryFeature
+  type IRpcRetryFeature,
+  type IRpcRetryExecution,
+  type IRetryFeatureOptions
 } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { safeRead } from '@migaia/rpc-contract/errors'
@@ -18,15 +19,10 @@ import { defaultRpcReporter, reportDiagnostic } from '../host/report.ts'
 import { resolveAbortReason } from '../host/abort-reason.ts'
 import { HostErrorText } from '../host/error-text.ts'
 import { localErrorWireSummary } from '../host/error-wire-metadata.ts'
+import { defineFeature } from '@migaia/plugin-host'
+import { registerRpcFeature, RpcCallFeatureRole } from '../sdk/metadata.ts'
+export type { IRetryFeatureOptions } from '@migaia/rpc-contract/interfaces'
 
-/** Limits and stable key generation belong to this complete feature, never host call flags. */
-export type IRetryFeatureOptions = Readonly<{
-  attempts?: number
-  backoff?: number | ((error: unknown, context: IRetryFailureContext) => number)
-  keyFactory?(): string
-  scheduler?: IScheduler
-  report?(error: unknown): void
-}>
 /** Captured policy is shared while every logical dispatch owns independent live resources. */
 type IRetryPolicy = Readonly<{
   attempts: number
@@ -317,32 +313,37 @@ class RetryInvocation<T> {
   }
 }
 
+/** Capture supported retry fields once; construction owns configuration, never a logical call. */
+function snapshotRetry(options: IRetryFeatureOptions): IRetryPolicy {
+  if (!options || typeof options !== 'object' || Array.isArray(options))
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, HostErrorText.callFeatureInvalid)
+  /** No native acquisition or call registry is created by policy construction. */
+  const policy = {
+    attempts: options.attempts ?? 2,
+    backoff: options.backoff,
+    keyFactory: options.keyFactory ?? defaultRpcId,
+    scheduler: options.scheduler ?? systemScheduler,
+    report: options.report ?? defaultRpcReporter
+  }
+  if (
+    !Number.isSafeInteger(policy.attempts) ||
+    policy.attempts < 1 ||
+    (policy.backoff !== undefined &&
+      typeof policy.backoff !== 'function' &&
+      (!Number.isFinite(policy.backoff) || policy.backoff < 0))
+  )
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, HostErrorText.callFeatureInvalid)
+  return Object.freeze(policy)
+}
+
 /** A complete strategy owns execution while FeatureScope alone owns precedence and composition. */
-class RetryFeature implements IRpcRetryFeature {
-  /** The contract discriminant identifies this executing instance at the sole FeatureScope. */
-  readonly kind = RpcCallFeatureKind.retry
+class RetryExecution implements IRpcRetryExecution {
   /** Cold options cannot change an already originating call. */
   readonly #policy: IRetryPolicy
 
   /** Preserve the original one-replay default and snapshot the supported strategy controls. */
   constructor(options: IRetryFeatureOptions) {
-    /** No native acquisition or call registry is created by policy construction. */
-    const policy = {
-      attempts: options.attempts ?? 2,
-      backoff: options.backoff,
-      keyFactory: options.keyFactory ?? defaultRpcId,
-      scheduler: options.scheduler ?? systemScheduler,
-      report: options.report ?? defaultRpcReporter
-    }
-    if (
-      !Number.isSafeInteger(policy.attempts) ||
-      policy.attempts < 1 ||
-      (policy.backoff !== undefined &&
-        typeof policy.backoff !== 'function' &&
-        (!Number.isFinite(policy.backoff) || policy.backoff < 0))
-    )
-      throw createRpcError(RpcCoreErrorCode.invalidConfig, HostErrorText.callFeatureInvalid)
-    this.#policy = Object.freeze(policy)
+    this.#policy = snapshotRetry(options)
   }
 
   /** Generation-capable origins replay; ordinary ungoverned sources preserve one send and identity. */
@@ -355,9 +356,19 @@ class RetryFeature implements IRpcRetryFeature {
   }
 }
 
-/** Create the complete origin strategy using actual carrier-supplied generation authority. */
+/** Execute plain retry parameters through the same origin strategy used by native installations. */
+export function createRpcRetryExecution(options: IRetryFeatureOptions = {}): IRpcRetryExecution {
+  return Object.freeze(new RetryExecution(options))
+}
+
+/** Define a cold origin strategy whose execution owner belongs to the declaring registration. */
 export function retryFeature(options: IRetryFeatureOptions = {}): IRpcRetryFeature {
-  return Object.freeze(new RetryFeature(options))
+  /** Snapshot and validate now, without creating any logical invocation or native resource. */
+  const policy = snapshotRetry(options)
+  /** Installation creates the actual independent owner; the token exposes no execution methods. */
+  const feature = defineFeature({ install: () => createRpcRetryExecution(policy) })
+  registerRpcFeature(feature, { role: RpcCallFeatureRole.retry })
+  return feature
 }
 
 export default retryFeature

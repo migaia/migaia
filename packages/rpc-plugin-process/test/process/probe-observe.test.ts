@@ -6,6 +6,7 @@ import { defineTransportPlugin, type IRpcTransportSetupContext } from '@migaia/r
 import type { IRpcCarrier, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { deferred } from '@migaia/utils/promise'
 import { sendQueueFeature, IpcSendClass } from '@migaia/rpc-plugin-process/features'
+import type { IIpcSendQueueExecution } from '../../dist/features/send-queue.js'
 import { createProcessCarrier } from '../../dist/process/carrier.js'
 import { createAdapterChildStdio } from '../../dist/process/node-io.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../../dist/process/types.js'
@@ -161,9 +162,9 @@ describe('process carrier observation', () => {
 /** Acquire one standalone public queue and one bare native carrier under the genuine source context. */
 function openCustodyCarrier(context: IRpcTransportSetupContext, raw: IProcessMessageChannel) {
   /** No feature queue is installed inside this carrier; the standalone queue is the only owner. */
-  const carrier = createProcessCarrier(raw, context, { id: 'custody-fast', features: [] })
+  const carrier = createProcessCarrier(raw, context, { id: 'custody-fast', features: {} })
   /** These are the same actual connection facts normally lent by ProcessCarrierFeatures. */
-  const installed = sendQueueFeature().install({
+  const installed = (context.owner.features.queue as IIpcSendQueueExecution).install({
     owner: context.namespace,
     namespace: context.namespace,
     signal: context.signal,
@@ -211,6 +212,7 @@ it('C005 standalone Process composition admits once before native start and phys
       defineTransportPlugin({
         name: 'custody-physical-composition',
         namespace: 'process',
+        features: { queue: sendQueueFeature() },
         /** Only native setup lends this source its existing transport authority and signal. */
         open(context) {
           /** Both original component receipts stay with this source's normal disposer. */

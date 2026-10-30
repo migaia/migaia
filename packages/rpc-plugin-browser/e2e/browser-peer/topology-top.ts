@@ -91,7 +91,7 @@ async function openTop(): Promise<IRpcHost> {
       dedicatedWorkerPlugin({
         worker,
         connect: { timeoutMs: 5000 },
-        features: hopAuth ? [authFeature(authCounter.options(HopSecret.shared))] : []
+        features: hopAuth ? { auth: authFeature(authCounter.options(HopSecret.shared)) } : {}
       })
     ],
     provide: {

@@ -6,6 +6,7 @@ import { detectServerRuntime, type IUrlLike } from '@migaia/utils'
 import {
   defineTransportPlugin,
   RpcNativeFeatureKind,
+  findRpcNativeFeatureOutput,
   RpcNativePoolMember
 } from '@migaia/rpc-host/sdk'
 import type {
@@ -32,7 +33,9 @@ export type IThreadCommonOptions = Readonly<{
   name?: string
   namespace?: string
   expose?: readonly string[]
-  features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]
+  features?: Readonly<
+    Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>
+  >
   /** Local connection policy remains independent from native launch/bootstrap objects. */
   connect?: Readonly<{ retain?: IRpcAuthenticationRetain }>
   report?(error: unknown): void
@@ -63,12 +66,12 @@ class ThreadInstallation {
     /** Only the diagnostic sink differs; the original core and native lifecycle ports are borrowed. */
     const nativeContext = report === context.report ? context : { ...context, report }
     /** Complete native features acquire members only through this source's repeatable constructor. */
-    const feature = this.#options.features?.find(
-      (value) => 'kind' in value && value.kind === RpcNativeFeatureKind.pool
-    )
-    if (feature && 'kind' in feature && feature.kind === RpcNativeFeatureKind.pool) {
+    const execution = findRpcNativeFeatureOutput<
+      import('@migaia/plugin-host').IFeatureOutput<IRpcNativeTransportFeature>
+    >(this.#options.features, context.owner, RpcNativeFeatureKind.pool)
+    if (execution) {
       /** The complete feature returns its original controls and one resource disposer. */
-      const installed = await feature.install({
+      const installed = await execution.install({
         ...nativeContext,
         memberKind: 'thread',
         ...(this.#options.connectToParent ? {} : { openMember: this.#openMember })
@@ -126,21 +129,23 @@ class ThreadInstallation {
 export function threadPlugin<
   const N extends string = typeof THREAD_NAMESPACE,
   E extends object = Record<never, never>,
-  const TFeatures extends readonly (
-    | IRpcCallFeature
-    | IRpcNativeTransportFeature
-    | IRpcFlowFeature<object>
-  )[] = readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]
+  const TFeatures extends Readonly<
+    Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>
+  > = Readonly<
+    Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>
+  >
 >(
   options: IThreadPluginOptions &
     Readonly<{
       namespace?: N
       features?: TFeatures &
-        readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]
+        Readonly<
+          Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>
+        >
     }>
 ): IRpcTransportPlugin<
   N,
-  IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+  IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>,
   true
 > {
   /** Runtime and exactly-one-source admission retain the original public source diagnostic. */
@@ -171,7 +176,7 @@ export function threadPlugin<
     open: installation.open
   }) as IRpcTransportPlugin<
     N,
-    IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+    IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>,
     true
   >
 }

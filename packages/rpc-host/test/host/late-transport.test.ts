@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Keeps late and cold installation on the same public native transaction boundary. */
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -22,9 +23,14 @@ it('late use returns the same public Host, inherits one shared setup and preserv
   /** One real host-level Feature prepares one original installation for every namespace. */
   const sharedSetup = vi.fn(() => ({ stages: { [RpcFlowPoint.dispatchInbound]: sharedStage } }))
   /** Equal authentic Feature names select a transport-local override through the existing compiler. */
-  const shared = defineFlowFeature({ name: 'late-shared-dispatch', setup: sharedSetup })
+  const shared = defineFlowFeature({
+    phase: 1000,
+    name: 'late-shared-dispatch',
+    setup: sharedSetup
+  })
   /** This original local Feature owns only the cold transport's actual dispatch lane. */
   const local = defineFlowFeature({
+    phase: 1001,
     name: 'late-shared-dispatch',
     setup: () => ({
       stages: {
@@ -36,13 +42,13 @@ it('late use returns the same public Host, inherits one shared setup and preserv
     })
   })
   /** The only cold listener deliberately overrides the shared placement. */
-  const first = coreMemoryServer('late-host', 'late-host', 'first', [local])
+  const first = coreMemoryServer('late-host', 'late-host', 'first', { local })
   /** The late listener uses its own real native transport and inherits the original shared state. */
   const second = coreMemoryServer('late-host', 'late-host', 'second')
   /** Public construction owns the actual native Host, provider and both eventual namespace groups. */
   const host = await createRpcHost({
     ...first.options,
-    plugins: [shared, first.transport],
+    plugins: [rpcFeaturesPlugin({ features: { shared } }), first.transport],
     provide: { echo: (value: unknown) => value }
   })
   /** The cold path already has a real physical client before the next transport is installed. */
@@ -164,7 +170,7 @@ it('cold construction rolls back every acquired transport and the shared flow in
   /** Cold outer construction must release this committed flow prefix after transport failure. */
   const sharedSetup = vi.fn(() => ({ stages: {}, dispose: sharedDispose }))
   /** No private setup or synthetic cleanup owner is used by this original Feature. */
-  const shared = defineFlowFeature({ name: 'late-cold-shared', setup: sharedSetup })
+  const shared = defineFlowFeature({ phase: 1002, name: 'late-cold-shared', setup: sharedSetup })
   /** The first genuine native acquisition has its own exact cleanup receipt. */
   const acquiredDispose = vi.fn()
   /** Observe actual acquisition order independently from later physical cleanup. */
@@ -190,7 +196,7 @@ it('cold construction rolls back every acquired transport and the shared flow in
   await expect(
     createRpcHost({
       self: { name: 'cold-atomic', instanceId: 'cold-atomic' },
-      plugins: [shared, acquired, rejected],
+      plugins: [rpcFeaturesPlugin({ features: { shared } }), acquired, rejected],
       report: () => undefined
     })
   ).rejects.toBe(primary)

@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original queued keyed cancellation uses genuine native stores, quotas and all four call modes. */
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
@@ -32,7 +33,12 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
     /** One real native installation owns the original shared limits and keyed claim lifecycle. */
     const host = await createRpcHost({
       ...server.options,
-      plugins: [limitsFeature(), idempotencyFeature(), server.transport],
+      plugins: [
+        rpcFeaturesPlugin({
+          features: { limits: limitsFeature(), idempotency: idempotencyFeature() }
+        }),
+        server.transport
+      ],
       provide: {
         hold: async () => {
           started = true
@@ -51,7 +57,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
     })
     /** This genuine caller uses the original published namespace outcome extension. */
     const client = await server.connect('store-lifetime-caller', {
-      plugins: [idempotencyFeature()]
+      plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })]
     })
     /** Only dynamic fixture typing erases the genuine cold namespace extension's callable type. */
     const lookup = Reflect.get(client.host.memory, 'outcome') as IRpcOutcomeLookup

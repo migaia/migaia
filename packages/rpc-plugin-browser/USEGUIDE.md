@@ -162,13 +162,13 @@ export async function observeFrame(target: Window, origin: string) {
   return createRpcHost({
     plugins: [
       observer,
-      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] })
+      windowPlugin({ window: target, origin, features: { timeout: timeoutFeature({ ms: 1500 }) } })
     ]
   })
 }
 ```
 
-调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。
+调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `rpcFeaturesPlugin` 或传输 plugin 的 record 组装；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。
 
 `outcome` 等可选扩展需要相应实际 plugin；完整自动 claim、身份 scope 和跨重连重放仍有未闭合项。不要配置根 Host 的旧策略字段、部署 assembler、手工 profile/ACK 或强制转换不支持的选项。
 

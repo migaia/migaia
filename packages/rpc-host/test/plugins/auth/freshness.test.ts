@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Signed captured traffic cannot reconstruct a fresh source in the same installed Auth owner. */
 import { createHmac } from 'node:crypto'
 import { MessageChannel } from 'node:worker_threads'
@@ -67,7 +68,7 @@ it('rejects a captured signed handshake and call after the original physical sou
   /** The existing fixture constructs exactly two codecs per pair, server first and caller second. */
   const capture = { ordinal: 0, frames: [] as IRpcCarrierFrame[] }
   /** All connections borrow the same installed receiver Auth and real selected JSON codec. */
-  const server = coreMemoryServer('server', 'server', 'memory', [], [], {
+  const server = coreMemoryServer('server', 'server', 'memory', {}, [], {
     create: () => new CapturedJsonCodec(++capture.ordinal % 2 === 0 ? capture.frames : undefined),
     nativeBinary: false
   })
@@ -76,7 +77,10 @@ it('rejects a captured signed handshake and call after the original physical sou
   /** The public host owns its one Auth installation throughout retirement and reconstruction. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [authentication(), ...server.options.plugins],
+    plugins: [
+      rpcFeaturesPlugin({ features: { authentication: authentication() } }),
+      ...server.options.plugins
+    ],
     provide: {
       echo: (value) => {
         providerCalls += 1
@@ -101,7 +105,7 @@ it('rejects a captured signed handshake and call after the original physical sou
   try {
     /** The caller's original encoder capture is active before its first physical hello. */
     first = await server.connect('caller', {
-      plugins: [authentication()]
+      plugins: [rpcFeaturesPlugin({ features: { authentication: authentication() } })]
     })
     expect(await first.host.memory.send('server', 'echo', 'original')).toBe('original')
     /** Retire the real accepted receipt before reconstructing the physical route. */
@@ -117,7 +121,9 @@ it('rejects a captured signed handshake and call after the original physical sou
     expect(providerCalls).toBe(1)
     await accepted.closed
     /** Genuine new signing callbacks can answer the new receiver challenge on the same Host. */
-    fresh = await server.connect('caller', { plugins: [authentication()] })
+    fresh = await server.connect('caller', {
+      plugins: [rpcFeaturesPlugin({ features: { authentication: authentication() } })]
+    })
     expect(await fresh.host.memory.send('server', 'echo', 'fresh')).toBe('fresh')
     expect(providerCalls).toBe(2)
   } finally {
@@ -139,11 +145,15 @@ it('publishes only an explicit authenticated principal on the actual accepted Se
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      authFeature({
-        verifyCredentials: (value) => {
-          if (value === identity.credential) return { principalId: identity.principalId }
-          if (value === identity.legacyCredential) return 'old-debug-return'
-          throw new Error('unrecognized principal fixture credential')
+      rpcFeaturesPlugin({
+        features: {
+          auth: authFeature({
+            verifyCredentials: (value) => {
+              if (value === identity.credential) return { principalId: identity.principalId }
+              if (value === identity.legacyCredential) return 'old-debug-return'
+              throw new Error('unrecognized principal fixture credential')
+            }
+          })
         }
       }),
       ...server.options.plugins
@@ -155,7 +165,9 @@ it('publishes only an explicit authenticated principal on the actual accepted Se
   try {
     /** Native identity and authentication identity deliberately have distinct literal values. */
     const authenticated = await server.connect('wire-name', {
-      plugins: [authFeature({ credentials: identity.credential })]
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: identity.credential }) } })
+      ]
     })
     clients.push(authenticated)
     expect(server.lookup('wire-name')?.view.authentication).toEqual({
@@ -165,7 +177,11 @@ it('publishes only an explicit authenticated principal on the actual accepted Se
     expect(await authenticated.host.memory.send('principal-server', 'echo', 42)).toBe(42)
     /** A string return remains ignored and cannot silently grant a new principal. */
     const legacy = await server.connect('legacy-name', {
-      plugins: [authFeature({ credentials: identity.legacyCredential })]
+      plugins: [
+        rpcFeaturesPlugin({
+          features: { auth: authFeature({ credentials: identity.legacyCredential }) }
+        })
+      ]
     })
     clients.push(legacy)
     expect(server.lookup('legacy-name')?.view.authentication).toBeUndefined()
@@ -251,7 +267,10 @@ class PhysicalAuthenticationPair {
   async open(): Promise<void> {
     this.#serverHost = await createRpcHost({
       ...this.server.options,
-      plugins: [this.serverFeature, ...this.server.options.plugins],
+      plugins: [
+        rpcFeaturesPlugin({ features: { feature0: this.serverFeature } }),
+        ...this.server.options.plugins
+      ],
       report: (error) => this.inboundFailures.push(error),
       provide: {
         echo: (value) => {
@@ -266,7 +285,7 @@ class PhysicalAuthenticationPair {
         defineTransportPlugin({
           name: 'physical-authentication-client',
           namespace: 'memory',
-          features: [this.clientFeature],
+          features: { clientFeature: this.clientFeature },
           open: this.#open
         })
       ],

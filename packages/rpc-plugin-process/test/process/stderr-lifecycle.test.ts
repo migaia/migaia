@@ -114,13 +114,13 @@ class NativeStderrFixture {
       plugins: [
         processPlugin({
           spawn: entry,
-          features: [
-            ipcLogFeature({
+          features: {
+            ipcLog: ipcLogFeature({
               report: (record) => {
                 this.records.push(record)
               }
             })
-          ]
+          }
         })
       ],
       report: () => undefined

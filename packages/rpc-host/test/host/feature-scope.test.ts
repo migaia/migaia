@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public feature placement and fixed native stage positions use the original Memory transport. */
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
@@ -10,6 +11,7 @@ import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import {
   defineFlowFeature,
+  defineTransportPlugin,
   RpcFlowLayer,
   RpcFlowPoint,
   RpcJsonCarrierCodec
@@ -37,6 +39,7 @@ it('owns one host feature setup and one setup for each transport-local placement
   const localDispose = vi.fn()
   /** One shared definition supplies all namespace groups through its original native wrapper. */
   const shared = defineFlowFeature({
+    phase: 1000,
     name: 'host-feature-lifetime',
     setup: () => {
       hostSetup()
@@ -45,6 +48,7 @@ it('owns one host feature setup and one setup for each transport-local placement
   })
   /** Both real transport definitions install this original opaque Feature independently. */
   const local = defineFlowFeature({
+    phase: 1001,
     name: 'local-feature-lifetime',
     setup: () => {
       localSetup()
@@ -52,13 +56,13 @@ it('owns one host feature setup and one setup for each transport-local placement
     }
   })
   /** Actual public construction receives two fixed namespaces before acquiring either source. */
-  const first = coreMemoryServer('feature-lifetime', undefined, 'first', [local])
+  const first = coreMemoryServer('feature-lifetime', undefined, 'first', { local })
   /** The second placement has the same definition identity and its own native setup receipt. */
-  const second = coreMemoryServer('feature-lifetime', undefined, 'second', [local])
+  const second = coreMemoryServer('feature-lifetime', undefined, 'second', { local })
   /** Native Host ownership, rather than a fixture disposer table, controls every callback. */
   const host = await createRpcHost({
     ...first.options,
-    plugins: [shared, first.transport, second.transport]
+    plugins: [rpcFeaturesPlugin({ features: { shared } }), first.transport, second.transport]
   })
   try {
     expect(hostSetup).toHaveBeenCalledTimes(1)
@@ -140,6 +144,7 @@ function orderedFeatures(order: readonly number[], trace: string[]) {
   const parser = { parse: (value: unknown) => value }
   /** The third-party stage sees business plaintext before authentication wraps the prepared data. */
   const thirdParty = defineFlowFeature({
+    phase: 1002,
     name: 'feature-order-third-party',
     setup: () => ({
       stages: {
@@ -166,10 +171,10 @@ function orderedFeatures(order: readonly number[], trace: string[]) {
     batchFeature(),
     thirdParty
   ]
-  return order.map((index) => features[index]!)
+  return Object.fromEntries(order.map((index) => [String(index), features[index]!]))
 }
 
-it('keeps three host/local array orders and different endpoint orders equivalent on actual wire records', async () => {
+it('keeps three host/local record key orders and different endpoint orders equivalent on actual wire records', async () => {
   /** The original failure is shared across permutations, so its business error text cannot drift. */
   const cause = new TypeError('feature scope provider cause')
   /** The original provider keeps this same native cause in every independent placement. */
@@ -195,7 +200,7 @@ it('keeps three host/local array orders and different endpoint orders equivalent
         'scope-server',
         'scope-server',
         'memory',
-        local ? serverFeatures : [],
+        local ? serverFeatures : {},
         [],
         {
           create: () => new RpcJsonCarrierCodec(),
@@ -205,7 +210,9 @@ it('keeps three host/local array orders and different endpoint orders equivalent
       /** Server side public construction chooses host-wide or transport-local placement. */
       const host = await createRpcHost({
         ...server.options,
-        plugins: local ? [server.transport] : [...serverFeatures, server.transport],
+        plugins: local
+          ? [server.transport]
+          : [rpcFeaturesPlugin({ features: serverFeatures }), server.transport],
         provide: {
           echo: (value: unknown) => value,
           fail: () => {
@@ -214,7 +221,9 @@ it('keeps three host/local array orders and different endpoint orders equivalent
         }
       })
       /** Client uses its actual public Host; no request or pipeline facade is inserted. */
-      const client = await server.connect('scope-client', { plugins: clientFeatures })
+      const client = await server.connect('scope-client', {
+        plugins: [rpcFeaturesPlugin({ features: clientFeatures })]
+      })
       /** Observe post-handshake frames at the original physical write boundary. */
       const clientWrite = vi.spyOn(client.pair[1], 'write')
       /** Replies are checked independently from requests on their original endpoint. */
@@ -300,116 +309,168 @@ it('keeps three host/local array orders and different endpoint orders equivalent
   }
 })
 
-it('uses native dependency order inside plaintext and exposes the explicit outer wire layer', async () => {
-  /** Only genuine stage invocations append this sequence after the handshake has completed. */
-  const trace: string[] = []
-  /** Original operation signals distinguish this business call from directory and close traffic. */
-  const businessSignals = new WeakSet<object>()
-  /** A dependency remains the original opaque native Feature, rather than a copied name edge. */
-  const base = defineFlowFeature({
-    name: 'scope-dependency-base',
-    setup: () => ({
-      stages: {
-        [RpcFlowPoint.envelopeOutbound]: async (payload, next) => {
-          /** Only the actual business envelope participates in the ordering assertion. */
-          const message = await payload.context.restore(payload.prepared)
-          if (message?.kind === 'call') {
-            businessSignals.add(payload.context.signal)
-            trace.push('base')
-            expect(message.task.method).toBe('echo')
-          }
-          await next(payload)
-        }
-      }
-    })
-  })
-  /** The caller lists this dependent first; native dependency planning still orders base first. */
-  const dependent = defineFlowFeature({
-    name: 'scope-dependency-dependent',
-    dependencies: { base },
-    setup: () => ({
-      stages: {
-        [RpcFlowPoint.envelopeOutbound]: async (payload, next) => {
-          if (!businessSignals.has(payload.context.signal)) return next(payload)
-          trace.push('dependent')
-          await next(payload)
-        },
-        [RpcFlowPoint.frameOutbound]: (payload, next) => {
-          if (!businessSignals.has(payload.context.signal)) return next(payload)
-          trace.push(`plaintext:${payload.frame.kind}`)
-          return next(payload)
-        }
-      }
-    })
-  })
-  /** Explicit wire positions see the real authentication wrapper and actual chunk extension. */
-  const wire = defineFlowFeature({
-    name: 'scope-wire-layer',
-    setup: () => ({
-      stages: {
-        [RpcFlowPoint.envelopeOutbound]: {
-          layer: RpcFlowLayer.wire,
-          stage: (payload, next) => {
-            if (!businessSignals.has(payload.context.signal)) return next(payload)
-            trace.push('wire-envelope')
-            expect(payload.prepared.message).toMatchObject({
-              authentication: 'rpc-authentication-replay'
-            })
-            return next(payload)
-          }
-        },
-        [RpcFlowPoint.frameOutbound]: {
-          layer: RpcFlowLayer.wire,
-          stage: (payload, next) => {
-            if (!businessSignals.has(payload.context.signal)) return next(payload)
-            trace.push(`wire:${payload.frame.kind}`)
-            expect(payload.frame).toMatchObject({ kind: 'extension', extension: 'chunk@1' })
-            return next(payload)
+it.each([false, true])(
+  'A3 uses explicit phases across record key order %s and retains native dependency installation',
+  async (reverse) => {
+    /** Only genuine stage invocations append this sequence after the handshake has completed. */
+    const trace: string[] = []
+    /** Native setup order is observed independently from business-stage execution order. */
+    const installations: string[] = []
+    /** Original operation signals distinguish this business call from directory and close traffic. */
+    const businessSignals = new WeakSet<object>()
+    /** A dependency remains the original opaque native Feature, rather than a copied name edge. */
+    const base = defineFlowFeature({
+      phase: 1003,
+      name: 'scope-dependency-base',
+      setup: () => {
+        installations.push('base')
+        return {
+          stages: {
+            [RpcFlowPoint.envelopeOutbound]: async (payload, next) => {
+              /** Only the actual business envelope participates in the ordering assertion. */
+              const message = await payload.context.restore(payload.prepared)
+              if (message?.kind === 'call') {
+                businessSignals.add(payload.context.signal)
+                trace.push('base')
+                expect(message.task.method).toBe('echo')
+              }
+              await next(payload)
+            }
           }
         }
       }
     })
-  })
-  /** Both actual endpoints negotiate the same builtin transforms before business begins. */
-  const server = coreMemoryServer('layer-server', undefined, 'memory', [], [], {
-    create: () => new RpcJsonCarrierCodec(),
-    nativeBinary: false
-  })
-  /** Provider publication and real native transport installation remain public operations. */
-  const host = await createRpcHost({
-    ...server.options,
-    plugins: [
-      authFeature({ sign: (value) => value, verify: (value) => value }),
-      chunkFeature({ chunkBytes: 1024 }),
-      server.transport
-    ],
-    provide: { echo: (value: unknown) => value }
-  })
-  /** The client alone installs witnesses so reply stages cannot satisfy request assertions. */
-  const client = await server.connect('layer-client', {
-    plugins: [
-      dependent,
-      wire,
-      authFeature({ sign: (value) => value, verify: (value) => value }),
-      chunkFeature({ chunkBytes: 1024 })
-    ]
-  })
-  try {
-    trace.length = 0
-    /** Multiple actual fragments verify default whole-frame placement and outer fragment placement. */
-    const value = 'layer-value'.repeat(900)
-    await expect(client.host.memory.send('layer-server', 'echo', value)).resolves.toBe(value)
-    expect(trace.slice(0, 4)).toEqual(['base', 'dependent', 'wire-envelope', 'plaintext:message'])
-    expect(trace.slice(4).length).toBeGreaterThan(1)
-    expect(trace.slice(4).every((entry) => entry === 'wire:extension')).toBe(true)
-  } finally {
-    await Promise.all([client.host.close(), host.close()])
+    /** The caller lists this dependent first; native dependency planning still orders base first. */
+    const dependent = defineFlowFeature({
+      phase: 1004,
+      name: 'scope-dependency-dependent',
+      dependencies: { base },
+      setup: () => {
+        installations.push('dependent')
+        return {
+          stages: {
+            [RpcFlowPoint.envelopeOutbound]: async (payload, next) => {
+              if (!businessSignals.has(payload.context.signal)) return next(payload)
+              trace.push('dependent')
+              await next(payload)
+            },
+            [RpcFlowPoint.frameOutbound]: (payload, next) => {
+              if (!businessSignals.has(payload.context.signal)) return next(payload)
+              trace.push(`plaintext:${payload.frame.kind}`)
+              return next(payload)
+            }
+          }
+        }
+      }
+    })
+    /** Explicit wire positions see the real authentication wrapper and actual chunk extension. */
+    const wire = defineFlowFeature({
+      phase: 1005,
+      name: 'scope-wire-layer',
+      setup: () => ({
+        stages: {
+          [RpcFlowPoint.envelopeOutbound]: {
+            layer: RpcFlowLayer.wire,
+            stage: (payload, next) => {
+              if (!businessSignals.has(payload.context.signal)) return next(payload)
+              trace.push('wire-envelope')
+              expect(payload.prepared.message).toMatchObject({
+                authentication: 'rpc-authentication-replay'
+              })
+              return next(payload)
+            }
+          },
+          [RpcFlowPoint.frameOutbound]: {
+            layer: RpcFlowLayer.wire,
+            stage: (payload, next) => {
+              if (!businessSignals.has(payload.context.signal)) return next(payload)
+              trace.push(`wire:${payload.frame.kind}`)
+              expect(payload.frame).toMatchObject({ kind: 'extension', extension: 'chunk@1' })
+              return next(payload)
+            }
+          }
+        }
+      })
+    })
+    /** Both actual endpoints negotiate the same builtin transforms before business begins. */
+    const server = coreMemoryServer('layer-server', undefined, 'memory', {}, [], {
+      create: () => new RpcJsonCarrierCodec(),
+      nativeBinary: false
+    })
+    /** Provider publication and real native transport installation remain public operations. */
+    const host = await createRpcHost({
+      ...server.options,
+      plugins: [
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({ sign: (value) => value, verify: (value) => value }),
+            chunk: chunkFeature({ chunkBytes: 1024 })
+          }
+        }),
+        server.transport
+      ],
+      provide: { echo: (value: unknown) => value }
+    })
+    /** The client alone installs witnesses so reply stages cannot satisfy request assertions. */
+    const client = await server.connect('layer-client', {
+      plugins: [
+        rpcFeaturesPlugin({
+          features: {
+            ...(reverse ? { wire, dependent } : { dependent, wire }),
+            auth: authFeature({ sign: (value) => value, verify: (value) => value }),
+            chunk: chunkFeature({ chunkBytes: 1024 })
+          }
+        })
+      ]
+    })
+    try {
+      expect(installations).toEqual(['base', 'dependent'])
+      trace.length = 0
+      /**
+       * Multiple actual fragments verify default whole-frame placement and outer fragment
+       * placement.
+       */
+      const value = 'layer-value'.repeat(900)
+      await expect(client.host.memory.send('layer-server', 'echo', value)).resolves.toBe(value)
+      expect(trace.slice(0, 4)).toEqual(['base', 'dependent', 'wire-envelope', 'plaintext:message'])
+      expect(trace.slice(4).length).toBeGreaterThan(1)
+      expect(trace.slice(4).every((entry) => entry === 'wire:extension')).toBe(true)
+    } finally {
+      await Promise.all([client.host.close(), host.close()])
+    }
   }
+)
+
+it('A3 rejects custom phase collisions before transport acquisition', async () => {
+  /** Both genuine tokens occupy the same supported point, layer and explicit phase. */
+  const first = defineFlowFeature({
+    name: 'phase-collision-first',
+    phase: 1200,
+    setup: () => ({ stages: { [RpcFlowPoint.envelopeOutbound]: (payload, next) => next(payload) } })
+  })
+  /** Different names cannot turn a phase collision into caller-key ordering. */
+  const second = defineFlowFeature({
+    name: 'phase-collision-second',
+    phase: 1200,
+    setup: () => ({ stages: { [RpcFlowPoint.envelopeOutbound]: (payload, next) => next(payload) } })
+  })
+  /** Acquisition must remain cold when shared flow preparation rejects. */
+  const open = vi.fn(() => ({ dispose: () => undefined }))
+  /** A normal transport supplies the same source admission path as successful hosts. */
+  const transport = defineTransportPlugin({ name: 'collision', namespace: 'collision', open })
+  await expect(
+    createRpcHost({
+      plugins: [rpcFeaturesPlugin({ features: { before: first, after: second } }), transport],
+      report: () => undefined
+    })
+  ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
+  expect(open).not.toHaveBeenCalled()
 })
 
 it('rejects an invalid layer and a host-only probe before any local transport acquires IO', async () => {
   /** This original cold feature is genuine; only its explicitly invalid layer is rejected. */
   const invalid = defineFlowFeature({
+    phase: 1006,
     name: 'scope-invalid-layer',
     setup: () => ({
       stages: {
@@ -421,13 +482,13 @@ it('rejects an invalid layer and a host-only probe before any local transport ac
     })
   })
   /** Real native transport open must remain absent for either invalid cold placement. */
-  const server = coreMemoryServer('invalid-layer', undefined, 'memory', [invalid])
+  const server = coreMemoryServer('invalid-layer', undefined, 'memory', { invalid })
   await expect(createRpcHost(server.options)).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
   /** Probe is the real readonly native plugin and cannot impersonate a local flow Feature. */
   expect(() =>
-    coreMemoryServer('invalid-probe', undefined, 'memory', [
-      probe({ stages: ['message'], emit: () => undefined })
-    ])
+    coreMemoryServer('invalid-probe', undefined, 'memory', {
+      probe: probe({ stages: ['message'], emit: () => undefined }) as never
+    })
   ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
 })
 
@@ -451,22 +512,30 @@ it('overrides host authentication once in one Memory namespace and keeps the oth
     verify: (value) => value
   })
   /** Both original listener definitions join one public Host's fixed cold inventory. */
-  const first = coreMemoryServer('override-server', undefined, 'first', [localAuth])
+  const first = coreMemoryServer('override-server', undefined, 'first', { localAuth })
   /** This second namespace inherits the same host installation instead of creating another one. */
   const second = coreMemoryServer('override-server', undefined, 'second')
   /** Real provider output is the sole source of reply signing. */
   const host = await createRpcHost({
     ...first.options,
-    plugins: [hostAuth, first.transport, second.transport],
+    plugins: [rpcFeaturesPlugin({ features: { hostAuth } }), first.transport, second.transport],
     provide: { echo: (value: unknown) => value }
   })
   /** Both actual clients install paired verification while owning separate physical Sessions. */
   const a = await first.connect('override-a', {
-    plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
+    plugins: [
+      rpcFeaturesPlugin({
+        features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+      })
+    ]
   })
   /** The second client connects to its original separate listener namespace. */
   const b = await second.connect('override-b', {
-    plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
+    plugins: [
+      rpcFeaturesPlugin({
+        features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+      })
+    ]
   })
   try {
     counts.host = counts.local = 0
@@ -490,9 +559,9 @@ it('runs a transport-local schema only in its own Memory namespace', async () =>
     }
   }
   /** One genuine local schema Feature joins only the first transport's seven lanes. */
-  const first = coreMemoryServer('schema-server', undefined, 'first', [
-    schemaFeature({ schemas: { echo: { params: parser, result: parser } } })
-  ])
+  const first = coreMemoryServer('schema-server', undefined, 'first', {
+    schema: schemaFeature({ schemas: { echo: { params: parser, result: parser } } })
+  })
   /** No schema is installed for this independent namespace. */
   const second = coreMemoryServer('schema-server', undefined, 'second')
   /** Only actual provider invocation records whether invalid data crossed schema admission. */
@@ -531,20 +600,22 @@ it.each([false, true])(
       'limits-server',
       undefined,
       'first',
-      local ? [limitsFeature({ maxGlobal: 1 })] : []
+      local ? { quota: limitsFeature({ maxGlobal: 1 }) } : {}
     )
     /** Only local placement gives this namespace its own genuine capacity owner. */
     const second = coreMemoryServer(
       'limits-server',
       undefined,
       'second',
-      local ? [limitsFeature({ maxGlobal: 1 })] : []
+      local ? { quota: limitsFeature({ maxGlobal: 1 }) } : {}
     )
     /** Both namespaces target the same actual original provider set. */
     const host = await createRpcHost({
       ...first.options,
       plugins: [
-        ...(local ? [] : [limitsFeature({ maxGlobal: 1 })]),
+        ...(local
+          ? []
+          : [rpcFeaturesPlugin({ features: { quota: limitsFeature({ maxGlobal: 1 }) } })]),
         first.transport,
         second.transport
       ],

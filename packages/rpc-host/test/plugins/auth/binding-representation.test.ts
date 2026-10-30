@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Exercises Auth callback representations through public Hosts and the original memory medium. */
 import { createHmac } from 'node:crypto'
 import { expect, it } from 'vitest'
@@ -47,7 +48,7 @@ class PublicAuthenticationPair {
 
   /** Configure the original medium without a new carrier, runner or protocol fixture. */
   constructor(nativeBinary = false) {
-    this.#listener = coreMemoryServer('a29-server', 'a29-server', 'memory', [], [], {
+    this.#listener = coreMemoryServer('a29-server', 'a29-server', 'memory', {}, [], {
       create: () => new RpcJsonCarrierCodec({ digest: createRpcBackingDigest() }),
       nativeBinary
     })
@@ -57,7 +58,10 @@ class PublicAuthenticationPair {
   async open(client: IRpcAuthenticationOptions, server: IRpcAuthenticationOptions): Promise<void> {
     this.#server = await createRpcHost({
       ...this.#listener.options,
-      plugins: [authFeature(server), this.#listener.transport],
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature(server) } }),
+        this.#listener.transport
+      ],
       provide: {
         echo: (value: unknown) => {
           this.delivered.push(value)
@@ -66,7 +70,9 @@ class PublicAuthenticationPair {
       }
     })
     /** The existing listener connects both real Session owners and awaits their original handshakes. */
-    const connected = await this.#listener.connect('a29-client', { plugins: [authFeature(client)] })
+    const connected = await this.#listener.connect('a29-client', {
+      plugins: [rpcFeaturesPlugin({ features: { auth: authFeature(client) } })]
+    })
     this.#client = connected.host
   }
 

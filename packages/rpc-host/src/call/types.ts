@@ -12,7 +12,7 @@ import type {
   IRpcObservation,
   IRpcTargetSource,
   IRpcOriginSelection,
-  IRpcTimeoutFeature
+  IRpcTimeoutExecution
 } from '@migaia/rpc-contract/interfaces'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { FeatureScope } from '../feature/scope.ts'
@@ -29,7 +29,7 @@ export type ICallTargetRef = Readonly<{
   source?: IRpcTargetSource
   origin?: IRpcOriginSelection
   /** A compact held target borrows its actual native registration's complete call wall cap. */
-  callTimeoutCap?: IRpcTimeoutFeature
+  callTimeoutCap?: IRpcTimeoutExecution
 }>
 
 /** The host supplies its admitted identity after native bootstrap facts have been reconciled. */
@@ -106,7 +106,7 @@ export type ICallTableOptions = Readonly<{
   report(error: unknown): void
   /** The canonical drain counts this exact attempt Promise without replacing its identity. */
   track?<T>(carrierId: string, promise: Promise<T>): Promise<T>
-  features: Pick<FeatureScope, 'resolve' | 'execute'>
+  features: Pick<FeatureScope, 'resolve' | 'executeSelected'>
   /** Attempt facts borrow accepted Session queries without granting mutation or media ownership. */
   sessions?: Pick<SessionTable, 'get' | 'getById'> &
     Readonly<{

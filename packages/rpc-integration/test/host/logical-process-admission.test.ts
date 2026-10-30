@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public Host composition borrows only the genuine Process carrier, FIFO and logical capacity. */
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { expect, it, vi } from 'vitest'
@@ -23,8 +24,7 @@ import {
   sendQueueFeature,
   IpcSendClass,
   IpcLogEventName,
-  type IIpcBacklogEvent,
-  type IProcessFeatureContext
+  type IIpcBacklogEvent
 } from '@migaia/rpc-plugin-process/features'
 import type { IpcSendQueue } from '@migaia/rpc-plugin-process/features/send-queue'
 import { IpcFlowControl } from '@migaia/rpc-plugin-process/features/flow-control'
@@ -84,10 +84,8 @@ class NativeProcessAdmissionPair {
     this.#definition = sendQueueFeature({ maxPendingData: capacity, maxPendingControl: 4 })
   }
   /** Observe the exact production installation without reconstructing its queue or flow. */
-  readonly #install = (context: IProcessFeatureContext) => {
-    /** This original receipt owns both the FIFO and its existing close disposer. */
-    const installed = this.#definition.install(context)
-    this.queue = installed.value
+  #observe(queue: IpcSendQueue): void {
+    this.queue = queue
     this.queue.onEvent((event) => {
       this.events.push(event)
       if (
@@ -96,7 +94,6 @@ class NativeProcessAdmissionPair {
       )
         this.capacityReached.resolve(event)
     })
-    return installed
   }
   /** A genuine named stage observes entry before forwarding to the unchanged batch continuation. */
   readonly #member: IRpcFlowStage<'frameOutbound'> = (payload, next) => {
@@ -161,16 +158,23 @@ class NativeProcessAdmissionPair {
     return defineTransportPlugin({
       name: client ? 'logical-client-source' : 'logical-server-source',
       namespace: 'process',
+      features: client ? { queue: this.#definition } : {},
       open: async (context) => {
+        /** Native output observation preserves the original installer and its returned FIFO. */
+        const installs = client
+          ? vi.spyOn(Object.getPrototypeOf(context.owner.features.queue), 'install')
+          : undefined
         /** The original physical Process owner alone installs logical reservation and FIFO. */
         const carrier = createProcessCarrier(
           this.#raw(client ? this.#ports.port1 : this.#ports.port2, client),
           context,
           {
             id: client ? 'logical-client-carrier' : 'logical-server-carrier',
-            features: client ? [{ ...this.#definition, install: this.#install }] : []
+            features: client ? { queue: this.#definition } : {}
           }
         )
+        if (client) this.#observe(installs!.mock.results[0]!.value.value)
+        installs?.mockRestore()
         /** This is the actual accepted Session later used for health and public business calls. */
         const session = context.attach(carrier)
         if (client) {
@@ -184,13 +188,9 @@ class NativeProcessAdmissionPair {
   }
   /** Real bilateral Host construction negotiates the original chunk and batch extensions. */
   async open() {
-    /** Both directions use their own genuine optional feature installations. */
-    const flow = () => [
-      chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }),
-      batchFeature()
-    ]
     /** This observer only supplies a deterministic batch-entry barrier. */
     const witness = defineFlowFeature({
+      phase: 1000,
       name: 'logical-native-frame-entry',
       setup: () => ({ stages: { [RpcFlowPoint.frameOutbound]: this.#member } })
     })
@@ -199,16 +199,28 @@ class NativeProcessAdmissionPair {
       createRpcHost({
         self: { name: 'logical-client', instanceId: 'logical-client' },
         plugins: [
-          chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }),
-          witness,
-          batchFeature(),
+          rpcFeaturesPlugin({
+            features: {
+              chunk: chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }),
+              witness,
+              batch: batchFeature()
+            }
+          }),
           this.#transport(true)
         ],
         report: (error) => this.reports.push(error)
       }),
       createRpcHost({
         self: { name: 'logical-server', instanceId: 'logical-server' },
-        plugins: [...flow(), this.#transport(false)],
+        plugins: [
+          rpcFeaturesPlugin({
+            features: {
+              chunks: chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }),
+              batching: batchFeature()
+            }
+          }),
+          this.#transport(false)
+        ],
         provide: { echo: (value: string) => value },
         report: (error) => this.reports.push(error)
       })

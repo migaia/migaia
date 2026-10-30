@@ -1,24 +1,11 @@
 /** The public C2 oracles use actual native SDK installation and semantic carrier exchange. */
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
-import type { IRpcAttempt, IRpcTimeoutFeature } from '@migaia/rpc-contract/interfaces'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { expect, it, vi } from 'vitest'
 import { coreMemoryServer } from './core-fixture.ts'
-
-/** A supplied complete instance actually executes the originating attempt through its public port. */
-class CountedTimeout implements IRpcTimeoutFeature {
-  /** A real complete call instance declares exactly its existing feature kind. */
-  readonly kind = 'timeout'
-  /** Invocation count distinguishes supplied execution from inherited/default behavior. */
-  runs = 0
-
-  /** This fixture adds no timer; it proves host selection by executing the actual attempt once. */
-  run<T>(attempt: IRpcAttempt<T>): Promise<T> {
-    this.runs++
-    return attempt.invoke(attempt.signal, attempt.remainingMs)
-  }
-}
 
 it('omits closing APIs and rejects keepalive on a generic unsupported transport', async () => {
   /** No physical source is needed to prove cold namespace capability publication and admission. */
@@ -209,13 +196,21 @@ it('forwards one real call across process and thread namespaces with the origina
   }
 })
 
-it('executes a supplied complete feature, honors false and rejects numeric policy syntax', async () => {
+it('executes installed timeout output and per-call options, honors false and rejects numeric policy syntax', async () => {
   /** The installed complete timeout instance is the actual inherited fallback. */
-  const inherited = new CountedTimeout()
+  const inheritedClock = createManualScheduler()
+  /** Timer registration proves that the installed timeout execution actually ran. */
+  const inheritedRuns = vi.spyOn(inheritedClock, 'schedule')
+  /** The native token has no public execution method. */
+  const inherited = timeoutFeature({ ms: 1000, scheduler: inheritedClock })
   /** A supplied instance must execute instead of the inherited one. */
-  const supplied = new CountedTimeout()
+  const suppliedClock = createManualScheduler()
+  /** Separate timer registration distinguishes the call override from the installed fallback. */
+  const suppliedRuns = vi.spyOn(suppliedClock, 'schedule')
+  /** Per-call data configures an execution without creating a feature token. */
+  const supplied = { ms: 1000, scheduler: suppliedClock }
   /** Transport installation owns the original complete fallback instance. */
-  const server = coreMemoryServer('origin', 'origin', 'memory', [inherited])
+  const server = coreMemoryServer('origin', 'origin', 'memory', { inherited })
   /** The actual remote provider records business execution independently of policy selection. */
   const echo = vi.fn((value: unknown) => value)
   /** One native host owns the originating call table and selected instance resolution. */
@@ -224,13 +219,13 @@ it('executes a supplied complete feature, honors false and rejects numeric polic
   const client = await server.connect('provider', { provide: { echo } })
   try {
     expect(await host.memory.send('provider', 'echo', 0)).toBe(0)
-    expect(inherited.runs).toBe(1)
+    expect(inheritedRuns).toHaveBeenCalledTimes(1)
     expect(await host.memory.send('provider', 'echo', 1, { timeout: false, retry: false })).toBe(1)
-    expect(inherited.runs).toBe(1)
+    expect(inheritedRuns).toHaveBeenCalledTimes(1)
     expect(await host.memory.send('provider', 'echo', 2, { timeout: supplied })).toBe(2)
-    expect(supplied.runs).toBe(1)
-    expect(inherited.runs).toBe(1)
-    // @ts-expect-error Complete instances or false are the only public call policy syntax.
+    expect(suppliedRuns).toHaveBeenCalledTimes(1)
+    expect(inheritedRuns).toHaveBeenCalledTimes(1)
+    // @ts-expect-error Policy options or false are the only public call policy syntax.
     await expect(host.memory.send('provider', 'echo', 3, { timeout: 5 })).rejects.toMatchObject({
       name: 'TypeError',
       code: RpcCoreErrorCode.invalidConfig

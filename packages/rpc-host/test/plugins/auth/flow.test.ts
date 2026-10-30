@@ -76,7 +76,7 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
   /** Only prepared original groups contribute namespace facts to this fixture. */
   const groups = new Map<string, IRpcFlowGroup>()
   /** Canonical native Feature inspection owns the local setup and its dependency closure. */
-  const program = new RpcTransportFlowProgram([feature])
+  const program = new RpcTransportFlowProgram({ feature })
   /** This namespace uses the same genuine group declaration and lazy owner as public SDK hosts. */
   const rpc = rpcHostPipelines(
     () => flow,

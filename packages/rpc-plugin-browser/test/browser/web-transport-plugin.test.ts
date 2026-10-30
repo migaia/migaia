@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, type IRpcProvide } from '@migaia/rpc-host'
@@ -50,7 +51,7 @@ async function connected(
     createRpcHost({
       self: { name: 'wt-client', instanceId: 'wt-client' },
       plugins: [
-        idempotencyFeature(),
+        rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
         webTransportPlugin({ session, connect: { timeoutMs: 1000 } })
       ],
       provide: clientProvide,
@@ -59,7 +60,10 @@ async function connected(
     }),
     createRpcHost({
       self: { name: 'wt-server', instanceId: 'wt-server' },
-      plugins: [idempotencyFeature(), serverTransport],
+      plugins: [
+        rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+        serverTransport
+      ],
       provide: serverProvide,
       signal: cancellation.signal,
       report: () => undefined

@@ -20,5 +20,5 @@ export type IBrowserPluginOptions<N extends string = string> = Readonly<{
     retain?: IRpcAuthenticationRetain
   }>
   /** Complete call policies and opaque flow features share the actual transport scope. */
-  features?: readonly IBrowserFeature[]
+  features?: Readonly<Record<string, IBrowserFeature>>
 }>

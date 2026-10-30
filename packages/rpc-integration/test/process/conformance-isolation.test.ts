@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { spawn, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
@@ -11,9 +12,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { serializeRpcError, type IRpcSerializedError } from '@migaia/rpc-contract/errors'
 import { RpcProbeLifecycle } from '@migaia/rpc-contract/interfaces'
 import { createRpcHost } from '@migaia/rpc-host'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { probe } from '@migaia/rpc-host/plugins/probe'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import { encodeRpcStreamFrame, RpcEventByteIO, type IRpcByteIO } from '@migaia/rpc-host/sdk'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { ipcLogFeature, type IIpcLogContext } from '@migaia/rpc-plugin-process/features'
@@ -27,6 +29,7 @@ import {
 import { type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
+import { nativeFeatureOutput } from '../../../rpc-plugin-process/test/native-feature.ts'
 
 /**
  * Native listener default from rpc-plugin-process/src/process/resilience/constants.ts; not a public
@@ -73,10 +76,15 @@ async function observedClient(token: string, address: string, scheduler?: ISched
   }
   /** Each simultaneously admitted public Host has its own genuine name and instance identity. */
   const identity = `caller-${randomUUID()}`
-  const installed = await installBusinessClient(fixture, selected, undefined, {
-    name: identity,
-    instanceId: identity
-  })
+  const installed = await installBusinessClient(
+    fixture,
+    selected,
+    scheduler === undefined ? undefined : { deadline: timeoutFeature({ ms: 30, scheduler }) },
+    {
+      name: identity,
+      instanceId: identity
+    }
+  )
   return { ...fixture, ...installed, raw: fixture.rawChannels[0]! }
 }
 /** The same native acquisition path serves all original isolation socket callers. */
@@ -230,9 +238,13 @@ describe('real process session and principal isolation', () => {
     const service = await createRpcHost({
       self: { name: 'server', instanceId: 'server' },
       plugins: [
-        authFeature({
-          verifyCredentials(value) {
-            verify(value)
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              verifyCredentials(value) {
+                verify(value)
+              }
+            })
           }
         }),
         probe({
@@ -540,15 +552,15 @@ describe('real process session and principal isolation', () => {
         observed.records.push(record)
       }
     })
-    const installed = await installBusinessClient(fixture, fixture.selected, [
-      {
-        ...logging,
-        install(context: IIpcLogContext) {
-          observed.identity = { connectionId: context.connectionId, sessionId: context.sessionId }
-          return logging.install(context)
-        }
-      }
-    ])
+    /** Observe the original native output without adding fields or methods to its token. */
+    const installs = vi.spyOn(Object.getPrototypeOf(await nativeFeatureOutput(logging)), 'install')
+    const installed = await installBusinessClient(fixture, fixture.selected, {
+      logging
+    })
+    /** The genuine Process installer lends the exact context used by the original log owner. */
+    const context = installs.mock.calls[0]![0] as IIpcLogContext
+    observed.identity = { connectionId: context.connectionId, sessionId: context.sessionId }
+    installs.mockRestore()
     /** Actual launched PID is sampled from the original handle, independently from IPC records. */
     const identity = { ...observed.identity, processId: String(fixture.handles[0]!.identity.pid) }
     const records = observed.records
@@ -695,7 +707,6 @@ describe('real process session and principal isolation', () => {
           pending.push(
             first.namespace
               .request('p.f.request', [['wait', `timeout-${index}`]], {
-                timeout: timeoutFeature({ ms: 30, scheduler: callerScheduler }),
                 signal: controller.signal
               })
               .then(

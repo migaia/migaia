@@ -3,7 +3,7 @@ import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import {
   defineTransportPlugin,
   defineFlowFeature,
-  rpcFlowPlugin,
+  rpcFeaturesPlugin,
   rpcHostPipelines,
   RpcFlowLayer,
   type IRpcFlowStage
@@ -64,6 +64,7 @@ function heldDispatch(
     await next(payload)
   }
   return defineFlowFeature({
+    phase: 1000,
     name: 'held-limits-dispatch',
     setup: () => ({
       stages: { dispatchInbound: { layer: RpcFlowLayer.wire, stage: inbound } }
@@ -237,13 +238,9 @@ describe('ordinary native Host RPC installation', () => {
      */
     const host = ordinaryHost()
     /** Actual native exposure supplies the original provider directory and physical connection. */
-    const server = coreMemoryServer(
-      'limits-server',
-      'limits-server',
-      'worker',
-      [],
-      ['limits-service']
-    )
+    const server = coreMemoryServer('limits-server', 'limits-server', 'worker', {}, [
+      'limits-service'
+    ])
     /** These original receipts separate provider admission from optional native policy disposal. */
     const entered = deferred<IRpcDispatchContext>()
     /** Cleanup releases this same continuation even when a public assertion fails. */
@@ -255,17 +252,26 @@ describe('ordinary native Host RPC installation', () => {
     /** The common native bridge owns both real Features in this cold worker group. */
     const transport = namedTransport(server)
     /** Removing this generation retires its actual limits instance and original borrowed stages. */
-    const flows = rpcFlowPlugin([
-      authFeature({ sign: (value) => value, verify: (value) => value }),
-      limitsFeature(),
-      heldDispatch({ entered, resume: resume.promise, admitted: () => additions?.mockClear() }),
-      transport
-    ])
+    const flows = rpcFeaturesPlugin({
+      features: {
+        auth: authFeature({ sign: (value) => value, verify: (value) => value }),
+        limits: limitsFeature(),
+        heldDispatch: heldDispatch({
+          entered,
+          resume: resume.promise,
+          admitted: () => additions?.mockClear()
+        })
+      }
+    })
     await host.use(limitsService, flows)
     await host.use(transport)
     /** This is a genuine connected public client, not a constructed flow context or fake signal. */
     const client = await server.connect('limits-client', {
-      plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
+      plugins: [
+        rpcFeaturesPlugin({
+          features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+        })
+      ]
     })
     /** Native readiness supplies the exact accepted close receipt needed before cold deletion. */
     const accepted = server.lookup('limits-client')!.handle
@@ -307,14 +313,18 @@ describe('ordinary native Host RPC installation', () => {
 
   it('protects a selected transport-local Feature while active and permits cold deletion and reconstruction', async () => {
     /** The local information-flow instance belongs to this original transport registration. */
-    const server = coreMemoryServer('local-auth-server', 'local-auth-server', 'memory', [
-      authFeature({ sign: (value) => value, verify: (value) => value })
-    ])
+    const server = coreMemoryServer('local-auth-server', 'local-auth-server', 'memory', {
+      auth: authFeature({ sign: (value) => value, verify: (value) => value })
+    })
     /** Only the genuine public provider supplies observable post-refusal communication. */
     const host = await createRpcHost({ ...server.options, provide: { echo: (value) => value } })
     /** Both peers explicitly install the original wire-changing Feature. */
     const client = await server.connect('local-auth-client', {
-      plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
+      plugins: [
+        rpcFeaturesPlugin({
+          features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+        })
+      ]
     })
     /** The actual accepted native receipt fences cold deletion after the last Session closes. */
     const accepted = server.lookup('local-auth-client')!.handle
@@ -353,7 +363,10 @@ describe('ordinary native Host RPC installation', () => {
     /** This public root deliberately publishes the wire-changing Feature on just one endpoint. */
     const host = await createRpcHost({
       ...server.options,
-      plugins: [chunkFeature({ chunkBytes: 1_024 }), server.transport],
+      plugins: [
+        rpcFeaturesPlugin({ features: { chunk: chunkFeature({ chunkBytes: 1_024 }) } }),
+        server.transport
+      ],
       provide: { echo: (value) => value },
       report: (error) => reports.push(error)
     })

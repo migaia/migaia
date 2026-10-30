@@ -81,7 +81,13 @@ function layerViolations(file: string, source: string): string[] {
         specifier === '@migaia/utils/promise' &&
         statement.type === 'ImportDeclaration' &&
         statement.importKind === 'type'
-      invalid ||= !signalType && !contractBareAllowlist.has(specifier)
+      /** Only the feature contract borrows opaque native identities and scheduler type shapes. */
+      const nativeFeatureType =
+        file === join(owner.root, 'interfaces/feature.ts') &&
+        statement.type === 'ImportDeclaration' &&
+        statement.importKind === 'type' &&
+        (specifier === '@migaia/plugin-host' || specifier === '@migaia/utils/scheduler')
+      invalid ||= !signalType && !nativeFeatureType && !contractBareAllowlist.has(specifier)
     }
     if (owner.owner === 'rpc-host' && !isRelative) invalid ||= /^(?:node:|bun:)/u.test(specifier)
     if (invalid) failures.push(`${owner.owner}/${relative(owner.root, file)}: ${specifier}`)
@@ -130,7 +136,7 @@ describe('layer dependency direction', () => {
     expect(imports.some((specifier) => /(?:process|threads|coroutine)/.test(specifier))).toBe(false)
   })
 
-  it('accepts the complete real source tree', () => {
+  it('accepts the complete runtime-neutral source tree including scoped native feature types', () => {
     const failures = ownerRoots.flatMap(({ root }) =>
       sourceFiles(root).flatMap((file) => layerViolations(file, readFileSync(file, 'utf8')))
     )
@@ -169,6 +175,30 @@ describe('layer dependency direction', () => {
     ['host to browser', 'rpc-host', 'host/rpc-host.ts', "import '@migaia/rpc-plugin-browser'"],
     ['host to pool', 'rpc-host', 'host/rpc-host.ts', "import '@migaia/rpc-plugin-pool'"],
     ['contract to process', 'rpc-contract', 'wire/frame.ts', "import '@migaia/rpc-plugin-process'"],
+    [
+      'contract native runtime import',
+      'rpc-contract',
+      'interfaces/feature.ts',
+      "import { defineFeature } from '@migaia/plugin-host'"
+    ],
+    [
+      'contract scheduler runtime import',
+      'rpc-contract',
+      'interfaces/feature.ts',
+      "import { systemScheduler } from '@migaia/utils/scheduler'"
+    ],
+    [
+      'contract native type outside feature',
+      'rpc-contract',
+      'wire/frame.ts',
+      "import type { IFeature } from '@migaia/plugin-host'"
+    ],
+    [
+      'contract scheduler type outside feature',
+      'rpc-contract',
+      'wire/frame.ts',
+      "import type { IScheduler } from '@migaia/utils/scheduler'"
+    ],
     [
       'process to private host',
       'rpc-plugin-process',
@@ -214,6 +244,18 @@ describe('layer dependency direction', () => {
   it.each([
     ['contract byte utility', 'rpc-contract', 'wire/frame.ts', "import '@migaia/utils/bytes'"],
     ['contract error utility', 'rpc-contract', 'contract/error.ts', "import '@migaia/utils/error'"],
+    [
+      'contract native feature types',
+      'rpc-contract',
+      'interfaces/feature.ts',
+      "import type { IFeature, IFeatureRecord } from '@migaia/plugin-host'"
+    ],
+    [
+      'contract feature scheduler types',
+      'rpc-contract',
+      'interfaces/feature.ts',
+      "import type { IScheduler } from '@migaia/utils/scheduler'"
+    ],
     [
       'browser sibling',
       'rpc-plugin-browser',

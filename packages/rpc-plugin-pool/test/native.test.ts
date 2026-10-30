@@ -36,7 +36,7 @@ it('preserves failed work once while the same real Peer restarts and serves futu
     }
   })
   /** One actual Thread member retains the original pool business and supervision path. */
-  const threadTransport = threadPlugin({ spawn, features: [pool({ size: 1 })] })
+  const threadTransport = threadPlugin({ spawn, features: { workers: pool({ size: 1 }) } })
   const threadObserver = probe(threadProbe)
   const threads = await createRpcHost<
     IThreadApi,
@@ -92,7 +92,10 @@ it('preserves failed work once while the same real Peer restarts and serves futu
     }
   })
   /** One actual Process member exercises probe forwarding alongside its existing typed calls. */
-  const processTransport = processPlugin({ spawn: processSpawn, features: [pool({ size: 1 })] })
+  const processTransport = processPlugin({
+    spawn: processSpawn,
+    features: { workers: pool({ size: 1 }) }
+  })
   const processObserver = probe(processProbe)
   const processes = await createRpcHost<
     IProcessApi,

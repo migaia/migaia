@@ -71,13 +71,9 @@ it('C123 keeps native installation pending and business gated until final commit
   })
   /** The existing genuine listener keeps its original accepted-session and physical IO owner. */
   const input: IActivationInput = {
-    server: coreMemoryServer(
-      'native-activation',
-      'native-activation',
-      'memory',
-      [],
-      ['activation-provider.echo']
-    ),
+    server: coreMemoryServer('native-activation', 'native-activation', 'memory', {}, [
+      'activation-provider.echo'
+    ]),
     enter: deferred<void>(),
     gate: deferred<void>(),
     entered: false,
@@ -142,13 +138,9 @@ it('C124 installs one actual native carrier receiver and keeps its subscription 
   })
   /** The same real final participant completes without a gate in the successful installation. */
   const input: IActivationInput = {
-    server: coreMemoryServer(
-      'native-activation',
-      'native-activation',
-      'memory',
-      [],
-      ['activation-provider.echo']
-    ),
+    server: coreMemoryServer('native-activation', 'native-activation', 'memory', {}, [
+      'activation-provider.echo'
+    ]),
     enter: deferred<void>(),
     entered: false,
     dispatches: 0

@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Maps only outbound errors while public local diagnostics retain their original identities. */
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
@@ -46,8 +47,14 @@ it.each([false, true])(
     const host = await createRpcHost({
       ...listener.options,
       plugins: [
-        ...(loggerFirst ? [logger, mapping] : [mapping, logger]),
-        authFeature({ verifyCredentials: () => ({ principalId: 'a32-client' }) }),
+        ...(loggerFirst ? [logger] : []),
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({ verifyCredentials: () => ({ principalId: 'a32-client' }) }),
+            mapping
+          }
+        }),
+        ...(loggerFirst ? [] : [logger]),
         listener.transport
       ],
       provide: {
@@ -59,7 +66,11 @@ it.each([false, true])(
     })
     /** Only this public caller receives the deliberately mapped remote graph. */
     const client = await listener.connect('mapped-client', {
-      plugins: [authFeature({ credentials: 'a32-public-fixture' })]
+      plugins: [
+        rpcFeaturesPlugin({
+          features: { auth: authFeature({ credentials: 'a32-public-fixture' }) }
+        })
+      ]
     })
     try {
       const received = await client.host.memory
@@ -109,14 +120,18 @@ it('selects a transport-local mapper only for that namespace and inherits the ho
     return local
   })
   /** The first native transport owns the local override; the second inherits host selection. */
-  const first = coreMemoryServer('mapping-scopes', 'mapping-scopes', 'first', [
-    errorMapFeature(localMap)
-  ])
+  const first = coreMemoryServer('mapping-scopes', 'mapping-scopes', 'first', {
+    errorMap: errorMapFeature(localMap)
+  })
   const second = coreMemoryServer('mapping-scopes', 'mapping-scopes', 'second')
   /** The public root prepares the one shared mapper through the original native Feature owner. */
   const host = await createRpcHost({
     ...first.options,
-    plugins: [errorMapFeature(sharedMap), first.transport, second.transport],
+    plugins: [
+      rpcFeaturesPlugin({ features: { errorMap: errorMapFeature(sharedMap) } }),
+      first.transport,
+      second.transport
+    ],
     provide: {
       fail: () => {
         throw primary
@@ -158,8 +173,12 @@ it.each(['none', 'throw'] as const)(
     const host = await createRpcHost({
       ...listener.options,
       plugins: [
-        ...(mode === 'none' ? [] : [errorMapFeature(map)]),
-        authFeature({ verifyCredentials: () => ({ principalId: 'fallback-client' }) }),
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({ verifyCredentials: () => ({ principalId: 'fallback-client' }) }),
+            ...(mode === 'none' ? {} : { mapping: errorMapFeature(map) })
+          }
+        }),
         listener.transport
       ],
       provide: {
@@ -170,7 +189,11 @@ it.each(['none', 'throw'] as const)(
       report: (error) => reports.push(error)
     })
     const client = await listener.connect('fallback-client', {
-      plugins: [authFeature({ credentials: 'a32-public-fixture' })]
+      plugins: [
+        rpcFeaturesPlugin({
+          features: { auth: authFeature({ credentials: 'a32-public-fixture' }) }
+        })
+      ]
     })
     try {
       expect(listener.lookup('fallback-client')?.view.authentication?.principalId).toBe(
@@ -213,7 +236,10 @@ it('falls back to the original remote error and reports one mapped serialization
   const listener = coreMemoryServer('serialization-fallback-provider')
   const host = await createRpcHost({
     ...listener.options,
-    plugins: [errorMapFeature(map), listener.transport],
+    plugins: [
+      rpcFeaturesPlugin({ features: { errorMap: errorMapFeature(map) } }),
+      listener.transport
+    ],
     provide: {
       fail: () => {
         throw primary
@@ -277,7 +303,7 @@ it('rejects a returned Promise as configuration, sends the original error and re
   const listener = coreMemoryServer('promise-fallback-provider')
   const host = await createRpcHost({
     ...listener.options,
-    plugins: [mapping, listener.transport],
+    plugins: [rpcFeaturesPlugin({ features: { mapping } }), listener.transport],
     provide: {
       fail: () => {
         throw primary
@@ -342,7 +368,7 @@ it('delivers the next message on the same Session without waiting for a never-se
   const listener = coreMemoryServer('nonblocking-mapper-provider')
   const host = await createRpcHost({
     ...listener.options,
-    plugins: [mapping, listener.transport],
+    plugins: [rpcFeaturesPlugin({ features: { mapping } }), listener.transport],
     provide: {
       fail: () => {
         throw primary
@@ -391,7 +417,11 @@ it.each(['verifier', 'resolver'] as const)(
     const host = await createRpcHost({
       ...listener.options,
       plugins: [
-        authFeature({ credentials: 'a32-server', verifyCredentials: () => undefined }),
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({ credentials: 'a32-server', verifyCredentials: () => undefined })
+          }
+        }),
         listener.transport
       ]
     })
@@ -400,20 +430,24 @@ it.each(['verifier', 'resolver'] as const)(
       const failure = await listener
         .connect('credential-cause-client', {
           plugins: [
-            authFeature({
-              credentials:
-                mode === 'resolver'
-                  ? () => {
-                      throw primary
-                    }
-                  : 'a32-client',
-              ...(mode === 'verifier'
-                ? {
-                    verifyCredentials: () => {
-                      throw primary
-                    }
-                  }
-                : {})
+            rpcFeaturesPlugin({
+              features: {
+                auth: authFeature({
+                  credentials:
+                    mode === 'resolver'
+                      ? () => {
+                          throw primary
+                        }
+                      : 'a32-client',
+                  ...(mode === 'verifier'
+                    ? {
+                        verifyCredentials: () => {
+                          throw primary
+                        }
+                      }
+                    : {})
+                })
+              }
             })
           ]
         })
@@ -441,9 +475,13 @@ it('keeps an unauthenticated wire rejection redacted while the local verifier ca
   const host = await createRpcHost({
     ...listener.options,
     plugins: [
-      authFeature({
-        verifyCredentials() {
-          throw primary
+      rpcFeaturesPlugin({
+        features: {
+          auth: authFeature({
+            verifyCredentials() {
+              throw primary
+            }
+          })
         }
       }),
       listener.transport
@@ -467,7 +505,9 @@ it('keeps an unauthenticated wire rejection redacted while the local verifier ca
       createRpcHost({
         self: { name: 'redaction-client', instanceId: 'redaction-client' },
         plugins: [
-          authFeature({ credentials: 'a32-untrusted-token' }),
+          rpcFeaturesPlugin({
+            features: { auth: authFeature({ credentials: 'a32-untrusted-token' }) }
+          }),
           defineTransportPlugin({ name: 'redaction-client', namespace: 'memory', open })
         ],
         report: () => undefined

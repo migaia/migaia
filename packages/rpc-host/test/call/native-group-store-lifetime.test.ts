@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original group refusal and fail-stop replay use the installed native store and quota owners. */
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
@@ -26,14 +27,19 @@ async function connectGroupStore(
   /** Quotas and keyed execution are complete installed Features rather than a test-side registry. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [limitsFeature(), idempotencyFeature({ store }), server.transport],
+    plugins: [
+      rpcFeaturesPlugin({
+        features: { limits: limitsFeature(), idempotency: idempotencyFeature({ store }) }
+      }),
+      server.transport
+    ],
     provide,
     report: (error) => failures.push(error)
   })
   try {
     /** Only dynamic fixture typing erases the genuine outcome extension's cold declared type. */
     const client = await server.connect('group-store-caller', {
-      plugins: [idempotencyFeature()],
+      plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
       report: (error) => failures.push(error)
     })
     /** This is the original published callable; no lookup or outcome state is fabricated. */

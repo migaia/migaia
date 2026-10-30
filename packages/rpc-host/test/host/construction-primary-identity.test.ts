@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public construction retains its primary failure after dependency setup and failing rollback. */
 import { defineFeature } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -40,18 +41,21 @@ it('keeps the original construction failure after object dependencies and both c
   )
   /** The first real flow setup transfers its disposer to the same native installation lifetime. */
   const first = defineFlowFeature({
+    phase: 1000,
     name: 'construction-first-resource',
     dependencies: { value: dependent },
     setup: () => ({ dispose: releaseFirst })
   })
   /** Native dependency order acquires this second disposer only after the first setup succeeds. */
   const second = defineFlowFeature({
+    phase: 1001,
     name: 'construction-second-resource',
     dependencies: { previous: first },
     setup: () => ({ dispose: releaseSecond })
   })
   /** Failure occurs inside public construction after both genuine cleanup registrations exist. */
   const failing = defineFlowFeature({
+    phase: 1002,
     name: 'construction-later-failure',
     dependencies: { previous: second },
     setup: () => {
@@ -68,9 +72,7 @@ it('keeps the original construction failure after object dependencies and both c
   /** Observe the actual public rejection, rather than a native Host.use wrapper or its cause. */
   const failure = await createRpcHost({
     plugins: [
-      first,
-      second,
-      failing,
+      rpcFeaturesPlugin({ features: { first, second, failing } }),
       defineTransportPlugin({ name: 'construction-transport', namespace: 'native', open })
     ],
     report: (error) => reports.push(error)

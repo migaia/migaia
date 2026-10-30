@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Owner-review failures use public hosts and their real physical carrier pair. */
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -30,6 +31,7 @@ class ClosingAcceptGate {
   readonly #failure: Error | undefined
   /** The actual public feature installs the same hook under the native transport lifetime. */
   readonly feature = defineFlowFeature({
+    phase: 1000,
     name: 'closing-accept-gate',
     setup: () => ({ stages: { [RpcFlowPoint.handshakeOutbound]: this.#wait } })
   })
@@ -60,6 +62,7 @@ class LateHelloFailure {
   readonly failure = deferred<unknown>()
   /** The actual transport installs the held work under its ordinary flow lifetime. */
   readonly feature = defineFlowFeature({
+    phase: 1001,
     name: 'late-hello-failure',
     setup: () => ({ stages: { [RpcFlowPoint.handshakeOutbound]: this.#wait } })
   })
@@ -111,7 +114,7 @@ it('does not report an earlier closing acknowledgment after its native reason is
         name: 'late-close-native',
         namespace: 'memory',
         closingWrites: true,
-        features: [gate.feature],
+        features: { feature: gate.feature },
         open: async (native) => {
           context = native
           handle = native.attach(right)
@@ -220,7 +223,7 @@ it('physical EOF still uses its native terminal reason and publishes peer closur
     () => undefined,
     { create: () => new RpcJsonCarrierCodec(), nativeBinary: false, closingWrites: true },
     () => undefined,
-    [gate.feature]
+    [rpcFeaturesPlugin({ features: { feature0: gate.feature } })]
   )
   const connectionSignal = (await gate.entered.promise).signal
   assert(connectionSignal)
@@ -256,7 +259,7 @@ it('public transport controls preserve closing-window errors after native reason
   const gate = new ClosingAcceptGate()
   gate.hold = false
   /** Existing listener-style construction owns the server's canonical native installation. */
-  const server = coreMemoryServer('a', 'public-close-a', 'memory', [], [], {
+  const server = coreMemoryServer('a', 'public-close-a', 'memory', {}, [], {
     create: () => new RpcJsonCarrierCodec(),
     nativeBinary: false,
     closingWrites: true
@@ -306,7 +309,7 @@ it('public transport controls preserve closing-window errors after native reason
     name: 'public-close-native',
     namespace: 'memory',
     closingWrites: true,
-    features: [gate.feature],
+    features: { feature: gate.feature },
     open: async (native) => {
       context = native
       /** Server readiness remains owned by its original accepted Session. */
@@ -352,11 +355,18 @@ it.each(['acknowledgment', 'genuine failure'] as const)(
     /** This window belongs only to the real server's Session and native lifetime. */
     const reports: unknown[] = []
     /** The existing listener creates both physical endpoints and the original accept handshake. */
-    const server = coreMemoryServer('a', 'closing-accept-a', 'memory', [gate.feature], [], {
-      create: () => new RpcJsonCarrierCodec(),
-      nativeBinary: false,
-      closingWrites: true
-    })
+    const server = coreMemoryServer(
+      'a',
+      'closing-accept-a',
+      'memory',
+      { feature: gate.feature },
+      [],
+      {
+        create: () => new RpcJsonCarrierCodec(),
+        nativeBinary: false,
+        closingWrites: true
+      }
+    )
     const host = await createRpcHost({ ...server.options, report: (error) => reports.push(error) })
     /** Client construction may fail normally when its original peer closes during admission. */
     const connected = server

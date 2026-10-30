@@ -1,6 +1,6 @@
 import { deferred } from '@migaia/utils/promise'
 import { RpcWireKind, RpcWireProfile } from '@migaia/rpc-contract/protocol'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
 import type { IRpcContext } from '@migaia/rpc-host'
 import { describe, expect, it, vi } from 'vitest'
 import { throwingSignal } from '../fixtures/throwing-signal.ts'
@@ -49,7 +49,7 @@ describe('public request cancellation through the canonical CallTable', () => {
     try {
       /** A full executing instance replaces the retired numeric per-call timeout configuration. */
       const pending = fixture.a.memory.send('b', 'hang', null, {
-        timeout: timeoutFeature({ ms: 40 })
+        timeout: { ms: 40 }
       })
       /** Observe rejection before waiting for actual entry so no rejection becomes detached. */
       const settled = pending.then(

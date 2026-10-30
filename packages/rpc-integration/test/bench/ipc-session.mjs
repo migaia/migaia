@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { IpcBenchErrorText } from '../../bench/error-text.mjs'
 import { captureSnapshot } from '../../bench/observe.mjs'
 import { IpcBenchDiagnostic, IpcBenchObservation, RuntimeBench } from '../../bench/text.mjs'
@@ -584,8 +585,8 @@ async function openRpc(input, cleanup) {
   }
   const host = await createRpcHost({
     plugins: [
+      rpcFeaturesPlugin({ features: { limits: limitsFeature(nativeProviderLimits) } }),
       ...(globalThis.__PROBE_BENCH_PROBE ? [globalThis.__PROBE_BENCH_PROBE] : []),
-      limitsFeature(nativeProviderLimits),
       definition
     ],
     report
@@ -679,7 +680,10 @@ async function childMain(side, carrier, address) {
             : { connectToParent: true, report }
         )
   await createRpcHost({
-    plugins: [limitsFeature(nativeProviderLimits), definition],
+    plugins: [
+      rpcFeaturesPlugin({ features: { limits: limitsFeature(nativeProviderLimits) } }),
+      definition
+    ],
     provide: {
       bench: { echo: (value) => value, pid: () => process.pid, snapshot: captureSnapshot }
     },

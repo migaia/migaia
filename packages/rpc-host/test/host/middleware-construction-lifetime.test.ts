@@ -84,7 +84,7 @@ it.each(['abort-first', 'timeout-first'] as const)(
     vi.useFakeTimers()
     /** Observe rejection before either real cancellation source can settle the original Promise. */
     const settled = fixture.a.memory
-      .send('b', 'hang', null, { signal: controller.signal, timeout: timeoutFeature({ ms: 1 }) })
+      .send('b', 'hang', null, { signal: controller.signal, timeout: { ms: 1 } })
       .catch((error: unknown) => error)
     try {
       await provider.started.promise

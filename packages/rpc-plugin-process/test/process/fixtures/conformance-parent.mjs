@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { randomUUID } from 'node:crypto'
 import { createUnitBudget } from '@migaia/supervision'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -18,7 +19,7 @@ const host = await createRpcHost({
   self: { name: 'parent', instanceId: 'caller' },
   report: () => undefined,
   plugins: [
-    authFeature({ credentials: token }),
+    rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: token }) } }),
     processPlugin({
       name: 'p',
       spawn: {

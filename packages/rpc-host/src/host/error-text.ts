@@ -13,8 +13,12 @@ export const HostErrorText = {
   namespaceInvalid: 'RPC host transport namespace is invalid or reserved',
   /** Full feature instances are the only executing call policy syntax admitted by revision 11. */
   callFeatureInvalid: 'RPC call policy must be a complete feature instance or false',
-  /** A plugin can select only one implementation of each call policy. */
-  featureCombinationConflict: 'RPC plugin installs the same call feature kind more than once',
+  /** One scope selects at most one feature per call, flow or transport-native role. */
+  featureCombinationConflict: 'RPC plugin installs the same feature role more than once',
+  /** Custom execution phases are bounded so cold ordering stays linear in the selected features. */
+  flowPhaseInvalid: 'RPC custom flow phase must be an integer from 0 to 65535',
+  /** Equal custom phases on one point and layer cannot be ordered by caller record position. */
+  flowPhaseConflict: 'RPC custom flows on the same point and layer must use distinct phases',
   /** Fixed flow hooks cannot be changed after transport startup. */
   flowStarted: 'RPC flow hooks cannot be installed after transport startup',
   /** Advanced stage authoring accepts only the SDK's finite public positions. */

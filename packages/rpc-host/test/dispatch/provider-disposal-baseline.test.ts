@@ -47,13 +47,9 @@ it('installed native Host disposal preserves its Promise and removes the origina
   /** One ordinary native Host receives the same SDK installation as a public RPC Root. */
   const native = receivingHost()
   /** This genuine listener lends its original carrier to the native installation. */
-  const server = coreMemoryServer(
-    'native-disposal',
-    'native-disposal',
-    'memory',
-    [],
-    [nativeFixture.method]
-  )
+  const server = coreMemoryServer('native-disposal', 'native-disposal', 'memory', {}, [
+    nativeFixture.method
+  ])
   await native.use(nativeFixture.provider, server.transport)
   /** A real public caller proves the provider and receiver were genuinely installed. */
   const client = await server.connect('native-client')
@@ -85,21 +81,13 @@ it('separate native Hosts keep consumer ping absent and both disposal identities
   /** The consumer remains an ordinary NativeHost whose control stays under its RPC namespace. */
   const consumer = receivingHost()
   /** Independent listeners retain the two actual installation and physical cleanup boundaries. */
-  const ownerServer = coreMemoryServer(
-    'disposal-owner',
-    'disposal-owner',
-    'memory',
-    [],
-    [nativeFixture.method]
-  )
+  const ownerServer = coreMemoryServer('disposal-owner', 'disposal-owner', 'memory', {}, [
+    nativeFixture.method
+  ])
   /** Reusing the cold provider definition does not share native registration lifetime. */
-  const consumerServer = coreMemoryServer(
-    'disposal-consumer',
-    'disposal-consumer',
-    'memory',
-    [],
-    [nativeFixture.method]
-  )
+  const consumerServer = coreMemoryServer('disposal-consumer', 'disposal-consumer', 'memory', {}, [
+    nativeFixture.method
+  ])
   await owner.use(nativeFixture.provider, ownerServer.transport)
   await consumer.use(nativeFixture.provider, consumerServer.transport)
   /** Each genuine accepted session has its own public caller and original memory carrier. */

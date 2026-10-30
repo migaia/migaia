@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original forged-error authority cases run through real Host-held capabilities and native stages. */
 import { RpcLifecycleError, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -35,6 +36,7 @@ class RefusedProxySend {
   #refused = false
   /** Native Feature installation uses the same public authoring and registration as production. */
   readonly feature = defineFlowFeature({
+    phase: 1000,
     name: 'proxy-forged-retirement',
     setup: () => ({
       stages: { [RpcFlowPoint.envelopeOutbound]: this.#rejectFirst }
@@ -79,7 +81,9 @@ describe('remote generation proxy through public held capabilities', () => {
         provide: { p: { f: { request } } }
       })
       /** The separate caller installs the actual Feature before its real native transport. */
-      const client = await listener.connect('proxy-caller', { plugins: [refusal.feature] })
+      const client = await listener.connect('proxy-caller', {
+        plugins: [rpcFeaturesPlugin({ features: { feature: refusal.feature } })]
+      })
       try {
         /** The existing fixture's public dynamic namespace supplies the actual accepted projection. */
         const namespace = client.host.memory

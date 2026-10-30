@@ -1,3 +1,4 @@
+import type { IFeatureRecord } from '@migaia/plugin-host'
 /** Original member lifecycle business runs on actual SDK generations, Sessions and native ports. */
 import { assert, expect, it, vi, type MockInstance } from 'vitest'
 import {
@@ -31,8 +32,8 @@ import type {
 } from '@migaia/rpc-contract/interfaces'
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
-import { retryFeature } from '@migaia/rpc-host/features/retry'
-import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+
+import { timeoutFeature, createRpcTimeoutExecution } from '@migaia/rpc-host/features/timeout'
 import { SessionTable } from '../../dist/session/table.js'
 import { CallTable } from '../../dist/call/table.js'
 import {
@@ -52,7 +53,7 @@ type ICarrierReceipt = Readonly<{
 type INativeMemberFixtureOptions = Readonly<{
   provide?: Parameters<typeof nativeManagedMemoryUnits>[0]['provide']
   contract?: IRpcHostOptions['contract']
-  features?: readonly unknown[]
+  features?: IFeatureRecord
   restart?: Parameters<typeof createSupervisor>[0]['restart']
   maxUnits?: number
   ready?: (unit: IManagedMemoryUnit, signal: IAbortSignal) => Promise<void>
@@ -586,6 +587,7 @@ class NativeHandshakeGate {
   readonly resume = deferred<void>()
   /** Genuine native Feature construction uses the same grouped pipeline as application features. */
   readonly feature = defineFlowFeature({
+    phase: 1000,
     name: 'proxy-native-handshake-gate',
     setup: () => ({ stages: { [RpcFlowPoint.handshakeInbound]: this.#wait } })
   })
@@ -641,7 +643,9 @@ it('does not report a shared native rebind closed by its own member release', as
   const gate = new NativeHandshakeGate()
   gate.hold = false
   /** Reports stay unfiltered throughout original native departure and owner release. */
-  const fixture = new NativeMemberFixture('review32-rebind-close', [], { features: [gate.feature] })
+  const fixture = new NativeMemberFixture('review32-rebind-close', [], {
+    features: { feature: gate.feature }
+  })
   try {
     await fixture.start()
     await fixture.member.open()
@@ -704,7 +708,7 @@ it('replays a written idempotent public request through the complete retry featu
     await fixture.member.open()
     /** The actual selected origin feature alone may wait and replay after native departure. */
     const result = fixture.namespace.send('remote', 'p.f.request', [], {
-      retry: retryFeature({ scheduler: fixture.scheduler, report: fixture.report })
+      retry: { scheduler: fixture.scheduler, report: fixture.report }
     })
     await entered.promise
     /** The original synchronous exit preceded replacement; join that same real native event here. */
@@ -829,7 +833,7 @@ it('rejects native departure during a real handshake and closes its actual candi
   const gate = new NativeHandshakeGate()
   /** A nonterminal native policy preserves the original pending readiness until explicit release. */
   const fixture = new NativeMemberFixture('proxy-departed-native-handshake', [], {
-    features: [gate.feature],
+    features: { feature: gate.feature },
     restart: { mode: 'always', initialDelayMs: 0, maxDelayMs: 0 }
   })
   try {
@@ -878,7 +882,7 @@ it('keeps shared native rebind alive when its first caller cancels only its own 
   gate.hold = false
   /** The original accepted Session enables the real native observation/reconciliation loop. */
   const fixture = new NativeMemberFixture('proxy-late-native-setup', [], {
-    features: [gate.feature]
+    features: { feature: gate.feature }
   })
   try {
     await fixture.start()
@@ -947,80 +951,87 @@ it('keeps unavailable public work off the wire and reports the original native l
   }
 })
 
-// Real complete timeout features replace removed private options DTOs.
+// Installed timeout outputs preserve the original native cap and optional deadline budgets.
 it('caps public scalar and stream deadlines while one notify creates no scalar request record', async () => {
-  /**
-   * Remote notification entry is the actual business completion checkpoint, not a local write
-   * guess.
-   */
+  /** Remote business entry is the completion checkpoint for the one original notification. */
   const notified = deferred<void>()
-  /** The real one-way provider owns its original invocation count. */
+  /** This real provider owns the original one-way invocation count across the fixed vectors. */
   const oneWay = vi.fn(() => notified.resolve())
-  /** Real native declaration supplies the execution wall cap outside optional call policies. */
-  const fixture = new NativeMemberFixture('proxy-native-call-cap', [], {
-    provide: () => ({
-      p: {
-        f: {
-          request: () => 'result',
-          async *generator() {
-            yield 'item'
-          },
-          oneWay
-        }
+  /** The same providers serve the original scalar, stream and one-way business. */
+  const provided = {
+    p: {
+      f: {
+        request: () => 'result',
+        async *generator() {
+          yield 'item'
+        },
+        oneWay
       }
-    })
-  })
-  fixture.prepareSource = (source) => ({
-    ...source,
-    localSourceFacts: {
-      ...source.localSourceFacts,
-      callTimeoutCap: timeoutFeature({ ms: 50, scheduler: fixture.scheduler })
     }
-  })
-  /** Passthrough scheduler observation records actual armed policy budgets, not a parallel limiter. */
-  const scheduled = vi.spyOn(fixture.scheduler, 'schedule')
-  /** The canonical call entry distinguishes physical notify from scalar request admission. */
+  }
+  /** Original table admission distinguishes notify from scalar request records. */
   const invoked = vi.spyOn(CallTable.prototype, 'invoke')
   try {
-    await fixture.start()
-    await fixture.member.open()
-    scheduled.mockClear()
-    await fixture.namespace.send('remote', 'p.f.request', [], {
-      timeout: timeoutFeature({ ms: 90, scheduler: fixture.scheduler })
-    })
-    expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50, 50])
-    scheduled.mockClear()
-    await fixture.namespace.send('remote', 'p.f.request', [], {
-      timeout: timeoutFeature({ ms: 20, scheduler: fixture.scheduler })
-    })
-    expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50, 20])
-    scheduled.mockClear()
-    /** The actual public lazy iterator runs through the original stream owner and timeout policies. */
-    const stream = fixture.namespace.streamTo('remote', 'p.f.generator', [], {
-      timeout: timeoutFeature({ ms: 90, scheduler: fixture.scheduler })
-    })
-    try {
-      expect(await stream.next()).toEqual({ value: 'item', done: false })
-      expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50, 50])
-    } finally {
-      await stream.return?.()
+    // These three original optional budgets are a fixed acceptance domain, independent from input size.
+    for (const [index, optionalMs] of [90, 20, 90].entries()) {
+      /** Cold caller aliases install each original optional policy with its real fixture scheduler. */
+      const features: Record<string, ReturnType<typeof timeoutFeature>> = {}
+      /** Each vector now installs its policy because per-call overrides contain options data only. */
+      const fixture = new NativeMemberFixture(`proxy-native-call-cap-${index}`, [], {
+        provide: () => provided,
+        features
+      })
+      features.deadline = timeoutFeature({ ms: optionalMs, scheduler: fixture.scheduler })
+      /** The genuine native source lends the same non-disableable execution wall cap. */
+      const cap = createRpcTimeoutExecution({ ms: 50, scheduler: fixture.scheduler })
+      Object.assign(fixture, {
+        prepareSource: (source: IRpcMemberSource) => ({
+          ...source,
+          localSourceFacts: { ...source.localSourceFacts, callTimeoutCap: cap }
+        })
+      })
+      /** Passive observation records actual timer budgets on the installed policy owner. */
+      const scheduled = vi.spyOn(fixture.scheduler, 'schedule')
+      try {
+        await fixture.start()
+        await fixture.member.open()
+        scheduled.mockClear()
+        if (index < 2) {
+          await fixture.namespace.send('remote', 'p.f.request', [])
+          expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual(
+            index === 0 ? [50, 50] : [50, 20]
+          )
+        } else {
+          /** The original public iterator executes through the same genuine stream owner. */
+          const stream = fixture.namespace.streamTo('remote', 'p.f.generator', [])
+          try {
+            expect(await stream.next()).toEqual({ value: 'item', done: false })
+            expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50, 50])
+          } finally {
+            await stream.return?.()
+          }
+          /** Scalar admission count remains unchanged by one actual public notification. */
+          const beforeOneWay = invoked.mock.calls.filter(
+            ([, command]) => command.mode === 'request'
+          ).length
+          scheduled.mockClear()
+          await fixture.namespace.notify('p.f.oneWay', [], { targetId: 'remote', timeout: false })
+          await notified.promise
+          expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50])
+          expect(oneWay).toHaveBeenCalledTimes(1)
+          expect(
+            invoked.mock.calls.filter(([, command]) => command.mode === 'request')
+          ).toHaveLength(beforeOneWay)
+          expect(
+            invoked.mock.calls.filter(([, command]) => command.mode === 'notify')
+          ).toHaveLength(1)
+        }
+      } finally {
+        scheduled.mockRestore()
+        await fixture.cleanup()
+      }
     }
-    /** Count the original scalar calls before one actual public notification is admitted. */
-    const beforeOneWay = invoked.mock.calls.filter(
-      ([, command]) => command.mode === 'request'
-    ).length
-    scheduled.mockClear()
-    await fixture.namespace.notify('p.f.oneWay', [], { targetId: 'remote' })
-    await notified.promise
-    expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50])
-    expect(oneWay).toHaveBeenCalledTimes(1)
-    expect(invoked.mock.calls.filter(([, command]) => command.mode === 'request')).toHaveLength(
-      beforeOneWay
-    )
-    expect(invoked.mock.calls.filter(([, command]) => command.mode === 'notify')).toHaveLength(1)
   } finally {
-    scheduled.mockRestore()
     invoked.mockRestore()
-    await fixture.cleanup()
   }
 })

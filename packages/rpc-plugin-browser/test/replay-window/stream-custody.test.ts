@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
@@ -11,7 +12,7 @@ describe('stream replay custody through public endpoint behavior', () => {
     'disconnect cleans the pending iterator and reports cleanup failure: authenticated=%s',
     async (authenticated) => {
       /** This original physical pair lends the actual four-stage codec to the real Host owners. */
-      const source = coreMemoryServer('server', 'server', 'memory', [], [], {
+      const source = coreMemoryServer('server', 'server', 'memory', {}, [], {
         create: () => new RpcJsonCarrierCodec(),
         nativeBinary: false
       })
@@ -21,7 +22,13 @@ describe('stream replay custody through public endpoint behavior', () => {
         ...source.options,
         plugins: [
           ...(authenticated
-            ? [authFeature({ sign: (value) => value, verify: (value) => value })]
+            ? [
+                rpcFeaturesPlugin({
+                  features: {
+                    auth: authFeature({ sign: (value) => value, verify: (value) => value })
+                  }
+                })
+              ]
             : []),
           source.transport
         ],
@@ -62,7 +69,13 @@ describe('stream replay custody through public endpoint behavior', () => {
       /** Initial accepted directories include the provider before its first public stream call. */
       const client = await source.connect('client', {
         plugins: authenticated
-          ? [authFeature({ sign: (value) => value, verify: (value) => value })]
+          ? [
+              rpcFeaturesPlugin({
+                features: {
+                  auth: authFeature({ sign: (value) => value, verify: (value) => value })
+                }
+              })
+            ]
           : []
       })
       try {
@@ -88,7 +101,7 @@ describe('stream replay custody through public endpoint behavior', () => {
 
   it('protected stream replay capacity rejects a second identity before provider entry', async () => {
     /** Signed Auth owns the request-ID replay capacity for this original physical source. */
-    const source = coreMemoryServer('server', 'server', 'memory', [], [], {
+    const source = coreMemoryServer('server', 'server', 'memory', {}, [], {
       create: () => new RpcJsonCarrierCodec(),
       nativeBinary: false
     })
@@ -97,16 +110,20 @@ describe('stream replay custody through public endpoint behavior', () => {
     const server = await createRpcHost({
       ...source.options,
       plugins: [
-        authFeature({
-          sign: (value) => value,
-          verify: (value) => value,
-          retain: 310_000,
-          maxReplayEntriesPerPeer: 1,
-          onRejected: (notice) => {
-            notices.push(notice)
+        rpcFeaturesPlugin({
+          features: {
+            auth: authFeature({
+              sign: (value) => value,
+              verify: (value) => value,
+              retain: 310_000,
+              maxReplayEntriesPerPeer: 1,
+              onRejected: (notice) => {
+                notices.push(notice)
+              }
+            }),
+            limits: limitsFeature()
           }
         }),
-        limitsFeature(),
         source.transport
       ]
     })
@@ -138,7 +155,11 @@ describe('stream replay custody through public endpoint behavior', () => {
     })
     /** Establish the original held method in the initial directory before testing replay capacity. */
     const client = await source.connect('client', {
-      plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
+      plugins: [
+        rpcFeaturesPlugin({
+          features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
+        })
+      ]
     })
     /** Cleanup always joins both original consumer promises, including the known failed admission. */
     const pending: Promise<unknown>[] = []

@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public Host and real native carriers retain the original observer non-interference oracles. */
 import { describe, expect, it, vi } from 'vitest'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
@@ -214,13 +215,17 @@ async function encryptedProbeCase(mode: IProbeMode) {
     createRpcHost({
       self: { name: 'encrypted-server', instanceId: 'encrypted-server' },
       plugins: [
-        encryptedAuthentication(transforms.right),
-        chunkFeature({ chunkBytes: 96 }),
-        limitsFeature({
-          maxGlobal: 2,
-          maxPerPeer: 2,
-          onRejected: (rejection) => {
-            rejections.push(rejection.reason)
+        rpcFeaturesPlugin({
+          features: {
+            encryptedAuthentication: encryptedAuthentication(transforms.right),
+            chunk: chunkFeature({ chunkBytes: 96 }),
+            limits: limitsFeature({
+              maxGlobal: 2,
+              maxPerPeer: 2,
+              onRejected: (rejection) => {
+                rejections.push(rejection.reason)
+              }
+            })
           }
         }),
         ...observation,
@@ -250,8 +255,12 @@ async function encryptedProbeCase(mode: IProbeMode) {
     createRpcHost({
       self: { name: 'encrypted-client', instanceId: 'encrypted-client' },
       plugins: [
-        encryptedAuthentication(transforms.left),
-        chunkFeature({ chunkBytes: 96 }),
+        rpcFeaturesPlugin({
+          features: {
+            encryptedAuthentication: encryptedAuthentication(transforms.left),
+            chunk: chunkFeature({ chunkBytes: 96 })
+          }
+        }),
         ...observation,
         probeTransport(leftWire, clientNative)
       ],
@@ -439,12 +448,20 @@ async function nativeTransferProbeCase(protection: IProbeProtection, mode: IProb
   const peers = await Promise.all([
     createRpcHost({
       self: { name: 'left', instanceId: 'transfer-left' },
-      plugins: [authFeature(authenticationConfig), ...observation, probeTransport(leftWire)],
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature(authenticationConfig) } }),
+        ...observation,
+        probeTransport(leftWire)
+      ],
       report: (error) => businessReports.push(error)
     }),
     createRpcHost({
       self: { name: 'right', instanceId: 'transfer-right' },
-      plugins: [authFeature(authenticationConfig), ...observation, probeTransport(rightWire)],
+      plugins: [
+        rpcFeaturesPlugin({ features: { auth: authFeature(authenticationConfig) } }),
+        ...observation,
+        probeTransport(rightWire)
+      ],
       report: (error) => businessReports.push(error),
       provide: {
         reenter: () => 9,

@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -16,6 +17,7 @@ describe('native Session frame pipelines', () => {
     }
     /** The real native multiple-next runner owns branch completion even when a stage returns void. */
     const fork = defineFlowFeature({
+      phase: 1000,
       name: 'native-frame-fork',
       setup: () => ({
         stages: {
@@ -32,7 +34,7 @@ describe('native Session frame pipelines', () => {
     /** The native plugin installs before the first actual transport startup. */
     const host = await createRpcHost({
       ...server.options,
-      plugins: [fork, ...server.options.plugins!]
+      plugins: [rpcFeaturesPlugin({ features: { fork } }), ...server.options.plugins!]
     })
     /** A notification provides physical completion without introducing a business reply barrier. */
     const client = await server.connect('native-frame-client', { provide: { note: () => null } })

@@ -104,7 +104,7 @@ describe('remote wire shapes', () => {
     })
   })
 
-  it('exports all specified runtime symbols through actual subpaths with inward dependencies', () => {
+  it('exports actual runtime subpaths with inward runtime dependencies and native feature types', () => {
     for (const key of [
       'RpcProviderDeclarationLimit',
       'RpcProviderMode',
@@ -122,13 +122,13 @@ describe('remote wire shapes', () => {
       'normalizeRpcHandshake'
     ])
       expect(protocol).toHaveProperty(key)
-    /** Package dependencies remain the two existing foundation packages. */
+    /** Native feature types add declaration resolution; runtime ownership remains inward. */
     const metadata = JSON.parse(
       readFileSync(new URL('../package.json', import.meta.url), 'utf8')
     ) as { dependencies: Record<string, string> }
     /** Object keys are unique; exact Set equality retains missing and extra dependency checks. */
     expect(new Set(Object.keys(metadata.dependencies))).toEqual(
-      new Set(['@migaia/serialize', '@migaia/utils'])
+      new Set(['@migaia/plugin-host', '@migaia/serialize', '@migaia/utils'])
     )
   })
 

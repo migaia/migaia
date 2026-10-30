@@ -1,3 +1,4 @@
+import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -43,10 +44,14 @@ describe('limits provider concurrency observer', () => {
       const server = await createRpcHost({
         ...listener.options,
         plugins: [
-          limitsFeature({
-            maxGlobal: 1,
-            maxPerPeer: 1,
-            ...(mode === 'none' ? {} : { onRejected: observer })
+          rpcFeaturesPlugin({
+            features: {
+              limits: limitsFeature({
+                maxGlobal: 1,
+                maxPerPeer: 1,
+                ...(mode === 'none' ? {} : { onRejected: observer })
+              })
+            }
           }),
           ...listener.options.plugins!
         ],
@@ -138,7 +143,9 @@ describe('limits accepted host policy', () => {
     const server = await createRpcHost({
       ...listener.options,
       plugins: [
-        limitsFeature({ maxGlobal: 1, maxPerPeer: 1, onRejected }),
+        rpcFeaturesPlugin({
+          features: { limits: limitsFeature({ maxGlobal: 1, maxPerPeer: 1, onRejected }) }
+        }),
         ...listener.options.plugins!
       ],
       provide: { business }
@@ -182,7 +189,10 @@ describe('limits accepted host policy', () => {
     /** Only this installed plugin contributes the original payload policy. */
     const server = await createRpcHost({
       ...listener.options,
-      plugins: [limitsFeature({ maxPayloadBytes: 4096 }), ...listener.options.plugins!],
+      plugins: [
+        rpcFeaturesPlugin({ features: { limits: limitsFeature({ maxPayloadBytes: 4096 }) } }),
+        ...listener.options.plugins!
+      ],
       provide: { scalar, stream }
     })
     /** Two genuine client sources retain isolation after one input is refused. */
@@ -220,7 +230,10 @@ describe('limits accepted host policy', () => {
     /** The same three-credit policy exercises the original remaining two-credit group boundary. */
     const server = await createRpcHost({
       ...listener.options,
-      plugins: [limitsFeature({ maxCallsPerMinute: 3 }), ...listener.options.plugins!],
+      plugins: [
+        rpcFeaturesPlugin({ features: { limits: limitsFeature({ maxCallsPerMinute: 3 }) } }),
+        ...listener.options.plugins!
+      ],
       provide: { business, warmup: () => null }
     })
     /** This genuine native source uses only the new public namespace. */

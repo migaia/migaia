@@ -26,7 +26,7 @@ function taskPlugins(task: ICoroutineUserTask) {
   return [
     coroutinePlugin({
       spawn: task,
-      features: [timeoutFeature({ ms: 1000 }), retryFeature({ attempts: 2 })],
+      features: { timeout: timeoutFeature({ ms: 1000 }), retry: retryFeature({ attempts: 2 }) },
       supervisor: { startupTimeoutMs: 1500 }
     })
   ] as const
@@ -42,7 +42,7 @@ export function open(task: ICoroutineUserTask) {
 export function call(host: ITaskHost, target: string, signal: AbortSignal) {
   return host.coroutine.send(target, 'echo', 'hello', {
     signal,
-    timeout: timeoutFeature({ ms: 500 }),
+    timeout: { ms: 500 },
     retry: false
   })
 }
@@ -61,13 +61,13 @@ export function replace(host: ITaskHost, target: string, task: ICoroutineUserTas
 }
 
 export function pooled(task: ICoroutineUserTask) {
-  return coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })
+  return coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })
 }
 ```
 
 `host.coroutine.request/notify/stream/group/send/dispatch` 使用统一 namespace 调用语义。notify 只等实际写出；request/send 等业务结果。`notify` 用 `{ targetId }` 指定目标。无目标调用按当前直连集合处理，多个普通直连保持独立结果。
 
-策略顺序为单次 options、transport feature、链路策略 plugin。单次 timeout/retry 只能给完整实例或 false；示例选择 500 ms 超时并关闭本次 retry。没有策略不会隐式新增一个超时或重试循环。supervisor.startupTimeoutMs 属于原生任务启动，与业务 timeout 是不同预算。
+策略顺序为单次 options、transport feature、链路策略 plugin。单次 timeout/retry 接收策略配置对象或 false；示例选择 500 ms 超时并关闭本次 retry。没有策略不会隐式新增一个超时或重试循环。supervisor.startupTimeoutMs 属于原生任务启动，与业务 timeout 是不同预算。
 
 流能力从 `host.coroutine.peers[target]` 取得并绑定当前代。消费完或提前退出时 return；这只结束该流，不停止整代任务。重启后重新读取当前目录，旧方法不会自动指向新任务。
 
