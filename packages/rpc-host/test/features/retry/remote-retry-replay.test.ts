@@ -1,4 +1,5 @@
-import { createRpcRetryExecution } from '@migaia/rpc-host/features/retry'
+/** Source import: FeatureScope's source graph already owns this module's coverage entry. */
+import { createRpcRetryExecution } from '../../../src/features/retry.ts'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import type {
@@ -167,6 +168,19 @@ describe('retry execution lifecycle', () => {
 })
 
 describe('retry execution departure handling', () => {
+  it('rejects an asynchronous invoke failure and ignores a departure after settling', async () => {
+    const generation = new FakeGeneration('c', 1)
+    const failure = new Error('async failure')
+    const execution = createRpcRetryExecution({ report: vi.fn() })
+    await expect(
+      execution.run(attempt(new FakeAvailability(generation), () => Promise.reject(failure)))
+    ).rejects.toBe(failure)
+    await expect(
+      execution.run(attempt(new FakeAvailability(generation), async () => 'done'))
+    ).resolves.toBe('done')
+    generation.depart(new Error('after settle'))
+  })
+
   it('reports CLOSED when the generation leaves before the write starts', async () => {
     const generation = new FakeGeneration('c', 1)
     const reason = new Error('gone')

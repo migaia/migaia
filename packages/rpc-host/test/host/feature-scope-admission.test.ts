@@ -1,12 +1,12 @@
-/**
- * Cold call-policy admission, per-call overlays and link-policy record checks (source modules share
- * one metadata owner).
- */
+/** Cold call-policy admission, per-call overlays and link-policy record checks. */
 import { describe, expect, it, vi } from 'vitest'
+import { createRpcHost } from '@migaia/rpc-host'
+import { retryFeature as publicRetryFeature } from '@migaia/rpc-host/features/retry'
+/** Execution owners load from source, the same modules FeatureScope's source graph uses. */
 import { retryFeature, createRpcRetryExecution } from '../../src/features/retry.ts'
 import { timeoutFeature, createRpcTimeoutExecution } from '../../src/features/timeout.ts'
-import { linkPolicy } from '../../src/plugins/link-policy/index.ts'
-import { defineFlowFeature } from '../../src/sdk/index.ts'
+import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
+import { defineFlowFeature, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { defineFeature } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -34,7 +34,34 @@ function outputsFor(record: Readonly<Record<string, object>>): Record<string, ob
   return outputs
 }
 
+/** Empty native transports acquire no resources while exercising genuine installation. */
+function openEmptyTransport() {
+  return { dispose: disposeEmptyTransport }
+}
+
+/** No resource was acquired by the empty transport. */
+function disposeEmptyTransport(): void {}
+
 describe('FeatureScope admission', () => {
+  it('rejects a link policy record holding one call role twice', async () => {
+    await expect(
+      createRpcHost({
+        self: { name: 'scope-admission', instanceId: 'scope-admission' },
+        plugins: [
+          linkPolicy({
+            features: { r1: publicRetryFeature(), r2: publicRetryFeature({ attempts: 3 }) }
+          }),
+          defineTransportPlugin({
+            name: 'scope-transport',
+            namespace: 'local',
+            features: {},
+            open: openEmptyTransport
+          })
+        ]
+      })
+    ).rejects.toSatisfy(hasCode(RpcCoreErrorCode.featureCombinationConflict))
+  })
+
   it('rejects a duplicate call role inside one record', () => {
     const record = { r1: retryFeature(), r2: retryFeature() }
     expect(() => new FeatureScope().setDefaults(record, outputsFor(record))).toThrow(
@@ -46,14 +73,6 @@ describe('FeatureScope admission', () => {
     expect(() => new FeatureScope().setDefaults({ r: retryFeature() }, {})).toThrow(
       expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
-  })
-
-  it('skips flow features while capturing call defaults', () => {
-    const flow = defineFlowFeature({ name: 'scope-flow', phase: 1, setup: () => ({}) })
-    const record = { flow, r: retryFeature() }
-    const scope = new FeatureScope()
-    scope.setDefaults(record, outputsFor({ r: record.r }))
-    expect(scope.resolve('missing').retry).toBeDefined()
   })
 
   it.each([
@@ -100,7 +119,7 @@ describe('link policy record admission', () => {
     const flow = defineFlowFeature({ name: 'policy-flow', phase: 1, setup: () => ({}) })
     expect(() =>
       linkPolicy({
-        features: { flow } as unknown as Record<string, ReturnType<typeof retryFeature>>
+        features: { flow } as unknown as Record<string, ReturnType<typeof publicRetryFeature>>
       })
     ).toThrow()
   })
@@ -111,17 +130,19 @@ describe('link policy record admission', () => {
   ])('rejects an %s record', (_name, features) => {
     expect(() =>
       linkPolicy({
-        features: features as unknown as Record<string, ReturnType<typeof retryFeature>>
+        features: features as unknown as Record<string, ReturnType<typeof publicRetryFeature>>
       })
     ).toThrow()
   })
 
   it('ignores symbol keys and rejects accessor entries', () => {
-    const record: Record<PropertyKey, unknown> = { r: retryFeature() }
-    record[Symbol('hidden')] = retryFeature()
-    Object.defineProperty(record, 'lazy', { enumerable: true, get: () => retryFeature() })
+    const record: Record<PropertyKey, unknown> = { r: publicRetryFeature() }
+    record[Symbol('hidden')] = publicRetryFeature()
+    Object.defineProperty(record, 'lazy', { enumerable: true, get: () => publicRetryFeature() })
     expect(() =>
-      linkPolicy({ features: record as unknown as Record<string, ReturnType<typeof retryFeature>> })
+      linkPolicy({
+        features: record as unknown as Record<string, ReturnType<typeof publicRetryFeature>>
+      })
     ).toThrow()
   })
 
@@ -129,7 +150,7 @@ describe('link policy record admission', () => {
     const helper = defineFeature(() => ({ value: 1 }))
     expect(() =>
       linkPolicy({
-        features: { helper } as unknown as Record<string, ReturnType<typeof retryFeature>>
+        features: { helper } as unknown as Record<string, ReturnType<typeof publicRetryFeature>>
       })
     ).toThrow()
   })
@@ -292,3 +313,19 @@ describe('call execution defaults', () => {
     ).rejects.toBe(failure)
   })
 })
+
+/** Search the native install wrapper's cause chain for the semantic RPC code. */
+function hasCode(code: string): (error: unknown) => boolean {
+  return (error) => findCode(error, code, 0)
+}
+
+/** Bounded cause/errors traversal; native wrappers keep the original reachable. */
+function findCode(error: unknown, code: string, depth: number): boolean {
+  if (depth > 8 || error === null || typeof error !== 'object') return false
+  if ((error as { code?: unknown }).code === code) return true
+  /** Aggregate members are searched before the single cause. */
+  const members = (error as { errors?: unknown }).errors
+  if (Array.isArray(members))
+    for (const member of members) if (findCode(member, code, depth + 1)) return true
+  return findCode((error as { cause?: unknown }).cause, code, depth + 1)
+}

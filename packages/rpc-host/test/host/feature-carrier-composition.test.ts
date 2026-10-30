@@ -57,12 +57,15 @@ async function carrierAndLocalOverrideCompose(): Promise<void> {
   const host = await createRpcHost({
     self,
     plugins: [
-      rpcFeaturesPlugin({ name: 'carrier', features: { shared, helper } }),
+      rpcFeaturesPlugin({
+        name: 'carrier',
+        features: { shared, helper, budget: timeoutFeature({ ms: 100 }) }
+      }),
       transport({ local })
     ]
   })
   try {
-    expect(Object.keys(host.local.features).sort()).toEqual(['helper', 'local', 'shared'])
+    expect(Object.keys(host.local.features).sort()).toEqual(['budget', 'helper', 'local', 'shared'])
   } finally {
     await host.close()
   }
@@ -112,10 +115,40 @@ async function lateCarrierFails(): Promise<void> {
 
 describe('RPC shared feature carriers', registerCases)
 
+/** A started host rejects a later plugin that is not an RPC definition. */
+async function lateForeignPluginFails(): Promise<void> {
+  const host = await createRpcHost({ self, plugins: [transport()] })
+  try {
+    await expect(
+      host.use(definePlugin({ name: 'late-foreign', install: () => ({}) }) as never)
+    ).rejects.toThrow(TypeError)
+  } finally {
+    await host.close()
+  }
+}
+
+/** A transport-local helper dependency and a shared flow of another role both compose. */
+async function localHelperAndSharedFlowCompose(): Promise<void> {
+  const shared = defineFlowFeature({ name: 'shared-only-flow', phase: 3, setup: emptySetup })
+  const helper = defineFeature(() => ({ value: 2 }))
+  const local = defineFlowFeature({ name: 'local-only-flow', phase: 4, setup: emptySetup })
+  const host = await createRpcHost({
+    self,
+    plugins: [rpcFeaturesPlugin({ features: { shared } }), transport({ helper, local })]
+  })
+  try {
+    expect(Object.keys(host.local.features).sort()).toEqual(['helper', 'local', 'shared'])
+  } finally {
+    await host.close()
+  }
+}
+
 /** One case per composition rule. */
 function registerCases(): void {
   it('composes a shared role, a local override and a helper', carrierAndLocalOverrideCompose)
   it('rejects two carriers owning one flow role', duplicateSharedFlowRoleFails)
   it('rejects a plugin that is not an RPC definition', foreignPluginFails)
   it('rejects a carrier added after startup', lateCarrierFails)
+  it('rejects a foreign plugin added after startup', lateForeignPluginFails)
+  it('composes a local helper with a shared flow of another role', localHelperAndSharedFlowCompose)
 }
