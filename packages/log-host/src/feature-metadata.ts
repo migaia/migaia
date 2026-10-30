@@ -54,6 +54,18 @@ export type ILogFeatureMetadata = Readonly<{
   policy?: LogDeliveryPolicy
 }>
 
+/**
+ * A singular slot is a policy an output can apply only once: its formatter or one built-in delivery
+ * policy (batch, retry, timeout). Entry stages and gates repeat freely and have no slot.
+ */
+export function singularSlot(
+  feature: IFeatureImplementation | ILogFeatureMetadata
+): string | undefined {
+  if (feature.phase === FeaturePhase.format) return FeaturePhase.format
+  if (feature.phase === FeaturePhase.delivery) return feature.policy
+  return undefined
+}
+
 /** Native features are the keys; this table describes log policies and grants no issuance authority. */
 const logFeatureMetadata = new WeakMap<object, ILogFeatureMetadata>()
 
@@ -99,11 +111,19 @@ export function featureScope(
   }
   /** Record aliases supply policy names without creating a second scope registry. */
   const selected = new Map<string, ILogFeature<any>>()
+  /** Singular slots already used by this record; a plugin applies each at most once. */
+  const slots = new Set<string>()
   for (const [alias, feature] of Object.entries(roots)) {
     /** Log plugin records hold only log features; the public types already require this. */
     const metadata = featureMetadata(feature)
     if (!metadata) throw invalidOption()
     if (output && metadata.phase === FeaturePhase.entry) throw invalidOption()
+    /** Format or delivery policy this feature occupies, if any. */
+    const slot = singularSlot(metadata)
+    if (slot) {
+      if (slots.has(slot)) throw invalidOption()
+      slots.add(slot)
+    }
     selected.set(alias, feature as ILogFeature<any>)
   }
   return selected
@@ -163,16 +183,33 @@ export function defineLogFeature(definition: ILogFeatureDefinition): ILogFeature
   throw invalidOption()
 }
 
-/** Merge already installed policies while retaining host-first and local declaration order. */
+/**
+ * Merge installed policies, host first then local. A local feature replaces the host feature with
+ * the same alias, and a local format/batch/retry/timeout replaces the host one of the same slot.
+ */
 export function resolveFeatureScope(
   host: ReadonlyMap<string, IFeatureImplementation>,
   local: ReadonlyMap<string, IFeatureImplementation>
 ): readonly IFeatureImplementation[] {
+  /** Singular slots the output configures itself. */
+  const localSlots = new Set<string>()
+  for (const implementation of local.values()) {
+    /** Slot of this local policy, if it has one. */
+    const slot = singularSlot(implementation)
+    if (slot) localSlots.add(slot)
+  }
   /** Entry implementations stay at host ingress and never enter an output's delivery chain. */
   const features: IFeatureImplementation[] = []
-  for (const [alias, implementation] of host)
-    if (!local.has(alias) && implementation.phase !== FeaturePhase.entry)
+  for (const [alias, implementation] of host) {
+    /** Slot of this host policy, if it has one. */
+    const slot = singularSlot(implementation)
+    if (
+      !local.has(alias) &&
+      implementation.phase !== FeaturePhase.entry &&
+      !(slot && localSlots.has(slot))
+    )
       features.push(implementation)
+  }
   for (const implementation of local.values()) features.push(implementation)
   return features
 }

@@ -48,7 +48,7 @@ await log.shutdown('manual')
 
 feature 工厂返回 `@migaia/plugin-host` 的原生 opaque 定义，不暴露 descriptor 字段或控制方法。`defineLogPlugin` 基于 `definePlugin` 组装普通 host-wide 插件；`createLogHost` 只通过 `plugins` 接收策略。`features` 一律使用 `{ alias: feature }` record。每次插件安装独立创建状态，控制通过 `${pluginName}_${alias}_${method}` 扩展调用，例如 `log.policy_threshold_setLevel('warn')`。
 
-输出插件的 features 只作用于自身，并仅覆盖 host-wide record 中同 key 的 feature。不同 key 的 gate 都会执行，即使来自同一工厂；多个 host-wide carrier 声明同 key 时冲突。执行按 entry、gate、format、batch、retry、timeout、输出阶段组织，gate 保留有效 record 声明顺序。每个输出在实际安装、按 key 覆盖后，最多有一个有效 format，以及各一个 batch、retry、timeout；冲突使用既有 `INVALID_OPTION`。没有有效显式 format 时才采用输出默认格式。
+输出插件的 features 只作用于自身。同 key 的输出级 feature 覆盖 host-wide feature；format、batch、retry、timeout 这四类每个输出只取一个，输出自己配了哪一类，就替换 host-wide 的同类 feature（即使 key 不同）。不同 key 的 gate 都会执行，即使来自同一工厂。一个插件的 record 里同类 format/batch/retry/timeout 只能有一个；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类 format/batch/retry/timeout，违反时以既有 `INVALID_OPTION` 拒绝。执行按 entry、gate、format、batch、retry、timeout、输出阶段组织，gate 保留有效 record 声明顺序。没有有效显式 format 时才采用输出默认格式。
 
 输出可声明 `consumesText: false`，只接收原条目与取消信号，跳过 host 格式阶段；该输出不能配置 format 或 defaultFormat。条目处理、gate 与交付策略照常执行。
 

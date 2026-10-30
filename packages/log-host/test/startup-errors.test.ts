@@ -21,29 +21,24 @@ function ignoreDelivery(): void {}
 /** Distinct host keys both survive, so a text output rejects the second effective format. */
 function duplicateHostFormats(): void {
   /** Constructing cold declarations is valid before an output's effective scope exists. */
-  const policy = sdk.defineLogPlugin({
-    name: 'policy',
-    features: { format: formatFeature({ format: 'json' }), otherFormat: otherFormat() }
-  })
-  /** The singular format slot belongs to an installed output after key overrides. */
-  const output = new CaptureOutput()
-  expect(() => createLogHost({ plugins: [policy, output.plugin()] })).toThrowError(
-    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
-  )
+  expect(() =>
+    sdk.defineLogPlugin({
+      name: 'policy',
+      features: { format: formatFeature({ format: 'json' }), otherFormat: otherFormat() }
+    })
+  ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
 }
 /** Local singular-slot validation runs at actual installation rather than cold definition. */
 function duplicateOutputFormats(): void {
-  /** Both declarations remain native features while they await an installing host. */
-  const output = sdk.defineOutputPlugin({
-    name: 'output',
-    batchable: true,
-    defaultFormat: 'json',
-    features: { format: formatFeature({ format: 'json' }), otherFormat: otherFormat() },
-    deliver: ignoreDelivery
-  })
-  expect(() => createLogHost({ plugins: [output] })).toThrowError(
-    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
-  )
+  expect(() =>
+    sdk.defineOutputPlugin({
+      name: 'output',
+      batchable: true,
+      defaultFormat: 'json',
+      features: { format: formatFeature({ format: 'json' }), otherFormat: otherFormat() },
+      deliver: ignoreDelivery
+    })
+  ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
 }
 
 /** The capture fixture observes selected text and the installed formatter from real output delivery. */
@@ -118,31 +113,29 @@ function malformedHostOptions(): void {
   ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
 }
 
-it('rejects multiple effective host formats at output installation', duplicateHostFormats)
-it('rejects multiple effective local formats at output installation', duplicateOutputFormats)
+it('rejects two formats in one host plugin record', duplicateHostFormats)
+it('rejects two formats in one output plugin record', duplicateOutputFormats)
 it('uses output format for the same host/output record key', outputOverridesSameKey)
 it('rejects malformed options and output-local entry features', malformedHostOptions)
 
-/** A local format with a different key supplements the host format rather than replacing it. */
-function differentFormatKeysConflict(): void {
+/** A local format replaces the host format even when their record keys differ. */
+async function localFormatOverridesHostFormat(): Promise<void> {
   /** The host key and output key deliberately differ while both select the format phase. */
   const policy = sdk.defineLogPlugin({ name: 'policy', features: { hostFormat: otherFormat() } })
-  /** The cold output is valid until its host-wide defaults become known during installation. */
-  const output = sdk.defineOutputPlugin({
-    name: 'output',
-    batchable: true,
-    defaultFormat: 'json',
-    features: { localFormat: formatFeature({ format: 'plain' }) },
-    deliver: ignoreDelivery
+  /** Observes which formatter the output actually used. */
+  const capture = new FormatCapture()
+  /** Host under test: host-wide custom format, output-local json format. */
+  const host = createLogHost({
+    plugins: [policy, capture.plugin(formatFeature({ format: 'json' }))]
   })
-  expect(() => createLogHost({ plugins: [policy, output] })).toThrowError(
-    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
-  )
+  host.log('info', 'message')
+  await host.flush()
+  expect(capture.records).toHaveLength(1)
+  expect(capture.records[0].text).not.toBe('custom')
+  expect(JSON.parse(capture.records[0].text)).toMatchObject({ message: 'message' })
+  await host.shutdown('manual')
 }
-it(
-  'BC6 rejects distinct-key host and output formats at actual installation',
-  differentFormatKeysConflict
-)
+it('uses the output format over a host format with a different key', localFormatOverridesHostFormat)
 
 /** Plain complete literals and shallow copies cannot manufacture native feature identity. */
 function forgedDescriptors(): void {

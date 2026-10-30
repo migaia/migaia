@@ -240,20 +240,18 @@ function singularPolicyPairs(): readonly ISingularPolicyPair[] {
   ]
 }
 
-/** BC6: cold declarations stay valid until installation resolves an output's effective policies. */
+/** One plugin record holds each singular slot once; host plugins share one host-wide slot. */
 async function singularPoliciesAtInstallation(): Promise<void> {
   for (const features of singularPolicyPairs()) {
-    /** Both roots are legal definitions; the effective output owns their singular-slot check. */
-    const coldOutput = defineOutputPlugin({
-      name: 'collision-output',
-      batchable: true,
-      defaultFormat: 'json',
-      features,
-      deliver: ignoreNativeDelivery
-    })
-    expect(() => createLogHost({ plugins: [coldOutput] })).toThrowError(
-      expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
-    )
+    expect(() =>
+      defineOutputPlugin({
+        name: 'collision-output',
+        batchable: true,
+        defaultFormat: 'json',
+        features,
+        deliver: ignoreNativeDelivery
+      })
+    ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
     /** A committed carrier and real output define the state against which a later install checks. */
     const output = new CaptureOutput()
     /** Different aliases prevent key conflicts from masking a duplicate execution slot. */
@@ -283,7 +281,7 @@ async function singularPoliciesAtInstallation(): Promise<void> {
 function ignoreNativeDelivery(): void {}
 
 it(
-  'BC6 checks effective format and delivery uniqueness during initial and later installs',
+  'BC6 rejects duplicate singular policies in one record and across host plugins',
   singularPoliciesAtInstallation
 )
 

@@ -1,9 +1,4 @@
-import {
-  definePlugin,
-  type IFeatureOutputs,
-  type IPluginConfig,
-  type IPluginRegistrationContext
-} from '@migaia/plugin-host'
+import { definePlugin, type IFeatureOutputs, type IPluginConfig } from '@migaia/plugin-host'
 import type {
   ILogControlExtensions,
   ILogEntry,
@@ -40,8 +35,6 @@ class LogPluginDefinition<
 > {
   /** Captured immutable definition options are reused across independent native installations. */
   readonly #definition: ILogPluginDefinition<N, F, O, C>
-  /** Canonical native signals identify this definition's cleanup owners across hosts. */
-  readonly #installations = new WeakMap<object, LogPolicyInstallation>()
   /** Root aliases retain the exact native feature identities. */
   readonly features: F
 
@@ -62,7 +55,6 @@ class LogPluginDefinition<
       output: false,
       features: installedFeatureScope(this.features, core.features)
     })
-    this.#installations.set(core.lifecycle.signal, installation)
     /** Application extensions install before the prepared log scope becomes visible. */
     const extensions = this.#definition.install?.(core) ?? ({} as O)
     /** Native admission still receives invalid results unchanged; valid data keeps its descriptors. */
@@ -73,15 +65,6 @@ class LogPluginDefinition<
     )
     installation.commit()
     return combined
-  }
-
-  /** Native enablement reuses its existing installed feature state. */
-  enable(context: IPluginRegistrationContext): void {
-    this.#installations.get(context.signal)?.enable()
-  }
-  /** Native disablement removes the ready policy contribution. */
-  disable(context: IPluginRegistrationContext): void {
-    this.#installations.get(context.signal)?.disable()
   }
 }
 
@@ -107,8 +90,6 @@ export function defineLogPlugin<
     features: owner.features as ILogFeatureRecord,
     config: definition.config,
     install: (core) =>
-      owner.install(core as ILogPluginCore & { readonly features: IFeatureOutputs<F> }),
-    onEnable: (context) => owner.enable(context),
-    onDisable: (context) => owner.disable(context)
+      owner.install(core as ILogPluginCore & { readonly features: IFeatureOutputs<F> })
   }) as ILogPlugin<O & ILogControlExtensions<N, F>, C, F>
 }

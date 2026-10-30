@@ -7,8 +7,7 @@ import {
   type IFeatureRecord,
   type IFeatureOutputs,
   type IPluginConfig,
-  type IPluginBeforeReleaseContext,
-  type IPluginRegistrationContext
+  type IPluginBeforeReleaseContext
 } from '@migaia/plugin-host'
 import type {
   ILogEntry,
@@ -642,8 +641,6 @@ class OutputPlugin<
   readonly local: F
   /** Native lifetime signals select the installed transport without owning registration identity. */
   readonly #outputs = new WeakMap<object, OutputInstallation<IEntryRecord>>()
-  /** Policy lifecycle dispatch retains only the native registration's derived contribution. */
-  readonly #policies = new WeakMap<object, LogPolicyInstallation>()
   /**
    * A longer-than-caller alias keeps the native fallback root disjoint without reserving public
    * names.
@@ -713,7 +710,6 @@ class OutputPlugin<
     /** This signal is issued and revoked by the native registration. */
     const signal = core.lifecycle.signal
     this.#outputs.set(signal, output)
-    this.#policies.set(signal, policy)
     core.onDispose(() => this.#release(signal, output))
     core.onFlush(() => output.flush())
     core.useSink((entry) => output.push(entry))
@@ -728,14 +724,6 @@ class OutputPlugin<
     policy.commit()
     return combined
   }
-  /** Reenable an installed output's policy using its original native registration. */
-  enable(context: IPluginRegistrationContext): void {
-    this.#policies.get(context.signal)?.enable()
-  }
-  /** Withdraw a disabled output's ready policy without creating an alternate scope. */
-  disable(context: IPluginRegistrationContext): void {
-    this.#policies.get(context.signal)?.disable()
-  }
   /** Drain output work before native release revokes its borrowed resources. */
   beforeRelease(context: IPluginBeforeReleaseContext): void | Promise<void> {
     return this.#outputs.get(context.signal)?.dispose()
@@ -743,7 +731,6 @@ class OutputPlugin<
   /** Forget derived dispatch state and reuse the output's idempotent disposer. */
   async #release(signal: object, output: OutputInstallation<IEntryRecord>): Promise<void> {
     this.#outputs.delete(signal)
-    this.#policies.delete(signal)
     await output.dispose()
   }
 }
@@ -770,8 +757,6 @@ export function defineOutputPlugin<
     name: definition.name,
     features: owner.features as ILogFeatureRecord,
     install: (core) => owner.install(core),
-    beforeRelease: (context) => owner.beforeRelease(context),
-    onEnable: (context) => owner.enable(context),
-    onDisable: (context) => owner.disable(context)
+    beforeRelease: (context) => owner.beforeRelease(context)
   }) as ILogPlugin<O & ILogControlExtensions<N, F>, IPluginConfig, F>
 }

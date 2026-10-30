@@ -66,9 +66,9 @@ entry 在 host 入口执行一次；每个输出端随后按 gate、format、bat
 
 `defineLogPlugin({ name, features })` 通过原生 `definePlugin` 安装 host-wide 策略。`createLogHost` 没有 `features` 选项；所有策略随调用者声明的插件进入。`defineOutputPlugin` 的策略只作用于自己的输出。两者一律使用 `{ alias: feature }` record，保留属性声明顺序。
 
-record key 是唯一名称：输出级 `features.<key>` 仅覆盖 host-wide 同 key 的 feature。不同 key 即使使用同一工厂也都保留，例如 `{ a: thresholdFeature(), b: thresholdFeature() }` 会应用两个 gate。未覆盖的 host gate 先运行，输出级 gate 随后按声明顺序运行。entry feature 只允许装在 host-wide carrier。
+record key 是 feature 的名称：输出级 `features.<key>` 覆盖 host-wide 同 key 的 feature。不同 key 即使使用同一工厂也都保留，例如 `{ a: thresholdFeature(), b: thresholdFeature() }` 会应用两个 gate。未覆盖的 host gate 先运行，输出级 gate 随后按声明顺序运行。entry feature 只允许装在 host-wide carrier。
 
-一个 record 内 key 天然唯一；多个 host-wide carrier 声明同 key 时使用既有名称冲突错误路径。所有输出各自在实际安装时按 key 合并 host/local，随后检查单一执行槽：最多一个有效 format，以及各一个 batch、retry、timeout。不同 key 不会互相覆盖，违反单一槽约束以既有 `INVALID_OPTION` 拒绝，动态 `use()` 也执行这项安装校验。没有有效显式 format 时采用输出插件的 `defaultFormat`。
+format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在定义插件时检查；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类，动态 `use()` 同样检查。违反时以既有 `INVALID_OPTION` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。
 
 | Feature                               | 作用                                                                               |
 | ------------------------------------- | ---------------------------------------------------------------------------------- |
