@@ -2,7 +2,7 @@ import { entityTestFeatures } from './helpers/entity-features.ts'
 import { describe, expect, it } from 'vitest'
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { createIndexedDbTestStore } from './helpers/installed-backends.ts'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 
 /** A complete injected IDB factory delays only delivery of its real open-success event. */
 class DelayedFactory extends IDBFactory {
@@ -35,11 +35,14 @@ class DelayedFactory extends IDBFactory {
 describe('storage-plugin-browser confirmed audit suspicions', () => {
   it('identifies the owned backfill aggregate and retains both original failures', async () => {
     /** Real simulation owns all transactions and backend admission. */
-    const store = await createIndexedDbTestStore({
-      factory: new IDBFactory(),
-      keyRange: IDBKeyRange,
-      dbName: 'audit-double-failure'
-    })
+    const { host: storeHost, store } = await createIndexedDbTestStore(
+      {
+        factory: new IDBFactory(),
+        keyRange: IDBKeyRange,
+        dbName: 'audit-double-failure'
+      },
+      true
+    )
     /** Fail only the two public object-store writes involved in this supported error path. */
     const primary = new Error('checkpoint write failed')
     /** The secondary cannot replace or hide the primary. */
@@ -47,13 +50,21 @@ describe('storage-plugin-browser confirmed audit suspicions', () => {
     /** Preserve the exact built-in receiver semantics for unaffected object-store writes. */
     const originalPut = IDBObjectStore.prototype.put
     try {
-      await defineEntity<{ id: string; value: string }>({
-        features: entityTestFeatures,
-        name: 'audit-double',
-        key: 'id'
+      /** Explicit native declaration owns this scenario's optional repository capabilities. */
+      const entity1EntityPlugin = defineEntityPlugin<{ id: string; value: string }>()(
+        'api-audit-suspected-spec-ts-50',
+        {
+          features: entityTestFeatures,
+          name: 'audit-double',
+          key: 'id'
+        }
+      )
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const entity1EntityPluginHost = await storeHost.use(entity1EntityPlugin)
+      await entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store).put({
+        id: 'row',
+        value: 'saved'
       })
-        .connect(store)
-        .put({ id: 'row', value: 'saved' })
       IDBObjectStore.prototype.put = function (
         this: IDBObjectStore,
         value: unknown,
@@ -75,13 +86,20 @@ describe('storage-plugin-browser confirmed audit suspicions', () => {
         return Reflect.apply(originalPut, this, key === undefined ? [value] : [value, key])
       }
       /** An ordinary indexed read drives the real repository backfill path. */
-      const repo = defineEntity<{ id: string; value: string }>()({
-        features: entityTestFeatures,
-        name: 'audit-double',
-        key: 'id',
-        indexes: { byValue: { path: 'value' } },
-        onDiagnostic: () => {}
-      }).connect(store)
+      const repoEntityPlugin = defineEntityPlugin<{ id: string; value: string }>()(
+        'api-audit-suspected-spec-ts-78',
+        {
+          features: entityTestFeatures,
+          name: 'audit-double',
+          key: 'id',
+          indexes: { byValue: { path: 'value' } },
+          onDiagnostic: () => {}
+        }
+      )
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
+      /** Borrow the supplied backend through the installed repository capability factories. */
+      const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
       await expect(
         repo.query().index('byValue', { lower: 'saved', upper: 'saved' }).all()
       ).rejects.toMatchObject({
@@ -139,20 +157,30 @@ describe('storage-plugin-browser confirmed audit suspicions', () => {
 
   it('index iteration applies one deadline across buffered yields', async () => {
     /** Real IDB transactions and backfill create the sidecar rows consumed by the public iterator. */
-    const store = await createIndexedDbTestStore({
-      factory: new IDBFactory(),
-      keyRange: IDBKeyRange,
-      dbName: 'audit-iterator-deadline'
-    })
+    const { host: storeHost, store } = await createIndexedDbTestStore(
+      {
+        factory: new IDBFactory(),
+        keyRange: IDBKeyRange,
+        dbName: 'audit-iterator-deadline'
+      },
+      true
+    )
     try {
       /** The normal repository is the only producer of index projection rows. */
-      const repo = defineEntity<{ id: string; value: string }>()({
-        features: entityTestFeatures,
-        name: 'audit-iterator',
-        key: 'id',
-        indexes: { byValue: { path: 'value' } },
-        onDiagnostic: () => {}
-      }).connect(store)
+      const repoEntityPlugin = defineEntityPlugin<{ id: string; value: string }>()(
+        'api-audit-suspected-spec-ts-149',
+        {
+          features: entityTestFeatures,
+          name: 'audit-iterator',
+          key: 'id',
+          indexes: { byValue: { path: 'value' } },
+          onDiagnostic: () => {}
+        }
+      )
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
+      /** Borrow the supplied backend through the installed repository capability factories. */
+      const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
       await repo.put({ id: 'first', value: 'a' })
       await repo.put({ id: 'second', value: 'b' })
       await repo.migrate()

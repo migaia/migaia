@@ -24,6 +24,7 @@ import type {
   IStorageBackendKind,
   IStorageDefinePlugin,
   IStorageDefineFeature,
+  IStorageUnitTarget,
   IStoragePluginCore,
   IStorageFeatureExpose,
   IStorageExecutionPort,
@@ -34,6 +35,13 @@ import type {
 const kinds = new WeakSet<object>()
 /** Defined storage Features retain their required kind identities without a second Feature system. */
 const featureTargets = new WeakMap<object, readonly object[]>()
+/** Mint a package-private unit target admitted by the existing native Feature wrapper. */
+export function defineStorageUnitTarget<TExpose extends object>(): IStorageUnitTarget<TExpose> {
+  /** The opaque identity grants only target matching; it carries no installation state. */
+  const target = Object.freeze({})
+  kinds.add(target)
+  return target as IStorageUnitTarget<TExpose>
+}
 /** Handles resolve to one original native definition; installation state remains PluginHost-owned. */
 const nativePluginDefinitions = new WeakMap<object, object>()
 /** Immutable definition metadata contains no store, driver or registration lifetime. */
@@ -199,6 +207,8 @@ type IStoragePluginDefinitionContext = {
   readonly descriptorFactory: (core: IStoragePluginCore) => IStorageNativePluginDescriptor
   readonly features?: IFeatureRecord
   readonly plan?: ReturnType<typeof inspectFeatures>
+  /** Internal pure-unit registrations use native outputs rather than backend capability projection. */
+  readonly unitTarget?: object
 }
 
 /** Registration-local transfer state borrows lifecycle and installation authority from PluginHost. */
@@ -223,7 +233,8 @@ type IStorageNativeDescriptorContext = {
 export const definePlugin: IStorageDefinePlugin = ((
   name: string,
   descriptorFactory: (core: IStoragePluginCore) => IStorageNativePluginDescriptor,
-  features?: IFeatureRecord
+  features?: IFeatureRecord,
+  unitTarget?: object
 ) => {
   assertStorageBackendId(name)
   /** Inspect the existing dependency closure without running any Feature factory. */
@@ -231,6 +242,7 @@ export const definePlugin: IStorageDefinePlugin = ((
     name,
     descriptorFactory,
     features,
+    unitTarget,
     plan: features === undefined ? undefined : inspectFeatures(features)
   }
   /** Native invokes one bounded adapter for each actual registration. */
@@ -392,12 +404,14 @@ function assertStorageFeatureTargets(context: IStorageNativeDescriptorContext): 
       StorageHostErrorCode.backendKindMismatch,
       StorageErrorText.backendKindMismatch
     )
+  /** Pure entity plugins select their private target without claiming a backend kind or Store. */
+  const target = context.kind ?? context.registration.definition.unitTarget
   for (const feature of context.registration.definition.plan?.ordered ?? []) {
     /** Dependency compatibility belongs to original Feature identities, not public type metadata. */
     const expected = featureTargets.get(feature)
     if (
-      context.kind !== undefined
-        ? expected === undefined || !expected.includes(context.kind)
+      target !== undefined
+        ? expected === undefined || !expected.includes(target)
         : expected !== undefined
     )
       throw createStorageTypeError(

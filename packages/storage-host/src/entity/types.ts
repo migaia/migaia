@@ -19,7 +19,6 @@ import type { IKeyValueStore } from '@migaia/storage-contract'
 import type { IStorageBorrowedBackend } from '../types.ts'
 /** Raw backends retain resource admission; only certified host views may omit ownership members. */
 export type IEntityConnectStore = IKeyValueStore | IStorageBorrowedBackend<IKeyValueStore>
-import type { IEntityFeature } from './assembly.ts'
 import type { ISchemaAdapter } from '../entity.ts'
 import type { IMigrationStep } from '@migaia/storage-contract'
 import type { ICodec } from '../entity.ts'
@@ -125,10 +124,10 @@ export type IEntityIndexMap<
 }>
 
 /**
- * Reusable entity definition. Configuration is captured before connecting; backend capability
- * decides the default codec route.
+ * Entity plugin declaration options. Native installation resolves optional role configuration; each
+ * supplied backend decides the repository's default codec route.
  */
-export type IEntityOptions<
+export type IEntityPluginOptions<
   TDomain,
   TStored = TDomain,
   TIndexes extends IEntityIndexDefinitions<TDomain> | undefined = undefined
@@ -137,7 +136,7 @@ export type IEntityOptions<
    * Explicit optional units imported from the entity capability subpaths; omitted means basic reads
    * and writes only.
    */
-  readonly features?: readonly IEntityFeature[]
+  readonly features?: import('@migaia/plugin-host').IFeatureRecord
   /** Nonempty entity namespace; names beginning with the reserved __ prefix are rejected. */
   readonly name: string
   /** Names the domain object property used as its primary key. */
@@ -487,21 +486,21 @@ export type IRepository<
   lockKey(id: IStorageKey): Extract<ILockKey, { readonly channel: 'text' | 'record' }>
 }
 
-/**
- * Reusable entity description with readonly public facts. Connecting creates a repository view
- * without taking ownership of its store.
- */
-export type IEntityDefinition<
+/** Synchronous repository acquisition reuses one entity plugin's installed native outputs. */
+export type IEntityRepositoryAccess<
   TDomain,
-  TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>
-> = {
-  /** Captured entity namespace. */
-  readonly name: string
-  /** Captured positive envelope version. */
-  readonly version: number
-  /** Bind to one actual store, selecting a capability-compatible codec and query route. */
-  connect<S extends IEntityConnectStore>(
-    store: S,
-    options?: IEntityConnectOptions
-  ): IRepository<TDomain, TIndexes, IEntityStoreChangeFeed<S>, IEntityStoreQueryMethods<S>>
-}
+  TIndexes extends Readonly<Record<string, IStorageKey>>
+> = <S extends IEntityConnectStore>(
+  store: S,
+  options?: IEntityConnectOptions
+) => IRepository<TDomain, TIndexes, IEntityStoreChangeFeed<S>, IEntityStoreQueryMethods<S>>
+
+/** An entity is a storage-host plugin; its literal id names the native repository extension. */
+export type IEntityPlugin<
+  TDomain,
+  TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>,
+  TId extends string = string
+> = import('../types.ts').IStorageBackendPluginHandle<{
+  readonly [K in TId]: IEntityRepositoryAccess<TDomain, TIndexes>
+}> &
+  Readonly<{ id: TId }>

@@ -1,6 +1,7 @@
 import { createStorageHost, defineFeature } from '@migaia/storage-host'
 import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
+import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
 import { lockKey } from '../src/authoring/concurrency.ts'
 import { records, rdf, vector, type IQuad, type IVectorHit } from '@migaia/storage-contract'
 
@@ -257,7 +258,16 @@ export type ITransactionInference = IAssert<
   IEqual<Awaited<typeof transactionResult>, Pick<ITypeCostRow, 'id'>[]>
 >
 /** Entity queries consume the same original backend with precise selected field inference. */
-const repository = defineEntity<ITypeCostRow>({ name: 'type-cost-users', key: 'id' }).connect(store)
+
+/** Explicit entity plugin configuration is installed before requesting a repository. */
+const entity1EntityPlugin = defineEntityPlugin<ITypeCostRow>()('type-cost-ts-entity1-1', {
+  name: 'type-cost-users',
+  key: 'id',
+  features: { reads: entityQueryFeature() }
+})
+/** This actual storage host owns the entity installation for this test scope. */
+const entity1EntityPluginHost = await host.use(entity1EntityPlugin)
+const repository = entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store)
 /** Ten real immutable query steps retain the entity domain before projection. */
 const entityResult = repository
   .query()

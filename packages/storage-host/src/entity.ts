@@ -22,9 +22,10 @@ export type {
   IRecordIndexBackfillStore
 } from './entity/backfill.ts'
 
-export { defineEntity } from './entity/define.ts'
+export { defineEntityPlugin } from './entity/define.ts'
 export type {
-  IEntityDefinition,
+  IEntityPlugin,
+  IEntityRepositoryAccess,
   IEntityQuery,
   IEntityQueryNarrowed,
   IEntityQueryNarrowedCore,
@@ -40,7 +41,7 @@ export type {
   IEntityStoreQueryMethods,
   IEntityIndex,
   IEntityIndexMap,
-  IEntityOptions,
+  IEntityPluginOptions,
   IEntityTransactionScope,
   IEntityListOrder,
   IEntityIndexOptions,
@@ -54,5 +55,3 @@ export type {
   IRecordComparator,
   IRepository
 } from './entity/types.ts'
-
-export type { IEntityFeature } from './entity/assembly.ts'

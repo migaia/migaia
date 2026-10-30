@@ -5,7 +5,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { ttl, kv } from '@migaia/storage-contract'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createStorageHost } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 import { indexedDbTtlFeature } from '../../src/features/indexed-db-ttl.ts'
 
@@ -127,13 +127,21 @@ describe('native IndexedDB TTL', () => {
   })
 
   it('removes expired indexed records through the original sidecar, revision and post-commit paths', async () => {
-    const { scheduler, store } = await setup()
-    const repository = defineEntity<{ id: string; score: number }>()({
-      features: entityTestFeatures,
-      name: 'ttl-index',
-      key: 'id',
-      indexes: { score: { path: 'score' } }
-    }).connect(store)
+    const { scheduler, host, store } = await setup()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repositoryEntityPlugin = defineEntityPlugin<{ id: string; score: number }>()(
+      'indexed-db-ttl-spec-ts-131',
+      {
+        features: entityTestFeatures,
+        name: 'ttl-index',
+        key: 'id',
+        indexes: { score: { path: 'score' } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await host.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     await repository.put({ id: 'expired', score: 1 })
     await repository.migrate()
     await expect(repository.query().index('score').all()).resolves.toEqual([

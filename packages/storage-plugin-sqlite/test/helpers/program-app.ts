@@ -6,7 +6,8 @@ import {
   type ILogStore,
   type IBinlogExt
 } from '@migaia/log-plugin-durable'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { createStorageHost } from '@migaia/storage-host'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
 import { asRecordStore, kv, type IKeyValueStore } from '@migaia/storage-contract'
 import { lockKey, useStorageCapability } from '@migaia/storage-host/sdk'
@@ -28,37 +29,46 @@ export async function runStorageProgramApp(
   storage: IKeyValueStore
 ): Promise<IStorageProgramResult> {
   const store = asRecordStore<IProgramRow>(storage)
-  const repo = defineEntity<IProgramRow>()({
-    features: [entityQueryFeature()],
+  /** Explicit native declaration owns this scenario's optional repository capabilities. */
+  const programEntityPlugin = defineEntityPlugin<IProgramRow>()('program-rows', {
+    features: { query: entityQueryFeature() },
     name: 'program-rows',
     key: 'id'
-  }).connect(store)
-  const state = createStore({ count: 0 })
-  const handle = persist(state, { key: 'program-state', storage: store, version: 1 })
+  })
+  /** The program owns its entity registration while the caller retains the actual backend. */
+  const entityHost = await createStorageHost({ plugins: [programEntityPlugin] })
   try {
-    await handle.ready
-    await repo.put({ id: 'a', score: 1 })
-    await repo.put({ id: 'b', score: 2 })
-    await persistTransaction(
-      store,
-      [handle],
-      async (scope) => {
-        state.count = 3
-        await handle.flush(scope)
-        await repo.in(scope).put({ id: 'a', score: 3 })
-        await scope.set('program-status', 'committed')
-      },
-      { lock: [repo.lockKey('a'), lockKey.text('program-state'), lockKey.text('program-status')] }
-    )
-    await handle.flush()
-    return {
-      rows: await repo.query().where('score', 'gte', 2).limit(2).select('id', 'score').all(),
-      persisted: JSON.parse((await store.get('program-state'))!),
-      status: await store.get('program-status')
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = entityHost.extensions[programEntityPlugin.id](store)
+    const state = createStore({ count: 0 })
+    const handle = persist(state, { key: 'program-state', storage: store, version: 1 })
+    try {
+      await handle.ready
+      await repo.put({ id: 'a', score: 1 })
+      await repo.put({ id: 'b', score: 2 })
+      await persistTransaction(
+        store,
+        [handle],
+        async (scope) => {
+          state.count = 3
+          await handle.flush(scope)
+          await repo.in(scope).put({ id: 'a', score: 3 })
+          await scope.set('program-status', 'committed')
+        },
+        { lock: [repo.lockKey('a'), lockKey.text('program-state'), lockKey.text('program-status')] }
+      )
+      await handle.flush()
+      return {
+        rows: await repo.query().where('score', 'gte', 2).limit(2).select('id', 'score').all(),
+        persisted: JSON.parse((await store.get('program-state'))!),
+        status: await store.get('program-status')
+      }
+    } finally {
+      await handle.disposeAsync()
+      await state.$dispose()
     }
   } finally {
-    await handle.disposeAsync()
-    await state.$dispose()
+    await entityHost.dispose()
   }
 }
 

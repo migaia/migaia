@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { lengthPrefixedNamespaceCodec } from '../src/index.ts'
 import { StorageError } from '@migaia/storage-host'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { fromStandardSchema } from '@migaia/storage-host/entity'
 import { createMemoryTestStore } from './helpers/installed-backends.ts'
 import { createLocalTestStore } from './helpers/installed-backends.ts'
@@ -33,10 +33,10 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
       'application validation message'
     )
     /** Exercise the public schema-to-repository write path. */
-    const store = await createMemoryTestStore()
+    const { host: storeHost, store } = await createMemoryTestStore({}, true)
     try {
       /** This is a supported throwing schema, not a forged backend. */
-      const repo = defineEntity<{ id: string }>({
+      const repoEntityPlugin = defineEntityPlugin<{ id: string }>()('api-audit-medium-spec-ts-39', {
         features: entityTestFeatures,
         name: 'audit-error-chain',
         key: 'id',
@@ -46,7 +46,11 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
             throw primary
           }
         }
-      }).connect(store)
+      })
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
+      /** Borrow the supplied backend through the installed repository capability factories. */
+      const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
       /**
        * Capture the failure for identity assertions without asserting an implementation wrapper
        * count.
@@ -68,20 +72,36 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
   })
 
   it.each([undefined, {}])('keeps a current-only v2 plan explicit: %s', async (migrations) => {
-    const store = await createMemoryTestStore()
-    const previous = defineEntity<{ id: string }>({
-      features: entityTestFeatures,
-      name: 'audit-graph',
-      key: 'id'
-    }).connect(store)
+    const { host: storeHost, store } = await createMemoryTestStore({}, true)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const previousEntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'api-audit-medium-spec-ts-72',
+      {
+        features: entityTestFeatures,
+        name: 'audit-graph',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const previousEntityPluginHost = await storeHost.use(previousEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const previous = previousEntityPluginHost.extensions[previousEntityPlugin.id](store)
     await previous.put({ id: 'old' })
-    const current = defineEntity<{ id: string }>({
-      features: entityTestFeatures,
-      name: 'audit-graph',
-      key: 'id',
-      version: 2,
-      ...(migrations === undefined ? {} : { migrations })
-    }).connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const currentEntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'api-audit-medium-spec-ts-78',
+      {
+        features: entityTestFeatures,
+        name: 'audit-graph',
+        key: 'id',
+        version: 2,
+        ...(migrations === undefined ? {} : { migrations })
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const currentEntityPluginHost = await storeHost.use(currentEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const current = currentEntityPluginHost.extensions[currentEntityPlugin.id](store)
     await current.put({ id: 'current' })
     await expect(current.get('current')).resolves.toEqual({ id: 'current' })
     await expect(current.get('old')).rejects.toMatchObject({
@@ -128,15 +148,19 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
       }
     })
     /** Drive the existing public storage and entity entries instead of internal staging helpers. */
-    const store = await createMemoryTestStore()
+    const { host: storeHost, store } = await createMemoryTestStore({}, true)
     try {
       /** Reads must preserve the host error, its stage and the original validator cause. */
-      const repository = defineEntity({
+      const repositoryEntityPlugin = defineEntityPlugin('api-audit-medium-spec-ts-134', {
         features: entityTestFeatures,
         name: 'moved-schema',
         key: 'id',
         schema
-      }).connect(store)
+      })
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const repositoryEntityPluginHost = await storeHost.use(repositoryEntityPlugin)
+      /** Borrow the supplied backend through the installed repository capability factories. */
+      const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
       await repository.put({ id: 'row' })
       rejectValidation = true
       /** The cause graph must retain the exact original rejection after stage enrichment. */

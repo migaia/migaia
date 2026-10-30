@@ -61,6 +61,7 @@ import type { EntityIndexesOwner } from './indexes-owner.ts'
 import type { EntityQueryOwner } from './query-owner.ts'
 import type { IEntityKeysetOwner } from './keyset.ts'
 import { missingEntityFeature } from './assembly.ts'
+import { throwIfAborted } from '../core/operation.ts'
 import { EntityRecordCodec } from './record-codec.ts'
 
 export class EntityRepositoryOwner<
@@ -125,6 +126,7 @@ export class EntityRepositoryOwner<
     connectOptions?: IEntityConnectOptions
   ) {
     this.#config = config
+    this.assertCurrent()
     this.#backend = snapshotEntityStore(inputStore)
     this.#store = this.#backend.store
     this.#name = config.name
@@ -147,10 +149,8 @@ export class EntityRepositoryOwner<
       })
     this.#recordStore = this.#backend.recordStore()
     this.#records = this.#recordStore !== undefined
-    this.#uniqueIndexes = Object.fromEntries(
-      Object.entries(this.#config.indexes).filter(([, index]) => index.definition.unique)
-    )
-    this.#uniqueDefinitions = Object.values(this.#uniqueIndexes).map((index) => index.definition)
+    this.#uniqueIndexes = config.uniqueIndexes
+    this.#uniqueDefinitions = config.uniqueDefinitions
     /**
      * Select one codec for every repository path. Structured backends use the identity-like
      * structured codec by default, while text-only backends use JSON; an explicit codec is always
@@ -183,7 +183,7 @@ export class EntityRepositoryOwner<
       codecName,
       `range:${this.#migrationPlan?.baseVersion ?? 1}:${this.#migrationPlan?.version ?? this.#version}`
     ].join('|')
-    for (const feature of config.features) this.#features.set(feature.name, feature.create(this))
+    for (const { role, factory } of config.units) this.#features.set(role, factory.create(this))
     this.#repository = this.#createApi()
   }
   /** Return the stable public methods while keeping the component state private. */
@@ -348,6 +348,7 @@ export class EntityRepositoryOwner<
     scope: ITransactionScope,
     expectedIdentity?: IStorageKey
   ): IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods> => {
+    this.assertCurrent()
     const info = this.#backend.assertScope(scope)
     /** Unique draft tracking exists only when its explicit unit owns constraints. */
     const activeChanges =
@@ -370,8 +371,13 @@ export class EntityRepositoryOwner<
   #boundGet = (
     binding: IEntityRepositoryBinding,
     id: IStorageKey
-  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['get']> =>
-    runTransactionOperation(binding.scope, async (current) => {
+  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['get']> => {
+    try {
+      this.assertCurrent()
+    } catch (cause) {
+      return Promise.reject(cause)
+    }
+    return runTransactionOperation(binding.scope, async (current) => {
       this.#backend.assertScope(current)
       const context = readTransactionOperationContext(current)
       assertStorageKey(id, this.#store.backend)
@@ -388,12 +394,18 @@ export class EntityRepositoryOwner<
             runtime
           )
     })
+  }
   /** Perform transaction-bound put work through its authentic original scope. */
   #boundPut = (
     binding: IEntityRepositoryBinding,
     value: TDomain
-  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['put']> =>
-    runTransactionOperation(binding.scope, async (current) => {
+  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['put']> => {
+    try {
+      this.assertCurrent()
+    } catch (cause) {
+      return Promise.reject(cause)
+    }
+    return runTransactionOperation(binding.scope, async (current) => {
       this.#backend.assertScope(current)
       const context = readTransactionOperationContext(current)
       const runtime = entityRuntime(current)
@@ -435,18 +447,25 @@ export class EntityRepositoryOwner<
       })
       return id
     })
+  }
   /** Perform transaction-bound remove work through its authentic original scope. */
   #boundRemove = (
     binding: IEntityRepositoryBinding,
     id: IStorageKey
-  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['remove']> =>
-    runTransactionOperation(binding.scope, async (current) => {
+  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['remove']> => {
+    try {
+      this.assertCurrent()
+    } catch (cause) {
+      return Promise.reject(cause)
+    }
+    return runTransactionOperation(binding.scope, async (current) => {
       this.#backend.assertScope(current)
       assertStorageKey(id, this.#store.backend)
       await current.deleteRecord(composeRepositoryKey(this.#name, id))
       await current.deleteRecord(composeStructuredKey(this.#name, id))
       binding.activeChanges?.deref()!.set(encodeFlatStorageKey(id), { id, projection: undefined })
     })
+  }
 
   /** Publish the original repository methods without exposing its internal state. */
   #createApi = (): IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods> => ({
@@ -467,6 +486,7 @@ export class EntityRepositoryOwner<
     id,
     ctx
   ) => {
+    this.assertCurrent()
     const context = snapshotOperationContext(ctx)
     const runtime = createStorageOperationRuntime()
     assertStorageKey(id, this.#store.backend, `entity "${this.#name}" id`)
@@ -482,6 +502,7 @@ export class EntityRepositoryOwner<
     value,
     ctx
   ) => {
+    this.assertCurrent()
     if (this.#recordStore !== undefined)
       return this.#recordStore.transaction((scope) => this.#bindRepository(scope).put(value), ctx)
     if (this.#uniqueDefinitions.length !== 0 && getBackendValueCommit(this.#store) === undefined)
@@ -508,6 +529,7 @@ export class EntityRepositoryOwner<
     id,
     ctx
   ) => {
+    this.assertCurrent()
     if (this.#recordStore !== undefined)
       return this.#recordStore.transaction((scope) => this.#bindRepository(scope).remove(id), ctx)
     assertStorageKey(id, this.#store.backend)
@@ -519,6 +541,7 @@ export class EntityRepositoryOwner<
     this.#bindRepository(scope)
   /** Perform the public lockKey operation using this repository state. */
   #apiLockKey: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['lockKey'] = (id) => {
+    this.assertCurrent()
     assertStorageKey(id, this.#store.backend)
     return this.#records
       ? lockKey.record(composeRepositoryKey(this.#name, id))
@@ -526,6 +549,11 @@ export class EntityRepositoryOwner<
   }
   /** Perform the public batch operation using this repository state. */
   #apiBatch: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['batch'] = (run, ctx) => {
+    try {
+      this.assertCurrent()
+    } catch (cause) {
+      return Promise.reject(cause)
+    }
     if (typeof run !== 'function')
       return Promise.reject(
         new StorageError(StorageHostErrorCode.invalidConfig, {
@@ -549,6 +577,14 @@ export class EntityRepositoryOwner<
   /** An absent keyset unit never imports or constructs its query implementation. */
   get keysetQuery(): IEntityKeysetOwner['query'] | undefined {
     return (this.#features.get(EntityFeatureName.keyset) as IEntityKeysetOwner | undefined)?.query
+  }
+  /** Reuse the native entity registration signal; no repository lifecycle state is introduced. */
+  assertCurrent(): void {
+    throwIfAborted(this.#config.signal)
+  }
+  /** The existing iterator owner borrows this signal for retained stream next calls. */
+  get signal() {
+    return this.#config.signal
   }
   /** Read only assembly presence; this never constructs another capability. */
   hasFeature(name: string): boolean {

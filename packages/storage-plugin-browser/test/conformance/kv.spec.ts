@@ -1,7 +1,7 @@
 import { entityTestFeatures } from '../helpers/entity-features.ts'
 import { describe, expect, it } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { runConformance, type IConformanceHarness } from '@migaia/storage-contract/conformance'
 import {
   kv,
@@ -103,11 +103,15 @@ runConformance(harness, {
     } finally {
       await session.release()
     }
-    const repository = defineEntity<{ id: string }>({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repositoryEntityPlugin = defineEntityPlugin<{ id: string }>()('kv-spec-ts-106', {
       features: entityTestFeatures,
       name: handle.scope,
       key: 'id'
-    }).connect(store)
+    })
+    const entityHost = await indexFixture.host.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = entityHost.extensions[repositoryEntityPlugin.id](store)
     return (key: string) => repository.lockKey(key).key
   }
 })

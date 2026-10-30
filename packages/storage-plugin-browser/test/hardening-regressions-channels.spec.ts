@@ -11,27 +11,30 @@ import {
   createLocalTestStore,
   createMemoryTestStore
 } from './helpers/installed-backends.ts'
-import { defineEntity } from '@migaia/storage-host/entity'
-import { fakeWebStorage } from '../src/testing/fake-web-storage.ts'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import type { IRecordStore } from '@migaia/storage-contract'
+import { fakeWebStorage } from '../src/testing/fake-web-storage.ts'
 
-const freshIdb = (): Promise<IRecordStore> =>
-  createIndexedDbTestStore({
-    factory: new IDBFactory(),
-    keyRange: IDBKeyRange,
-    dbName: `adv-${Math.random().toString(36).slice(2)}`
-  })
+const freshIdb = () =>
+  createIndexedDbTestStore(
+    {
+      factory: new IDBFactory(),
+      keyRange: IDBKeyRange,
+      dbName: `adv-${Math.random().toString(36).slice(2)}`
+    },
+    true
+  )
 
 describe('#1 clearAll() 清理全部 record 通道', () => {
   it('memory: clearAll() 连 records 一起清', async () => {
-    const store = await createMemoryTestStore()
+    const store = await createMemoryTestStore({})
     await store.putRecord({ v: 1 }, 'doc')
     await store.clearAll()
     expect(await store.getRecord('doc')).toBeUndefined()
   })
 
   it('indexedDbHost: clearAll() 连 records 一起清', async () => {
-    const store = await freshIdb()
+    const { store } = await freshIdb()
     await store.putRecord({ v: 1 }, 'doc')
     await store.clearAll()
     expect(await store.getRecord('doc')).toBeUndefined()
@@ -40,14 +43,14 @@ describe('#1 clearAll() 清理全部 record 通道', () => {
 
 describe('#2 getBytes/setBytes 与 get/set 通道隔离且跨通道不可静默覆盖', () => {
   it('memory: bytes 与 kv 互不可见', async () => {
-    const store = await createMemoryTestStore()
+    const store = await createMemoryTestStore({})
     await store.setBytes('k', new Uint8Array([1, 2]))
     expect(await store.has('k')).toBe(false)
     expect(await store.keys()).toEqual([])
   })
 
   it('indexedDbHost: bytes 键不泄漏进 keys()/has()', async () => {
-    const store = await freshIdb()
+    const { store } = await freshIdb()
     await store.setBytes('k', new Uint8Array([1, 2]))
     expect(await store.has('k')).toBe(false)
     expect(await store.keys()).toEqual([])
@@ -59,7 +62,7 @@ describe('#2 getBytes/setBytes 与 get/set 通道隔离且跨通道不可静默�
 
 describe('#3 dispose 后 L1 方法统一抛 STORE_DISPOSED', () => {
   it('memory: getRecord/getBytes 抛 STORE_DISPOSED', async () => {
-    const store = await createMemoryTestStore()
+    const store = await createMemoryTestStore({})
     await store.putRecord({ v: 1 }, 'doc')
     await store.dispose()
     await expect(store.getRecord('doc')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
@@ -67,7 +70,7 @@ describe('#3 dispose 后 L1 方法统一抛 STORE_DISPOSED', () => {
   })
 
   it('indexedDbHost: getRecord 抛 STORE_DISPOSED', async () => {
-    const store = await freshIdb()
+    const { store } = await freshIdb()
     await store.dispose()
     await expect(store.getRecord('doc')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
   })
@@ -75,7 +78,7 @@ describe('#3 dispose 后 L1 方法统一抛 STORE_DISPOSED', () => {
 
 describe('#4 memory 存活引用，indexedDbHost 结构化克隆', () => {
   it('memory: 写入后修改原对象不污染已存数据', async () => {
-    const store = await createMemoryTestStore()
+    const store = await createMemoryTestStore({})
     const value = { n: 1 }
     await store.putRecord(value, 'k')
     value.n = 999
@@ -83,7 +86,7 @@ describe('#4 memory 存活引用，indexedDbHost 结构化克隆', () => {
   })
 
   it('indexedDbHost: 同样操作不受影响', async () => {
-    const store = await freshIdb()
+    const { store } = await freshIdb()
     const value = { n: 1 }
     await store.putRecord(value, 'k')
     value.n = 999
@@ -106,7 +109,7 @@ describe('#5 iterate 顺序：memory 与 indexedDbHost 都是键序', () => {
   })
 
   it('indexedDbHost', async () => {
-    expect(await insert(await freshIdb())).toEqual(['a', 'b', 'c'])
+    expect(await insert((await freshIdb()).store)).toEqual(['a', 'b', 'c'])
   })
 })
 
@@ -126,13 +129,21 @@ describe('#6 命名空间前缀是可穿透的', () => {
 
 describe('#7 数组主键：get/list 可见性一致', () => {
   it('list() 包含数组 id 的记录', async () => {
-    const store = await freshIdb()
+    const { host: storeHost, store } = await freshIdb()
     type IRow = { readonly id: readonly string[]; readonly n: number }
-    const repo = defineEntity<IRow>({
-      features: entityTestFeatures,
-      name: 'rows',
-      key: 'id'
-    }).connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repoEntityPlugin = defineEntityPlugin<IRow>()(
+      'hardening-regressions-channels-spec-ts-131',
+      {
+        features: entityTestFeatures,
+        name: 'rows',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
 
     await repo.put({ id: ['tenant-1', 'u1'], n: 1 })
     expect(await repo.get(['tenant-1', 'u1'])).toEqual({ id: ['tenant-1', 'u1'], n: 1 })
@@ -142,7 +153,7 @@ describe('#7 数组主键：get/list 可见性一致', () => {
 
 describe('#8 单条脏数据不阻断 list()', () => {
   it('一条校验失败的记录被跳过并保留好记录', async () => {
-    const store = await createMemoryTestStore()
+    const { host: storeHost, store } = await createMemoryTestStore({}, true)
     type IRow = { readonly id: string; readonly n: number }
     const schema = {
       name: 'strict',
@@ -152,12 +163,20 @@ describe('#8 单条脏数据不阻断 list()', () => {
         return row
       }
     }
-    const repo = defineEntity<IRow>({
-      features: entityTestFeatures,
-      name: 'rows',
-      key: 'id',
-      schema
-    }).connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repoEntityPlugin = defineEntityPlugin<IRow>()(
+      'hardening-regressions-channels-spec-ts-155',
+      {
+        features: entityTestFeatures,
+        name: 'rows',
+        key: 'id',
+        schema
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
 
     await store.putRecord({ version: 1, state: { id: 'good', n: 1 } }, ['rows', 'good'])
     await store.putRecord({ version: 1, state: { id: 'bad', n: 'oops' } }, ['rows', 'bad'])
@@ -168,7 +187,7 @@ describe('#8 单条脏数据不阻断 list()', () => {
 
 describe('#9 memory.iterate 尊重 timeoutMs', () => {
   it('零超时不会产出记录', async () => {
-    const store = await createMemoryTestStore()
+    const store = await createMemoryTestStore({})
     await store.putRecord({ v: 1 }, 'k')
     await expect(store.iterateRecords(undefined, { timeoutMs: 0 }).next()).rejects.toMatchObject({
       code: 'ABORTED'
@@ -178,7 +197,7 @@ describe('#9 memory.iterate 尊重 timeoutMs', () => {
 
 describe('#10 飞行中 abort 的错误类型不是 StorageError', () => {
   it('indexedDbHost.get 在请求发出后 abort，拒绝值没有 code', async () => {
-    const store = await freshIdb()
+    const { store } = await freshIdb()
     await store.set('k', 'v')
     const controller = new AbortController()
     const pending = store.get('k', { signal: controller.signal })

@@ -2,37 +2,53 @@ import { EntityFeatureName } from './constants.ts'
 import { EntityText } from './text.ts'
 import { passthrough } from '../schema/passthrough.ts'
 import { createRepository } from './repository.ts'
-import type { IEntityConnectStore } from './types.ts'
+import { definePlugin } from '../contracts.ts'
+import type { IStoragePipelineInput } from '../types.ts'
+import type { IFeatureRecord, IFeatureOutputs, IPluginHostCore } from '@migaia/plugin-host'
+import type { IRepositoryConfig } from './repository-shared.ts'
 import type { ISchemaAdapter } from '../entity.ts'
 import type {
-  IEntityDefinition,
+  IEntityPlugin,
   IEntityIndex,
   IEntityIndexMap,
-  IEntityOptions,
-  IRepository,
+  IEntityPluginOptions,
+  IEntityConnectStore,
   IEntityConnectOptions,
-  IEntityStoreQueryMethods
+  IEntityRepositoryAccess
 } from './types.ts'
 import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { assertCodec } from '@migaia/storage-contract'
-import type { IRepositoryConfig } from './repository-shared.ts'
-import { missingEntityFeature } from './assembly.ts'
+import { assertCodec, type IStorageKey } from '@migaia/storage-contract'
+import {
+  captureEntityUnitRecord,
+  configureEntityUnits,
+  entityUnitTarget,
+  missingEntityFeature,
+  snapshotEntityUnits,
+  type IInstalledRepositoryUnit,
+  type IRepositoryUnitFactory
+} from './assembly.ts'
 
-type IEntityOptionsWithoutIndexes<TDomain, TStored> = Omit<
-  IEntityOptions<TDomain, TStored, undefined>,
-  'indexes'
->
-
-/** Curried entity declaration form that keeps the domain explicit while inferring literal indexes. */
-type IDefineEntityBuilder<TDomain, TStored> = {
-  (
-    options: IEntityOptionsWithoutIndexes<TDomain, TStored> & { readonly indexes?: undefined }
-  ): IEntityDefinition<TDomain>
-  <const TIndexes extends Readonly<Record<string, IEntityIndex<TDomain>>>>(
-    options: IEntityOptionsWithoutIndexes<TDomain, TStored> & { readonly indexes: TIndexes }
-  ): IEntityDefinition<TDomain, IEntityIndexMap<TDomain, TIndexes>>
+/** Explicit-domain declarations infer literal plugin ids and declared index names at the call. */
+export type IDefineEntityPluginBuilder<TDomain, TStored> = {
+  <const TId extends string>(
+    id: TId,
+    options: IEntityPluginOptions<TDomain, TStored, undefined> & { readonly indexes?: undefined }
+  ): IEntityPlugin<TDomain, Readonly<Record<never, IStorageKey>>, TId>
+  <
+    const TId extends string,
+    const TIndexes extends Readonly<Record<string, IEntityIndex<TDomain>>>
+  >(
+    id: TId,
+    options: Omit<IEntityPluginOptions<TDomain, TStored, TIndexes>, 'indexes'> & {
+      readonly indexes: TIndexes
+    }
+  ): IEntityPlugin<TDomain, IEntityIndexMap<TDomain, TIndexes>, TId>
 }
+
+/** Native installation lends its exact root outputs and existing registration lifetime. */
+type IEntityPluginCore = Pick<IPluginHostCore<IStoragePipelineInput>, 'lifecycle'> &
+  Readonly<{ features: IFeatureOutputs<IFeatureRecord> }>
 
 /** Entity names cannot enter the host's reserved internal key namespace. */
 const RESERVED_ENTITY_PREFIX = '__'
@@ -60,7 +76,7 @@ function assertEntitySchema<TDomain, TStored>(
 }
 /** Validate scalar declaration choices before any repository is connected. */
 function validateDefinition<TDomain, TStored>(
-  options: IEntityOptions<TDomain, TStored>,
+  options: IEntityPluginOptions<TDomain, TStored, any>,
   version: number
 ): void {
   if (typeof options.name !== 'string' || options.name.trim() === '')
@@ -84,145 +100,179 @@ function defaultDiagnostic(message: string): void {
   const runtime = globalThis as typeof globalThis & { console?: { warn(value: string): void } }
   runtime.console?.warn(message)
 }
-/** One reusable declaration owns configuration while each connected repository owns its work. */
-class EntityDefinition<TDomain, TStored> {
-  /** The original repository config type prevents a parallel declaration contract. */
-  readonly #configuration: Parameters<typeof createRepository<TDomain, TStored>>[0]
-  /** Public namespace is captured before future connections can await native work. */
-  readonly name: string
-  /** Public envelope version selects the same canonical migration plan at every connection. */
-  readonly version: number
-  /** Admit a declaration, retaining original schema/codec receivers and canonical index facts. */
+/** One actual host registration owns installed factories and its immutable entity configuration. */
+class EntityPluginRegistration<TDomain, TStored, TId extends string> {
+  /** The explicit id addresses the native extension independently of the persisted namespace. */
+  readonly #id: TId
+  /** Native outputs are read only after feature construction, in the descriptor install hook. */
+  readonly #core: IEntityPluginCore
+  /** Resolved role addresses are installation-local and never scanned by an operation. */
+  readonly #roles: ReadonlyMap<EntityFeatureName, string>
+  /** Ordered native outputs are captured once without allocating Map entry tuples per repository. */
+  readonly #units: IInstalledRepositoryUnit[] = []
+  /** Configuration borrows the native signal and never owns the supplied backends. */
+  readonly #configuration: IRepositoryConfig<TDomain, TStored>
+
+  /** Resolve role-dependent admission before any unit install or public extension can run. */
   constructor(
-    options: IEntityOptions<
-      TDomain,
-      TStored,
-      Readonly<Record<string, IEntityIndex<TDomain>>> | undefined
-    >,
-    allowIndexes: boolean
+    id: TId,
+    options: IEntityPluginOptions<TDomain, TStored, any>,
+    schema: ISchemaAdapter<TDomain, TStored>,
+    version: number,
+    record: IFeatureRecord,
+    core: IEntityPluginCore
   ) {
-    if (options === null || typeof options !== 'object' || Array.isArray(options))
-      invalidDefinition(EntityText.entityDefinitionMustBeAnObject)
-    if (options.indexes !== undefined && !allowIndexes)
-      invalidDefinition(EntityText.entityIndexesRequireCurriedDeclaration)
-    /** Omitted schema has the original domain-preserving passthrough behavior. */
-    const schema =
-      options.schema === undefined
-        ? (passthrough<TDomain>() as unknown as ISchemaAdapter<TDomain, TStored>)
-        : options.schema
-    // Explicit null must remain invalid rather than being treated as omitted.
-    if (options.schema !== undefined) assertEntitySchema<TDomain, TStored>(options.schema)
-    /** Codec admission borrows its original receiver; the native route is selected at connect. */
-    const codec = options.codec
-    if (codec !== undefined) assertCodec(codec)
-    this.version = options.version === undefined ? 1 : options.version
-    validateDefinition(options as IEntityOptions<TDomain, TStored>, this.version)
-    if (options.features !== undefined && !Array.isArray(options.features))
-      invalidDefinition(EntityText.featuresMustBeArray)
-    /** Index declaration errors retain their original precedence before scalar/migration admission. */
-    const features = [...(options.features ?? [])]
-    /** Reject malformed or repeated explicit units before any definition callback executes. */
-    const declaredFeatures = new Set<string>()
-    for (const feature of features) {
-      if (
-        feature === null ||
-        typeof feature !== 'object' ||
-        typeof feature.name !== 'string' ||
-        typeof feature.create !== 'function' ||
-        (feature.configure !== undefined && typeof feature.configure !== 'function') ||
-        declaredFeatures.has(feature.name)
-      )
-        invalidDefinition(EntityText.featuresMustBeArray)
-      declaredFeatures.add(feature.name)
-    }
+    this.#id = id
+    this.#core = core
+    /** Duplicate and missing roles are rejected in this native installation window. */
+    const assembly = snapshotEntityUnits(record)
+    this.#roles = assembly.roles
     if (
       options.indexes !== undefined &&
-      !features.some(
-        (feature) =>
-          feature.name === EntityFeatureName.indexes || feature.name === EntityFeatureName.unique
-      )
+      !assembly.roles.has(EntityFeatureName.indexes) &&
+      !assembly.roles.has(EntityFeatureName.unique)
     )
       missingEntityFeature(EntityFeatureName.indexes)
     if (
-      (this.version !== 1 || options.migrations !== undefined) &&
-      !features.some((feature) => feature.name === EntityFeatureName.migration)
+      (version !== 1 || options.migrations !== undefined) &&
+      !assembly.roles.has(EntityFeatureName.migration)
     )
       missingEntityFeature(EntityFeatureName.migration)
-    const configured: Partial<IRepositoryConfig<TDomain, TStored>> = Object.assign(
-      {},
-      ...features.map((feature) => feature.configure?.(options))
-    )
+    /** Configuration callbacks remain declaration-only; installed outputs hold capability factories. */
+    const configured = configureEntityUnits(assembly, options)
+    /** Indexes/unique share their one canonical immutable projection. */
     const indexes = configured.indexes ?? {}
-    if (
-      Object.values(indexes).some((index) => index.definition.unique) &&
-      !features.some((feature) => feature.name === EntityFeatureName.unique)
-    )
+    /** Every repository borrows the same immutable unique projection of the admitted snapshots. */
+    const uniqueIndexes: Record<string, (typeof indexes)[string]> = {}
+    /** Native/fallback commits reuse the exact existing definition identities in declaration order. */
+    const uniqueDefinitions: (typeof indexes)[string]['definition'][] = []
+    for (const [key, index] of Object.entries(indexes)) {
+      if (!index.definition.unique) continue
+      uniqueIndexes[key] = index
+      uniqueDefinitions.push(index.definition)
+    }
+    if (uniqueDefinitions.length !== 0 && !assembly.roles.has(EntityFeatureName.unique))
       missingEntityFeature(EntityFeatureName.unique)
-    validateDefinition(options as IEntityOptions<TDomain, TStored>, this.version)
-    this.name = options.name
     this.#configuration = {
-      name: this.name,
+      name: options.name,
       key: options.key,
-      version: this.version,
+      version,
       migrationPlan: configured.migrationPlan,
-      features,
+      units: this.#units,
+      signal: core.lifecycle.signal,
       schema,
-      codec,
+      codec: options.codec,
       validateOnRead: options.validateOnRead ?? true,
       onDiagnostic: options.onDiagnostic ?? defaultDiagnostic,
       defaultOrderBy: options.defaultOrderBy,
-      indexes
+      indexes,
+      uniqueIndexes,
+      uniqueDefinitions
     }
   }
-  /** The own arrow retains the original extractable connect method without taking store ownership. */
-  readonly connect = <S extends IEntityConnectStore>(
-    store: S,
-    connectOptions?: IEntityConnectOptions
-  ): IRepository<
-    TDomain,
-    Readonly<Record<string, import('@migaia/storage-contract').IStorageKey>>,
-    S extends { readonly capabilities: { readonly changeFeed: true } } ? true : false,
-    IEntityStoreQueryMethods<S>
-  > =>
-    createRepository<
-      TDomain,
-      TStored,
-      Readonly<Record<string, import('@migaia/storage-contract').IStorageKey>>,
-      IEntityStoreQueryMethods<S>,
-      S extends { readonly capabilities: { readonly changeFeed: true } } ? true : false
-    >(this.#configuration, store, connectOptions)
+
+  /** The native host creates feature outputs before invoking this single install callback. */
+  descriptor() {
+    return { install: () => this.#install() }
+  }
+
+  /** Publish the flat guarded native repository extension after indexing exact factory outputs. */
+  #install(): Record<TId, IEntityRepositoryAccess<TDomain, Readonly<Record<string, IStorageKey>>>> {
+    for (const [role, key] of this.#roles)
+      this.#units.push({ role, factory: this.#core.features[key] as IRepositoryUnitFactory })
+    return {
+      [this.#id]: (store: IEntityConnectStore, options?: IEntityConnectOptions) =>
+        createRepository(this.#configuration, store, options)
+    } as Record<TId, IEntityRepositoryAccess<TDomain, Readonly<Record<string, IStorageKey>>>>
+  }
 }
 
-/**
- * Defines a record entity declaratively. `connect()` binds the definition to a backend and returns
- * a repository for repeated `get`, `put`, `remove`, `list`, `stream`, and `batch` calls. The same
- * definition can connect to multiple backends with capability-selected codec/query routes.
- * Definition errors throw INVALID_CONFIG before backend use; version defaults to 1 and
- * validateOnRead to true. The curried form is required when declaring indexes; each connected Store
- * retains its disposal ownership.
- */
-export function defineEntity<TDomain, TStored = TDomain>(
-  options: IEntityOptions<TDomain, TStored, never> & { readonly indexes?: undefined }
-): IEntityDefinition<TDomain>
-/** Choose the domain type first, then infer literal index names from the supplied entity options. */
-export function defineEntity<TDomain, TStored = TDomain>(): IDefineEntityBuilder<TDomain, TStored>
-export function defineEntity<TDomain, TStored = TDomain>(
-  options?: IEntityOptions<
-    TDomain,
-    TStored,
-    Readonly<Record<string, IEntityIndex<TDomain>>> | undefined
-  >,
-  allowCurriedIndexes = false
+/** Capture a reusable declaration; host installation creates its native registration state. */
+class EntityPluginDefinition<TDomain, TStored, TId extends string> {
+  /** Plugin registration identity is independent of its persisted entity namespace. */
+  readonly #id: TId
+  /** Scalar choices and original schema/codec receivers are captured before asynchronous install. */
+  readonly #options: IEntityPluginOptions<TDomain, TStored, any>
+  /** Native root admission is snapshotted while role-dependent failures remain install-time. */
+  readonly #record: IFeatureRecord
+  /** The original schema remains authoritative for every repository obtained from this plugin. */
+  readonly #schema: ISchemaAdapter<TDomain, TStored>
+  /** One validated target version supplies migration admission in each host installation. */
+  readonly #version: number
+
+  /** Validate scalar declaration facts without running role admission or creating a repository. */
+  constructor(id: TId, options: IEntityPluginOptions<TDomain, TStored, any>) {
+    if (options === null || typeof options !== 'object' || Array.isArray(options))
+      invalidDefinition(EntityText.entityDefinitionMustBeAnObject)
+    this.#id = id
+    this.#version = options.version === undefined ? 1 : options.version
+    validateDefinition(options, this.#version)
+    if (options.schema !== undefined) assertEntitySchema<TDomain, TStored>(options.schema)
+    if (options.codec !== undefined) assertCodec(options.codec)
+    this.#schema =
+      options.schema === undefined
+        ? (passthrough<TDomain>() as unknown as ISchemaAdapter<TDomain, TStored>)
+        : options.schema
+    this.#record = captureEntityUnitRecord(options.features)
+    this.#options = { ...options, features: this.#record }
+  }
+
+  /** Existing storage admission installs this actual native plugin, with no private Host. */
+  plugin(): IEntityPlugin<TDomain, Readonly<Record<string, IStorageKey>>, TId> {
+    return definePlugin(this.#id, (core) => this.#descriptor(core), this.#record, entityUnitTarget)
+  }
+
+  /** One descriptor owner is created per host installation, before native feature construction. */
+  #descriptor(core: IEntityPluginCore) {
+    return new EntityPluginRegistration(
+      this.#id,
+      this.#options,
+      this.#schema,
+      this.#version,
+      this.#record,
+      core
+    ).descriptor()
+  }
+}
+
+/** Build a declaration from either public call form without retaining a closure-based component. */
+function createEntityPlugin<TDomain, TStored, const TId extends string>(
+  id: TId,
+  options: IEntityPluginOptions<TDomain, TStored, any>
+): IEntityPlugin<TDomain, Readonly<Record<string, IStorageKey>>, TId> {
+  return new EntityPluginDefinition(id, options).plugin()
+}
+
+/** Select an explicit domain first, then infer the plugin id and literal index contract. */
+export function defineEntityPlugin<TDomain, TStored = TDomain>(): IDefineEntityPluginBuilder<
+  TDomain,
+  TStored
+>
+/** Infer an entity's domain and stored form from its schema while preserving its literal id. */
+export function defineEntityPlugin<
+  const TId extends string,
+  TDomain,
+  TStored = TDomain,
+  const TIndexes extends Readonly<Record<string, IEntityIndex<TDomain>>> | undefined = undefined
+>(
+  id: TId,
+  options: IEntityPluginOptions<TDomain, TStored, TIndexes>
+): IEntityPlugin<
+  TDomain,
+  TIndexes extends Readonly<Record<string, IEntityIndex<TDomain>>>
+    ? IEntityIndexMap<TDomain, TIndexes>
+    : Readonly<Record<never, IStorageKey>>,
+  TId
+>
+/** Dispatch declaration forms; native factories run only when a storage host installs the plugin. */
+export function defineEntityPlugin<TDomain, TStored = TDomain>(
+  id?: string,
+  options?: IEntityPluginOptions<TDomain, TStored, any>
 ):
-  | IEntityDefinition<
-      TDomain,
-      Readonly<Record<string, import('@migaia/storage-contract').IStorageKey>>
-    >
-  | IDefineEntityBuilder<TDomain, TStored> {
+  | IDefineEntityPluginBuilder<TDomain, TStored>
+  | IEntityPlugin<TDomain, Readonly<Record<string, IStorageKey>>> {
   if (arguments.length === 0)
-    return ((
-      configured: IEntityOptions<TDomain, TStored, Readonly<Record<string, IEntityIndex<TDomain>>>>
-    ) => new EntityDefinition(configured, true)) as IDefineEntityBuilder<TDomain, TStored>
+    return createEntityPlugin as IDefineEntityPluginBuilder<TDomain, TStored>
   if (options === undefined) return invalidDefinition(EntityText.entityDefinitionMustBeAnObject)
-  return new EntityDefinition(options, allowCurriedIndexes)
+  return createEntityPlugin(id!, options)
 }

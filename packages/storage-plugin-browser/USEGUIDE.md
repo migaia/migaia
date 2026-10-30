@@ -158,23 +158,22 @@ try {
 
 ## 实体仓储
 
-基础 `defineEntity` 只定义、连接和读写。查询在实体配置的 `features` 中选择 `entityQueryFeature()`（`@migaia/storage-host/entity/features/query`）；唯一约束选择 `/entity/features/unique` 的 `entityUniqueFeature()`；迁移选择 `/entity/features/migration` 的 `entityMigrationFeature()`；索引规划选择 `/entity/features/indexes` 的 `entityIndexesFeature()`；keyset 分页选择 `/entity/features/keyset` 的 `entityKeysetFeature()`。索引查询组合 query 与 indexes，分页组合 query 与 keyset；IndexedDB 原生索引还需后端的 `indexedDbIndexesFeature()`。各项独立声明，不会自动安装。
+`defineEntityPlugin` 声明实体插件，每个实体安装到 storage host 一次。查询在实体配置的 `features` 中选择 `entityQueryFeature()`（`@migaia/storage-host/entity/features/query`）；唯一约束选择 `/entity/features/unique` 的 `entityUniqueFeature()`；迁移选择 `/entity/features/migration` 的 `entityMigrationFeature()`；索引规划选择 `/entity/features/indexes` 的 `entityIndexesFeature()`；keyset 分页选择 `/entity/features/keyset` 的 `entityKeysetFeature()`。索引查询组合 query 与 indexes，分页组合 query 与 keyset；IndexedDB 原生索引还需后端的 `indexedDbIndexesFeature()`。各项独立声明，不会自动安装。
 
 从 `@migaia/storage-host/entity` 导入中立仓储定义，并连接实际已安装的 IndexedDB 存储。
 
 ```ts
 import { createStorageHost } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-db'
 
 type IUser = { id: string; name: string }
+const usersEntityPlugin = defineEntityPlugin<IUser>()('users', { name: 'users', key: 'id' })
 const host = await createStorageHost({
-  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' })]
+  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }), usersEntityPlugin]
 })
 try {
-  const users = defineEntity<IUser>({ name: 'users', key: 'id' }).connect(
-    host.backend('indexed-db')
-  )
+  const users = host.extensions[usersEntityPlugin.id](host.backend('indexed-db'))
   await users.put({ id: 'a', name: 'Ada' })
   console.log(await users.get('a'))
 } finally {

@@ -16,9 +16,9 @@ import '../test/helpers/browser-text-redo.ts'
 import { cookieBackendPlugin } from '../src/cookies.ts'
 import { indexedDbBackendPlugin, type IIndexedDbBackendStore } from '../src/indexed-db.ts'
 import { localStorageBackendPlugin } from '../src/local-storage.ts'
-import { createStorageHost } from '@migaia/storage-host'
+import { createStorageHost, type IStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { fromStandardSchema } from '@migaia/storage-host/entity'
 import { assertVersionedEnvelope } from '@migaia/storage-contract'
 import {
@@ -43,6 +43,18 @@ import {
   runPersistNativeConsumerScenario,
   runPersistCrossTaskCodecScenario
 } from '../../store-persist/test/helpers/native-transaction.ts'
+
+/** Install-time entity admission keeps its original semantic code under native wrappers. */
+function entityAdmissionCode(error: unknown): string | undefined {
+  const failure = walkErrorCauses(error).find(
+    (cause) =>
+      cause !== null &&
+      typeof cause === 'object' &&
+      'code' in cause &&
+      cause.code === 'INVALID_CONFIG'
+  )
+  return (failure as { code?: string } | undefined)?.code ?? (error as { code?: string })?.code
+}
 
 /** Installer scenarios classify the original native Web error through the public host chain. */
 const browserFailure = (error: unknown): { code?: string; cause?: unknown } =>
@@ -89,13 +101,19 @@ type ILeaseFailure = { source?: string; code?: string; name?: string; message?: 
 /** Completion proves the current generation and sidecar survived the stale owner's return. */
 type ILeaseOwnerResult = { readiness: string; indexed: number; failures: ILeaseFailure[] }
 
+/** Exact native fixture host retains the real backend registration and extension inference. */
+type ILeaseHost = IStorageHost<
+  readonly [ReturnType<typeof indexedDbBackendPlugin<'indexed-db', typeof indexedDbTestFeatures>>]
+>
 /** Construct only a public repository; the backend owns every native backfill resource. */
-const indexedLeaseRepository = (
+const indexedLeaseRepository = async (
+  host: ILeaseHost,
   store: IIndexedDbBackendStore,
   name: string,
   decode?: () => Promise<void>
-) =>
-  defineEntity<ILeaseRow>()({
+) => {
+  /** Explicit native declaration owns this scenario's optional repository capabilities. */
+  const leaseEntityPlugin = defineEntityPlugin<ILeaseRow>()(`lease-index-${name}`, {
     features: entityTestFeatures,
     name,
     key: 'id',
@@ -108,11 +126,20 @@ const indexedLeaseRepository = (
       }
     },
     indexes: { value: { path: 'value' } }
-  }).connect(store)
+  })
+  /** Install once on the real fixture host and retain exact extension inference. */
+  const entityHost = await host.use(leaseEntityPlugin)
+  return entityHost.extensions[leaseEntityPlugin.id](store)
+}
 
 /** Seed through an unindexed public repository so its later query must perform real backfill. */
-const seedLeaseRepository = async (store: IIndexedDbBackendStore, name: string): Promise<void> => {
-  const baseline = defineEntity<ILeaseRow>({
+const seedLeaseRepository = async (
+  host: ILeaseHost,
+  store: IIndexedDbBackendStore,
+  name: string
+): Promise<void> => {
+  /** Explicit native declaration owns this scenario's optional repository capabilities. */
+  const baselineEntityPlugin = defineEntityPlugin<ILeaseRow>()(`lease-seed-${name}`, {
     features: entityTestFeatures,
     name,
     key: 'id',
@@ -120,7 +147,11 @@ const seedLeaseRepository = async (store: IIndexedDbBackendStore, name: string):
       name: 'browser-backfill-schema',
       validate: async (value) => value as ILeaseRow
     }
-  }).connect(store)
+  })
+  /** Install once on the real fixture host and retain exact extension inference. */
+  const entityHost = await host.use(baselineEntityPlugin)
+  /** Borrow the supplied backend through the installed repository capability factories. */
+  const baseline = entityHost.extensions[baselineEntityPlugin.id](store)
   await baseline.put({ id: 'seed', value: 1 })
   await baseline.migrate()
 }
@@ -143,7 +174,7 @@ const browserBackfillLeaseContenders = new Map<
     host: { dispose(): Promise<void> }
     store: IIndexedDbBackendStore
     handle: IRecordIndexHandle
-    repository: ReturnType<typeof indexedLeaseRepository>
+    repository: Awaited<ReturnType<typeof indexedLeaseRepository>>
   }
 >()
 
@@ -2129,51 +2160,69 @@ window.runIndexedDbEntityMigrationScenario = async () => {
   })
   try {
     const store = storeHost.backend('indexed-db')
-    const entity = defineEntity<{ id: string; displayName: string }>({
-      features: entityTestFeatures,
-      name: 'browser-migrate',
-      key: 'id',
-      version: 2,
-      migrations: {
-        2: async (value: unknown) => {
-          const input = value as { id: string; name: string }
-          return { id: input.id, displayName: input.name }
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'main-ts-2132',
+      {
+        features: entityTestFeatures,
+        name: 'browser-migrate',
+        key: 'id',
+        version: 2,
+        migrations: {
+          2: async (value: unknown) => {
+            const input = value as { id: string; name: string }
+            return { id: input.id, displayName: input.name }
+          }
         }
       }
-    })
+    )
     await store.putRecord({ version: 1, state: { id: 'a', name: 'Ada' } }, ['browser-migrate', 'a'])
-    const result = await entity.connect(store).migrate({ batchSize: 1 })
-    const value = await entity.connect(store).get('a')
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const result = await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate({
+      batchSize: 1
+    })
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const value = await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).get('a')
     const legacyValue = await store.getRecord(['browser-migrate', 'a'])
     let invalidBatchCode: string | undefined
     try {
-      await entity.connect(store).migrate({ batchSize: null as never })
+      await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate({
+        batchSize: null as never
+      })
     } catch (error) {
       invalidBatchCode = (error as { code?: string }).code
     }
     const invalidOptionsCodes: Array<string | undefined> = []
     for (const options of [null, [], 'options', 1]) {
       try {
-        await entity.connect(store).migrate(options as never)
+        await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate(
+          options as never
+        )
       } catch (error) {
         invalidOptionsCodes.push((error as { code?: string }).code)
       }
     }
     try {
-      await entity.connect(store).migrate({ batchSize: Number.MAX_SAFE_INTEGER + 1 })
+      await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate({
+        batchSize: Number.MAX_SAFE_INTEGER + 1
+      })
     } catch (error) {
       invalidOptionsCodes.push((error as { code?: string }).code)
     }
     const invalidBatchCallbackCodes: Array<string | undefined> = []
     for (const callback of [null, undefined, {}, 'run']) {
       try {
-        await entity.connect(store).batch(callback as never)
+        await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).batch(
+          callback as never
+        )
       } catch (error) {
         invalidBatchCallbackCodes.push((error as { code?: string }).code)
       }
     }
     let migrationOptionReads = 0
-    await entity.connect(store).migrate({
+    await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate({
       get batchSize() {
         migrationOptionReads += 1
         if (migrationOptionReads > 1) throw new Error('batchSize read twice')
@@ -2225,8 +2274,10 @@ window.runIndexedDbConcurrentEntityMigrationScenario = async () => {
       })
       try {
         const second = secondHost.backend('indexed-db')
-        const createEntity = () =>
-          defineEntity<{ id: string; displayName: string }>({
+        /** Explicit native declaration owns this scenario's optional repository capabilities. */
+        const concurrentEntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+          'main-ts-2229',
+          {
             features: entityTestFeatures,
             name: 'browser-concurrent-migrate',
             key: 'id',
@@ -2237,15 +2288,21 @@ window.runIndexedDbConcurrentEntityMigrationScenario = async () => {
                 return { id: input.id, displayName: input.name }
               }
             }
-          })
+          }
+        )
+        /** Install once on the real fixture host and retain exact extension inference. */
+        const firstEntityHost = await firstHost.use(concurrentEntityPlugin)
+        /** Install once on the real fixture host and retain exact extension inference. */
+        const secondEntityHost = await secondHost.use(concurrentEntityPlugin)
+        /** Borrow the supplied backend through the installed repository capability factories. */
+        const firstRepository = firstEntityHost.extensions[concurrentEntityPlugin.id](first)
+        /** Borrow the supplied backend through the installed repository capability factories. */
+        const secondRepository = secondEntityHost.extensions[concurrentEntityPlugin.id](second)
         const [firstResult, secondResult] = await Promise.all([
-          createEntity().connect(first).migrate({ batchSize: 1 }),
-          createEntity().connect(second).migrate({ batchSize: 1 })
+          firstRepository.migrate({ batchSize: 1 }),
+          secondRepository.migrate({ batchSize: 1 })
         ])
-        const values = await Promise.all([
-          createEntity().connect(first).get('a'),
-          createEntity().connect(first).get('b')
-        ])
+        const values = await Promise.all([firstRepository.get('a'), firstRepository.get('b')])
         const legacyValues = await Promise.all([
           first.getRecord(['browser-concurrent-migrate', 'a']),
           first.getRecord(['browser-concurrent-migrate', 'b'])
@@ -2375,8 +2432,8 @@ window.runIndexedDbRawIndexFirewallScenario = async () => {
     > = {}
     for (const [label, rawKey] of rawKeys) {
       const name = `browser-raw-${label}`
-      await seedLeaseRepository(store, name)
-      await indexedLeaseRepository(store, name).query().index('value').all()
+      await seedLeaseRepository(storeHost, store, name)
+      await (await indexedLeaseRepository(storeHost, store, name)).query().index('value').all()
       const oldHandle = await store.ensureRecordIndexes(name, definitions)
       if ((await store.getRecordIndexReadiness(oldHandle)).status !== 'complete')
         throw new Error('public indexed query did not complete backfill')
@@ -2396,8 +2453,8 @@ window.runIndexedDbRawIndexFirewallScenario = async () => {
     }
     await store.clearRecords()
     const name = 'browser-raw-rollback'
-    await seedLeaseRepository(store, name)
-    await indexedLeaseRepository(store, name).query().index('value').all()
+    await seedLeaseRepository(storeHost, store, name)
+    await (await indexedLeaseRepository(storeHost, store, name)).query().index('value').all()
     const handle = await store.ensureRecordIndexes(name, definitions)
     /** Read the actual public record key rather than importing private repository key composition. */
     let seed: readonly [IStorageKey, unknown] | undefined
@@ -2459,11 +2516,11 @@ window.startIndexedDbBackfillLeaseOwner = async (dbName) => {
   })
   const store = host.backend('indexed-db')
   const name = 'lease-pages'
-  await seedLeaseRepository(store, name)
+  await seedLeaseRepository(host, store, name)
   const entered = deferred<void>()
   const gate = deferred<void>()
   let first = true
-  const repository = indexedLeaseRepository(store, name, async () => {
+  const repository = await indexedLeaseRepository(host, store, name, async () => {
     if (!first) return
     first = false
     entered.resolve()
@@ -2495,7 +2552,12 @@ window.contendIndexedDbBackfillLease = async (dbName) => {
     const handle = await store.ensureRecordIndexes('lease-pages', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    contender = { host, store, handle, repository: indexedLeaseRepository(store, 'lease-pages') }
+    contender = {
+      host,
+      store,
+      handle,
+      repository: await indexedLeaseRepository(host, store, 'lease-pages')
+    }
     browserBackfillLeaseContenders.set(dbName, contender)
   }
   const rows = await contender.repository.query().index('value').all()
@@ -2609,14 +2671,20 @@ window.runOperationLifecycleScenario = async () => {
       conflictPolicy: 'replace' as const
     }
     await memory.set('context-snapshot', 'value', context)
-    const lifecycleEntity = defineEntity<{ id: string }>({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const lifecycleEntityPlugin = defineEntityPlugin<{ id: string }>()('main-ts-2612', {
       features: entityTestFeatures,
       name: 'operation-lifecycle',
       key: 'id'
     })
     const stableSnapshot = snapshotOperationContext({ signal: contextController.signal })
     await withAbort(stableSnapshot, async () => undefined)
-    await lifecycleEntity.connect(memory).put({ id: 'snapshot' }, context)
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const lifecycleEntityPluginHost = await memoryHost.use(lifecycleEntityPlugin)
+    await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.id](memory).put(
+      { id: 'snapshot' },
+      context
+    )
     let memoryTimeoutCode: string | undefined
     try {
       await memory.set('timeout', 'no-write', { timeoutMs: 0 })
@@ -2684,7 +2752,7 @@ window.runOperationLifecycleScenario = async () => {
     })
     let extensionListenerSetupCode: string | undefined
     try {
-      await lifecycleEntity.connect(memory).put(
+      await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.id](memory).put(
         { id: 'extension-listener-setup' },
         {
           signal: {
@@ -2699,7 +2767,7 @@ window.runOperationLifecycleScenario = async () => {
     } catch (error) {
       extensionListenerSetupCode = (error as { code?: string }).code
     }
-    await lifecycleEntity.connect(memory).put(
+    await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.id](memory).put(
       { id: 'extension-listener-cleanup' },
       {
         signal: {
@@ -2712,8 +2780,11 @@ window.runOperationLifecycleScenario = async () => {
       }
     )
     const extensionCleanupPreserved =
-      (await lifecycleEntity.connect(memory).get('extension-listener-cleanup'))?.id ===
-      'extension-listener-cleanup'
+      (
+        await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.id](memory).get(
+          'extension-listener-cleanup'
+        )
+      )?.id === 'extension-listener-cleanup'
     let migrationListenerSetupCode: string | undefined
     try {
       await migrateEnvelope(
@@ -3110,7 +3181,8 @@ window.runIndexedDbExtensionFailureScenario = async () => {
   })
   try {
     const store = storeHost.backend('indexed-db')
-    const entity = defineEntity<{ id: string; value: string }>({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; value: string }>()('main-ts-3113', {
       features: entityTestFeatures,
       name: 'browser-extension-failure',
       key: 'id',
@@ -3123,7 +3195,10 @@ window.runIndexedDbExtensionFailureScenario = async () => {
         decode: async (value: unknown) => value
       }
     })
-    const repo = entity.connect(store)
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](store)
     let code: string | undefined
     try {
       await repo.put({ id: 'broken', value: 'value' })
@@ -3152,12 +3227,17 @@ window.runIndexedDbFutureVersionScenario = async () => {
       'browser-future-version',
       'future'
     ])
-    const repo = defineEntity<{ id: string; name: string }>({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repoEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()('main-ts-3155', {
       features: entityTestFeatures,
       name: 'browser-future-version',
       key: 'id',
       version: 1
-    }).connect(store)
+    })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
     let getCode: string | undefined
     try {
       await repo.get('future')
@@ -3195,7 +3275,8 @@ window.runIndexedDbHangingExtensionAbortScenario = async () => {
   })
   try {
     const store = storeHost.backend('indexed-db')
-    const entity = defineEntity<{ id: string; name: string }>({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()('main-ts-3198', {
       features: entityTestFeatures,
       name: 'browser-hanging-extension',
       key: 'id',
@@ -3207,9 +3288,13 @@ window.runIndexedDbHangingExtensionAbortScenario = async () => {
       }
     })
     const controller = new AbortController()
-    const pending = entity
-      .connect(store)
-      .put({ id: 'hanging', name: 'Ada' }, { signal: controller.signal })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const pending = entityEntityPluginHost.extensions[entityEntityPlugin.id](store).put(
+      { id: 'hanging', name: 'Ada' },
+      { signal: controller.signal }
+    )
     await Promise.resolve()
     controller.abort('cancel hanging codec')
     let code: string | undefined
@@ -3240,21 +3325,30 @@ window.runIndexedDbHangingMigrationAbortScenario = async () => {
       'browser-hanging-migration',
       'hanging'
     ])
-    const entity = defineEntity<{ id: string; displayName: string }>({
-      features: entityTestFeatures,
-      name: 'browser-hanging-migration',
-      key: 'id',
-      version: 2,
-      migrations: {
-        2: async (_value: unknown, context) => {
-          receivedSignal = context.signal === controller.signal
-          return new Promise<unknown>(() => {})
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'main-ts-3243',
+      {
+        features: entityTestFeatures,
+        name: 'browser-hanging-migration',
+        key: 'id',
+        version: 2,
+        migrations: {
+          2: async (_value: unknown, context) => {
+            receivedSignal = context.signal === controller.signal
+            return new Promise<unknown>(() => {})
+          }
         }
       }
-    })
+    )
     const controller = new AbortController()
     let receivedSignal = false
-    const pending = entity.connect(store).get('hanging', { signal: controller.signal })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const pending = entityEntityPluginHost.extensions[entityEntityPlugin.id](store).get('hanging', {
+      signal: controller.signal
+    })
     for (let attempt = 0; attempt < 100 && !receivedSignal; attempt += 1)
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
     if (!receivedSignal) throw new Error('migration callback did not start')
@@ -3284,7 +3378,8 @@ window.runIndexedDbPreAbortExtensionScenario = async () => {
   try {
     const store = storeHost.backend('indexed-db')
     let calls = 0
-    const entity = defineEntity<{ id: string; name: string }>({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()('main-ts-3287', {
       features: entityTestFeatures,
       name: 'browser-pre-abort-extension',
       key: 'id',
@@ -3302,7 +3397,12 @@ window.runIndexedDbPreAbortExtensionScenario = async () => {
     controller.abort('already cancelled')
     let code: string | undefined
     try {
-      await entity.connect(store).put({ id: 'u1', name: 'Ada' }, { signal: controller.signal })
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+      await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).put(
+        { id: 'u1', name: 'Ada' },
+        { signal: controller.signal }
+      )
     } catch (error) {
       code = (error as { code?: string }).code
     }
@@ -3323,7 +3423,8 @@ window.runIndexedDbPreAbortMigrationScenario = async () => {
   })
   try {
     const store = storeHost.backend('indexed-db')
-    const entity = defineEntity<{ id: string; name: string }>({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()('main-ts-3326', {
       features: entityTestFeatures,
       name: 'browser-pre-abort-migration',
       key: 'id',
@@ -3333,7 +3434,11 @@ window.runIndexedDbPreAbortMigrationScenario = async () => {
     controller.abort('already cancelled')
     let code: string | undefined
     try {
-      await entity.connect(store).get('missing', { signal: controller.signal })
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+      await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).get('missing', {
+        signal: controller.signal
+      })
     } catch (error) {
       code = (error as { code?: string }).code
     }
@@ -3354,7 +3459,8 @@ window.runIndexedDbSchemaFailureScenario = async () => {
   })
   try {
     const store = storeHost.backend('indexed-db')
-    const entity = defineEntity<{ id: string; name: string }>({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()('main-ts-3357', {
       features: entityTestFeatures,
       name: 'browser-schema-failure',
       key: 'id',
@@ -3367,7 +3473,12 @@ window.runIndexedDbSchemaFailureScenario = async () => {
     })
     let code: string | undefined
     try {
-      await entity.connect(store).put({ id: 'invalid', name: 'Ada' })
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+      await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).put({
+        id: 'invalid',
+        name: 'Ada'
+      })
     } catch (error) {
       code = (error as { code?: string }).code
     }
@@ -3455,11 +3566,20 @@ window.runIndexedDbPagedScanScenario = async () => {
       }
     }
     /** This repository uses the same public store and its authentic transaction scopes. */
-    const streamed = defineEntity<{ id: string; index: number }>({
-      features: entityTestFeatures,
-      name: 'query-stream-resources',
-      key: 'id'
-    }).connect(store, { queryStages })
+    const streamedEntityPlugin = defineEntityPlugin<{ id: string; index: number }>()(
+      'main-ts-3458',
+      {
+        features: entityTestFeatures,
+        name: 'query-stream-resources',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const streamedEntityPluginHost = await storeHost.use(streamedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const streamed = streamedEntityPluginHost.extensions[streamedEntityPlugin.id](store, {
+      queryStages
+    })
     await streamed.put({ id: 'one', index: 7 })
     /** One asynchronous mapper is shared by the four actual root and scoped stream paths. */
     const mapStreamRow = async (value: { index: number }) => {
@@ -4310,7 +4430,8 @@ window.runIndexedDbOptionsGuardScenario = async () => {
 
 /** 真实浏览器验证 JS 边界传入非法 entity definition 时仍返回统一错误码。 */
 window.runEntityDefinitionGuardScenario = async () => {
-  const definition = defineEntity<{ id: string }>({
+  /** Explicit native declaration owns this scenario's optional repository capabilities. */
+  const definitionEntityPlugin = defineEntityPlugin<{ id: string }>()('main-ts-4313', {
     features: entityTestFeatures,
     name: 'browser-definition',
     key: 'id',
@@ -4326,7 +4447,11 @@ window.runEntityDefinitionGuardScenario = async () => {
     plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
   })
   try {
-    await definition.connect(definitionMemoryHost.backend('memory')).put({ id: 'stable' })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const definitionEntityPluginHost = await definitionMemoryHost.use(definitionEntityPlugin)
+    await definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+      definitionMemoryHost.backend('memory')
+    ).put({ id: 'stable' })
     const malformedStore = { backend: 'memory' }
     const storePredicates = [
       isKeyValueStore(malformedStore),
@@ -4335,20 +4460,23 @@ window.runEntityDefinitionGuardScenario = async () => {
     const codes: Array<string | undefined> = []
     for (const value of [null, undefined, [], 'entity', 42, true]) {
       try {
-        defineEntity(value as never)
+        defineEntityPlugin('main-ts-4338', value as never)
       } catch (error) {
         codes.push((error as { code?: string }).code)
       }
     }
-    const entity = defineEntity<{ id: string }>({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string }>()('main-ts-4343', {
       features: entityTestFeatures,
       name: 'browser-store-guard',
       key: 'id'
     })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const storeGuardHost = await definitionMemoryHost.use(entityEntityPlugin)
     const storeCodes: Array<string | undefined> = []
     for (const store of [null, undefined, [], {}, { backend: 'memory' }]) {
       try {
-        entity.connect(store as never)
+        storeGuardHost.extensions[entityEntityPlugin.id](store as never)
       } catch (error) {
         storeCodes.push((error as { code?: string }).code)
       }
@@ -4358,11 +4486,13 @@ window.runEntityDefinitionGuardScenario = async () => {
       plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
     })
     try {
-      entity.connect(entityMemoryHost.backend('memory'))
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const entityEntityPluginHost = await entityMemoryHost.use(entityEntityPlugin)
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](entityMemoryHost.backend('memory'))
       const codecCodes: Array<string | undefined> = []
       for (const codec of [null, [], {}, { name: 'codec' }, { name: 'codec', output: 'unknown' }]) {
         try {
-          defineEntity({
+          defineEntityPlugin('main-ts-4365', {
             features: entityTestFeatures,
             name: 'browser-codec-guard',
             key: 'id',
@@ -4375,7 +4505,7 @@ window.runEntityDefinitionGuardScenario = async () => {
       const schemaCodes: Array<string | undefined> = []
       for (const schema of [null, [], {}, { name: 'schema' }, { name: 'schema', validate: true }]) {
         try {
-          defineEntity({
+          defineEntityPlugin('main-ts-4378', {
             features: entityTestFeatures,
             name: 'browser-schema-guard',
             key: 'id',
@@ -4388,20 +4518,22 @@ window.runEntityDefinitionGuardScenario = async () => {
       const migrationCodes: Array<string | undefined> = []
       for (const migrations of [null, [], 'migrations', 42]) {
         try {
-          defineEntity({
+          /** Explicit native declaration owns this scenario's optional repository capabilities. */
+          const migrationGuardEntityPlugin = defineEntityPlugin('main-ts-4391', {
             features: entityTestFeatures,
             name: 'browser-migration-guard',
             key: 'id',
             version: 1,
             migrations
           } as never)
+          await entityMemoryHost.use(migrationGuardEntityPlugin)
         } catch (error) {
-          migrationCodes.push((error as { code?: string }).code)
+          migrationCodes.push(entityAdmissionCode(error))
         }
       }
       const versionCodes: Array<string | undefined> = []
       try {
-        defineEntity({
+        defineEntityPlugin('main-ts-4404', {
           features: entityTestFeatures,
           name: 'browser-unsafe-version',
           key: 'id',
@@ -4412,32 +4544,36 @@ window.runEntityDefinitionGuardScenario = async () => {
       }
       const migrationVersionCodes: Array<string | undefined> = []
       try {
-        defineEntity({
+        /** Explicit native declaration owns this scenario's optional repository capabilities. */
+        const migrationVersionEntityPlugin = defineEntityPlugin('main-ts-4415', {
           features: entityTestFeatures,
           name: 'browser-unsafe-migration-version',
           key: 'id',
           version: Number.MAX_SAFE_INTEGER,
           migrations: { '9007199254740993': async (value: unknown) => value }
         } as never)
+        await entityMemoryHost.use(migrationVersionEntityPlugin)
       } catch (error) {
-        migrationVersionCodes.push((error as { code?: string }).code)
+        migrationVersionCodes.push(entityAdmissionCode(error))
       }
       const prototypeMigrationCodes: Array<string | undefined> = []
       try {
         const migrations = Object.create({ 2: async (value: unknown) => value })
-        defineEntity({
+        /** Explicit native declaration owns this scenario's optional repository capabilities. */
+        const prototypeMigrationEntityPlugin = defineEntityPlugin('main-ts-4428', {
           features: entityTestFeatures,
           name: 'browser-prototype-migration',
           key: 'id',
           version: 2,
           migrations
         } as never)
+        await entityMemoryHost.use(prototypeMigrationEntityPlugin)
       } catch (error) {
-        prototypeMigrationCodes.push((error as { code?: string }).code)
+        prototypeMigrationCodes.push(entityAdmissionCode(error))
       }
       const nullVersionCodes: Array<string | undefined> = []
       try {
-        defineEntity({
+        defineEntityPlugin('main-ts-4440', {
           features: entityTestFeatures,
           name: 'browser-null-version',
           key: 'id',
@@ -4460,14 +4596,26 @@ window.runEntityDefinitionGuardScenario = async () => {
           clearAll: async () => undefined,
           dispose: async () => undefined
         }
-        defineEntity<{ id: string }>({
+        /** Explicit native declaration owns this scenario's optional repository capabilities. */
+        const alienEntityPlugin = defineEntityPlugin<{ id: string }>()('main-ts-4463', {
           features: entityTestFeatures,
           name: 'browser-alien-store',
           key: 'id'
-        }).connect(alienStore as never)
+        })
+        /** Install once on the real fixture host and retain exact extension inference. */
+        const alienEntityHost = await entityMemoryHost.use(alienEntityPlugin)
+        alienEntityHost.extensions[alienEntityPlugin.id](alienStore as never)
       } catch (error) {
         backendCodes.push((error as { code?: string }).code)
       }
+      /** Explicit native declaration owns this scenario's optional repository capabilities. */
+      const capabilityEntityPlugin = defineEntityPlugin<{ id: string }>()('capability-guard', {
+        features: entityTestFeatures,
+        name: 'browser-capability-guard',
+        key: 'id'
+      })
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const capabilityEntityHost = await entityMemoryHost.use(capabilityEntityPlugin)
       const capabilityCodes: Array<string | undefined> = []
       for (const capabilities of [
         { syncRead: 'yes' },
@@ -4497,31 +4645,29 @@ window.runEntityDefinitionGuardScenario = async () => {
             clearAll: async () => undefined,
             dispose: async () => undefined
           }
-          defineEntity<{ id: string }>({
-            features: entityTestFeatures,
-            name: 'browser-capability-guard',
-            key: 'id'
-          }).connect(malformedStore as never)
+          capabilityEntityHost.extensions[capabilityEntityPlugin.id](malformedStore as never)
         } catch (error) {
           capabilityCodes.push((error as { code?: string }).code)
         }
       }
       const sparseVersionCodes: Array<string | undefined> = []
       try {
-        defineEntity({
+        /** Explicit native declaration owns this scenario's optional repository capabilities. */
+        const sparseVersionEntityPlugin = defineEntityPlugin('main-ts-4511', {
           features: entityTestFeatures,
           name: 'browser-sparse-huge-version',
           key: 'id',
           version: Number.MAX_SAFE_INTEGER,
           migrations: { 2: async (value: unknown) => value }
         } as never)
+        await entityMemoryHost.use(sparseVersionEntityPlugin)
       } catch (error) {
-        sparseVersionCodes.push((error as { code?: string }).code)
+        sparseVersionCodes.push(entityAdmissionCode(error))
       }
       const validateOnReadCodes: Array<string | undefined> = []
       for (const validateOnRead of [null, 'yes', 1, []]) {
         try {
-          defineEntity({
+          defineEntityPlugin('main-ts-4524', {
             features: entityTestFeatures,
             name: 'browser-validate-on-read',
             key: 'id',
@@ -4679,7 +4825,8 @@ window.runEntityDefinitionGuardScenario = async () => {
 
 /** 真实浏览器验证 orderBy comparator 的返回类型不会被 Array.sort 静默转换。 */
 window.runEntityComparatorGuardScenario = async () => {
-  const entity = defineEntity<{ id: string }>({
+  /** Explicit native declaration owns this scenario's optional repository capabilities. */
+  const entityEntityPlugin = defineEntityPlugin<{ id: string }>()('main-ts-4682', {
     features: entityTestFeatures,
     name: 'browser-comparator-guard',
     key: 'id'
@@ -4689,7 +4836,12 @@ window.runEntityComparatorGuardScenario = async () => {
     plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
   })
   try {
-    const repo = entity.connect(entityMemoryHost.backend('memory'))
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await entityMemoryHost.use(entityEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](
+      entityMemoryHost.backend('memory')
+    )
     await repo.put({ id: 'a' })
     await repo.put({ id: 'b' })
     const codes: Array<string | undefined> = []

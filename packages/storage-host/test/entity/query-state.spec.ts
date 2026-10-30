@@ -1,29 +1,38 @@
+import { entityHost } from '../helpers/memory.ts'
 import { entityQueryFeature } from '../../src/entity/query-feature.ts'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.ts'
 import { entityMigrationFeature } from '../../src/entity/migration-feature.ts'
 import { entityIndexesFeature } from '../../src/entity/indexes-feature.ts'
 import { entityKeysetFeature } from '../../src/entity/keyset.ts'
 import { expect, it } from 'vitest'
-import { defineEntity } from '../../src/entity.ts'
+import { defineEntityPlugin } from '../../src/entity.ts'
 import { memoryBackend } from '../helpers/memory.ts'
 
 /** Source and ordering transitions retain the entity adapter around the original shared core. */
 type IRow = { id: string; group: string; score: number }
 
 it('retains default ordering and its finite bound after skip and projection', async () => {
-  const definition = defineEntity<IRow>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
-    name: 'query-state',
-    key: 'id',
-    defaultOrderBy: (left, right) => right.score - left.score
-  })
-  const repo = definition.connect(await memoryBackend())
+  const definitionEntityPlugin = defineEntityPlugin<IRow>()(
+    'entity-query-state-spec-ts-definition-1',
+    {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
+      name: 'query-state',
+      key: 'id',
+      defaultOrderBy: (left, right) => right.score - left.score
+    }
+  )
+  /** This actual storage host owns the entity installation for this test scope. */
+  const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
+
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+    await memoryBackend()
+  )
   await repo.put({ id: 'a', group: 'one', score: 1 })
   await repo.put({ id: 'b', group: 'one', score: 2 })
   expect(() => repo.query().skip(0).all()).toThrowError(
@@ -35,18 +44,26 @@ it('retains default ordering and its finite bound after skip and projection', as
 })
 
 it('preserves entity controls after selector and distinct branches', async () => {
-  const definition = defineEntity<IRow>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
-    name: 'query-branches',
-    key: 'id'
-  })
-  const repo = definition.connect(await memoryBackend())
+  const definitionEntityPlugin = defineEntityPlugin<IRow>()(
+    'entity-query-state-spec-ts-definition-2',
+    {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
+      name: 'query-branches',
+      key: 'id'
+    }
+  )
+  /** This actual storage host owns the entity installation for this test scope. */
+  const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
+
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+    await memoryBackend()
+  )
   await repo.put({ id: 'a', group: 'one', score: 2 })
   await repo.put({ id: 'b', group: 'one', score: 1 })
   const ordered = repo.query().orderBy((row) => row.score)
@@ -72,19 +89,27 @@ it('preserves entity controls after selector and distinct branches', async () =>
 })
 
 it('rejects duplicate and late source selection before opening any native iterator', async () => {
-  const definition = defineEntity<IRow>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
-    name: 'query-source-state',
-    key: 'id',
-    indexes: { byGroup: { path: 'group' } }
-  })
-  const repo = definition.connect(await memoryBackend())
+  const definitionEntityPlugin = defineEntityPlugin<IRow>()(
+    'entity-query-state-spec-ts-definition-3',
+    {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
+      name: 'query-source-state',
+      key: 'id',
+      indexes: { byGroup: { path: 'group' } }
+    }
+  )
+  /** This actual storage host owns the entity installation for this test scope. */
+  const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
+
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+    await memoryBackend()
+  )
   for (const branch of [
     repo.query().index('byGroup', 'one'),
     repo.query().range({ lower: 'a' }),
@@ -103,21 +128,26 @@ it('rejects duplicate and late source selection before opening any native iterat
 it('keeps the last page bounds after default comparison and does no work for a zero page', async () => {
   const store = await memoryBackend()
   let comparisons = 0
-  const repo = defineEntity<IRow>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
+
+  /** Explicit entity plugin configuration is installed before requesting a repository. */
+  const entity4EntityPlugin = defineEntityPlugin<IRow>()('entity-query-state-spec-ts-entity4-4', {
+    features: {
+      query: entityQueryFeature(),
+      unique: entityUniqueFeature(),
+      migration: entityMigrationFeature(),
+      indexes: entityIndexesFeature(),
+      keyset: entityKeysetFeature()
+    },
     name: 'query-page',
     key: 'id',
     defaultOrderBy: (left, right) => {
       comparisons++
       return right.score - left.score
     }
-  }).connect(store)
+  })
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
+  const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](store)
   for (const [id, score] of [
     ['a', 1],
     ['b', 2],
@@ -139,17 +169,22 @@ it('keeps the last page bounds after default comparison and does no work for a z
 
 it('keeps selector failures at the original entity extension boundary', async () => {
   const store = await memoryBackend()
-  const repo = defineEntity<IRow>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
+
+  /** Explicit entity plugin configuration is installed before requesting a repository. */
+  const entity5EntityPlugin = defineEntityPlugin<IRow>()('entity-query-state-spec-ts-entity5-5', {
+    features: {
+      query: entityQueryFeature(),
+      unique: entityUniqueFeature(),
+      migration: entityMigrationFeature(),
+      indexes: entityIndexesFeature(),
+      keyset: entityKeysetFeature()
+    },
     name: 'query-selector',
     key: 'id'
-  }).connect(store)
+  })
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entity5EntityPluginHost = await entityHost(entity5EntityPlugin)
+  const repo = entity5EntityPluginHost.extensions[entity5EntityPlugin.id](store)
   await repo.put({ id: 'a', score: 1, group: 'one' })
   const primary = new RangeError('entity selector failure')
   const failure = await repo

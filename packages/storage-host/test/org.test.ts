@@ -1,3 +1,4 @@
+import { entityHost } from './helpers/memory.ts'
 import { storageProbe } from '../src/plugins/probe/index.ts'
 import { entityQueryFeature } from '../src/entity/query-feature.ts'
 import { entityUniqueFeature } from '../src/entity/unique-feature.ts'
@@ -25,7 +26,7 @@ import {
 } from '../src/index.ts'
 import { memoryBackendPlugin, memoryBackendKind } from '../src/plugins/memory.ts'
 import { catalog } from './helpers/catalog.ts'
-import { defineEntity } from '../src/entity.ts'
+import { defineEntityPlugin } from '../src/entity.ts'
 
 describe('immutable storage organizations', () => {
   it('shares the configured default target and isolates two organizations and plugin namespaces', async () => {
@@ -294,25 +295,35 @@ describe('immutable storage organizations', () => {
       ]
     })
     /** Identical entity layouts remain isolated by the original native namespace. */
-    const users = defineEntity<{ id: string; email: string }>()({
-      name: 'users',
-      key: 'id',
-      features: [entityQueryFeature(), entityUniqueFeature(), entityIndexesFeature()],
-      indexes: { email: { path: 'email', unique: true } }
-    })
+    const usersEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'org-test-ts-users-1',
+      {
+        name: 'users',
+        key: 'id',
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          indexes: entityIndexesFeature()
+        },
+        indexes: { email: { path: 'email', unique: true } }
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
     const first = createOrgId()
     const second = createOrgId()
     const leftStore = host.org(first).backend('memory')
     const rightStore = host.org(second).backend('memory')
-    const left = users.connect(leftStore)
-    const right = users.connect(rightStore)
+    const left = usersEntityPluginHost.extensions[usersEntityPlugin.id](leftStore)
+    const right = usersEntityPluginHost.extensions[usersEntityPlugin.id](rightStore)
     /**
      * A dynamic dependency ID has no statically known channel; this fixture explicitly declares its
      * installed memory dependency and tests the original runtime admission.
      */
     const borrowed = definePlugin('borrowed-entity', (core) => {
       const store = core.getPublishedBackend('memory')
-      const repository = users.connect(
+      const repository = usersEntityPluginHost.extensions[usersEntityPlugin.id](
         store as typeof store &
           import('../src/types.ts').IStorageBorrowedBackend<
             import('@migaia/storage-contract').IKeyValueStore
@@ -321,9 +332,10 @@ describe('immutable storage organizations', () => {
       return { install: () => ({ readBorrowed: (id: string) => repository.get(id) }) }
     })
     const composed = await host.use(borrowed)
-    await users
-      .connect(host.backend('memory'))
-      .put({ id: 'default', email: 'default@example.test' })
+    await usersEntityPluginHost.extensions[usersEntityPlugin.id](host.backend('memory')).put({
+      id: 'default',
+      email: 'default@example.test'
+    })
     expect(await composed.extensions.readBorrowed('default')).toEqual({
       id: 'default',
       email: 'default@example.test'
@@ -345,12 +357,12 @@ describe('immutable storage organizations', () => {
       )
     })
     /** Shape forwarding alone cannot copy the original host's exact identity admission. */
-    expect(() => users.connect({ ...leftStore })).toThrowError(
-      expect.objectContaining({ code: 'INVALID_CONFIG' })
-    )
-    expect(() => users.connect(new Proxy(leftStore, {}))).toThrowError(
-      expect.objectContaining({ code: 'INVALID_CONFIG' })
-    )
+    expect(() =>
+      usersEntityPluginHost.extensions[usersEntityPlugin.id]({ ...leftStore })
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
+    expect(() =>
+      usersEntityPluginHost.extensions[usersEntityPlugin.id](new Proxy(leftStore, {}))
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
     expect('dispose' in leftStore).toBe(false)
     const captured = left.query()
     await host.dropOrg(first)

@@ -1,3 +1,4 @@
+import { entityHost } from '../helpers/memory.ts'
 import { storageProbe } from '../../src/plugins/probe/index.ts'
 import { entityQueryFeature } from '../../src/entity/query-feature.ts'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.ts'
@@ -7,31 +8,37 @@ import { entityKeysetFeature } from '../../src/entity/keyset.ts'
 import { expect, it } from 'vitest'
 import { createStorageHost } from '../../src/index.ts'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
-import { defineEntity } from '../../src/entity.ts'
+import { defineEntityPlugin } from '../../src/entity.ts'
 import { memoryBackend } from '../helpers/memory.ts'
 
 /** Declared-path choices reach the actual original index reader and materializer. */
 type IRow = { id: string; group: string; score: number; email: string }
-const definition = defineEntity<IRow>()({
-  features: [
-    entityQueryFeature(),
-    entityUniqueFeature(),
-    entityMigrationFeature(),
-    entityIndexesFeature(),
-    entityKeysetFeature()
-  ],
-  name: 'automatic-index',
-  key: 'id',
-  onDiagnostic: () => {},
-  indexes: {
-    byGroup: { path: 'group' },
-    byScore: { path: 'score' },
-    byEmail: { path: 'email', unique: true },
-    byPair: { paths: ['group', 'score'] }
+const definitionEntityPlugin = defineEntityPlugin<IRow>()(
+  'entity-query-index-plan-spec-ts-definition-1',
+  {
+    features: {
+      query: entityQueryFeature(),
+      unique: entityUniqueFeature(),
+      migration: entityMigrationFeature(),
+      indexes: entityIndexesFeature(),
+      keyset: entityKeysetFeature()
+    },
+    name: 'automatic-index',
+    key: 'id',
+    onDiagnostic: () => {},
+    indexes: {
+      byGroup: { path: 'group' },
+      byScore: { path: 'score' },
+      byEmail: { path: 'email', unique: true },
+      byPair: { paths: ['group', 'score'] }
+    }
   }
-})
+)
 
 it('selects declared equality indexes once without opening a source during explain', async () => {
+  /** This actual storage host owns the entity installation for this test scope. */
+  const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
+
   const reads: number[] = []
   await using host = await createStorageHost({
     plugins: [
@@ -44,7 +51,9 @@ it('selects declared equality indexes once without opening a source during expla
     ] as const
   })
   const store = host.backend('memory')
-  const repo = definition.connect(store, { queryStages: host.queryStages(store) })
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](store, {
+    queryStages: host.queryStages(store)
+  })
   for (let index = 0; index < 12; index++)
     await repo.put({
       id: String(index),
@@ -92,7 +101,12 @@ it('selects declared equality indexes once without opening a source during expla
 })
 
 it('uses conservative in and prefix candidates with exact canonical matching', async () => {
-  const repo = definition.connect(await memoryBackend())
+  /** This actual storage host owns the entity installation for this test scope. */
+  const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
+
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+    await memoryBackend()
+  )
   for (const [id, group, score] of [
     ['a', 'prefix', 1],
     ['b', 'prefix\ufffftail', 2],
@@ -133,8 +147,11 @@ it('uses conservative in and prefix candidates with exact canonical matching', a
 })
 
 it('uses the same planned selection for draft reads and committed query mutations', async () => {
+  /** This actual storage host owns the entity installation for this test scope. */
+  const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
+
   const store = await memoryBackend()
-  const repo = definition.connect(store)
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](store)
   await repo.put({ id: 'a', group: 'one', score: 1, email: 'a@test' })
   await repo.put({ id: 'b', group: 'two', score: 2, email: 'b@test' })
   await store.transaction(async (scope) => {
@@ -154,18 +171,25 @@ it('uses the same planned selection for draft reads and committed query mutation
 })
 
 it('reuses the same default comparator identity across original keyset pages', async () => {
-  const repo = defineEntity<IRow>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
-    name: 'default-cursor',
-    key: 'id',
-    defaultOrderBy: (left, right) => right.score - left.score
-  }).connect(await memoryBackend())
+  /** Explicit entity plugin configuration is installed before requesting a repository. */
+  const entity2EntityPlugin = defineEntityPlugin<IRow>()(
+    'entity-query-index-plan-spec-ts-entity2-2',
+    {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
+      name: 'default-cursor',
+      key: 'id',
+      defaultOrderBy: (left, right) => right.score - left.score
+    }
+  )
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entity2EntityPluginHost = await entityHost(entity2EntityPlugin)
+  const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.id](await memoryBackend())
   for (const [id, score] of [
     ['a', 1],
     ['b', 2],
@@ -180,19 +204,26 @@ it('reuses the same default comparator identity across original keyset pages', a
 })
 
 it('uses a full compound equality tuple without parsing projection callbacks', async () => {
-  const repo = defineEntity<IRow>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
-    name: 'compound-source',
-    key: 'id',
-    onDiagnostic: () => {},
-    indexes: { pair: { paths: ['group', 'score'] } }
-  }).connect(await memoryBackend())
+  /** Explicit entity plugin configuration is installed before requesting a repository. */
+  const entity3EntityPlugin = defineEntityPlugin<IRow>()(
+    'entity-query-index-plan-spec-ts-entity3-3',
+    {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
+      name: 'compound-source',
+      key: 'id',
+      onDiagnostic: () => {},
+      indexes: { pair: { paths: ['group', 'score'] } }
+    }
+  )
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entity3EntityPluginHost = await entityHost(entity3EntityPlugin)
+  const repo = entity3EntityPluginHost.extensions[entity3EntityPlugin.id](await memoryBackend())
   await repo.put({ id: 'a', group: 'one', score: 1, email: 'a@test' })
   await repo.put({ id: 'b', group: 'one', score: 2, email: 'b@test' })
   const query = repo.query().where({ group: 'one', score: 1 })

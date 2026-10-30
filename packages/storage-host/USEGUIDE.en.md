@@ -75,91 +75,100 @@ Strings, bytes and records have channel-conflict rules for the same logical key.
 
 ## Use an entity repository
 
-`/entity` provides definition, connection and basic reads/writes. Optional operations require explicit subpath units. Missing units throw `ENTITY_FEATURE_REQUIRED` with `source: @migaia/storage-host` and name the required import.
-
-```ts
-import { defineEntity, type IEntityConnectStore } from '@migaia/storage-host/entity'
-/** Connected application storage whose lifetime remains caller-owned. */
-declare const store: IEntityConnectStore
-const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(
-  store
-)
-await users.put({ id: 'u1', name: 'Ada' })
-console.log(await users.get('u1'))
-```
-
-Select only required units in `features`: `entityQueryFeature()` from `/entity/features/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/features/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/features/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/features/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/features/keyset` admits page/after. Index-backed queries and fallback uniqueness validation also require query. Migration without indexes or unique constraints scans native records or text keys directly and needs neither query nor unique. Units never enable another unit implicitly.
-
-The unique unit captures its own constraint projections without enabling index planning. Unique write checks alone do not require the indexes unit.
-
-`defineEntity<T>()({...})` declares an object's primary key and indexes. `connect(store)` attaches it to a backend. This example writes first, then queries through the same definition.
+`defineEntityPlugin` declares an entity plugin. Install it into the storage host, then obtain repositories from its extension. The plugin ID addresses installation and can differ from the persisted entity namespace `name`; two versions of the same namespace need distinct plugin IDs. There is no `defineEntity` alias or declaration `connect` method.
 
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
+
+const usersEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()('users', {
+  name: 'users',
+  key: 'id'
+})
+const host = await createStorageHost({ plugins: [memoryBackendPlugin(), usersEntityPlugin] })
+try {
+  const users = host.extensions[usersEntityPlugin.id](host.backend('memory'))
+  await users.put({ id: 'u1', name: 'Ada' })
+  console.log(await users.get('u1'))
+} finally {
+  await host.dispose()
+}
+```
+
+Select query, indexes, unique checks, migration and keyset from their `/entity/features/*` entries. `features` is a record such as `{ lookup: entityQueryFeature() }`; keys are caller-chosen addresses, independent of role and execution order. Feature definitions are opaque native identities with no public name/create/configure fields. Native installation runs once per entity installation and returns repository capability factories; obtaining another repository reuses those factories. Arrays, forged plain units and duplicate roles are rejected. Missing indexes/unique/migration requirements are checked during installation; their original `storage.host / ENTITY_FEATURE_REQUIRED` or `INVALID_CONFIG` errors remain reachable through the install error's cause chain. The host has no `features` option.
+
+Query-only, unique-only configuration, migration-only and query+keyset retain their independent assembly boundaries. Index query planning selects query and indexes; fallback unique checks also need query. No unit implicitly enables another.
+
+```ts doc-test=run
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
 import { entityIndexesFeature } from '@migaia/storage-host/entity/features/indexes'
 
 type IOrder = { id: string; state: string; total: number }
-const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const ordersEntityPlugin = defineEntityPlugin<IOrder>()('orders', {
+  name: 'orders',
+  key: 'id',
+  features: { lookup: entityQueryFeature(), selectors: entityIndexesFeature() },
+  indexes: { byState: { path: 'state' } }
+})
+const host = await createStorageHost({ plugins: [memoryBackendPlugin(), ordersEntityPlugin] })
 try {
-  const orders = defineEntity<IOrder>()({
-    name: 'orders',
-    key: 'id',
-    features: [entityQueryFeature(), entityIndexesFeature()],
-    indexes: { byState: { path: 'state' } }
-  }).connect(host.backend('memory'))
+  const orders = host.extensions[ordersEntityPlugin.id](host.backend('memory'))
   await orders.put({ id: 'o1', state: 'paid', total: 20 })
   console.log(await orders.get('o1'))
   console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())
-  // [{ id: 'o1', total: 20 }]
 } finally {
   await host.dispose()
 }
 ```
 
-The repository does not close its backend. Use `orders.in(tx)` inside a transaction; `orders.batch(...)` uses one native record transaction. Schemas and codecs perform runtime validation and conversion; TypeScript types alone do not validate external input. `fromStandardSchema` is available from the same `/entity` entry. Conversion failures retain the original error through `cause`.
-
-Select `index` or `range` first and only once. `where`, `select`, `skip` and `limit` create new query branches. Pair custom comparators with a finite `limit`, or use `first()`. `stream()` returns a disposable iterator; use `await using` or explicit `dispose()` if stopping early. When available, `watch()` supplies invalidation notifications, not result rows or reliable replay. Transaction queries do not expose `watch()`.
+You can also add an entity with `const installed = await host.use(ordersEntityPlugin)` and use `installed.extensions[ordersEntityPlugin.id](store)`. Each repository borrows the backend; it never closes it. Repository, retained query and iterator access expires when the entity is removed or its host is disposed. Use `orders.in(tx)` inside an original transaction and `orders.batch(...)` for one native record transaction. Schemas/codecs retain their runtime conversion and original causes. Choose index/range once; pair a custom comparator with a finite limit. Dispose a stream when stopping early.
 
 ### Persist versioned records
-
-Select only migration when upgrading records without indexes or unique constraints. Reading an old record upgrades the returned value; call `migrate()` to persist the new envelopes. Each memory-record batch uses the original native transaction.
 
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { entityMigrationFeature } from '@migaia/storage-host/entity/features/migration'
 
 type IUser = { id: string; name: string }
-const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const originalUsersEntityPlugin = defineEntityPlugin<IUser>()('users-v1', {
+  name: 'migration-users',
+  key: 'id'
+})
+const migratedUsersEntityPlugin = defineEntityPlugin<IUser>()('users-v2', {
+  name: 'migration-users',
+  key: 'id',
+  version: 2,
+  features: { upgrade: entityMigrationFeature() },
+  migrations: {
+    2: (previous) => {
+      const user = previous as IUser
+      return { ...user, name: user.name.trim() }
+    }
+  }
+})
+const host = await createStorageHost({
+  plugins: [memoryBackendPlugin(), originalUsersEntityPlugin, migratedUsersEntityPlugin]
+})
 try {
   const store = host.backend('memory')
-  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)
+  const original = host.extensions[originalUsersEntityPlugin.id](store)
   await original.put({ id: 'ada', name: ' Ada ' })
   await original.put({ id: 'lin', name: ' Lin ' })
-  const users = defineEntity<IUser>({
-    name: 'migration-users',
-    key: 'id',
-    version: 2,
-    features: [entityMigrationFeature()],
-    migrations: {
-      2: (previous) => {
-        const user = previous as IUser
-        return { ...user, name: user.name.trim() }
-      }
-    }
-  }).connect(store)
+  const users = host.extensions[migratedUsersEntityPlugin.id](store)
   const result = await users.migrate({ batchSize: 1 })
-  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada
+  console.log(result.migrated, (await users.get('ada'))?.name)
 } finally {
   await host.dispose()
 }
 ```
 
-Declaring unique constraints still requires the unique unit. Its fallback check also requires query; migration does not supply either unit implicitly.
+Reading an old record materializes the selected version without writing it back; `migrate()` persists new envelopes. Migration without indexes or unique constraints uses its own original native scan and batches; unique constraints still require the unique unit and fallback query unit.
 
 ## Separate organization data
 

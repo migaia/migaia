@@ -75,91 +75,100 @@ memory 的记录过滤在客户端执行。换用数据库后端时，下推能�
 
 ## 使用实体仓储
 
-`/entity` 现在只包含定义、连接和基础读写。附加能力需从独立子路径显式装配；缺少装配时抛出 `source: @migaia/storage-host`、`code: ENTITY_FEATURE_REQUIRED`，消息写明所需导入。
-
-```ts
-import { defineEntity, type IEntityConnectStore } from '@migaia/storage-host/entity'
-/** 已连接的应用存储，生命周期由调用方管理。 */
-declare const store: IEntityConnectStore
-const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(
-  store
-)
-await users.put({ id: 'u1', name: 'Ada' })
-console.log(await users.get('u1'))
-```
-
-只在 `features` 中选择用到的单元：`/entity/features/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/features/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/features/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/features/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/features/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引查询与唯一约束的回退校验还需要 query。没有索引或唯一约束的迁移直接扫描原生记录或文本键，不需要 query 或 unique。单元不会自动开启其他单元。
-
-unique 单元能单独捕获约束投影，不会因此开启索引规划；仅做唯一写入检查时不需 indexes 单元。
-
-`defineEntity<T>()({...})` 声明对象的主键与索引，`connect(store)` 连接实际后端。下面先写入，再用同一声明查询。
+`defineEntityPlugin` 声明实体插件。先安装到 storage host，再从该插件的扩展获取仓储。插件 ID 用于安装寻址，可以与持久化实体命名空间 `name` 不同；同一命名空间的不同版本使用不同插件 ID。旧 `defineEntity` 不保留别名，声明也没有 `connect` 方法。
 
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
+
+const usersEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()('users', {
+  name: 'users',
+  key: 'id'
+})
+const host = await createStorageHost({ plugins: [memoryBackendPlugin(), usersEntityPlugin] })
+try {
+  const users = host.extensions[usersEntityPlugin.id](host.backend('memory'))
+  await users.put({ id: 'u1', name: 'Ada' })
+  console.log(await users.get('u1'))
+} finally {
+  await host.dispose()
+}
+```
+
+query、indexes、unique、migration、keyset 分别从 `/entity/features/*` 入口选择。`features` 使用 record，例如 `{ lookup: entityQueryFeature() }`；键是调用方选择的地址，不代表角色或执行顺序。Feature 定义是不透明原生身份，没有公开 name/create/configure 字段。每次实体安装只运行一次原生 Feature 安装，输出仓储能力工厂；获取其他仓储时复用这些工厂。数组、伪造普通单元和重复角色都会拒绝。缺少 indexes/unique/migration 的检查发生在安装时；原始 `storage.host / ENTITY_FEATURE_REQUIRED` 或 `INVALID_CONFIG` 可沿安装错误的 cause 链取得。宿主没有 `features` 选项。
+
+仅 query、仅 unique 配置、仅 migration、query+keyset 保留独立装配边界。索引查询规划选择 query 和 indexes，fallback unique 检查还需要 query；单元不会隐式启用其他单元。
+
+```ts doc-test=run
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
 import { entityIndexesFeature } from '@migaia/storage-host/entity/features/indexes'
 
 type IOrder = { id: string; state: string; total: number }
-const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const ordersEntityPlugin = defineEntityPlugin<IOrder>()('orders', {
+  name: 'orders',
+  key: 'id',
+  features: { lookup: entityQueryFeature(), selectors: entityIndexesFeature() },
+  indexes: { byState: { path: 'state' } }
+})
+const host = await createStorageHost({ plugins: [memoryBackendPlugin(), ordersEntityPlugin] })
 try {
-  const orders = defineEntity<IOrder>()({
-    name: 'orders',
-    key: 'id',
-    features: [entityQueryFeature(), entityIndexesFeature()],
-    indexes: { byState: { path: 'state' } }
-  }).connect(host.backend('memory'))
+  const orders = host.extensions[ordersEntityPlugin.id](host.backend('memory'))
   await orders.put({ id: 'o1', state: 'paid', total: 20 })
   console.log(await orders.get('o1'))
   console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())
-  // [{ id: 'o1', total: 20 }]
 } finally {
   await host.dispose()
 }
 ```
 
-实体不会关闭传入的后端。事务中使用 `orders.in(tx)`；`orders.batch(...)` 使用一个原生记录事务。schema 与 codec 用于运行时校验和转换，TypeScript 类型本身不校验外部输入。需要外部 schema 时，可从同一 `/entity` 入口使用 `fromStandardSchema`；转换失败保留原错误在 `cause` 中。
+也可通过 `const installed = await host.use(ordersEntityPlugin)` 增量安装，再使用 `installed.extensions[ordersEntityPlugin.id](store)`。仓储借用后端，不关闭它；实体被移除或宿主 dispose 后，保留的仓储、查询及迭代器失去访问权。在原事务中使用 `orders.in(tx)`，`orders.batch(...)` 使用一次原生 record 事务。schema/codec 保留原运行时转换及 cause。index/range 只选择一次，自定义比较器配合有限 limit；提前停止 stream 时主动 dispose。
 
-查询的 `index` 或 `range` 要最先选择，且只能选一次；普通 `where`、`select`、`skip`、`limit` 会产生新分支。自定义比较器应搭配有限 `limit`，或使用 `first()`。`stream()` 返回可释放迭代器；提前停止时使用 `await using` 或显式 `dispose()`。`watch()` 是可用后端的失效通知，并非结果行流，也不保证重放。事务查询没有 `watch()`。
-
-### 持久化版本迁移
-
-迁移没有索引或唯一约束的记录时，只需选择 migration 单元。读取旧记录会升级返回值；需要持久化新版本信封时，再调用 `migrate()`。内存记录的每个迁移批次沿用原生事务。
+### 持久化版本化记录
 
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { entityMigrationFeature } from '@migaia/storage-host/entity/features/migration'
 
 type IUser = { id: string; name: string }
-const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const originalUsersEntityPlugin = defineEntityPlugin<IUser>()('users-v1', {
+  name: 'migration-users',
+  key: 'id'
+})
+const migratedUsersEntityPlugin = defineEntityPlugin<IUser>()('users-v2', {
+  name: 'migration-users',
+  key: 'id',
+  version: 2,
+  features: { upgrade: entityMigrationFeature() },
+  migrations: {
+    2: (previous) => {
+      const user = previous as IUser
+      return { ...user, name: user.name.trim() }
+    }
+  }
+})
+const host = await createStorageHost({
+  plugins: [memoryBackendPlugin(), originalUsersEntityPlugin, migratedUsersEntityPlugin]
+})
 try {
   const store = host.backend('memory')
-  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)
+  const original = host.extensions[originalUsersEntityPlugin.id](store)
   await original.put({ id: 'ada', name: ' Ada ' })
   await original.put({ id: 'lin', name: ' Lin ' })
-  const users = defineEntity<IUser>({
-    name: 'migration-users',
-    key: 'id',
-    version: 2,
-    features: [entityMigrationFeature()],
-    migrations: {
-      2: (previous) => {
-        const user = previous as IUser
-        return { ...user, name: user.name.trim() }
-      }
-    }
-  }).connect(store)
+  const users = host.extensions[migratedUsersEntityPlugin.id](store)
   const result = await users.migrate({ batchSize: 1 })
-  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada
+  console.log(result.migrated, (await users.get('ada'))?.name)
 } finally {
   await host.dispose()
 }
 ```
 
-声明唯一约束时仍需选择 unique 单元；其回退校验还需要 query。迁移不会隐式补装任何一个单元。
+读取旧记录只生成声明版本的值，`migrate()` 才持久化新 envelope。没有索引或 unique 约束的迁移沿用原生扫描和分批事务；unique 约束仍需 unique 单元及 fallback query 单元。
 
 ## 隔离组织数据
 

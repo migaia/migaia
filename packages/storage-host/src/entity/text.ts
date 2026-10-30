@@ -1,7 +1,7 @@
 /** Stable entity boundary diagnostics remain shared across every root and transaction path. */
 export const EntityText = {
-  /** Explicit entity assembly is an ordered list of units, never an implicit truthy flag. */
-  featuresMustBeArray: 'entity features must be an array of distinct explicit assembly units',
+  /** Native record admission rejects arrays, forged values and repeated semantic roles. */
+  featuresMustBeRecord: 'entity features must be a record of native features with distinct roles',
 
   /** Missing assembly names tell callers the exact explicit entity subpath to import. */
   featureRequired: (name: string): string =>

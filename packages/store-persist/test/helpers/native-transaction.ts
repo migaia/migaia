@@ -1,5 +1,6 @@
 import { createRuntime } from '@migaia/reactive'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { createStorageHost } from '@migaia/storage-host'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { entityIndexesFeature } from '@migaia/storage-host/entity/features/indexes'
 import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
 import { entityUniqueFeature } from '@migaia/storage-host/entity/features/unique'
@@ -45,149 +46,164 @@ export async function runPersistNativeConsumerScenario(storage: INativeStore) {
   /** Manual time advances only the existing persistence debounce, never native transaction time. */
   const scheduler = createManualScheduler()
   /** Real entity indexes are intentionally cold when the first transaction begins. */
-  const repo = defineEntity<{ id: string; email: string }>()({
-    features: [entityQueryFeature(), entityIndexesFeature(), entityUniqueFeature()],
-    name: 'persist-native-users',
-    key: 'id',
-    indexes: { email: { path: 'email', unique: true } }
-  }).connect(storage)
-  /** This actual mutable unit remains changed after rollback. */
-  const value = counterUnit()
-  /** The default production codec must stay on the native active request chain. */
-  const handle = persistUnit(value.unit, {
-    key: 'persist-native-counter',
-    storage,
-    runtime: createRuntime(),
-    scheduler,
-    debounceMs: 100
-  })
-  await handle.ready
-  await handle.flush()
-  try {
-    /** A callback result proves the original transaction result reaches the public coordinator. */
-    const result = await persistTransaction(storage, [handle], async (tx) => {
-      value.change(1)
-      await handle.flush(tx)
-      await repo.in(tx).put({ id: 'committed', email: 'one' })
-      await tx.set('persist-native-business', 'committed')
-      return 'committed' as const
-    })
-    /** All committed channels are read through their public original root entries. */
-    const committed = {
-      result,
-      envelope: await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {}),
-      entity: await repo.get('committed'),
-      business: await storage.get('persist-native-business')
-    }
-    /** This exact user failure must remain reachable through backend normalization. */
-    const primary = new Error('persist native rollback fixture')
-    /** The first rejected native transaction must not turn its flush into a root write. */
-    const failure = await persistTransaction(storage, [handle], async (tx) => {
-      value.change(2)
-      await handle.flush(tx)
-      await repo.in(tx).put({ id: 'rolled-back', email: 'two' })
-      await tx.set('persist-native-rolled-back', 'uncommitted')
-      throw primary
-    }).catch((cause: unknown) => cause)
-    /** These reads happen before the original debounce is advanced. */
-    const rolledBack = {
-      primaryReachable: walkErrorCauses(failure).includes(primary),
-      envelope: await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {}),
-      entity: await repo.get('rolled-back'),
-      business: await storage.get('persist-native-rolled-back'),
-      memory: value.state.count,
-      writeErrorSame: handle.writeError.value === failure
-    }
-    /** The existing commit feed acknowledges automatic mirroring without calling handle.flush(). */
-    await mirror()
-    /** Rollback leaves application memory intact and resumes its ordinary persistence timer. */
-    const mirrored = await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {})
-    /** A cold unique index remains the actual final-state authority for this same native scope. */
-    const uniqueFailure = await persistTransaction(storage, [handle], async (tx) => {
-      value.change(3)
-      await handle.flush(tx)
-      await repo.in(tx).put({ id: 'duplicate', email: 'one' })
-    }).catch((cause: unknown) => cause)
-    /** The conflicting entity and snapshot both remain absent until normal mirroring resumes. */
-    const unique = {
-      code: (uniqueFailure as { readonly code?: string }).code,
-      envelope: await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {}),
-      entity: await repo.get('duplicate'),
-      memory: value.state.count
-    }
-    await mirror()
-    /** The caller's original abort reason belongs to the same one native transaction attempt. */
-    const controller = new AbortController()
-    /** Identity is checked locally before serialization by the browser fixture. */
-    const reason = new Error('persist native cancellation fixture')
-    /** Cancellation happens after both real requests, so rollback cannot be a vacuous assertion. */
-    const cancelledFailure = await persistTransaction(
-      storage,
-      [handle],
-      async (tx) => {
-        value.change(4)
-        await handle.flush(tx)
-        await repo.in(tx).put({ id: 'cancelled', email: 'four' })
-        controller.abort(reason)
+  const usersEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+    'persist-native-users',
+    {
+      features: {
+        query: entityQueryFeature(),
+        indexes: entityIndexesFeature(),
+        unique: entityUniqueFeature()
       },
-      { signal: controller.signal }
-    ).catch((cause: unknown) => cause)
-    /** Native rollback settles before the coordinator resumes the attachment's normal timer. */
-    const cancelled = {
-      reasonReachable: walkErrorCauses(cancelledFailure).includes(reason),
-      envelope: await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {}),
-      entity: await repo.get('cancelled'),
-      memory: value.state.count
+      name: 'persist-native-users',
+      key: 'id',
+      indexes: { email: { path: 'email', unique: true } }
     }
-    await mirror()
-    /** A caller may restore application memory after the failed native transaction settles. */
-    const restoredPrimary = new Error('persist caller restoration fixture')
-    /** The expected rejected outcome remains explicit evidence rather than a swallowed failure. */
-    let restorationFailure: unknown
+  )
+  /** This scenario owns one entity registration and borrows the supplied native backend. */
+  const entityHost = await createStorageHost({ plugins: [usersEntityPlugin] })
+  try {
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = entityHost.extensions[usersEntityPlugin.id](storage)
+    /** This actual mutable unit remains changed after rollback. */
+    const value = counterUnit()
+    /** The default production codec must stay on the native active request chain. */
+    const handle = persistUnit(value.unit, {
+      key: 'persist-native-counter',
+      storage,
+      runtime: createRuntime(),
+      scheduler,
+      debounceMs: 100
+    })
+    await handle.ready
+    await handle.flush()
     try {
-      await persistTransaction(storage, [handle], async (tx) => {
-        value.change(5)
+      /** A callback result proves the original transaction result reaches the public coordinator. */
+      const result = await persistTransaction(storage, [handle], async (tx) => {
+        value.change(1)
         await handle.flush(tx)
-        await repo.in(tx).put({ id: 'restored', email: 'five' })
-        throw restoredPrimary
+        await repo.in(tx).put({ id: 'committed', email: 'one' })
+        await tx.set('persist-native-business', 'committed')
+        return 'committed' as const
       })
-    } catch (cause) {
-      restorationFailure = cause
-      value.change(4)
-    }
-    await mirror()
-    return {
-      committed,
-      rolledBack,
-      mirrored,
-      unique,
-      cancelled,
-      restored: {
-        primaryReachable: walkErrorCauses(restorationFailure).includes(restoredPrimary),
+      /** All committed channels are read through their public original root entries. */
+      const committed = {
+        result,
         envelope: await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {}),
-        entity: await repo.get('restored'),
+        entity: await repo.get('committed'),
+        business: await storage.get('persist-native-business')
+      }
+      /** This exact user failure must remain reachable through backend normalization. */
+      const primary = new Error('persist native rollback fixture')
+      /** The first rejected native transaction must not turn its flush into a root write. */
+      const failure = await persistTransaction(storage, [handle], async (tx) => {
+        value.change(2)
+        await handle.flush(tx)
+        await repo.in(tx).put({ id: 'rolled-back', email: 'two' })
+        await tx.set('persist-native-rolled-back', 'uncommitted')
+        throw primary
+      }).catch((cause: unknown) => cause)
+      /** These reads happen before the original debounce is advanced. */
+      const rolledBack = {
+        primaryReachable: walkErrorCauses(failure).includes(primary),
+        envelope: await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {}),
+        entity: await repo.get('rolled-back'),
+        business: await storage.get('persist-native-rolled-back'),
+        memory: value.state.count,
+        writeErrorSame: handle.writeError.value === failure
+      }
+      /** The existing commit feed acknowledges automatic mirroring without calling handle.flush(). */
+      await mirror()
+      /** Rollback leaves application memory intact and resumes its ordinary persistence timer. */
+      const mirrored = await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {})
+      /** A cold unique index remains the actual final-state authority for this same native scope. */
+      const uniqueFailure = await persistTransaction(storage, [handle], async (tx) => {
+        value.change(3)
+        await handle.flush(tx)
+        await repo.in(tx).put({ id: 'duplicate', email: 'one' })
+      }).catch((cause: unknown) => cause)
+      /** The conflicting entity and snapshot both remain absent until normal mirroring resumes. */
+      const unique = {
+        code: (uniqueFailure as { readonly code?: string }).code,
+        envelope: await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {}),
+        entity: await repo.get('duplicate'),
         memory: value.state.count
+      }
+      await mirror()
+      /** The caller's original abort reason belongs to the same one native transaction attempt. */
+      const controller = new AbortController()
+      /** Identity is checked locally before serialization by the browser fixture. */
+      const reason = new Error('persist native cancellation fixture')
+      /** Cancellation happens after both real requests, so rollback cannot be a vacuous assertion. */
+      const cancelledFailure = await persistTransaction(
+        storage,
+        [handle],
+        async (tx) => {
+          value.change(4)
+          await handle.flush(tx)
+          await repo.in(tx).put({ id: 'cancelled', email: 'four' })
+          controller.abort(reason)
+        },
+        { signal: controller.signal }
+      ).catch((cause: unknown) => cause)
+      /** Native rollback settles before the coordinator resumes the attachment's normal timer. */
+      const cancelled = {
+        reasonReachable: walkErrorCauses(cancelledFailure).includes(reason),
+        envelope: await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {}),
+        entity: await repo.get('cancelled'),
+        memory: value.state.count
+      }
+      await mirror()
+      /** A caller may restore application memory after the failed native transaction settles. */
+      const restoredPrimary = new Error('persist caller restoration fixture')
+      /** The expected rejected outcome remains explicit evidence rather than a swallowed failure. */
+      let restorationFailure: unknown
+      try {
+        await persistTransaction(storage, [handle], async (tx) => {
+          value.change(5)
+          await handle.flush(tx)
+          await repo.in(tx).put({ id: 'restored', email: 'five' })
+          throw restoredPrimary
+        })
+      } catch (cause) {
+        restorationFailure = cause
+        value.change(4)
+      }
+      await mirror()
+      return {
+        committed,
+        rolledBack,
+        mirrored,
+        unique,
+        cancelled,
+        restored: {
+          primaryReachable: walkErrorCauses(restorationFailure).includes(restoredPrimary),
+          envelope: await readEnvelope(storage, 'persist-native-counter', defaultJsonCodec, {}),
+          entity: await repo.get('restored'),
+          memory: value.state.count
+        }
+      }
+    } finally {
+      await handle.disposeAsync()
+    }
+
+    /** Advance only the original queued debounce and wait for its actual native commit notification. */
+    async function mirror(): Promise<void> {
+      /** The native feed resolves only after the restored background write genuinely commits. */
+      const committed = Promise.withResolvers<void>()
+      /** This fixture owns only this finite notification subscription. */
+      const unsubscribe = storage.subscribeChanges((change) => {
+        if (change.channel === 'value' && change.keys?.includes('persist-native-counter'))
+          committed.resolve()
+      })
+      try {
+        scheduler.advance(100)
+        await committed.promise
+      } finally {
+        unsubscribe()
       }
     }
   } finally {
-    await handle.disposeAsync()
-  }
-
-  /** Advance only the original queued debounce and wait for its actual native commit notification. */
-  async function mirror(): Promise<void> {
-    /** The native feed resolves only after the restored background write genuinely commits. */
-    const committed = Promise.withResolvers<void>()
-    /** This fixture owns only this finite notification subscription. */
-    const unsubscribe = storage.subscribeChanges((change) => {
-      if (change.channel === 'value' && change.keys?.includes('persist-native-counter'))
-        committed.resolve()
-    })
-    try {
-      scheduler.advance(100)
-      await committed.promise
-    } finally {
-      unsubscribe()
-    }
+    await entityHost.dispose()
   }
 }
 

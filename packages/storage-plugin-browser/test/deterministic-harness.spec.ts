@@ -12,7 +12,7 @@ import { localStorageBackendPlugin, localStorageBackendKind } from '../src/local
 import { sessionStorageBackendPlugin, sessionStorageBackendKind } from '../src/session-storage.ts'
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin, memoryBackendKind } from '@migaia/storage-host/plugins/memory'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { reactiveFeature } from '../src/features/reactive.ts'
 import { createReactiveServiceFixture } from './helpers/reactive-service.ts'
 
@@ -47,6 +47,15 @@ describe('deterministic shared harness', () => {
   })
 
   it('re-queries through each of the five canonical adapters after a library commit', async () => {
+    /** One actual entity installation supplies factories for all five backend repositories. */
+    const repositoryEntityPlugin = defineEntityPlugin<{ id: string; value: string }>()(
+      'deterministic-harness-spec-ts-102',
+      {
+        features: entityTestFeatures,
+        name: 'live-fixture',
+        key: 'id'
+      }
+    )
     const host = await createStorageHost({
       plugins: [
         memoryBackendPlugin(
@@ -85,7 +94,8 @@ describe('deterministic shared harness', () => {
             keyRange: IDBKeyRange
           },
           { ...indexedDbTestFeatures, reactive: reactiveFeature(indexedDbBackendKind) }
-        )
+        ),
+        repositoryEntityPlugin
       ] as const
     })
     const runtime = createRuntime()
@@ -99,11 +109,8 @@ describe('deterministic shared harness', () => {
     try {
       for (const backendId of backendIds) {
         const store = host.backend(backendId)
-        const repository = defineEntity<{ id: string; value: string }>({
-          features: entityTestFeatures,
-          name: 'live-fixture',
-          key: 'id'
-        }).connect(store)
+        /** Borrow the supplied backend through the installed repository capability factories. */
+        const repository = host.extensions[repositoryEntityPlugin.id](store)
         const chain = repository.query()
         const query = chain.live({ runtime })
         await query.ready

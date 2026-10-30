@@ -1,6 +1,7 @@
 import { createRecordQuery } from '../authoring/query.ts'
 import { EntityFeatureName } from './constants.ts'
-import type { IEntityFeature } from './assembly.ts'
+import { defineFeature } from '../contracts.ts'
+import { entityUnitTarget, registerEntityUnit } from './assembly.ts'
 
 /** Keyset assembly delegates page and cursor work to the original canonical query owner. */
 class EntityKeysetOwner {
@@ -11,12 +12,17 @@ class EntityKeysetOwner {
 }
 /** Internal owner contract keeps the public subpath limited to its Feature constructor. */
 export type IEntityKeysetOwner = EntityKeysetOwner
+/** Each repository request creates the original independent pagination owner. */
+function createEntityKeyset(): EntityKeysetOwner {
+  return new EntityKeysetOwner()
+}
+/** Native installation publishes the independent keyset capability factory once. */
+function installEntityKeyset() {
+  return { create: createEntityKeyset }
+}
 /** Explicitly assemble keyset pagination without enabling query, indexes, unique or migration. */
-export function entityKeysetFeature(): IEntityFeature {
-  return {
-    name: EntityFeatureName.keyset,
-    create() {
-      return new EntityKeysetOwner()
-    }
-  }
+export function entityKeysetFeature() {
+  /** Role identity stays private while the native Feature owns its eventual runtime output. */
+  const feature = defineFeature(entityUnitTarget, installEntityKeyset)
+  return registerEntityUnit(feature, EntityFeatureName.keyset)
 }

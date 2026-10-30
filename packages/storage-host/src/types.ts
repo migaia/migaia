@@ -86,6 +86,12 @@ export type IStorageExecutionPort = {
 declare const storageBackendKindBrand: unique symbol
 /** Retain a Feature target while runtime identity remains private. */
 declare const storageFeatureTargetBrand: unique symbol
+/** Private native-unit targets carry only their required expose contract in declarations. */
+declare const storageUnitTargetBrand: unique symbol
+/** Internal targets share native Feature identity checks without pretending to be a backend. */
+export type IStorageUnitTarget<TExpose extends object> = Readonly<{
+  readonly [storageUnitTargetBrand]: TExpose
+}>
 /** Preserve the actual installed backend and selected roots in declarations. */
 declare const storageBackendPluginBrand: unique symbol
 export type IStorageBackendKind<
@@ -688,6 +694,15 @@ export type IStorageOrgView<
 
 /** Keeps higher-order factory inference in the defining module. */
 export type IStorageDefinePlugin = {
+  <const N extends string, const F extends IFeatureRecord, E extends Record<string, unknown>>(
+    name: N,
+    descriptorFactory: (
+      core: Pick<IPluginHostCore<IStoragePipelineInput>, 'lifecycle'> &
+        Readonly<{ features: IFeatureOutputs<F> }>
+    ) => Readonly<{ install(): E }>,
+    features: F,
+    target: IStorageUnitTarget<Record<never, never>>
+  ): IStorageBackendPluginHandle<E> & Readonly<{ id: N }>
   <
     const N extends string,
     const Factory extends (core: IStoragePluginCore<F>) => IStorageNativePluginDescriptor & {
@@ -746,7 +761,7 @@ export type IStorageDefinePlugin = {
   }
 }
 /** Backend Features retain the exact target, dependencies and contextual API receiver. */
-export type IStorageDefineFeature = <
+type IStorageDefineBackendFeature = <
   const T extends IStorageFeatureTarget,
   const D extends IFeatureDependencyRecord = {},
   O extends IStorageFeatureOutput = IStorageFeatureOutput
@@ -760,3 +775,19 @@ export type IStorageDefineFeature = <
     ITransactionApiCompatibility<T, O> & { readonly api: IContextualApi<T, O> },
   dependencies?: D & IDependencyCompatibility<ITargetKind<T>, NoInfer<D>>
 ) => IStorageFeature<T, O, D>
+
+/** Entity units reuse the same target metadata and native installation as backend Features. */
+export type IStorageDefineFeature = IStorageDefineBackendFeature & {
+  <
+    TExpose extends object,
+    const D extends IFeatureRecord = {},
+    O extends object = Record<never, never>
+  >(
+    target: IStorageUnitTarget<TExpose>,
+    factory: (
+      core: { readonly featureExpose: TExpose },
+      dependencies: IFeatureOutputs<D>
+    ) => O & (O extends PromiseLike<unknown> ? never : unknown),
+    dependencies?: D
+  ): IFeature<TExpose, O, D>
+}

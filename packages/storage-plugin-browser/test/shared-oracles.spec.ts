@@ -2,7 +2,7 @@ import { entityTestFeatures } from './helpers/entity-features.ts'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { createMemoryTestStore } from './helpers/installed-backends.ts'
 import { createReactiveServiceFixture } from './helpers/reactive-service.ts'
 import { safeJsonPayloadByteLength } from '@migaia/storage-host/sdk'
@@ -36,7 +36,8 @@ describe('shared oracle clusters', () => {
   })
 
   it('proves typed index projection and fallback ordering through one query route', async () => {
-    const entity = defineEntity<IIndexedUser>()({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<IIndexedUser>()('shared-oracles-spec-ts-39', {
       features: entityTestFeatures,
       name: 'indexed-users',
       key: 'id',
@@ -45,7 +46,14 @@ describe('shared oracle clusters', () => {
         tags: { path: 'tags', multiEntry: true }
       }
     })
-    const repository = entity.connect(await createMemoryTestStore())
+    const { host: entityEntityPluginBackendHost, store: entityEntityPluginBackendStore } =
+      await createMemoryTestStore({}, true)
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await entityEntityPluginBackendHost.use(entityEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = entityEntityPluginHost.extensions[entityEntityPlugin.id](
+      entityEntityPluginBackendStore
+    )
     await repository.put({ id: 'u2', email: 'same@example.com', tags: ['staff'] })
     await repository.put({ id: 'u1', email: 'same@example.com', tags: ['admin', 'staff'] })
     await repository.put({ id: 'u3', email: 'z@example.com', tags: ['staff'] })

@@ -56,6 +56,8 @@ type IIteratorRegistration = {
   readonly kind: typeof RegistrationKind.iterator
   readonly info: ITransactionInfo
   readonly advance: (scope: object) => Promise<IteratorResult<unknown>>
+  /** A private owner may reject revoked work before the backend admits a transaction operation. */
+  guard: (() => void) | undefined
   readonly cleanup: () => Promise<void>
   readonly compose: <TResult>(
     run: (scope: object | undefined) => Promise<TResult>
@@ -456,6 +458,7 @@ class TransactionIterator<TScope extends object, T> {
       kind: RegistrationKind.iterator,
       info: this.#state.info,
       advance: (currentScope) => this.#advance(currentScope as TScope),
+      guard: undefined,
       cleanup: this.#lifetime.dispose,
       compose: (run) => (this.#scope ? runTransactionOperation(this.#scope, run) : run(undefined)),
       derive: (read, closeExtra) => this.#derive(owner, read, closeExtra),
@@ -494,6 +497,9 @@ class TransactionIterator<TScope extends object, T> {
   }
   /** Each advance borrows the original owner's fresh operation view and complete drain path. */
   #advance(scope: TScope): Promise<IteratorResult<T>> {
+    /** Revoked entity work never enters the backend's accepted-operation or failure sets. */
+    const rejected = this.#guardFailure()
+    if (rejected !== undefined) return rejected
     return this.#lifetime.advance(() =>
       runTransactionOperation(scope, (current) => {
         if (this.#lifetime.isClosing() || !this.#port)
@@ -502,13 +508,26 @@ class TransactionIterator<TScope extends object, T> {
       })
     )
   }
+  /** Run only the private admission guard, preserving caller rejection without a backend task. */
+  #guardFailure(): Promise<IteratorResult<T>> | undefined {
+    try {
+      this.#registration.guard?.()
+    } catch (cause) {
+      /** The caller keeps this exact rejection; an ignored next creates no secondary leak. */
+      const rejected = Promise.reject<IteratorResult<T>>(cause)
+      void rejected.then(undefined, () => undefined)
+      return rejected
+    }
+  }
   /** Expired original views retain their cached backend failure rather than reviving a scope. */
   #next(): Promise<IteratorResult<T>> {
-    return this.#scope
-      ? this.#advance(this.#scope)
-      : this.#creationView.state
-        ? Promise.resolve({ done: true, value: undefined })
-        : rejectedTransactionResult(this.#creationView.expiredFailure)
+    if (this.#scope) return this.#advance(this.#scope)
+    /** Cleanup detaches the scope, but a retained iterator must still observe entity revocation. */
+    const rejected = this.#guardFailure()
+    if (rejected !== undefined) return rejected
+    return this.#creationView.state
+      ? Promise.resolve({ done: true, value: undefined })
+      : rejectedTransactionResult(this.#creationView.expiredFailure)
   }
   /** The first data failure reaches the original transaction before cleanup can fail. */
   #fail(error: unknown): unknown {
@@ -714,6 +733,21 @@ export function deriveTransactionIterator<T, TResult>(
     ) => Promise<IteratorResult<TResult>>,
     close
   )
+}
+
+/**
+ * Attach private admission to the actual registered iterator without changing its public identity,
+ * resource lifetime or SDK signatures. Both direct next and SDK advancement use this same owner.
+ */
+export function guardTransactionIterator<T>(
+  iterator: IStorageIterator<T>,
+  guard: () => void
+): boolean {
+  /** Only the sole existing owner registration can accept a pre-operation guard. */
+  const resource = transactionRegistrations.get(iterator)
+  if (resource?.kind !== RegistrationKind.iterator) return false
+  resource.guard = guard
+  return true
 }
 
 /** Returns authentic live identity without granting registration, reads or future validity. */

@@ -13,7 +13,7 @@ import {
   STORAGE_BROWSER_ERROR_SOURCE,
   StorageBrowserErrorCode as WebErrorCode
 } from '@migaia/storage-contract/error-code'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
 import { entityUniqueFeature } from '@migaia/storage-host/entity/features/unique'
 import { entityMigrationFeature } from '@migaia/storage-host/entity/features/migration'
@@ -47,17 +47,28 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
     /** The certified backend view retains its actual native transaction owner. */
     const store = host.backend('indexed-db')
     /** No optional entity owner is selected for the CRUD baseline. */
-    const basic = defineEntity<IRow>({ name: 'basic', key: 'id' }).connect(store)
+    const basicEntityPlugin = defineEntityPlugin<IRow>()('feature-assembly-spec-ts-50', {
+      name: 'basic',
+      key: 'id'
+    })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const basicEntityPluginHost = await host.use(basicEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const basic = basicEntityPluginHost.extensions[basicEntityPlugin.id](store)
     await basic.put({ id: 'a', group: 'one' })
     expect(await basic.get('a')).toEqual({ id: 'a', group: 'one' })
     expect(() => basic.query()).toThrow(expect.objectContaining(missing('query')))
     expect(() => basic.migrate()).toThrow(expect.objectContaining(missing('migration')))
     /** A second definition reads the same rows through only the selected query unit. */
-    const querying = defineEntity<IRow>({
+    const queryingEntityPlugin = defineEntityPlugin<IRow>()('feature-assembly-spec-ts-56', {
       name: 'basic',
       key: 'id',
-      features: [entityQueryFeature()]
-    }).connect(store)
+      features: { query: entityQueryFeature() }
+    })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const queryingEntityPluginHost = await host.use(queryingEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const querying = queryingEntityPluginHost.extensions[queryingEntityPlugin.id](store)
     /** Query execution must open the original records cursor after the seeded write. */
     const nativeCursor = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
     onTestFinished(() => nativeCursor.mockRestore())
@@ -81,17 +92,28 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
     /** The certified backend view retains its actual native transaction owner. */
     const store = host.backend('indexed-db')
     /** The old public definition seeds real versioned records before the upgrade. */
-    const previous = defineEntity<IRow>({ name: 'versions', key: 'id' }).connect(store)
+    const previousEntityPlugin = defineEntityPlugin<IRow>()('feature-assembly-spec-ts-84', {
+      name: 'versions',
+      key: 'id'
+    })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const previousEntityPluginHost = await host.use(previousEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const previous = previousEntityPluginHost.extensions[previousEntityPlugin.id](store)
     await previous.put({ id: 'a', group: 'one' })
     await previous.put({ id: 'b', group: 'two' })
     /** Only the declared units can supply optional behavior for this repository. */
-    const repository = defineEntity<IRow>({
+    const repositoryEntityPlugin = defineEntityPlugin<IRow>()('feature-assembly-spec-ts-88', {
       name: 'versions',
       key: 'id',
       version: 2,
-      features: [entityMigrationFeature()],
+      features: { migration: entityMigrationFeature() },
       migrations: { 2: (state) => ({ ...(state as IRow), group: 'migrated' }) }
-    }).connect(store)
+    })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await host.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     /** Migration must read and rewrite actual stored envelopes, not only return counters. */
     const nativeCursor = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
     /** Native record writes distinguish the migration from later repository.get calls. */
@@ -118,12 +140,16 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
     /** The certified backend view retains its actual native transaction owner. */
     const store = host.backend('indexed-db')
     /** Only the declared units can supply optional behavior for this repository. */
-    const repository = defineEntity<IRow>()({
+    const repositoryEntityPlugin = defineEntityPlugin<IRow>()('feature-assembly-spec-ts-121', {
       name: 'unique',
       key: 'id',
-      features: [entityQueryFeature(), entityUniqueFeature()],
+      features: { query: entityQueryFeature(), unique: entityUniqueFeature() },
       indexes: { group: { path: 'group', unique: true } }
-    }).connect(store)
+    })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await host.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     await repository.put({ id: 'a', group: 'same' })
     /** Retain the original failure chain rather than replacing its package identity. */
     const failure = await repository
@@ -150,12 +176,16 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
     /** The certified backend view retains its actual native transaction owner. */
     const store = host.backend('indexed-db')
     /** Only the declared units can supply optional behavior for this repository. */
-    const repository = defineEntity<IRow>()({
+    const repositoryEntityPlugin = defineEntityPlugin<IRow>()('feature-assembly-spec-ts-153', {
       name: 'indexed',
       key: 'id',
-      features: [entityQueryFeature(), entityIndexesFeature()],
+      features: { query: entityQueryFeature(), indexes: entityIndexesFeature() },
       indexes: { group: { path: 'group' } }
-    }).connect(store)
+    })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await host.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     await repository.put({ id: 'a', group: 'one' })
     await repository.put({ id: 'b', group: 'two' })
     expect(await repository.query().index('group', 'one').all()).toEqual([
@@ -183,11 +213,15 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
     /** The certified backend view retains its actual native transaction owner. */
     const store = host.backend('indexed-db')
     /** Only the declared units can supply optional behavior for this repository. */
-    const repository = defineEntity<IRow>({
+    const repositoryEntityPlugin = defineEntityPlugin<IRow>()('feature-assembly-spec-ts-186', {
       name: 'pages',
       key: 'id',
-      features: [entityQueryFeature(), entityKeysetFeature()]
-    }).connect(store)
+      features: { query: entityQueryFeature(), keyset: entityKeysetFeature() }
+    })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await host.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     await repository.put({ id: 'a', group: 'one' })
     await repository.put({ id: 'b', group: 'two' })
     /** Cursor source identity remains shared by branches of this one original query. */
@@ -221,12 +255,16 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
     /** This certified view shares the provider registered on the original native store. */
     const store = host.backend('indexed-db')
     /** Current envelopes can be proved by a full clean backfill without installing migration. */
-    const repository = defineEntity<IRow>()({
+    const repositoryEntityPlugin = defineEntityPlugin<IRow>()('feature-assembly-spec-ts-224', {
       name: 'current-only',
       key: 'id',
-      features: [entityQueryFeature(), entityIndexesFeature()],
+      features: { query: entityQueryFeature(), indexes: entityIndexesFeature() },
       indexes: { group: { path: 'group' } }
-    }).connect(store)
+    })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await host.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     await repository.put({ id: 'a', group: 'one' })
     await repository.put({ id: 'b', group: 'two' })
     /** The first strict terminal must invoke the selected backend port, without a warm-up scan. */
@@ -252,10 +290,10 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
     /** Public diagnostics distinguish the skipped row from the authoritative query fallback. */
     const diagnostics: string[] = []
     /** Only query and indexes are selected, matching the migration-free current-format case. */
-    const repository = defineEntity<IRow>()({
+    const repositoryEntityPlugin = defineEntityPlugin<IRow>()('feature-assembly-spec-ts-255', {
       name: 'invalid-current-only',
       key: 'id',
-      features: [entityQueryFeature(), entityIndexesFeature()],
+      features: { query: entityQueryFeature(), indexes: entityIndexesFeature() },
       onDiagnostic: (message) => diagnostics.push(message),
       schema: {
         name: 'current-row',
@@ -269,7 +307,11 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
         }
       },
       indexes: { group: { path: 'group' } }
-    }).connect(store)
+    })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await host.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     await repository.put({ id: 'a', group: 'one' })
     await store.putRecord(
       { version: 1, state: { id: 'invalid', group: 1 } },
@@ -308,25 +350,42 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
     expect(native).not.toHaveBeenCalled()
   })
 
-  it('rejects missing definition owners with their exact host source and code before connection', () => {
-    expect(() =>
-      defineEntity<IRow>({
-        name: 'versions',
-        key: 'id',
-        version: 2,
-        migrations: { 2: (value) => value }
-      })
-    ).toThrow(expect.objectContaining(missing('migration')))
-    expect(() =>
-      defineEntity<IRow>()({ name: 'indexed', key: 'id', indexes: { group: { path: 'group' } } })
-    ).toThrow(expect.objectContaining(missing('indexes')))
-    expect(() =>
-      defineEntity<IRow>()({
-        name: 'unique',
-        key: 'id',
-        features: [entityIndexesFeature()],
-        indexes: { group: { path: 'group', unique: true } }
-      })
-    ).toThrow(expect.objectContaining(missing('unique')))
+  it('rejects missing definition owners at installation before backend work', async () => {
+    /** The native entity registration owns role admission; no backend is needed to reject it. */
+    await using host = await createStorageHost({ plugins: [] })
+    /** Each missing role retains its original host code inside native install wrapping. */
+    const cases = [
+      {
+        role: 'migration',
+        plugin: defineEntityPlugin<IRow>()('missing-migration', {
+          name: 'versions',
+          key: 'id',
+          version: 2,
+          migrations: { 2: (value) => value }
+        })
+      },
+      {
+        role: 'indexes',
+        plugin: defineEntityPlugin<IRow>()('missing-indexes', {
+          name: 'indexed',
+          key: 'id',
+          indexes: { group: { path: 'group' } }
+        })
+      },
+      {
+        role: 'unique',
+        plugin: defineEntityPlugin<IRow>()('missing-unique', {
+          name: 'unique',
+          key: 'id',
+          features: { indexes: entityIndexesFeature() },
+          indexes: { group: { path: 'group', unique: true } }
+        })
+      }
+    ]
+    for (const { role, plugin: missingEntityPlugin } of cases) {
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const failure = await host.use(missingEntityPlugin).catch((cause: unknown) => cause)
+      expect(walkErrorCauses(failure)).toContainEqual(expect.objectContaining(missing(role)))
+    }
   })
 })

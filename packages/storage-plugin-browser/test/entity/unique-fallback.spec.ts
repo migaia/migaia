@@ -1,8 +1,7 @@
 import { entityTestFeatures } from '../helpers/entity-features.ts'
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
-import type { IKeyValueStore } from '@migaia/storage-contract'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import {
   createLocalTestStore,
   createSessionTestStore,
@@ -15,23 +14,24 @@ import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
 type IUser = { id: string; email: string }
 
 /** Every factory uses the real public backend plus existing complete isolated host ports. */
-const factories: ReadonlyArray<{ name: string; create: () => Promise<IKeyValueStore> }> = [
+const factories = [
   {
     name: 'local',
-    create: () => createLocalTestStore({ storage: fakeWebStorage(), namespace: 'unique' })
+    create: () => createLocalTestStore({ storage: fakeWebStorage(), namespace: 'unique' }, true)
   },
   {
     name: 'session',
-    create: () => createSessionTestStore({ storage: fakeWebStorage(), namespace: 'unique' })
+    create: () => createSessionTestStore({ storage: fakeWebStorage(), namespace: 'unique' }, true)
   },
   {
     name: 'cookie',
-    create: () => createCookieTestStore({ document: fakeCookieDocument(), namespace: 'unique' })
+    create: () =>
+      createCookieTestStore({ document: fakeCookieDocument(), namespace: 'unique' }, true)
   }
 ]
 
 /** Both independently connected repositories use the same public definition. */
-const users = defineEntity<IUser>()({
+const usersEntityPlugin = defineEntityPlugin<IUser>()('unique-fallback-spec-ts-34', {
   features: entityTestFeatures,
   name: 'unique-users',
   key: 'id',
@@ -49,10 +49,10 @@ describe('authoritative fallback unique writes', () => {
        */
       const original = new Error('unique selector failed')
       /** Use the real backend with an ordinary public throwing selector. */
-      const store = await create()
+      const { host: storeHost, store } = await create()
       try {
         /** The definition must remain valid even when evaluating a particular value fails. */
-        const repo = defineEntity<IUser>()({
+        const repoEntityPlugin = defineEntityPlugin<IUser>()('unique-fallback-spec-ts-55', {
           features: entityTestFeatures,
           name: 'failed-projection',
           key: 'id',
@@ -66,7 +66,12 @@ describe('authoritative fallback unique writes', () => {
               }
             }
           }
-        }).connect(store)
+        })
+        /** Install once on the real fixture host and retain exact extension inference. */
+        const repoEntityPluginHost =
+          await storeHost.use<readonly [typeof repoEntityPlugin]>(repoEntityPlugin)
+        /** Borrow the supplied backend through the installed repository capability factories. */
+        const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
         await expect(repo.put({ id: 'row', email: 'same' })).rejects.toMatchObject({
           source: 'storage.host',
           code: 'EXTENSION_FAILED',
@@ -84,14 +89,18 @@ describe('authoritative fallback unique writes', () => {
     /** The application codec deliberately performs one supported asynchronous nested write. */
     let entered = false
     /** Capture the public repository after its ordinary construction. */
-    let repo!: ReturnType<typeof users.connect>
+    let repo!: import('@migaia/storage-host/entity').IRepository<IUser>
     /** A complete isolated host port gives the public backend its normal sync and async surfaces. */
-    const store = await createLocalTestStore({
-      namespace: 'reentrant-codec',
-      storage: fakeWebStorage()
-    })
+    const { host: storeHost, store } = await createLocalTestStore(
+      {
+        namespace: 'reentrant-codec',
+        storage: fakeWebStorage()
+      },
+      true
+    )
     try {
-      repo = defineEntity<IUser>()({
+      /** Explicit native declaration owns this scenario's optional repository capabilities. */
+      const entity1EntityPlugin = defineEntityPlugin<IUser>()('unique-fallback-spec-ts-94', {
         features: entityTestFeatures,
         name: 'nested-users',
         key: 'id',
@@ -113,7 +122,10 @@ describe('authoritative fallback unique writes', () => {
             return JSON.parse(raw as string)
           }
         }
-      }).connect(store)
+      })
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const entity1EntityPluginHost = await storeHost.use(entity1EntityPlugin)
+      repo = entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store)
       await expect(repo.put({ id: 'outer', email: 'same' })).resolves.toBe('outer')
       expect(await repo.get('inner')).toEqual({ id: 'inner', email: 'other' })
     } finally {
@@ -125,12 +137,15 @@ describe('authoritative fallback unique writes', () => {
     '$name rejects another owner, permits self replacement, and frees deleted values',
     async ({ create }) => {
       /** The tested store advertises no native secondary index and must keep its ordinary API. */
-      const store = await create()
+      const { host: storeHost, store } = await create()
       try {
         /** Distinct repository instances cannot maintain separate uniqueness authorities. */
-        const first = users.connect(store)
+        const usersEntityPluginHost =
+          await storeHost.use<readonly [typeof usersEntityPlugin]>(usersEntityPlugin)
+        /** Borrow the supplied backend through the installed repository capability factories. */
+        const first = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
         /** Reconnect through the actual public definition rather than sharing private state. */
-        const second = users.connect(store)
+        const second = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
         await first.put({ id: 'a', email: 'same' })
         await expect(second.put({ id: 'b', email: 'same' })).rejects.toMatchObject({
           source: 'storage.host',
@@ -153,9 +168,15 @@ describe('authoritative fallback unique writes', () => {
       /** Independent backend objects share only their real underlying Storage port. */
       const storage = fakeWebStorage()
       /** One instance per writer prevents per-repository or per-store caches from passing. */
-      const firstStore = await createLocalTestStore({ storage, namespace: 'parallel-unique' })
+      const { host: firstStoreHost, store: firstStore } = await createLocalTestStore(
+        { storage, namespace: 'parallel-unique' },
+        true
+      )
       /** Uses the same public namespace, with a separate controller and repository. */
-      const secondStore = await createLocalTestStore({ storage, namespace: 'parallel-unique' })
+      const { host: secondStoreHost, store: secondStore } = await createLocalTestStore(
+        { storage, namespace: 'parallel-unique' },
+        true
+      )
       /** Force both snapshots to exist before either commits. */
       let release!: () => void
       /** Only existing-row validation is delayed; codec and commit paths remain real. */
@@ -173,7 +194,7 @@ describe('authoritative fallback unique writes', () => {
       /** Counts actual existing-record schema reads. */
       let reads = 0
       /** Shared indexes are declared identically by both public repositories. */
-      const definition = defineEntity<IUser>()({
+      const definitionEntityPlugin = defineEntityPlugin<IUser>()('unique-fallback-spec-ts-176', {
         features: entityTestFeatures,
         name: 'parallel-users',
         key: 'id',
@@ -194,12 +215,24 @@ describe('authoritative fallback unique writes', () => {
         }
       })
       try {
-        await definition.connect(firstStore).put({ id: 'seed', email: 'other' })
+        /** Install once on the real fixture host and retain exact extension inference. */
+        const definitionEntityPluginHost = await firstStoreHost.use(definitionEntityPlugin)
+        await definitionEntityPluginHost.extensions[definitionEntityPlugin.id](firstStore).put({
+          id: 'seed',
+          email: 'other'
+        })
         gate = true
         /** Both new values collide, while their snapshots initially contain only the seed. */
+        const definitionEntityPluginHost2 = await secondStoreHost.use(definitionEntityPlugin)
         const writing = Promise.allSettled([
-          definition.connect(firstStore).put({ id: 'a', email: 'same' }),
-          definition.connect(secondStore).put({ id: 'b', email: 'same' })
+          definitionEntityPluginHost.extensions[definitionEntityPlugin.id](firstStore).put({
+            id: 'a',
+            email: 'same'
+          }),
+          definitionEntityPluginHost2.extensions[definitionEntityPlugin.id](secondStore).put({
+            id: 'b',
+            email: 'same'
+          })
         ])
         await Promise.race([both, writing.then(() => undefined)])
         expect(reads).toBe(2)
@@ -212,8 +245,7 @@ describe('authoritative fallback unique writes', () => {
           reason: { source: 'storage.contract', code: 'WRITE_CONFLICT' }
         })
         expect(
-          await definition
-            .connect(firstStore)
+          await definitionEntityPluginHost.extensions[definitionEntityPlugin.id](firstStore)
             .query()
             .index('byEmail', { lower: 'same', upper: 'same' })
             .all()

@@ -1,3 +1,4 @@
+import { entityHost } from '../helpers/memory.ts'
 import { storageProbe } from '../../src/plugins/probe/index.ts'
 import { entityQueryFeature } from '../../src/entity/query-feature.ts'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.ts'
@@ -12,7 +13,7 @@ import { type ICodecStageObserver, type IQueryStageObserver } from '@migaia/stor
 import { createStorageHost, definePlugin, type IStoragePluginCore } from '../../src/index.ts'
 import { memoryBackendKind } from '../../src/plugins/memory.ts'
 import { createMemoryBackend } from '../../src/backends/memory.ts'
-import { defineEntity } from '../../src/entity.ts'
+import { defineEntityPlugin } from '../../src/entity.ts'
 
 /** Public installation captures only the already declared observation factories from the real core. */
 function observedMemory() {
@@ -78,17 +79,25 @@ it('binds codec conversions and whole queries to the actual store and current tr
     ]
   })
   const store = host.backend('observed-memory')
-  const repo = defineEntity<{ id: string; score: number }>({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
-    name: 'observed-rows',
-    key: 'id'
-  }).connect(store, fixture.ports())
+
+  /** Explicit entity plugin configuration is installed before requesting a repository. */
+  const entity1EntityPlugin = defineEntityPlugin<{ id: string; score: number }>()(
+    'entity-stages-spec-ts-entity1-1',
+    {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
+      name: 'observed-rows',
+      key: 'id'
+    }
+  )
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entity1EntityPluginHost = await entityHost(entity1EntityPlugin)
+  const repo = entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store, fixture.ports())
   await repo.put({ id: 'a', score: 1 })
   expect(encode).toHaveLength(2)
   expect(encode[0]).toMatchObject({
@@ -157,31 +166,52 @@ it('reports explicit observer failures without changing results and rejects cros
   const failure = new Error('observer rejection')
   const report = vi.fn(() => undefined)
   const query = { ...ports.queryStages, beforeQuery: () => Promise.reject(failure), report }
-  const repo = defineEntity<{ id: string }>({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
-    name: 'observer-failures',
-    key: 'id'
-  }).connect(host.backend('observed-memory'), { queryStages: query })
+
+  /** Explicit entity plugin configuration is installed before requesting a repository. */
+  const entity2EntityPlugin = defineEntityPlugin<{ id: string }>()(
+    'entity-stages-spec-ts-entity2-2',
+    {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
+      name: 'observer-failures',
+      key: 'id'
+    }
+  )
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entity2EntityPluginHost = await entityHost(entity2EntityPlugin)
+  const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.id](
+    host.backend('observed-memory'),
+    { queryStages: query }
+  )
   expect(await repo.query().all()).toEqual([])
   await Promise.resolve()
   expect(report).toHaveBeenCalledWith(failure)
-  expect(() =>
-    defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
+
+  /** Explicit entity plugin configuration is installed before requesting a repository. */
+  const entity3EntityPlugin = defineEntityPlugin<{ id: string }>()(
+    'entity-stages-spec-ts-entity3-3',
+    {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
       name: 'wrong-port',
       key: 'id'
-    }).connect(host.backend('observed-memory'), { codecStages: ports.queryStages as never })
+    }
+  )
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entity3EntityPluginHost = await entityHost(entity3EntityPlugin)
+  expect(() =>
+    entity3EntityPluginHost.extensions[entity3EntityPlugin.id](host.backend('observed-memory'), {
+      codecStages: ports.queryStages as never
+    })
   ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
 })

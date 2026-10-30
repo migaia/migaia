@@ -1,9 +1,13 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.ts'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.ts'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.ts'
+import { entityHost } from '../helpers/memory.ts'
 import type { IMemoryBackendWithChangeFeed } from '../helpers/memory.ts'
 import type { IStorageBorrowedBackend } from '../../src/types.ts'
 import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
 import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { expectTypeOf } from 'vitest'
-import { defineEntity } from '../../src/entity.ts'
+import { defineEntityPlugin, passthrough } from '../../src/entity.ts'
 import { memoryBackend } from '../helpers/memory.ts'
 import type { ICapabilityInstallPort, IStorageBase, IStorageKey } from '@migaia/storage-contract'
 import {
@@ -23,10 +27,42 @@ type IUser = {
   score: number
 }
 
-const users = defineEntity<IUser>({ name: 'users', key: 'id' })
-const repo = users.connect(await memoryBackend())
+/** A9: schema inference preserves the domain and the explicit native extension address. */
+const inferredUsersEntityPlugin = defineEntityPlugin('typed-inferred', {
+  schema: passthrough<IUser>(),
+  name: 'inferred-users',
+  key: 'id',
+  features: { reads: entityQueryFeature() }
+})
+expectTypeOf(inferredUsersEntityPlugin.id).toEqualTypeOf<'typed-inferred'>()
+/** Installing later must retain the inferred plugin extension in the widened host type. */
+const emptyEntityHost = await entityHost()
+/** The native use result carries the newly installed entity's exact extension signature. */
+const installed = await emptyEntityHost.use(inferredUsersEntityPlugin)
+/** Repository acquisition borrows an original backend while retaining its literal feed fact. */
+const inferredRepo = installed.extensions[inferredUsersEntityPlugin.id](await memoryBackend())
+expectTypeOf(inferredRepo).toEqualTypeOf<
+  IRepository<IUser, Readonly<Record<never, IStorageKey>>, true>
+>()
+expectTypeOf(inferredRepo.get).returns.toEqualTypeOf<Promise<IUser | undefined>>()
+expectTypeOf(inferredRepo.put).parameter(0).toEqualTypeOf<IUser>()
+expectTypeOf<
+  Extract<keyof typeof import('../../src/entity.ts'), 'defineEntity'>
+>().toEqualTypeOf<never>()
+// @ts-expect-error native entity declarations expose no legacy connect method.
+void inferredUsersEntityPlugin.connect
 
-// connect() 的返回类型正确推导出 IRepository<IUser>，get/put/stream
+const usersEntityPlugin = defineEntityPlugin<IUser>()('type-entity-test-d-ts-users-1', {
+  name: 'users',
+  key: 'id',
+  features: { reads: entityQueryFeature() }
+})
+/** This actual storage host owns the entity installation for this test scope. */
+const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
+
+// 安装后的扩展返回类型推导出 IRepository<IUser>，get/put/stream
 // 的值类型都是 IUser，不需要调用方手写类型断言。
 expectTypeOf(repo).toEqualTypeOf<IRepository<IUser, Readonly<Record<never, IStorageKey>>, true>>()
 expectTypeOf(repo.get).returns.toEqualTypeOf<Promise<IUser | undefined>>()
@@ -37,26 +73,39 @@ expectTypeOf(repo.stream).returns.toEqualTypeOf<
 expectTypeOf(repo.migrate).parameter(0).toMatchTypeOf<IMigrateOptions<IUser> | undefined>()
 expectTypeOf<Awaited<ReturnType<typeof repo.migrate>>>().toEqualTypeOf<IMigrateResult>()
 
-const indexedUsers = defineEntity<IUser>()({
-  name: 'indexed-users',
-  key: 'id',
-  indexes: {
-    name: { path: 'name' },
-    id: { path: 'id', unique: true },
-    email: { path: 'profile.email' },
-    tags: { path: 'tags', multiEntry: true },
-    compound: { paths: ['name', 'score'] },
-    custom: {
-      select: (value) => ({ kind: 'single' as const, key: value.id }),
-      revision: 1
+const indexedUsersEntityPlugin = defineEntityPlugin<IUser>()(
+  'type-entity-test-d-ts-indexedUsers-2',
+  {
+    name: 'indexed-users',
+    key: 'id',
+    features: {
+      reads: entityQueryFeature(),
+      lookup: entityIndexesFeature(),
+      unique: entityUniqueFeature()
     },
-    customMany: {
-      select: (value) => ({ kind: 'multiple' as const, keys: value.tags }),
-      revision: 1
+    indexes: {
+      name: { path: 'name' },
+      id: { path: 'id', unique: true },
+      email: { path: 'profile.email' },
+      tags: { path: 'tags', multiEntry: true },
+      compound: { paths: ['name', 'score'] },
+      custom: {
+        select: (value) => ({ kind: 'single' as const, key: value.id }),
+        revision: 1
+      },
+      customMany: {
+        select: (value) => ({ kind: 'multiple' as const, keys: value.tags }),
+        revision: 1
+      }
     }
   }
-})
-const indexedRepo = indexedUsers.connect(await memoryBackend())
+)
+/** This actual storage host owns the entity installation for this test scope. */
+const indexedUsersEntityPluginHost = await entityHost(indexedUsersEntityPlugin)
+
+const indexedRepo = indexedUsersEntityPluginHost.extensions[indexedUsersEntityPlugin.id](
+  await memoryBackend()
+)
 type IUserIndexMap = {
   readonly name: string
   readonly id: string
@@ -84,16 +133,16 @@ indexedRepo.findBy('tags', ['admin'])
 // @ts-expect-error indexed ranges use the exact query-key type.
 indexedRepo.list({ index: 'name', range: { lower: 1 } })
 
-defineEntity<IUser>({
+// @ts-expect-error plugin declarations require an explicit registration ID before options.
+defineEntityPlugin<IUser>()({
   name: 'direct-indexed',
   key: 'id',
-  // @ts-expect-error direct indexed declarations are forbidden; use the curried form above.
   indexes: { id: { path: 'id' } }
 })
 
 // key 必须是领域对象上真实存在的属性名（编译期约束）。
 // @ts-expect-error "missing" 不是 IUser 的属性
-defineEntity<IUser>({ name: 'bad', key: 'missing' })
+defineEntityPlugin<IUser>()('type-entity-test-d-ts-entity4-4', { name: 'bad', key: 'missing' })
 
 /** Certified borrowed views retain their exact data channels without taking root ownership. */
 const memoryHost = await createStorageHost({
@@ -105,7 +154,7 @@ const memoryHost = await createStorageHost({
   ] as const
 })
 const memoryOrg = memoryHost.org('00000000-0000-0000-0000-000000000001')
-const orgRepository = users.connect(
+const orgRepository = usersEntityPluginHost.extensions[usersEntityPlugin.id](
   memoryOrg.backend('memory') as IStorageBorrowedBackend<IMemoryBackendWithChangeFeed>
 )
 expectTypeOf(orgRepository.get).returns.toEqualTypeOf<Promise<IUser | undefined>>()
@@ -128,8 +177,10 @@ const baseOnlyPlugin = definePlugin('base-only', (core: IStoragePluginCore) => (
 }))
 /** The organization view is genuine host output rather than a cast borrowed type. */
 const baseOnlyHost = await createStorageHost({ plugins: [baseOnlyPlugin] as const })
-// @ts-expect-error a precise base-only backend does not provide entity key-value channels.
-users.connect(baseOnlyHost.org('00000000-0000-0000-0000-000000000001').backend('base-only'))
+usersEntityPluginHost.extensions[usersEntityPlugin.id](
+  // @ts-expect-error a precise base-only backend does not provide entity key-value channels.
+  baseOnlyHost.org('00000000-0000-0000-0000-000000000001').backend('base-only')
+)
 
 /** Every source/ordering transition preserves the entity adapter and exact callback domain. */
 const narrowedQuery = indexedRepo.query().where({ name: 'Ada' }).skip(1).onInvalid('throw')
@@ -175,7 +226,7 @@ repo.batch((scope) => scope.query().watch())
 /** The raw legacy type has no literal true feed fact and cannot advertise a native record watcher. */
 declare const unknownFeedStore: import('@migaia/storage-contract').IKeyValueStore
 // @ts-expect-error a runtime-unknown feed flag cannot publish the root native watcher.
-users.connect(unknownFeedStore).query().watch()
+usersEntityPluginHost.extensions[usersEntityPlugin.id](unknownFeedStore).query().watch()
 /** An explicitly false feed remains unavailable even if other legacy methods exist. */
 declare const noFeedStore: import('@migaia/storage-contract').IKeyValueStore & {
   readonly capabilities: import('@migaia/storage-contract').IStorageCapabilities & {
@@ -183,4 +234,4 @@ declare const noFeedStore: import('@migaia/storage-contract').IKeyValueStore & {
   }
 }
 // @ts-expect-error false feed capability never grants watch.
-users.connect(noFeedStore).query().watch()
+usersEntityPluginHost.extensions[usersEntityPlugin.id](noFeedStore).query().watch()

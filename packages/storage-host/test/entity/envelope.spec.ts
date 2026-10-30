@@ -1,3 +1,4 @@
+import { entityHost } from '../helpers/memory.ts'
 import { storageProbe } from '../../src/plugins/probe/index.ts'
 import { entityQueryFeature } from '../../src/entity/query-feature.ts'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.ts'
@@ -13,7 +14,7 @@ import {
   defineStorageBackendKind,
   type IStoragePluginCore
 } from '../../src/index.ts'
-import { defineEntity } from '../../src/entity.ts'
+import { defineEntityPlugin } from '../../src/entity.ts'
 import { composeFlatKey } from '../../src/entity/key.ts'
 
 /**
@@ -119,39 +120,55 @@ describe('entity envelopes through the shared plan owner', () => {
       const fixture = rawPlugin(undefined, false, synchronous)
       await using host = await createStorageHost({ plugins: [fixture.plugin] })
       const store = fixture.getStore()
-      const plain = defineEntity<{ id: string; email: string }>({
-        features: [
-          entityQueryFeature(),
-          entityUniqueFeature(),
-          entityMigrationFeature(),
-          entityIndexesFeature(),
-          entityKeysetFeature()
-        ],
-        name: 'plain-raw',
-        key: 'id'
-      }).connect(store)
+
+      /** Explicit entity plugin configuration is installed before requesting a repository. */
+      const entity1EntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+        'entity-envelope-spec-ts-entity1-1',
+        {
+          features: {
+            query: entityQueryFeature(),
+            unique: entityUniqueFeature(),
+            migration: entityMigrationFeature(),
+            indexes: entityIndexesFeature(),
+            keyset: entityKeysetFeature()
+          },
+          name: 'plain-raw',
+          key: 'id'
+        }
+      )
+      /** This actual storage host owns the entity installation for this test scope. */
+      const entity1EntityPluginHost = await entityHost(entity1EntityPlugin)
+      const plain = entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store)
       await plain.put({ id: 'existing', email: 'one' })
       const before = await store.keys()
       let validations = 0
-      const unique = defineEntity<{ id: string; email: string }>()({
-        features: [
-          entityQueryFeature(),
-          entityUniqueFeature(),
-          entityMigrationFeature(),
-          entityIndexesFeature(),
-          entityKeysetFeature()
-        ],
-        name: 'unique-raw',
-        key: 'id',
-        indexes: { email: { path: 'email', unique: true } },
-        schema: {
-          name: 'counted',
-          async validate(value) {
-            validations++
-            return value as { id: string; email: string }
+
+      /** Explicit entity plugin configuration is installed before requesting a repository. */
+      const entity2EntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+        'entity-envelope-spec-ts-entity2-2',
+        {
+          features: {
+            query: entityQueryFeature(),
+            unique: entityUniqueFeature(),
+            migration: entityMigrationFeature(),
+            indexes: entityIndexesFeature(),
+            keyset: entityKeysetFeature()
+          },
+          name: 'unique-raw',
+          key: 'id',
+          indexes: { email: { path: 'email', unique: true } },
+          schema: {
+            name: 'counted',
+            async validate(value) {
+              validations++
+              return value as { id: string; email: string }
+            }
           }
         }
-      }).connect(store)
+      )
+      /** This actual storage host owns the entity installation for this test scope. */
+      const entity2EntityPluginHost = await entityHost(entity2EntityPlugin)
+      const unique = entity2EntityPluginHost.extensions[entity2EntityPlugin.id](store)
       await expect(unique.put({ id: 'new', email: 'one' })).rejects.toMatchObject({
         source: 'storage.contract',
         code: 'UNSUPPORTED_CAPABILITY'
@@ -167,17 +184,25 @@ describe('entity envelopes through the shared plan owner', () => {
   it('rejects ambiguous query methods when one host sharing the same raw store has no selected methods', async () => {
     const firstRaw = rawPlugin(undefined, true)
     const first = await createStorageHost({ plugins: [firstRaw.plugin] })
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'shared-query',
-      key: 'id'
-    }).connect(firstRaw.getStore())
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity3EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-envelope-spec-ts-entity3-3',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'shared-query',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity3EntityPluginHost = await entityHost(entity3EntityPlugin)
+    const repo = entity3EntityPluginHost.extensions[entity3EntityPlugin.id](firstRaw.getStore())
     expect(repo.query()).toHaveProperty('mark')
     await using second = await createStorageHost({
       plugins: [rawPlugin(firstRaw.getStore()).plugin]
@@ -214,17 +239,25 @@ describe('entity envelopes through the shared plan owner', () => {
       ]
     })
     expect(second.backend('raw')).toBe(store)
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'shared',
-      key: 'id'
-    }).connect(store)
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity4EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-envelope-spec-ts-entity4-4',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'shared',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
+    const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](store)
     await repo.put({ id: 'a' })
     expect(await repo.get('a')).toEqual({ id: 'a' })
     expect(seen).toEqual(['first', 'second'])
@@ -267,19 +300,27 @@ describe('entity envelopes through the shared plan owner', () => {
       composeFlatKey('archives', 'a'),
       JSON.stringify({ version: 1, state: { id: 'a', count: 1 } })
     )
-    const repo = defineEntity<{ id: string; count: number }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'archives',
-      key: 'id',
-      version: 2,
-      migrations: { 2: (value) => ({ ...(value as { id: string }), count: 2 }) }
-    }).connect(store)
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity5EntityPlugin = defineEntityPlugin<{ id: string; count: number }>()(
+      'entity-envelope-spec-ts-entity5-5',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'archives',
+        key: 'id',
+        version: 2,
+        migrations: { 2: (value) => ({ ...(value as { id: string }), count: 2 }) }
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity5EntityPluginHost = await entityHost(entity5EntityPlugin)
+    const repo = entity5EntityPluginHost.extensions[entity5EntityPlugin.id](store)
     expect(await repo.get('a')).toEqual({ id: 'a', count: 2 })
     expect(order).toEqual(['check', 'checked', 'step', 'stepped', 'migrated'])
     await repo.put({ id: 'b', count: 3 })
@@ -294,18 +335,26 @@ describe('entity envelopes through the shared plan owner', () => {
     await using host = await createStorageHost({ plugins: [raw.plugin] })
     const store = raw.getStore()
     expect(host.backend('raw')).toBe(store)
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'invalid',
-      key: 'id',
-      version: 2
-    }).connect(store)
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity6EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-envelope-spec-ts-entity6-6',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'invalid',
+        key: 'id',
+        version: 2
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity6EntityPluginHost = await entityHost(entity6EntityPlugin)
+    const repo = entity6EntityPluginHost.extensions[entity6EntityPlugin.id](store)
     await store.set(
       composeFlatKey('invalid', 'old'),
       JSON.stringify({ __v: 2, data: { id: 'old' } })
@@ -324,22 +373,30 @@ describe('entity envelopes through the shared plan owner', () => {
       code: 'VERSION_UNSUPPORTED',
       cause: { source: 'storage.contract', code: 'VERSION_UNSUPPORTED' }
     })
-    const invalidWrite = defineEntity<{ id: string }, null>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'null-state',
-      key: 'id',
-      schema: {
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity7EntityPlugin = defineEntityPlugin<{ id: string }, null>()(
+      'entity-envelope-spec-ts-entity7-7',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
         name: 'null-state',
-        validate: async (value) => value as { id: string },
-        encode: async () => null
+        key: 'id',
+        schema: {
+          name: 'null-state',
+          validate: async (value) => value as { id: string },
+          encode: async () => null
+        }
       }
-    }).connect(store)
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity7EntityPluginHost = await entityHost(entity7EntityPlugin)
+    const invalidWrite = entity7EntityPluginHost.extensions[entity7EntityPlugin.id](store)
     await expect(invalidWrite.put({ id: 'a' })).rejects.toMatchObject({
       source: 'storage.host',
       code: 'SERIALIZE_FAILED',
@@ -354,23 +411,31 @@ describe('entity envelopes through the shared plan owner', () => {
     const store = raw.getStore()
     expect(host.backend('raw')).toBe(store)
     const original = new Error('actual migration failure')
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'broken',
-      key: 'id',
-      version: 2,
-      migrations: {
-        2: () => {
-          throw original
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity8EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-envelope-spec-ts-entity8-8',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'broken',
+        key: 'id',
+        version: 2,
+        migrations: {
+          2: () => {
+            throw original
+          }
         }
       }
-    }).connect(store)
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity8EntityPluginHost = await entityHost(entity8EntityPlugin)
+    const repo = entity8EntityPluginHost.extensions[entity8EntityPlugin.id](store)
     await store.set(
       composeFlatKey('broken', 'a'),
       JSON.stringify({ version: 1, state: { id: 'a' } })

@@ -5,7 +5,7 @@ import { Resource } from '@migaia/resource'
 import { records, StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createReactiveServiceFixture } from '../helpers/reactive-service.ts'
@@ -114,13 +114,25 @@ describe('public reactive query policies', () => {
 
   it('isolates entity scopes and rejected changes while conservatively refreshing on predicate failure', async () => {
     /** Public entity writes produce the native controller's actual canonical record scopes. */
-    const { store } = await createPublicReactiveFixture()
+    const { host, store } = await createPublicReactiveFixture()
     /** Only this entity belongs to the live query's declared invalidation scope. */
-    const selected = defineEntity<IReactiveFixtureRow>({ name: 'selected', key: 'id' }).connect(
-      store
+    const selectedEntityPlugin = defineEntityPlugin<IReactiveFixtureRow>()(
+      'resource-backed-queries-spec-ts-119',
+      { name: 'selected', key: 'id' }
     )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const selectedEntityPluginHost = await host.use(selectedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const selected = selectedEntityPluginHost.extensions[selectedEntityPlugin.id](store)
     /** A second ordinary entity supplies a real unrelated committed invalidation. */
-    const foreign = defineEntity<IReactiveFixtureRow>({ name: 'foreign', key: 'id' }).connect(store)
+    const foreignEntityPlugin = defineEntityPlugin<IReactiveFixtureRow>()(
+      'resource-backed-queries-spec-ts-123',
+      { name: 'foreign', key: 'id' }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const foreignEntityPluginHost = await host.use(foreignEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const foreign = foreignEntityPluginHost.extensions[foreignEntityPlugin.id](store)
     await selected.put({ id: 'selected', value: 'initial' })
     await foreign.put({ id: 'foreign', value: 'foreign' })
     /** Count public projections rather than observing any private source implementation. */

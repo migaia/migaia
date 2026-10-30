@@ -1,4 +1,3 @@
-import { entityTestFeatures } from '../helpers/entity-features.ts'
 import {
   kv,
   records,
@@ -16,7 +15,6 @@ import {
 } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  defineEntity,
   REPOSITORY_KEY_PREFIX,
   RecordIndexBackfillPhase,
   type IRecordIndexBackfillStore
@@ -74,11 +72,15 @@ const createBackfillDb = (
   }
 ) => createIndexedDbBackfillTestStore(options)
 
-/** Native key fixtures derive canonical identity through the same actual public repository. */
-const entityRecordKey = (store: IKeyValueStore, scope: string, id: IStorageKey): IStorageKey =>
-  defineEntity<{ id: IStorageKey }>({ features: entityTestFeatures, name: scope, key: 'id' })
-    .connect(store)
-    .lockKey(id).key
+/**
+ * Native fixtures use the existing canonical record-key prefix without installing a business
+ * entity.
+ */
+const entityRecordKey = (_store: IKeyValueStore, scope: string, id: IStorageKey): IStorageKey => [
+  REPOSITORY_KEY_PREFIX,
+  scope,
+  id
+]
 
 /** These explicit bounds select the known native canonical-key fixture prefix. */
 const canonicalFixtureRange = (scope: string) => ({

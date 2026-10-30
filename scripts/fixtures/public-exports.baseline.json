@@ -1118,7 +1118,7 @@
         "REPOSITORY_KEY_PREFIX",
         "RecordIndexBackfillPhase",
         "binaryCodec",
-        "defineEntity",
+        "defineEntityPlugin",
         "fromStandardSchema",
         "jsonCodec",
         "markRecordIndexBackfillContentionFailure",

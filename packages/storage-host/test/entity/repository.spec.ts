@@ -1,15 +1,17 @@
+import { entityHost } from '../helpers/memory.ts'
 import { entityQueryFeature } from '../../src/entity/query-feature.ts'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.ts'
 import { entityMigrationFeature } from '../../src/entity/migration-feature.ts'
 import { entityIndexesFeature } from '../../src/entity/indexes-feature.ts'
 import { entityKeysetFeature } from '../../src/entity/keyset.ts'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { defineEntity } from '../../src/entity.ts'
+import { defineEntityPlugin } from '../../src/entity.ts'
 import { memoryBackend } from '../helpers/memory.ts'
 import { StorageError } from '../../src/errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { composeRepositoryKey } from '../../src/entity/key.ts'
+import type { IStorageHost } from '../../src/types.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -19,21 +21,24 @@ import {
 
 type IUser = { id: string; name: string; email: string }
 
-const users = defineEntity<IUser>({
-  features: [
-    entityQueryFeature(),
-    entityUniqueFeature(),
-    entityMigrationFeature(),
-    entityIndexesFeature(),
-    entityKeysetFeature()
-  ],
+const usersEntityPlugin = defineEntityPlugin<IUser>()('entity-repository-spec-ts-users-1', {
+  features: {
+    query: entityQueryFeature(),
+    unique: entityUniqueFeature(),
+    migration: entityMigrationFeature(),
+    indexes: entityIndexesFeature(),
+    keyset: entityKeysetFeature()
+  },
   name: 'users',
   key: 'id'
 })
 
 it('stream limit zero performs no backend read or yield', async () => {
+  /** This actual storage host owns the entity installation for this test scope. */
+  const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
   const store = await memoryBackend()
-  const repo = users.connect(store)
+  const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
   await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
   let reads = 0
   const originalIterate = store.iterateRecords
@@ -48,7 +53,10 @@ it('stream limit zero performs no backend read or yield', async () => {
 })
 
 it('stream direction reverses the explicit comparator order', async () => {
-  const repo = users.connect(await memoryBackend())
+  /** This actual storage host owns the entity installation for this test scope. */
+  const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+  const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
   await repo.put({ id: 'a', name: 'A', email: 'a@b.c' })
   await repo.put({ id: 'b', name: 'B', email: 'b@c.d' })
   const values: IUser[] = []
@@ -65,30 +73,36 @@ it('projects explicit selectors and indexed list through the shared query route'
   type IIndexedUser = { id: string; email: string; tags: string[] }
   let selectorCalls = 0
   const diagnostics: string[] = []
-  const entity = defineEntity<IIndexedUser>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
-    name: 'indexed-list-users',
-    key: 'id',
-    onDiagnostic: (message) => diagnostics.push(message),
-    indexes: {
-      email: { path: 'email' },
-      tags: { path: 'tags', multiEntry: true },
-      selected: {
-        select: (value) => {
-          selectorCalls += 1
-          return { kind: 'single' as const, key: value.email }
-        },
-        revision: 1
+  const entityEntityPlugin = defineEntityPlugin<IIndexedUser>()(
+    'entity-repository-spec-ts-entity-2',
+    {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
+      name: 'indexed-list-users',
+      key: 'id',
+      onDiagnostic: (message) => diagnostics.push(message),
+      indexes: {
+        email: { path: 'email' },
+        tags: { path: 'tags', multiEntry: true },
+        selected: {
+          select: (value) => {
+            selectorCalls += 1
+            return { kind: 'single' as const, key: value.email }
+          },
+          revision: 1
+        }
       }
     }
-  })
-  const repository = entity.connect(await memoryBackend())
+  )
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
+  const repository = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
   await repository.put({ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] })
   await repository.put({ id: 'u2', email: 'grace@example.com', tags: ['staff'] })
 
@@ -134,14 +148,14 @@ it('projects explicit selectors and indexed list through the shared query route'
 
 it('fallback batch does not execute secondary-index selectors', async () => {
   let selectorCalls = 0
-  const entity = defineEntity<IUser>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
+  const entityEntityPlugin = defineEntityPlugin<IUser>()('entity-repository-spec-ts-entity-3', {
+    features: {
+      query: entityQueryFeature(),
+      unique: entityUniqueFeature(),
+      migration: entityMigrationFeature(),
+      indexes: entityIndexesFeature(),
+      keyset: entityKeysetFeature()
+    },
     name: 'fallback-batch-users',
     key: 'id',
     indexes: {
@@ -154,25 +168,36 @@ it('fallback batch does not execute secondary-index selectors', async () => {
       }
     }
   })
-  await entity.connect(await memoryBackend()).batch(async (tx) => {
-    await tx.put({ id: 'u1', name: 'Ada', email: 'ada@example.com' })
-  })
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
+  await entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend()).batch(
+    async (tx) => {
+      await tx.put({ id: 'u1', name: 'Ada', email: 'ada@example.com' })
+    }
+  )
   expect(selectorCalls).toBe(0)
 })
 
 it('find APIs share fallback range, ordering, direction, and limit semantics', async () => {
-  const repository = defineEntity<IUser>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
+  /** Explicit entity plugin configuration is installed before requesting a repository. */
+  const entity4EntityPlugin = defineEntityPlugin<IUser>()('entity-repository-spec-ts-entity4-4', {
+    features: {
+      query: entityQueryFeature(),
+      unique: entityUniqueFeature(),
+      migration: entityMigrationFeature(),
+      indexes: entityIndexesFeature(),
+      keyset: entityKeysetFeature()
+    },
     name: 'indexed-fallback-users',
     key: 'id',
     indexes: { email: { path: 'email' } }
-  }).connect(await memoryBackend())
+  })
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
+  const repository = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](
+    await memoryBackend()
+  )
   await repository.put({ id: 'u2', name: 'Bob', email: 'same@example.com' })
   await repository.put({ id: 'u1', name: 'Ada', email: 'same@example.com' })
   await repository.put({ id: 'u3', name: 'Cat', email: 'z@example.com' })
@@ -203,20 +228,23 @@ it('find APIs share fallback range, ordering, direction, and limit semantics', a
 })
 
 it('indexed comparator ordering ties by index and id before direction and limit', async () => {
-  const entity = defineEntity<IUser>()({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
+  const entityEntityPlugin = defineEntityPlugin<IUser>()('entity-repository-spec-ts-entity-5', {
+    features: {
+      query: entityQueryFeature(),
+      unique: entityUniqueFeature(),
+      migration: entityMigrationFeature(),
+      indexes: entityIndexesFeature(),
+      keyset: entityKeysetFeature()
+    },
     name: 'indexed-comparator-users',
     key: 'id',
     defaultOrderBy: () => 0,
     indexes: { email: { path: 'email' } }
   })
-  const repository = entity.connect(await memoryBackend())
+  /** This actual storage host owns the entity installation for this test scope. */
+  const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
+  const repository = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
   await repository.put({ id: 'a', name: 'A', email: 'z@example.com' })
   await repository.put({ id: 'b', name: 'B', email: 'a@example.com' })
 
@@ -248,7 +276,10 @@ const backends = [{ label: 'memory (structured)', create: memoryBackend }] as co
 for (const { label, create } of backends) {
   describe(`repository over ${label}`, () => {
     it('put 后 get 返回同值', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'ada@example.com' })
       await expect(repo.get('u1')).resolves.toEqual({
         id: 'u1',
@@ -258,31 +289,46 @@ for (const { label, create } of backends) {
     })
 
     it('put 返回 id', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await expect(repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })).resolves.toBe('u1')
     })
 
     it('get 未写入的 id 返回 undefined', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await expect(repo.get('missing')).resolves.toBeUndefined()
     })
 
     it('put 缺少 key 属性时抛稳定 StorageError', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await expect(repo.put({ name: 'Ada' } as unknown as IUser)).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
       })
     })
 
     it('remove 后 get 返回 undefined', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await repo.remove('u1')
       await expect(repo.get('u1')).resolves.toBeUndefined()
     })
 
     it('list 返回全部记录', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await repo.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
       const all = await repo.list()
@@ -291,7 +337,10 @@ for (const { label, create } of backends) {
     })
 
     it('list 支持 limit', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await repo.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
       await repo.put({ id: 'u3', name: 'Cy', email: 'c@d.e' })
@@ -300,7 +349,10 @@ for (const { label, create } of backends) {
     })
 
     it('stream 接受查询 options 并在流式路径应用 limit', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await repo.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
       const streamed: IUser[] = []
@@ -309,7 +361,10 @@ for (const { label, create } of backends) {
     })
 
     it('stream 应用 orderBy 后再应用 limit', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await repo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
       await repo.put({ id: 'b', name: 'Bob', email: 'b@c.d' })
       const streamed: IUser[] = []
@@ -322,7 +377,10 @@ for (const { label, create } of backends) {
     })
 
     it('KV list 按主键排序并在排序后应用 limit/range', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await repo.put({ id: 'c', name: 'C', email: 'c@d.e' })
       await repo.put({ id: 'a', name: 'A', email: 'a@b.c' })
       await repo.put({ id: 'b', name: 'B', email: 'b@c.d' })
@@ -332,7 +390,10 @@ for (const { label, create } of backends) {
     })
 
     it('stream 逐条产出全部记录', async () => {
-      const repo = users.connect(await create())
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await repo.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
       const seen: string[] = []
@@ -341,20 +402,29 @@ for (const { label, create } of backends) {
     })
 
     it('list/stream 不会读到其他 entity 的记录', async () => {
+      /** This actual storage host owns the entity installation for this test scope. */
+      const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
       const store = await create()
-      const posts = defineEntity<{ id: string; title: string }>({
-        features: [
-          entityQueryFeature(),
-          entityUniqueFeature(),
-          entityMigrationFeature(),
-          entityIndexesFeature(),
-          entityKeysetFeature()
-        ],
-        name: 'posts',
-        key: 'id'
-      })
-      const userRepo = users.connect(store)
-      const postRepo = posts.connect(store)
+      const postsEntityPlugin = defineEntityPlugin<{ id: string; title: string }>()(
+        'entity-repository-spec-ts-posts-6',
+        {
+          features: {
+            query: entityQueryFeature(),
+            unique: entityUniqueFeature(),
+            migration: entityMigrationFeature(),
+            indexes: entityIndexesFeature(),
+            keyset: entityKeysetFeature()
+          },
+          name: 'posts',
+          key: 'id'
+        }
+      )
+      /** This actual storage host owns the entity installation for this test scope. */
+      const postsEntityPluginHost = await entityHost(postsEntityPlugin)
+
+      const userRepo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+      const postRepo = postsEntityPluginHost.extensions[postsEntityPlugin.id](store)
       await userRepo.put({ id: 'shared-id', name: 'Ada', email: 'a@b.c' })
       await postRepo.put({ id: 'shared-id', title: 'Hello' })
       await expect(userRepo.list()).resolves.toEqual([
@@ -368,19 +438,27 @@ for (const { label, create } of backends) {
 describe('KV-only scan diagnostics', () => {
   it('结构化后端上 list/stream 不触发 diagnostic', async () => {
     const diagnosed: string[] = []
-    const diagnosedEntity = defineEntity<IUser>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'users-diag-structured',
-      key: 'id',
-      onDiagnostic: (message) => diagnosed.push(message)
-    })
-    const repo = diagnosedEntity.connect(await memoryBackend())
+    const diagnosedEntityEntityPlugin = defineEntityPlugin<IUser>()(
+      'entity-repository-spec-ts-diagnosedEntity-7',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'users-diag-structured',
+        key: 'id',
+        onDiagnostic: (message) => diagnosed.push(message)
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const diagnosedEntityEntityPluginHost = await entityHost(diagnosedEntityEntityPlugin)
+
+    const repo = diagnosedEntityEntityPluginHost.extensions[diagnosedEntityEntityPlugin.id](
+      await memoryBackend()
+    )
     await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
     await repo.list()
     expect(diagnosed).toHaveLength(0)
@@ -389,17 +467,24 @@ describe('KV-only scan diagnostics', () => {
 
 describe('查询排序与无效记录策略', () => {
   it('comparator 异常统一为 EXTENSION_FAILED', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'order-error',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity8EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity8-8',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'order-error',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity8EntityPluginHost = await entityHost(entity8EntityPlugin)
+    const repo = entity8EntityPluginHost.extensions[entity8EntityPlugin.id](await memoryBackend())
     await repo.put({ id: 'a' })
     await repo.put({ id: 'b' })
     const comparator = () => {
@@ -418,17 +503,24 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('comparator 返回非 number 时不静默强制转换', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'invalid-comparator',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity9EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity9-9',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'invalid-comparator',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity9EntityPluginHost = await entityHost(entity9EntityPlugin)
+    const repo = entity9EntityPluginHost.extensions[entity9EntityPlugin.id](await memoryBackend())
     await repo.put({ id: 'a' })
     await repo.put({ id: 'b' })
     await expect(repo.list({ orderBy: () => 'invalid' as never, limit: 2 })).rejects.toMatchObject({
@@ -444,17 +536,24 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list/stream 不把显式 null orderBy 静默当成默认排序', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'null-order-by',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity10EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity10-10',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'null-order-by',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity10EntityPluginHost = await entityHost(entity10EntityPlugin)
+    const repo = entity10EntityPluginHost.extensions[entity10EntityPlugin.id](await memoryBackend())
     await expect(repo.list({ orderBy: null as never })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
@@ -466,17 +565,24 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list/stream 拒绝 null、数组和 primitive range', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'invalid-range',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity11EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity11-11',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'invalid-range',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity11EntityPluginHost = await entityHost(entity11EntityPlugin)
+    const repo = entity11EntityPluginHost.extensions[entity11EntityPlugin.id](await memoryBackend())
     for (const range of [null, [], 'range', 1]) {
       await expect(repo.list({ range: range as never })).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT'
@@ -490,17 +596,24 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list/stream 拒绝非 boolean range open flags', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'invalid-range-flags',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity12EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity12-12',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'invalid-range-flags',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity12EntityPluginHost = await entityHost(entity12EntityPlugin)
+    const repo = entity12EntityPluginHost.extensions[entity12EntityPlugin.id](await memoryBackend())
     for (const range of [{ lowerOpen: 'yes' }, { upperOpen: 1 }]) {
       await expect(repo.list({ range: range as never })).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT'
@@ -514,17 +627,24 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list/stream 拒绝 null、数组和 primitive options', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'invalid-list-options',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity13EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity13-13',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'invalid-list-options',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity13EntityPluginHost = await entityHost(entity13EntityPlugin)
+    const repo = entity13EntityPluginHost.extensions[entity13EntityPlugin.id](await memoryBackend())
     for (const options of [null, [], 'options', 1]) {
       await expect(repo.list(options as never)).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
       await expect(
@@ -536,17 +656,24 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list/stream/migrate 在没有坏记录时也拒绝非法 onInvalid', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'invalid-on-invalid',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity14EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity14-14',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'invalid-on-invalid',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity14EntityPluginHost = await entityHost(entity14EntityPlugin)
+    const repo = entity14EntityPluginHost.extensions[entity14EntityPlugin.id](await memoryBackend())
     for (const onInvalid of [null, [], 'invalid', 1]) {
       await expect(repo.list({ onInvalid: onInvalid as never })).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
@@ -561,19 +688,22 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list 支持单次 orderBy 覆盖默认顺序并在排序后 limit', async () => {
-    const entity = defineEntity<IUser>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
+    const entityEntityPlugin = defineEntityPlugin<IUser>()('entity-repository-spec-ts-entity-15', {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
       name: 'ordered-users',
       key: 'id',
       defaultOrderBy: (left, right) => right.name.localeCompare(left.name)
     })
-    const repo = entity.connect(await memoryBackend())
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
     await repo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
     await repo.put({ id: 'b', name: 'Bob', email: 'b@c.d' })
     await expect(repo.list({ limit: 1 })).resolves.toEqual([
@@ -588,30 +718,36 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('onInvalid throw 策略让坏记录终止查询', async () => {
-    const entity = defineEntity<{ id: string; n: number }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'strict-users',
-      key: 'id',
-      schema: {
-        name: 'strict',
-        validate: async (value: { id: string; n: unknown }) => {
-          const typedValue = value
-          if (typeof typedValue.n !== 'number') throw new Error('invalid n')
-          return typedValue as { id: string; n: number }
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; n: number }>()(
+      'entity-repository-spec-ts-entity-16',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'strict-users',
+        key: 'id',
+        schema: {
+          name: 'strict',
+          validate: async (value: { id: string; n: unknown }) => {
+            const typedValue = value
+            if (typeof typedValue.n !== 'number') throw new Error('invalid n')
+            return typedValue as { id: string; n: number }
+          }
         }
       }
-    })
-    const repo = entity.connect(await memoryBackend())
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
     await repo.put({ id: 'good', n: 1 })
     const rawStore = await memoryBackend()
     await rawStore.putRecord({ version: 1, state: { id: 'bad', n: 'x' } }, ['strict-users', 'bad'])
-    const strictRepo = entity.connect(rawStore)
+    const strictRepo = entityEntityPluginHost.extensions[entityEntityPlugin.id](rawStore)
     await expect(strictRepo.get('bad')).rejects.toMatchObject({
       code: 'EXTENSION_FAILED',
       operation: 'entity.schema.validate',
@@ -629,24 +765,34 @@ describe('查询排序与无效记录策略', () => {
 
 describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   it('schema 扩展 raw throw 统一为 EXTENSION_FAILED', async () => {
-    const entity = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'schema-extension-error',
-      key: 'id',
-      schema: {
-        name: 'throws',
-        validate: async () => {
-          throw new Error('schema failure')
+    const entityEntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity-17',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'schema-extension-error',
+        key: 'id',
+        schema: {
+          name: 'throws',
+          validate: async () => {
+            throw new Error('schema failure')
+          }
         }
       }
-    })
-    await expect(entity.connect(await memoryBackend()).put({ id: 'x' })).rejects.toMatchObject({
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
+    await expect(
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend()).put({
+        id: 'x'
+      })
+    ).rejects.toMatchObject({
       code: 'EXTENSION_FAILED',
       operation: 'entity.schema.validate',
       extensionStage: 'schema'
@@ -654,7 +800,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
 
     const rawStore = await memoryBackend()
     await rawStore.putRecord({ version: 1, state: { id: 'x' } }, ['schema-extension-error', 'x'])
-    const readRepo = entity.connect(rawStore)
+    const readRepo = entityEntityPluginHost.extensions[entityEntityPlugin.id](rawStore)
     await expect(readRepo.get('x')).rejects.toMatchObject({
       code: 'EXTENSION_FAILED',
       operation: 'entity.schema.validate',
@@ -668,29 +814,37 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   })
 
   it('schema 主动抛 StorageError 时保留 code 并补齐扩展上下文', async () => {
-    const entity = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'schema-storage-error-context',
-      key: 'id',
-      schema: {
-        name: 'throws-storage-error',
-        validate: async () => {
-          throw new StorageError(StorageHostErrorCode.invalidConfig)
+    const entityEntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity-18',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'schema-storage-error-context',
+        key: 'id',
+        schema: {
+          name: 'throws-storage-error',
+          validate: async () => {
+            throw new StorageError(StorageHostErrorCode.invalidConfig)
+          }
         }
       }
-    })
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
     const store = await memoryBackend()
     await store.putRecord({ version: 1, state: { id: 'u1' } }, [
       'schema-storage-error-context',
       'u1'
     ])
-    await expect(entity.connect(store).get('u1')).rejects.toMatchObject({
+    await expect(
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).get('u1')
+    ).rejects.toMatchObject({
       code: 'INVALID_CONFIG',
       operation: 'entity.schema.validate',
       extensionStage: 'schema'
@@ -698,31 +852,41 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   })
 
   it('读取可关闭 validate，并拒绝畸形 envelope', async () => {
-    const unchecked = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'unchecked-read',
-      key: 'id',
-      validateOnRead: false,
-      schema: {
-        name: 'unchecked',
-        validate: async () => {
-          throw new Error('must not run on read')
+    const uncheckedEntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-unchecked-19',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'unchecked-read',
+        key: 'id',
+        validateOnRead: false,
+        schema: {
+          name: 'unchecked',
+          validate: async () => {
+            throw new Error('must not run on read')
+          }
         }
       }
-    })
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const uncheckedEntityPluginHost = await entityHost(uncheckedEntityPlugin)
+
     const store = await memoryBackend()
     await store.putRecord({ version: 1, state: { id: 'ok' } }, ['unchecked-read', 'ok'])
-    await expect(unchecked.connect(store).get('ok')).resolves.toEqual({ id: 'ok' })
+    await expect(
+      uncheckedEntityPluginHost.extensions[uncheckedEntityPlugin.id](store).get('ok')
+    ).resolves.toEqual({ id: 'ok' })
 
     const malformed = await memoryBackend()
     await malformed.putRecord({ broken: true }, ['unchecked-read', 'broken'])
-    await expect(unchecked.connect(malformed).get('broken')).rejects.toMatchObject({
+    await expect(
+      uncheckedEntityPluginHost.extensions[uncheckedEntityPlugin.id](malformed).get('broken')
+    ).rejects.toMatchObject({
       code: 'DESERIALIZE_FAILED'
     })
   })
@@ -730,34 +894,46 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   type IRawUser = { id: string; createdAt: string }
   type IDomainUser = { id: string; createdAt: Date }
 
-  const withSchema = defineEntity<IDomainUser, IRawUser>({
-    features: [
-      entityQueryFeature(),
-      entityUniqueFeature(),
-      entityMigrationFeature(),
-      entityIndexesFeature(),
-      entityKeysetFeature()
-    ],
-    name: 'users-schema',
-    key: 'id',
-    schema: {
-      name: 'test-schema',
-      validate: async (value) => value as IDomainUser,
-      normalize: async (value) => ({ ...value, id: value.id.toLowerCase() }),
-      encode: async (value) => ({ id: value.id, createdAt: value.createdAt.toISOString() }),
-      decode: async (stored) => ({ id: stored.id, createdAt: new Date(stored.createdAt) })
+  const withSchemaEntityPlugin = defineEntityPlugin<IDomainUser, IRawUser>()(
+    'entity-repository-spec-ts-withSchema-20',
+    {
+      features: {
+        query: entityQueryFeature(),
+        unique: entityUniqueFeature(),
+        migration: entityMigrationFeature(),
+        indexes: entityIndexesFeature(),
+        keyset: entityKeysetFeature()
+      },
+      name: 'users-schema',
+      key: 'id',
+      schema: {
+        name: 'test-schema',
+        validate: async (value) => value as IDomainUser,
+        normalize: async (value) => ({ ...value, id: value.id.toLowerCase() }),
+        encode: async (value) => ({ id: value.id, createdAt: value.createdAt.toISOString() }),
+        decode: async (stored) => ({ id: stored.id, createdAt: new Date(stored.createdAt) })
+      }
     }
+  )
+  /** Each case owns an entity installation that survives until that case's existing cleanup. */
+  let withSchemaEntityPluginHost: IStorageHost<readonly [typeof withSchemaEntityPlugin]>
+  beforeEach(async () => {
+    withSchemaEntityPluginHost = await entityHost(withSchemaEntityPlugin)
   })
 
   it('put 经 normalize+encode，get 经 decode，往返值语义一致', async () => {
-    const repo = withSchema.connect(await memoryBackend())
+    const repo = withSchemaEntityPluginHost.extensions[withSchemaEntityPlugin.id](
+      await memoryBackend()
+    )
     const createdAt = new Date('2024-01-01T00:00:00.000Z')
     await repo.put({ id: 'u1', createdAt })
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', createdAt })
   })
 
   it('normalize 修改主键时以规范化后的主键写入', async () => {
-    const repo = withSchema.connect(await memoryBackend())
+    const repo = withSchemaEntityPluginHost.extensions[withSchemaEntityPlugin.id](
+      await memoryBackend()
+    )
     await expect(
       repo.put({ id: 'ABC', createdAt: new Date('2024-01-01T00:00:00.000Z') })
     ).resolves.toBe('abc')
@@ -769,7 +945,9 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   })
 
   it('list/stream 同样经过 schema.decode', async () => {
-    const repo = withSchema.connect(await memoryBackend())
+    const repo = withSchemaEntityPluginHost.extensions[withSchemaEntityPlugin.id](
+      await memoryBackend()
+    )
     const createdAt = new Date('2024-01-01T00:00:00.000Z')
     await repo.put({ id: 'u1', createdAt })
     const all = await repo.list()
@@ -779,26 +957,36 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
 
 describe('结构化后端上的自定义 repository codec', () => {
   it('codec raw throw 统一为 EXTENSION_FAILED', async () => {
-    const entity = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'codec-extension-error',
-      key: 'id',
-      codec: {
-        name: 'throws',
-        output: 'structured',
-        encode: async () => {
-          throw new Error('codec failure')
+    const entityEntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity-21',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
         },
-        decode: async (value) => value
+        name: 'codec-extension-error',
+        key: 'id',
+        codec: {
+          name: 'throws',
+          output: 'structured',
+          encode: async () => {
+            throw new Error('codec failure')
+          },
+          decode: async (value) => value
+        }
       }
-    })
-    await expect(entity.connect(await memoryBackend()).put({ id: 'x' })).rejects.toMatchObject({
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
+    await expect(
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend()).put({
+        id: 'x'
+      })
+    ).rejects.toMatchObject({
       code: 'EXTENSION_FAILED',
       operation: 'entity.codec.encode',
       extensionStage: 'codec'
@@ -808,37 +996,43 @@ describe('结构化后端上的自定义 repository codec', () => {
   it('put/get 都经过显式 codec，而不是绕过 codec 直存 envelope', async () => {
     let encodeCount = 0
     let decodeCount = 0
-    const entity = defineEntity<{ id: string; value: number }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'structured-codec-users',
-      key: 'id',
-      codec: {
-        name: 'counting-structured',
-        output: 'structured',
-        encode: async (value) => {
-          encodeCount += 1
-          const envelope = value as { version: number; state: { id: string; value: number } }
-          return { ...envelope, state: { ...envelope.state, encoded: true } }
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; value: number }>()(
+      'entity-repository-spec-ts-entity-22',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
         },
-        decode: async (value) => {
-          decodeCount += 1
-          const envelope = value as {
-            version: number
-            state: { id: string; value: number; encoded: boolean }
+        name: 'structured-codec-users',
+        key: 'id',
+        codec: {
+          name: 'counting-structured',
+          output: 'structured',
+          encode: async (value) => {
+            encodeCount += 1
+            const envelope = value as { version: number; state: { id: string; value: number } }
+            return { ...envelope, state: { ...envelope.state, encoded: true } }
+          },
+          decode: async (value) => {
+            decodeCount += 1
+            const envelope = value as {
+              version: number
+              state: { id: string; value: number; encoded: boolean }
+            }
+            const stored = envelope.state
+            expect(stored.encoded).toBe(true)
+            return { ...envelope, state: { id: stored.id, value: stored.value } }
           }
-          const stored = envelope.state
-          expect(stored.encoded).toBe(true)
-          return { ...envelope, state: { id: stored.id, value: stored.value } }
         }
       }
-    })
-    const repo = entity.connect(await memoryBackend())
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
 
     await repo.put({ id: 'u1', value: 7 })
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', value: 7 })
@@ -850,30 +1044,42 @@ describe('结构化后端上的自定义 repository codec', () => {
 describe('list 显式 range', () => {
   it('结构化后端上 list 支持显式 range，且不会逃逸到其他 entity', async () => {
     const store = await memoryBackend()
-    const posts = defineEntity<{ id: string; title: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'posts-range',
-      key: 'id'
-    })
-    const rangedUsers = defineEntity<IUser>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'users-range',
-      key: 'id'
-    })
-    const userRepo = rangedUsers.connect(store)
-    const postRepo = posts.connect(store)
+    const postsEntityPlugin = defineEntityPlugin<{ id: string; title: string }>()(
+      'entity-repository-spec-ts-posts-23',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'posts-range',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const postsEntityPluginHost = await entityHost(postsEntityPlugin)
+
+    const rangedUsersEntityPlugin = defineEntityPlugin<IUser>()(
+      'entity-repository-spec-ts-rangedUsers-24',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'users-range',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const rangedUsersEntityPluginHost = await entityHost(rangedUsersEntityPlugin)
+
+    const userRepo = rangedUsersEntityPluginHost.extensions[rangedUsersEntityPlugin.id](store)
+    const postRepo = postsEntityPluginHost.extensions[postsEntityPlugin.id](store)
     await userRepo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
     await userRepo.put({ id: 'm', name: 'Mid', email: 'm@b.c' })
     await userRepo.put({ id: 'z', name: 'Zed', email: 'z@b.c' })
@@ -888,17 +1094,25 @@ describe('版本迁移', () => {
   it('读取未来 envelope version 时明确失败', async () => {
     const store = await memoryBackend()
     await store.putRecord({ version: 2, state: { id: 'u1', name: 'Ada' } }, ['future-users', 'u1'])
-    const repo = defineEntity<{ id: string; name: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'future-users',
-      key: 'id'
-    }).connect(store)
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity25EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'entity-repository-spec-ts-entity25-25',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'future-users',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity25EntityPluginHost = await entityHost(entity25EntityPlugin)
+    const repo = entity25EntityPluginHost.extensions[entity25EntityPlugin.id](store)
     await expect(repo.get('u1')).rejects.toMatchObject({ code: 'VERSION_UNSUPPORTED' })
     await expect(repo.list({ onInvalid: 'skip' })).resolves.toEqual([])
     await expect(repo.list({ onInvalid: 'throw' })).rejects.toMatchObject({
@@ -909,54 +1123,76 @@ describe('版本迁移', () => {
   it('拒绝超出 safe integer 的 envelope version', async () => {
     const store = await memoryBackend()
     await store.putRecord({ version: 1, state: { id: 'u1' } }, ['unsafe-envelope-version', 'u1'])
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'unsafe-envelope-version',
-      key: 'id',
-      codec: {
-        name: 'unsafe-envelope',
-        output: 'structured',
-        encode: async (value) => value,
-        decode: async () => ({ version: Number.MAX_SAFE_INTEGER + 1, state: { id: 'u1' } })
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity26EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity26-26',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'unsafe-envelope-version',
+        key: 'id',
+        codec: {
+          name: 'unsafe-envelope',
+          output: 'structured',
+          encode: async (value) => value,
+          decode: async () => ({ version: Number.MAX_SAFE_INTEGER + 1, state: { id: 'u1' } })
+        }
       }
-    }).connect(store)
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity26EntityPluginHost = await entityHost(entity26EntityPlugin)
+    const repo = entity26EntityPluginHost.extensions[entity26EntityPlugin.id](store)
     await expect(repo.get('u1')).rejects.toMatchObject({ code: 'DESERIALIZE_FAILED' })
   })
 
   it('显式 migrate 才持久化新版本并返回统计', async () => {
     const store = await memoryBackend()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'explicit-migrate',
-      key: 'id'
-    })
-    await v1.connect(store).put({ id: 'u1', name: 'Ada' })
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'explicit-migrate',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
-    })
-    await expect(v2.connect(store).migrate({ batchSize: 1 })).resolves.toEqual({
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'entity-repository-spec-ts-v1-27',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'explicit-migrate',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v1EntityPluginHost = await entityHost(v1EntityPlugin)
+
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](store).put({ id: 'u1', name: 'Ada' })
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'entity-repository-spec-ts-v2-28',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'explicit-migrate',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v2EntityPluginHost = await entityHost(v2EntityPlugin)
+
+    await expect(
+      v2EntityPluginHost.extensions[v2EntityPlugin.id](store).migrate({ batchSize: 1 })
+    ).resolves.toEqual({
       scanned: 1,
       eligible: 1,
       migrated: 1,
@@ -972,51 +1208,72 @@ describe('版本迁移', () => {
   })
 
   it('migrate 不把显式 null batchSize 静默当成默认值', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'null-batch-size',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity29EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity29-29',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'null-batch-size',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity29EntityPluginHost = await entityHost(entity29EntityPlugin)
+    const repo = entity29EntityPluginHost.extensions[entity29EntityPlugin.id](await memoryBackend())
     await expect(repo.migrate({ batchSize: null as never })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
   })
 
   it('migrate 拒绝超出 safe integer 的 batchSize', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'unsafe-batch-size',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity30EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity30-30',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'unsafe-batch-size',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity30EntityPluginHost = await entityHost(entity30EntityPlugin)
+    const repo = entity30EntityPluginHost.extensions[entity30EntityPlugin.id](await memoryBackend())
     await expect(repo.migrate({ batchSize: Number.MAX_SAFE_INTEGER + 1 })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
   })
 
   it('migrate 拒绝 null、数组和 primitive options', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'invalid-migrate-options',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity31EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity31-31',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'invalid-migrate-options',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity31EntityPluginHost = await entityHost(entity31EntityPlugin)
+    const repo = entity31EntityPluginHost.extensions[entity31EntityPlugin.id](await memoryBackend())
     for (const options of [null, [], 'options', 1])
       await expect(repo.migrate(options as never)).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
@@ -1025,24 +1282,30 @@ describe('版本迁移', () => {
 
   it('migrate 统计被跳过的坏记录', async () => {
     const store = await memoryBackend()
-    const entity = defineEntity<{ id: string; value: number }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'explicit-migrate-invalid',
-      key: 'id',
-      schema: {
-        name: 'strict',
-        validate: async (value: { id: string; value: number | string }) => {
-          if (typeof value.value !== 'number') throw new Error('invalid value')
-          return value as { id: string; value: number }
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; value: number }>()(
+      'entity-repository-spec-ts-entity-32',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'explicit-migrate-invalid',
+        key: 'id',
+        schema: {
+          name: 'strict',
+          validate: async (value: { id: string; value: number | string }) => {
+            if (typeof value.value !== 'number') throw new Error('invalid value')
+            return value as { id: string; value: number }
+          }
         }
       }
-    })
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
     await store.putRecord({ version: 1, state: { id: 'good', value: 1 } }, [
       'explicit-migrate-invalid',
       'good'
@@ -1051,7 +1314,9 @@ describe('版本迁移', () => {
       'explicit-migrate-invalid',
       'bad'
     ])
-    await expect(entity.connect(store).migrate()).resolves.toMatchObject({
+    await expect(
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate()
+    ).resolves.toMatchObject({
       scanned: 2,
       eligible: 0,
       migrated: 0,
@@ -1062,18 +1327,24 @@ describe('版本迁移', () => {
 
   it('migrate 在 optimistic transaction 冲突时统计整批 conflicted', async () => {
     const source = await memoryBackend()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'explicit-migrate-conflict',
-      key: 'id'
-    })
-    await v1.connect(source).put({ id: 'u1', name: 'Ada' })
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'entity-repository-spec-ts-v1-33',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'explicit-migrate-conflict',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v1EntityPluginHost = await entityHost(v1EntityPlugin)
+
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](source).put({ id: 'u1', name: 'Ada' })
     const conflictStore = {
       ...source,
       transaction: async () => {
@@ -1082,20 +1353,28 @@ describe('版本迁移', () => {
         })
       }
     }
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'explicit-migrate-conflict',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
-    })
-    await expect(v2.connect(conflictStore).migrate({ batchSize: 1 })).resolves.toEqual({
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'entity-repository-spec-ts-v2-34',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'explicit-migrate-conflict',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v2EntityPluginHost = await entityHost(v2EntityPlugin)
+
+    await expect(
+      v2EntityPluginHost.extensions[v2EntityPlugin.id](conflictStore).migrate({ batchSize: 1 })
+    ).resolves.toEqual({
       scanned: 1,
       eligible: 1,
       migrated: 0,
@@ -1107,39 +1386,56 @@ describe('版本迁移', () => {
 
   it('migrate 归一化 backend transaction 的裸异常', async () => {
     const source = await memoryBackend()
-    await defineEntity<{ id: string; name: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'raw-migrate-error',
-      key: 'id'
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity35EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'entity-repository-spec-ts-entity35-35',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'raw-migrate-error',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity35EntityPluginHost = await entityHost(entity35EntityPlugin)
+    await entity35EntityPluginHost.extensions[entity35EntityPlugin.id](source).put({
+      id: 'u1',
+      name: 'Ada'
     })
-      .connect(source)
-      .put({ id: 'u1', name: 'Ada' })
     const failingStore = {
       ...source,
       transaction: async () => {
         throw new Error('transaction exploded')
       }
     }
-    const entity = defineEntity<{ id: string; displayName: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'raw-migrate-error',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
-    })
-    await expect(entity.connect(failingStore).migrate()).rejects.toMatchObject({
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'entity-repository-spec-ts-entity-36',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'raw-migrate-error',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
+    await expect(
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](failingStore).migrate()
+    ).rejects.toMatchObject({
       code: 'TRANSACTION_FAILED',
       cause: { message: 'transaction exploded' }
     })
@@ -1147,18 +1443,24 @@ describe('版本迁移', () => {
 
   it('migrate 批冲突后逐条重试，避免整批跳过', async () => {
     const source = await memoryBackend()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'retry-migrate',
-      key: 'id'
-    })
-    await v1.connect(source).put({ id: 'u1', name: 'Ada' })
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'entity-repository-spec-ts-v1-37',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'retry-migrate',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v1EntityPluginHost = await entityHost(v1EntityPlugin)
+
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](source).put({ id: 'u1', name: 'Ada' })
     let calls = 0
     const originalTransaction = source.transaction
     type ICurrentScope = Parameters<Parameters<typeof originalTransaction>[0]>[0]
@@ -1174,20 +1476,28 @@ describe('版本迁移', () => {
         })
       return originalTransaction(run, ctx)
     }
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'retry-migrate',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
-    })
-    await expect(v2.connect(retryStore).migrate({ batchSize: 1 })).resolves.toMatchObject({
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'entity-repository-spec-ts-v2-38',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'retry-migrate',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v2EntityPluginHost = await entityHost(v2EntityPlugin)
+
+    await expect(
+      v2EntityPluginHost.extensions[v2EntityPlugin.id](retryStore).migrate({ batchSize: 1 })
+    ).resolves.toMatchObject({
       eligible: 1,
       migrated: 1,
       conflicted: 0
@@ -1196,18 +1506,24 @@ describe('版本迁移', () => {
 
   it('migrate 冲突重试发现并发方已迁移时不虚报 migrated', async () => {
     const source = await memoryBackend()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'retry-current',
-      key: 'id'
-    })
-    await v1.connect(source).put({ id: 'u1', name: 'Ada' })
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'entity-repository-spec-ts-v1-39',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'retry-current',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v1EntityPluginHost = await entityHost(v1EntityPlugin)
+
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](source).put({ id: 'u1', name: 'Ada' })
     let first = true
     const originalTransaction = source.transaction
     type ICurrentScope = Parameters<Parameters<typeof originalTransaction>[0]>[0]
@@ -1231,20 +1547,28 @@ describe('版本迁移', () => {
       }
       return originalTransaction(run, ctx)
     }
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'retry-current',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
-    })
-    await expect(v2.connect(retryStore).migrate({ batchSize: 1 })).resolves.toMatchObject({
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'entity-repository-spec-ts-v2-40',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'retry-current',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v2EntityPluginHost = await entityHost(v2EntityPlugin)
+
+    await expect(
+      v2EntityPluginHost.extensions[v2EntityPlugin.id](retryStore).migrate({ batchSize: 1 })
+    ).resolves.toMatchObject({
       migrated: 0,
       alreadyCurrent: 1,
       conflicted: 0
@@ -1254,19 +1578,25 @@ describe('版本迁移', () => {
   it('迁移读取不触发隐式写回', async () => {
     const diagnosed: string[] = []
     const inner = await memoryBackend()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'people2',
-      key: 'id',
-      version: 1
-    })
-    await v1.connect(inner).put({ id: 'u1', name: 'Ada' })
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'entity-repository-spec-ts-v1-41',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'people2',
+        key: 'id',
+        version: 1
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v1EntityPluginHost = await entityHost(v1EntityPlugin)
+
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](inner).put({ id: 'u1', name: 'Ada' })
 
     // 读正常、写失败的包装 store：用 putCalls 证明读取路径没有尝试隐式写回。
     let putCalls = 0
@@ -1278,21 +1608,27 @@ describe('版本迁移', () => {
       }
     }
 
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'people2',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (prev: any) => ({ id: prev.id, displayName: prev.name }) },
-      onDiagnostic: (message) => diagnosed.push(message)
-    })
-    const repo = v2.connect(flakyStore)
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'entity-repository-spec-ts-v2-42',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'people2',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (prev: any) => ({ id: prev.id, displayName: prev.name }) },
+        onDiagnostic: (message) => diagnosed.push(message)
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v2EntityPluginHost = await entityHost(v2EntityPlugin)
+
+    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.id](flakyStore)
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', displayName: 'Ada' })
     expect(putCalls).toBe(0)
     expect(diagnosed).toHaveLength(0)
@@ -1301,19 +1637,25 @@ describe('版本迁移', () => {
   it('迁移读取不触发非 Error 写回异常', async () => {
     const diagnosed: string[] = []
     const inner = await memoryBackend()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'people3',
-      key: 'id',
-      version: 1
-    })
-    await v1.connect(inner).put({ id: 'u1', name: 'Ada' })
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'entity-repository-spec-ts-v1-43',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'people3',
+        key: 'id',
+        version: 1
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v1EntityPluginHost = await entityHost(v1EntityPlugin)
+
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](inner).put({ id: 'u1', name: 'Ada' })
 
     const flakyStore = {
       ...inner,
@@ -1323,55 +1665,73 @@ describe('版本迁移', () => {
       }
     }
 
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'people3',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (prev: any) => ({ id: prev.id, displayName: prev.name }) },
-      onDiagnostic: (message) => diagnosed.push(message)
-    })
-    const repo = v2.connect(flakyStore)
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'entity-repository-spec-ts-v2-44',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'people3',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (prev: any) => ({ id: prev.id, displayName: prev.name }) },
+        onDiagnostic: (message) => diagnosed.push(message)
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v2EntityPluginHost = await entityHost(v2EntityPlugin)
+
+    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.id](flakyStore)
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', displayName: 'Ada' })
     expect(diagnosed).toHaveLength(0)
   })
 
   it('batch 作用域内 get 读到旧版本记录时触发迁移，但事务内不写回（writeBackTarget 为 undefined）', async () => {
     const store = await memoryBackend()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'people4',
-      key: 'id',
-      version: 1
-    })
-    await v1.connect(store).put({ id: 'u1', name: 'Ada' })
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'entity-repository-spec-ts-v1-45',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'people4',
+        key: 'id',
+        version: 1
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v1EntityPluginHost = await entityHost(v1EntityPlugin)
 
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'people4',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (prev: any) => ({ id: prev.id, displayName: prev.name }) }
-    })
-    const repo = v2.connect(store)
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](store).put({ id: 'u1', name: 'Ada' })
+
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'entity-repository-spec-ts-v2-46',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'people4',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (prev: any) => ({ id: prev.id, displayName: prev.name }) }
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const v2EntityPluginHost = await entityHost(v2EntityPlugin)
+
+    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.id](store)
     /** Normal and authentic transaction reads recover exactly the same persisted envelope. */
     const normal = await repo.get('u1')
     let seen: { id: string; displayName: string } | undefined
@@ -1389,7 +1749,10 @@ describe('版本迁移', () => {
 
 describe('batch', () => {
   it('batch 拒绝非函数 callback', async () => {
-    const repo = users.connect(await memoryBackend())
+    /** This actual storage host owns the entity installation for this test scope. */
+    const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
     for (const callback of [null, undefined, {}, 'run'])
       await expect(repo.batch(callback as never)).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
@@ -1397,7 +1760,10 @@ describe('batch', () => {
   })
 
   it('结构化后端上 batch 成功后所有写入持久化', async () => {
-    const repo = users.connect(await memoryBackend())
+    /** This actual storage host owns the entity installation for this test scope. */
+    const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
     await repo.batch(async (tx) => {
       await tx.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await tx.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
@@ -1407,23 +1773,31 @@ describe('batch', () => {
   })
 
   it('batch put 使用 normalize 后的主键', async () => {
-    const batchEntity = defineEntity<{ id: string; createdAt: Date }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'batch-normalized',
-      key: 'id',
-      schema: {
-        name: 'batch-normalized-schema',
-        validate: async (value) => value as { id: string; createdAt: Date },
-        normalize: async (value) => ({ ...value, id: value.id.toLowerCase() })
+    const batchEntityEntityPlugin = defineEntityPlugin<{ id: string; createdAt: Date }>()(
+      'entity-repository-spec-ts-batchEntity-47',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'batch-normalized',
+        key: 'id',
+        schema: {
+          name: 'batch-normalized-schema',
+          validate: async (value) => value as { id: string; createdAt: Date },
+          normalize: async (value) => ({ ...value, id: value.id.toLowerCase() })
+        }
       }
-    })
-    const repo = batchEntity.connect(await memoryBackend())
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const batchEntityEntityPluginHost = await entityHost(batchEntityEntityPlugin)
+
+    const repo = batchEntityEntityPluginHost.extensions[batchEntityEntityPlugin.id](
+      await memoryBackend()
+    )
     await repo.batch(async (tx) => {
       await expect(
         tx.put({ id: 'BATCH-ABC', createdAt: new Date('2024-01-01T00:00:00.000Z') })
@@ -1434,7 +1808,10 @@ describe('batch', () => {
   })
 
   it('结构化后端上 batch 内抛错时整批回滚', async () => {
-    const repo = users.connect(await memoryBackend())
+    /** This actual storage host owns the entity installation for this test scope. */
+    const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
     await repo.put({ id: 'existing', name: 'Old', email: 'old@x.y' })
     /** The actual callback error must remain reachable through the transaction boundary. */
     const original = new Error('boom')
@@ -1456,7 +1833,10 @@ describe('batch', () => {
   })
 
   it('batch 作用域内 get 可读取快照内已写入的值', async () => {
-    const repo = users.connect(await memoryBackend())
+    /** This actual storage host owns the entity installation for this test scope. */
+    const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
     await repo.batch(async (tx) => {
       await tx.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await expect(tx.get('u1')).resolves.toEqual({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -1467,18 +1847,24 @@ describe('batch', () => {
 
 describe('entity key and invalid-record boundaries', () => {
   it('accepts supported key domains and rejects invalid keys', async () => {
-    const entity = defineEntity<{ id: IStorageKey; value: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'key-domains',
-      key: 'id'
-    })
-    const repo = entity.connect(await memoryBackend())
+    const entityEntityPlugin = defineEntityPlugin<{ id: IStorageKey; value: string }>()(
+      'entity-repository-spec-ts-entity-48',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'key-domains',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
     for (const id of [
       1,
       new Date('2024-01-01T00:00:00Z'),
@@ -1499,17 +1885,25 @@ describe('entity key and invalid-record boundaries', () => {
     // 顶层 get()/remove() 在进入 key composition 前先 assertStorageKey；batch() 作用域内的
     // scope.get/scope.remove 曾经跳过这一步，让同一个非法输入在 batch 里被误分类成
     // TRANSACTION_FAILED（暗示"可重试"）而不是 INVALID_KEY（永久性、重试无意义）。
-    const repo = defineEntity<{ id: IStorageKey; value: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'batch-key-guard',
-      key: 'id'
-    }).connect(await memoryBackend())
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity49EntityPlugin = defineEntityPlugin<{ id: IStorageKey; value: string }>()(
+      'entity-repository-spec-ts-entity49-49',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'batch-key-guard',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity49EntityPluginHost = await entityHost(entity49EntityPlugin)
+    const repo = entity49EntityPluginHost.extensions[entity49EntityPlugin.id](await memoryBackend())
     for (const id of [true, {}, 42n] as unknown[]) {
       await expect(repo.batch((tx) => tx.get(id as IStorageKey))).rejects.toMatchObject({
         code: 'INVALID_KEY'
@@ -1521,34 +1915,48 @@ describe('entity key and invalid-record boundaries', () => {
   })
 
   it('rejects invalid list limits before reading', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'limit-guard',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity50EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity50-50',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'limit-guard',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity50EntityPluginHost = await entityHost(entity50EntityPlugin)
+    const repo = entity50EntityPluginHost.extensions[entity50EntityPlugin.id](await memoryBackend())
     for (const limit of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
       await expect(repo.list({ limit })).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     await expect(repo.list({ limit: 0 })).resolves.toEqual([])
   })
 
   it('list 与 stream apply the same range and invalid-record policy', async () => {
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'list-options',
-      key: 'id'
-    }).connect(await memoryBackend())
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity51EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-repository-spec-ts-entity51-51',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'list-options',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity51EntityPluginHost = await entityHost(entity51EntityPlugin)
+    const repo = entity51EntityPluginHost.extensions[entity51EntityPlugin.id](await memoryBackend())
     await repo.put({ id: 'a' })
     const options = { range: { lower: 'a', upper: 'z' }, limit: 1, onInvalid: 'throw' as const }
     await expect(repo.list(options)).resolves.toEqual([{ id: 'a' }])
@@ -1559,32 +1967,38 @@ describe('entity key and invalid-record boundaries', () => {
 
   it('onInvalid.stage 区分 decode 与 validate', async () => {
     const store = await memoryBackend()
-    const decodeEntity = defineEntity<{ id: string; n: number }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'stage-users',
-      key: 'id',
-      codec: {
-        name: 'throws-decode',
-        output: 'structured',
-        encode: async (value) => value,
-        decode: async () => {
-          throw new Error('decode failure')
+    const decodeEntityEntityPlugin = defineEntityPlugin<{ id: string; n: number }>()(
+      'entity-repository-spec-ts-decodeEntity-52',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'stage-users',
+        key: 'id',
+        codec: {
+          name: 'throws-decode',
+          output: 'structured',
+          encode: async (value) => value,
+          decode: async () => {
+            throw new Error('decode failure')
+          }
+        },
+        schema: {
+          name: 'stage-schema',
+          validate: async (value) => value as { id: string; n: number }
         }
-      },
-      schema: {
-        name: 'stage-schema',
-        validate: async (value) => value as { id: string; n: number }
       }
-    })
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const decodeEntityEntityPluginHost = await entityHost(decodeEntityEntityPlugin)
+
     await store.putRecord({ version: 1, state: { id: 'bad', n: 1 } }, ['stage-users', 'bad'])
     const stages: string[] = []
-    await decodeEntity.connect(store).list({
+    await decodeEntityEntityPluginHost.extensions[decodeEntityEntityPlugin.id](store).list({
       onInvalid: (issue) => {
         stages.push(issue.stage)
         return 'skip'
@@ -1595,66 +2009,82 @@ describe('entity key and invalid-record boundaries', () => {
 
   it('rejects an invalid onInvalid policy or handler result', async () => {
     const store = await memoryBackend()
-    const entity = defineEntity<{ id: string; n: number }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'invalid-policy-users',
-      key: 'id',
-      codec: {
-        name: 'invalid-policy-codec',
-        output: 'structured',
-        encode: async (value) => value,
-        decode: async () => ({ invalid: true })
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; n: number }>()(
+      'entity-repository-spec-ts-entity-53',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'invalid-policy-users',
+        key: 'id',
+        codec: {
+          name: 'invalid-policy-codec',
+          output: 'structured',
+          encode: async (value) => value,
+          decode: async () => ({ invalid: true })
+        }
       }
-    })
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
     await store.putRecord({ version: 1, state: { id: 'bad', n: 1 } }, [
       'invalid-policy-users',
       'bad'
     ])
     await expect(
-      entity.connect(store).list({ onInvalid: 'invalid' as never })
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).list({
+        onInvalid: 'invalid' as never
+      })
     ).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
     await expect(
-      entity.connect(store).list({ onInvalid: () => 'invalid' as never })
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).list({
+        onInvalid: () => 'invalid' as never
+      })
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
   })
 
   it('onInvalid.stage 区分 migration failure', async () => {
     const store = await memoryBackend()
-    const entity = defineEntity<{ id: string; n: number }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'migration-stage-users',
-      key: 'id',
-      version: 2,
-      migrations: {
-        2: async () => {
-          throw new Error('migration failure')
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; n: number }>()(
+      'entity-repository-spec-ts-entity-54',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'migration-stage-users',
+        key: 'id',
+        version: 2,
+        migrations: {
+          2: async () => {
+            throw new Error('migration failure')
+          }
+        },
+        schema: {
+          name: 'migration-stage',
+          validate: async (value) => value as { id: string; n: number }
         }
-      },
-      schema: {
-        name: 'migration-stage',
-        validate: async (value) => value as { id: string; n: number }
       }
-    })
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entityEntityPluginHost = await entityHost(entityEntityPlugin)
+
     await store.putRecord({ version: 1, state: { id: 'bad', n: 1 } }, [
       'migration-stage-users',
       'bad'
     ])
     const stages: string[] = []
-    await entity.connect(store).list({
+    await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).list({
       onInvalid: (issue) => {
         stages.push(issue.stage)
         return 'skip'

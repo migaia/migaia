@@ -1,3 +1,4 @@
+import { entityHost } from '../helpers/memory.ts'
 import { entityQueryFeature } from '../../src/entity/query-feature.ts'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.ts'
 import { entityMigrationFeature } from '../../src/entity/migration-feature.ts'
@@ -10,19 +11,19 @@ import { walkErrorCauses } from '@migaia/utils/error'
 import { readTransactionOperationContext } from '../../src/authoring/transaction.ts'
 import { createStorageHost } from '../../src/index.ts'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
-import { defineEntity } from '../../src/entity.ts'
+import { defineEntityPlugin } from '../../src/entity.ts'
 import { memoryBackend } from '../helpers/memory.ts'
 
 /** Real unique records share one namespace and one native transaction owner. */
 type IUser = { id: string; email: string; score: number }
-const users = defineEntity<IUser>()({
-  features: [
-    entityQueryFeature(),
-    entityUniqueFeature(),
-    entityMigrationFeature(),
-    entityIndexesFeature(),
-    entityKeysetFeature()
-  ],
+const usersEntityPlugin = defineEntityPlugin<IUser>()('entity-transaction-spec-ts-users-1', {
+  features: {
+    query: entityQueryFeature(),
+    unique: entityUniqueFeature(),
+    migration: entityMigrationFeature(),
+    indexes: entityIndexesFeature(),
+    keyset: entityKeysetFeature()
+  },
   name: 'users',
   key: 'id',
   indexes: { email: { path: 'email', unique: true } },
@@ -42,30 +43,38 @@ describe('entity composition through original transaction views', () => {
       const report = vi.fn()
       let expected: unknown
       let observed: unknown
-      const repo = defineEntity<{ id: string }>({
-        features: [
-          entityQueryFeature(),
-          entityUniqueFeature(),
-          entityMigrationFeature(),
-          entityIndexesFeature(),
-          entityKeysetFeature()
-        ],
-        name: 'cancel-preparation',
-        key: 'id',
-        schema: {
-          name: 'cooperative',
-          async validate(value, context) {
-            observed = context?.signal
-            /** A cooperative extension settles only when the actual transaction budget cancels. */
-            const cancelled = deferred<void>()
-            const off = subscribeToAbort(context?.signal, () => cancelled.resolve(), report)
-            entered.resolve()
-            await cancelled.promise
-            off()
-            throw readAbortReason(context?.signal)
+
+      /** Explicit entity plugin configuration is installed before requesting a repository. */
+      const entity2EntityPlugin = defineEntityPlugin<{ id: string }>()(
+        'entity-transaction-spec-ts-entity2-2',
+        {
+          features: {
+            query: entityQueryFeature(),
+            unique: entityUniqueFeature(),
+            migration: entityMigrationFeature(),
+            indexes: entityIndexesFeature(),
+            keyset: entityKeysetFeature()
+          },
+          name: 'cancel-preparation',
+          key: 'id',
+          schema: {
+            name: 'cooperative',
+            async validate(value, context) {
+              observed = context?.signal
+              /** A cooperative extension settles only when the actual transaction budget cancels. */
+              const cancelled = deferred<void>()
+              const off = subscribeToAbort(context?.signal, () => cancelled.resolve(), report)
+              entered.resolve()
+              await cancelled.promise
+              off()
+              throw readAbortReason(context?.signal)
+            }
           }
         }
-      }).connect(store)
+      )
+      /** This actual storage host owns the entity installation for this test scope. */
+      const entity2EntityPluginHost = await entityHost(entity2EntityPlugin)
+      const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.id](store)
       const pending = bound
         ? store.transaction(
             (scope) => {
@@ -88,19 +97,30 @@ describe('entity composition through original transaction views', () => {
   )
 
   it('composes repositories with all native channels and reads actual draft cursors', async () => {
+    /** This actual storage host owns the entity installation for this test scope. */
+    const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
     const store = await memoryBackend()
-    const first = users.connect(store)
-    const second = defineEntity<{ id: string; name: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'teams',
-      key: 'id'
-    }).connect(store)
+    const first = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity3EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'entity-transaction-spec-ts-entity3-3',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
+        name: 'teams',
+        key: 'id'
+      }
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity3EntityPluginHost = await entityHost(entity3EntityPlugin)
+    const second = entity3EntityPluginHost.extensions[entity3EntityPlugin.id](store)
     await store
       .tx()
       .lock(first.lockKey('a'))
@@ -118,8 +138,11 @@ describe('entity composition through original transaction views', () => {
   })
 
   it('checks one final unique state across repeated bindings and permits swaps', async () => {
+    /** This actual storage host owns the entity installation for this test scope. */
+    const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
     const store = await memoryBackend()
-    const repo = users.connect(store)
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
     await repo.put({ id: 'a', email: 'one', score: 1 })
     await repo.put({ id: 'b', email: 'two', score: 2 })
     await store.transaction(async (scope) => {
@@ -144,25 +167,33 @@ describe('entity composition through original transaction views', () => {
     const store = await memoryBackend()
     const entered = deferred<void>()
     const ready = deferred<void>()
-    const repo = defineEntity<{ id: string }>({
-      features: [
-        entityQueryFeature(),
-        entityUniqueFeature(),
-        entityMigrationFeature(),
-        entityIndexesFeature(),
-        entityKeysetFeature()
-      ],
-      name: 'delayed',
-      key: 'id',
-      schema: {
+
+    /** Explicit entity plugin configuration is installed before requesting a repository. */
+    const entity4EntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'entity-transaction-spec-ts-entity4-4',
+      {
+        features: {
+          query: entityQueryFeature(),
+          unique: entityUniqueFeature(),
+          migration: entityMigrationFeature(),
+          indexes: entityIndexesFeature(),
+          keyset: entityKeysetFeature()
+        },
         name: 'delayed',
-        async validate(value) {
-          entered.resolve()
-          await ready.promise
-          return value as { id: string }
+        key: 'id',
+        schema: {
+          name: 'delayed',
+          async validate(value) {
+            entered.resolve()
+            await ready.promise
+            return value as { id: string }
+          }
         }
       }
-    }).connect(store)
+    )
+    /** This actual storage host owns the entity installation for this test scope. */
+    const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
+    const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](store)
     let accepted: Promise<unknown> | undefined
     const pending = store.transaction((scope) => {
       accepted = repo.in(scope).put({ id: 'later' })
@@ -174,10 +205,13 @@ describe('entity composition through original transaction views', () => {
   })
 
   it('rejects foreign binding synchronously and preserves expired bound data errors', async () => {
+    /** This actual storage host owns the entity installation for this test scope. */
+    const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
     await using host = await createStorageHost({
       plugins: [memoryBackendPlugin({ id: 'left' }), memoryBackendPlugin({ id: 'right' })]
     })
-    const repo = users.connect(host.backend('left'))
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](host.backend('left'))
     await host.backend('right').transaction((scope) => {
       expect(() => repo.in(scope)).toThrowError(
         expect.objectContaining({ code: 'INVALID_ARGUMENT' })
@@ -191,7 +225,10 @@ describe('entity composition through original transaction views', () => {
   })
 
   it('uses one real iterator resource for bounded domain ordering and explicit disposal', async () => {
-    const repo = users.connect(await memoryBackend())
+    /** This actual storage host owns the entity installation for this test scope. */
+    const usersEntityPluginHost = await entityHost(usersEntityPlugin)
+
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
     for (const [id, score] of [
       ['a', 3],
       ['b', 1],

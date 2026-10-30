@@ -1,12 +1,12 @@
 import { entityTestFeatures } from './helpers/entity-features.ts'
 import { describe, expect, it } from 'vitest'
 import { createMemoryTestStore } from './helpers/installed-backends.ts'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 
 describe('storage-plugin-browser audit high severity regressions', () => {
   it('notifies replacement observers only after the destination exists', async () => {
     /** Real memory storage owns both channels and post-commit notifications. */
-    const store = await createMemoryTestStore()
+    const store = await createMemoryTestStore({})
     await store.putRecord({ before: true }, 'key')
     /** Capture the read initiated synchronously inside the removal callback. */
     let observedBytes: Promise<Uint8Array | null> | undefined
@@ -36,7 +36,7 @@ describe('storage-plugin-browser audit high severity regressions', () => {
 
   it('migration preserves an update committed after the scan', async () => {
     /** Real repositories share one transaction-capable backend. */
-    const store = await createMemoryTestStore()
+    const { host: storeHost, store } = await createMemoryTestStore({}, true)
     /** Gate only the first scanned old value through the supported asynchronous schema. */
     let releaseRead!: () => void
     /** Announce the scan before committing the competing update. */
@@ -53,33 +53,47 @@ describe('storage-plugin-browser audit high severity regressions', () => {
     let intercepted = false
     try {
       /** Initial v1 data is eligible for migration. */
-      const old = defineEntity<{ id: string; value: string }>({
-        features: entityTestFeatures,
-        name: 'audit-race',
-        key: 'id'
-      }).connect(store)
+      const oldEntityPlugin = defineEntityPlugin<{ id: string; value: string }>()(
+        'api-audit-high-spec-ts-56',
+        {
+          features: entityTestFeatures,
+          name: 'audit-race',
+          key: 'id'
+        }
+      )
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const oldEntityPluginHost = await storeHost.use(oldEntityPlugin)
+      /** Borrow the supplied backend through the installed repository capability factories. */
+      const old = oldEntityPluginHost.extensions[oldEntityPlugin.id](store)
       await old.put({ id: 'row', value: 'old' })
       /** The complete v2 graph is valid independently of the race. */
-      const upgraded = defineEntity<{ id: string; value: string }>({
-        features: entityTestFeatures,
-        name: 'audit-race',
-        key: 'id',
-        version: 2,
-        migrations: { 2: async (value) => value },
-        schema: {
-          name: 'audit-gated-schema',
-          async validate(value) {
-            /** The schema's validated domain value controls only the public gate. */
-            const row = value as { id: string; value: string }
-            if (row.value === 'old' && !intercepted) {
-              intercepted = true
-              announceRead()
-              await blocked
+      const upgradedEntityPlugin = defineEntityPlugin<{ id: string; value: string }>()(
+        'api-audit-high-spec-ts-63',
+        {
+          features: entityTestFeatures,
+          name: 'audit-race',
+          key: 'id',
+          version: 2,
+          migrations: { 2: async (value) => value },
+          schema: {
+            name: 'audit-gated-schema',
+            async validate(value) {
+              /** The schema's validated domain value controls only the public gate. */
+              const row = value as { id: string; value: string }
+              if (row.value === 'old' && !intercepted) {
+                intercepted = true
+                announceRead()
+                await blocked
+              }
+              return row
             }
-            return row
           }
         }
-      }).connect(store)
+      )
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const upgradedEntityPluginHost = await storeHost.use(upgradedEntityPlugin)
+      /** Borrow the supplied backend through the installed repository capability factories. */
+      const upgraded = upgradedEntityPluginHost.extensions[upgradedEntityPlugin.id](store)
       /** Migration captures old data before the competing write. */
       const migrating = upgraded.migrate({ batchSize: 1 })
       await reached
@@ -95,16 +109,23 @@ describe('storage-plugin-browser audit high severity regressions', () => {
 
   it('fallback rejects a second owner of a unique index value', async () => {
     /** A backend without a native sidecar still has declared entity write constraints. */
-    const store = await createMemoryTestStore()
+    const { host: storeHost, store } = await createMemoryTestStore({}, true)
     try {
       /** Both writes use the public curried index definition and ordinary repository. */
-      const users = defineEntity<{ id: string; email: string }>()({
-        features: entityTestFeatures,
-        name: 'audit-unique',
-        key: 'id',
-        indexes: { byEmail: { path: 'email', unique: true } },
-        onDiagnostic: () => {}
-      }).connect(store)
+      const usersEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+        'api-audit-high-spec-ts-101',
+        {
+          features: entityTestFeatures,
+          name: 'audit-unique',
+          key: 'id',
+          indexes: { byEmail: { path: 'email', unique: true } },
+          onDiagnostic: () => {}
+        }
+      )
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const usersEntityPluginHost = await storeHost.use(usersEntityPlugin)
+      /** Borrow the supplied backend through the installed repository capability factories. */
+      const users = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
       await users.put({ id: 'first', email: 'same' })
       await expect(users.put({ id: 'second', email: 'same' })).rejects.toMatchObject({
         source: 'storage.host',

@@ -111,6 +111,7 @@ export class EntityMigrationOwner<
       throw new StorageContractError(StorageContractErrorCode.unsupported, {
         backend: this.#context.store.backend
       })
+    this.#context.assertCurrent()
     migration.context = snapshotOperationContext(ctx)
     migration.runtime = createStorageOperationRuntime()
     ;({ batchSize: migration.batchSize, onInvalid: migration.onInvalid } =

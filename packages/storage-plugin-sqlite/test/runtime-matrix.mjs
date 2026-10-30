@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createStorageHost } from '@migaia/storage-host'
 import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
 import { entityMigrationFeature } from '@migaia/storage-host/entity/features/migration'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
@@ -46,13 +46,17 @@ const state = createStore({ count: mode === 'write' ? 1 : 0 })
 /** One handle owns only persistence work, never the borrowed backend or connection. */
 const handle = persist(state, { key: 'runtime-counter', storage, version: 1 })
 /** The same public entity definition drives root and native transaction views in every runtime. */
-const entities = defineEntity({
+const runtimeEntityPlugin = defineEntityPlugin('runtime-entities', {
   name: 'runtime-entities',
-  features: [entityQueryFeature(), entityMigrationFeature()],
+  features: { query: entityQueryFeature(), migration: entityMigrationFeature() },
   key: 'id',
   version: 2,
   migrations: { 2: (value) => ({ ...value, score: 2 }) }
-}).connect(storage)
+})
+/** Install once on the real fixture host and retain exact extension inference. */
+const entityHost = await host.use(runtimeEntityPlugin)
+/** Borrow the supplied backend through the installed repository capability factories. */
+const entities = entityHost.extensions[runtimeEntityPlugin.id](storage)
 /** A real legacy archive must remain unchanged when its migrated state is read. */
 const legacy = { version: 1, state: { id: 'legacy', active: true, score: 1 } }
 /** Canonical record order makes ordinary and transaction projections directly comparable. */

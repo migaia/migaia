@@ -2,7 +2,7 @@ import { entityTestFeatures } from '../helpers/entity-features.ts'
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { STORAGE_CONTRACT_SOURCE } from '@migaia/storage-contract'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { localStorageBackendPlugin } from '../../src/local-storage.ts'
@@ -47,13 +47,16 @@ const factories = [
 ] as const
 
 /** Same repository definition exercises the real native value-commit owner in each organization. */
-const users = defineEntity<{ id: string; email: string }>()({
-  features: entityTestFeatures,
-  name: 'organization-users',
-  key: 'id',
-  indexes: { byEmail: { path: 'email', unique: true } },
-  onDiagnostic: () => {}
-})
+const usersEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+  'browser-org-text-spec-ts-50',
+  {
+    features: entityTestFeatures,
+    name: 'organization-users',
+    key: 'id',
+    indexes: { byEmail: { path: 'email', unique: true } },
+    onDiagnostic: () => {}
+  }
+)
 
 describe('physical organizations in text browser backends', () => {
   it.each(factories)(
@@ -106,8 +109,16 @@ describe('physical organizations in text browser backends', () => {
     async ({ setup }) => {
       const { plugin } = setup()
       await using host = await createStorageHost({ plugins: [plugin('prefs', 'unique')] })
-      const left = users.connect(host.org(createOrgId()).backend('prefs'))
-      const right = users.connect(host.org(createOrgId()).backend('prefs'))
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const usersEntityPluginHost = await host.use(usersEntityPlugin)
+      /** Borrow the supplied backend through the installed repository capability factories. */
+      const left = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+        host.org(createOrgId()).backend('prefs')
+      )
+      /** Borrow the supplied backend through the installed repository capability factories. */
+      const right = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+        host.org(createOrgId()).backend('prefs')
+      )
       await left.put({ id: 'a', email: 'same' })
       await right.put({ id: 'a', email: 'same' })
       await expect(left.put({ id: 'b', email: 'same' })).rejects.toMatchObject({

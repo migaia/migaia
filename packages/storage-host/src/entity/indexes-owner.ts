@@ -538,6 +538,7 @@ export class EntityIndexesOwner<
     ctx
   ) => {
     assertStorageKey(key, this.#context.store.backend, `entity "${this.#context.name}" index query`)
+    this.#context.assertCurrent()
     const context = snapshotOperationContext(ctx)
     const snapshot = this.createIndexedListSnapshot(index, { lower: key, upper: key }, undefined)
     let matched = 0

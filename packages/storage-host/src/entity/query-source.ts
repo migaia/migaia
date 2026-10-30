@@ -28,7 +28,7 @@ import { createStorageOperationRuntime } from '../core/operation-reporter.ts'
 import { EntityText } from './text.ts'
 import { type IEntityQueryPlan, type IEntityQuerySourceSelection } from './query-adapter.ts'
 import { snapshotOperationContext } from '../authoring/context.ts'
-import type { IStorageKey } from '@migaia/storage-contract'
+import type { IStorageKey, IOperationContext } from '@migaia/storage-contract'
 import type { IInvalidRecordIssue } from './types.ts'
 import { createOrderedRecordIndex } from '../core/ordered-record-index.ts'
 import { EntityState, StorageInvalidRecordAction, StorageRecordStage } from './constants.ts'
@@ -36,6 +36,7 @@ import {
   entityRuntime,
   observeEntity,
   entityIterator,
+  guardEntityIterator,
   IStageFailure,
   minimumProjectedIndexKey,
   idOf,
@@ -163,10 +164,11 @@ export class EntityQuerySourceOwner<
     selection: IEntityQuerySourceSelection<TDomain>,
     counter: { readCount: number } | undefined
   ): IStorageIterator<R> => {
-    if (this.#context.queryStages === undefined) return iterator
+    if (this.#context.queryStages === undefined)
+      return guardEntityIterator(iterator, this.#context.signal)
     /** Diagnostics accumulate only for this actual iterator lifetime. */
     const observation: IEntityQueryObservation<TDomain, R> = {
-      iterator,
+      advance: () => iterator.next(),
       plan,
       selection,
       counter,
@@ -176,16 +178,19 @@ export class EntityQuerySourceOwner<
     const derived = deriveTransactionIterator(iterator, (next, _fail, current) =>
       this.advanceObservedEntityQuery(observation, next, current as ITransactionScope)
     )
-    if (derived !== undefined) return derived
-    return {
-      next: () => this.advanceObservedEntityQuery(observation, () => iterator.next()),
-      return: iterator.return === undefined ? undefined : (value) => iterator.return!(value),
-      dispose: () => iterator.dispose(),
-      [asyncDisposeKey]: () => iterator[asyncDisposeKey](),
-      [Symbol.asyncIterator]() {
-        return this
-      }
-    }
+    if (derived !== undefined) return guardEntityIterator(derived, this.#context.signal)
+    return guardEntityIterator<R>(
+      {
+        next: () => this.advanceObservedEntityQuery(observation, observation.advance),
+        return: iterator.return === undefined ? undefined : (value) => iterator.return!(value),
+        dispose: () => iterator.dispose(),
+        [asyncDisposeKey]: () => iterator[asyncDisposeKey](),
+        [Symbol.asyncIterator]() {
+          return this
+        }
+      },
+      this.#context.signal
+    )
   }
 
   /** Reuse the original repository operation through its explicit owner context. */
@@ -206,7 +211,7 @@ export class EntityQuerySourceOwner<
         ? {}
         : {
             watch: ({ ctx }: import('@migaia/storage-contract').IRecordQueryInput) =>
-              this.#context.backend.watchRecords!(ctx)
+              this.watchEntitySource(ctx)
           }),
       ...(this.#context.hasFeature(EntityFeatureName.indexes)
         ? {
@@ -217,6 +222,14 @@ export class EntityQuerySourceOwner<
       mutate: (request, run) => this.mutateEntitySource(sourceContext, request, run),
       execute: (input) => this.executeEntitySource(sourceContext, input)
     }
+  }
+
+  /** Retained watchers borrow the same native entity lifetime as ordinary query streams. */
+  watchEntitySource(
+    ctx?: IOperationContext
+  ): IStorageIterator<import('@migaia/storage-contract').IStorageChange> {
+    this.#context.assertCurrent()
+    return guardEntityIterator(this.#context.backend.watchRecords!(ctx), this.#context.signal)
   }
 
   /** Reuse the original repository operation through its explicit owner context. */

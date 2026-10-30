@@ -2,7 +2,7 @@ import { entityTestFeatures } from '../helpers/entity-features.ts'
 import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { IDBFactory, IDBIndex, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
-import { defineEntity, type IRecordIndexBackfillStore } from '@migaia/storage-host/entity'
+import { defineEntityPlugin, type IRecordIndexBackfillStore } from '@migaia/storage-host/entity'
 import * as entityOwner from '@migaia/storage-host/entity'
 import { createIndexedDbTestStore } from '../helpers/installed-backends.ts'
 import { StorageError } from '../../src/types/errors.ts'
@@ -17,14 +17,22 @@ import { captureOperationCleanup } from '../helpers/operation-reporter.ts'
 
 type IUser = { id: string; name: string; email: string }
 
-const users = defineEntity<IUser>({ features: entityTestFeatures, name: 'users', key: 'id' })
+/** Explicit native declaration owns this scenario's optional repository capabilities. */
+const usersEntityPlugin = defineEntityPlugin<IUser>()('repository-indexeddb-spec-ts-20', {
+  features: entityTestFeatures,
+  name: 'users',
+  key: 'id'
+})
 
 const freshIndexedDb = () =>
-  createIndexedDbTestStore({
-    factory: new IDBFactory(),
-    keyRange: IDBKeyRange,
-    dbName: `entity-idb-${Math.random().toString(36).slice(2)}`
-  })
+  createIndexedDbTestStore(
+    {
+      factory: new IDBFactory(),
+      keyRange: IDBKeyRange,
+      dbName: `entity-idb-${Math.random().toString(36).slice(2)}`
+    },
+    true
+  )
 
 /** Low-level native cases capture the exact registered provider, with no second lookup registry. */
 const freshIndexedDbBackfill = async () => {
@@ -37,9 +45,9 @@ const freshIndexedDbBackfill = async () => {
       capability = provider
     })
   try {
-    const store = await freshIndexedDb()
+    const { host: storeHost, store } = await freshIndexedDb()
     if (capability === undefined) throw new Error('native backfill provider was not registered')
-    return { store, capability }
+    return { host: storeHost, store, capability }
   } finally {
     capture.mockRestore()
   }
@@ -48,21 +56,37 @@ const freshIndexedDbBackfill = async () => {
 describe('repository over real indexedDbHost backend', () => {
   it('uses the complete sidecar for exact/range/list/stream queries', async () => {
     type IIndexedUser = { id: string; score: number }
-    const store = await freshIndexedDb()
-    const baseline = defineEntity<IIndexedUser>({
-      features: entityTestFeatures,
-      name: 'native-users',
-      key: 'id'
-    }).connect(store)
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const baselineEntityPlugin = defineEntityPlugin<IIndexedUser>()(
+      'repository-indexeddb-spec-ts-52',
+      {
+        features: entityTestFeatures,
+        name: 'native-users',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const baselineEntityPluginHost = await storeHost.use(baselineEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const baseline = baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store)
     await baseline.put({ id: 'u1', score: 2 })
     await baseline.put({ id: 'u2', score: 1 })
     await baseline.migrate()
-    const repository = defineEntity<IIndexedUser>()({
-      features: entityTestFeatures,
-      name: 'native-users',
-      key: 'id',
-      indexes: { score: { path: 'score' } }
-    }).connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repositoryEntityPlugin = defineEntityPlugin<IIndexedUser>()(
+      'repository-indexeddb-spec-ts-60',
+      {
+        features: entityTestFeatures,
+        name: 'native-users',
+        key: 'id',
+        indexes: { score: { path: 'score' } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await storeHost.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     await repository.query().index('score', { lower: 1, upper: 2 }).all()
     const fullScan = vi.spyOn(store, 'iterateRecords')
 
@@ -145,17 +169,33 @@ describe('repository over real indexedDbHost backend', () => {
       key: 'id',
       indexes: { value: { path: 'value' } }
     } as const
-    const old = defineEntity<{ id: string; value: number }>()(definition).connect(writer)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const oldEntityPlugin = defineEntityPlugin<{ id: string; value: number }>()(
+      'repository-indexeddb-spec-ts-148',
+      definition
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const oldEntityPluginHost = await host.use(oldEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const old = oldEntityPluginHost.extensions[oldEntityPlugin.id](writer)
     await old.put({ id: 'row', value: 1 })
     await old.migrate()
-    const upgraded = defineEntity<{ id: string; value: number }>()({
-      ...definition,
-      features: entityTestFeatures,
-      version: 2,
-      migrations: {
-        2: async (value) => ({ ...(value as { id: string; value: number }), value: 2 })
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const upgradedEntityPlugin = defineEntityPlugin<{ id: string; value: number }>()(
+      'repository-indexeddb-spec-ts-151',
+      {
+        ...definition,
+        features: entityTestFeatures,
+        version: 2,
+        migrations: {
+          2: async (value) => ({ ...(value as { id: string; value: number }), value: 2 })
+        }
       }
-    }).connect(writer)
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const upgradedEntityPluginHost = await host.use(upgradedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const upgraded = upgradedEntityPluginHost.extensions[upgradedEntityPlugin.id](writer)
     await upgraded.query().index('value').all()
     const physical = upgraded.lockKey('row')
     readCurrent = () => holder.getRecord(physical.key)
@@ -229,20 +269,36 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('compiles narrow ranges into the lookup cursor before defensive filtering', async () => {
     type IRangeUser = { id: string; score: number }
-    const store = await freshIndexedDb()
-    const baseline = defineEntity<IRangeUser>({
-      features: entityTestFeatures,
-      name: 'native-range-users',
-      key: 'id'
-    }).connect(store)
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const baselineEntityPlugin = defineEntityPlugin<IRangeUser>()(
+      'repository-indexeddb-spec-ts-233',
+      {
+        features: entityTestFeatures,
+        name: 'native-range-users',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const baselineEntityPluginHost = await storeHost.use(baselineEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const baseline = baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store)
     for (const score of [1, 2, 3, 4, 5]) await baseline.put({ id: `u${score}`, score })
     await baseline.migrate()
-    const repository = defineEntity<IRangeUser>()({
-      features: entityTestFeatures,
-      name: 'native-range-users',
-      key: 'id',
-      indexes: { score: { path: 'score' } }
-    }).connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repositoryEntityPlugin = defineEntityPlugin<IRangeUser>()(
+      'repository-indexeddb-spec-ts-240',
+      {
+        features: entityTestFeatures,
+        name: 'native-range-users',
+        key: 'id',
+        indexes: { score: { path: 'score' } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await storeHost.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     const observedRanges: IDBKeyRange[] = []
     const spy = vi
       .spyOn(IDBIndex.prototype, 'openKeyCursor')
@@ -267,28 +323,44 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('keeps compound and deeply nested index keys inside the generation prefix', async () => {
     type INestedRangeUser = { id: string; values: IStorageKey[] }
-    const store = await freshIndexedDb()
-    const baseline = defineEntity<INestedRangeUser>({
-      features: entityTestFeatures,
-      name: 'native-nested-range-users',
-      key: 'id'
-    }).connect(store)
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const baselineEntityPlugin = defineEntityPlugin<INestedRangeUser>()(
+      'repository-indexeddb-spec-ts-271',
+      {
+        features: entityTestFeatures,
+        name: 'native-nested-range-users',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const baselineEntityPluginHost = await storeHost.use(baselineEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const baseline = baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store)
     await baseline.put({ id: 'primitive', values: ['alpha'] })
     await baseline.put({ id: 'empty-string', values: [''] })
     await baseline.put({ id: 'compound-array', values: [['tenant', 'user']] })
     await baseline.put({ id: 'deep-array', values: [[['tenant', ['region', 'user']]]] })
     await baseline.migrate()
-    const repository = defineEntity<INestedRangeUser>()({
-      features: entityTestFeatures,
-      name: 'native-nested-range-users',
-      key: 'id',
-      indexes: {
-        value: {
-          select: (value) => ({ kind: 'multiple' as const, keys: value.values }),
-          revision: 1
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repositoryEntityPlugin = defineEntityPlugin<INestedRangeUser>()(
+      'repository-indexeddb-spec-ts-281',
+      {
+        features: entityTestFeatures,
+        name: 'native-nested-range-users',
+        key: 'id',
+        indexes: {
+          value: {
+            select: (value) => ({ kind: 'multiple' as const, keys: value.values }),
+            revision: 1
+          }
         }
       }
-    }).connect(store)
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await storeHost.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     const observedRanges: IDBKeyRange[] = []
     const spy = vi
       .spyOn(IDBIndex.prototype, 'openKeyCursor')
@@ -319,22 +391,38 @@ describe('repository over real indexedDbHost backend', () => {
     type IUniqueUser = { id: string; email: string }
     const factory = new IDBFactory()
     const dbName = `native-unique-${Math.random().toString(36).slice(2)}`
-    const firstStore = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
-    const secondStore = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
-    const entity = defineEntity<IUniqueUser>()({
-      features: entityTestFeatures,
-      name: 'native-unique-users',
-      key: 'id',
-      indexes: { email: { path: 'email', unique: true } }
-    })
-    const first = entity.connect(firstStore)
+    const { host: firstStoreHost, store: firstStore } = await createIndexedDbTestStore(
+      { factory, keyRange: IDBKeyRange, dbName },
+      true
+    )
+    const { host: secondStoreHost, store: secondStore } = await createIndexedDbTestStore(
+      { factory, keyRange: IDBKeyRange, dbName },
+      true
+    )
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<IUniqueUser>()(
+      'repository-indexeddb-spec-ts-324',
+      {
+        features: entityTestFeatures,
+        name: 'native-unique-users',
+        key: 'id',
+        indexes: { email: { path: 'email', unique: true } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await firstStoreHost.use(entityEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const first = entityEntityPluginHost.extensions[entityEntityPlugin.id](firstStore)
     await first.put({ id: 'seed', email: 'seed@example.com' })
     await first.migrate()
     await first
       .query()
       .index('email', { lower: 'seed@example.com', upper: 'seed@example.com' })
       .all()
-    const second = entity.connect(secondStore)
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost2 = await secondStoreHost.use(entityEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const second = entityEntityPluginHost2.extensions[entityEntityPlugin.id](secondStore)
     const outcomes = await Promise.allSettled([
       first.put({ id: 'left', email: 'same@example.com' }),
       second.put({ id: 'right', email: 'same@example.com' })
@@ -350,38 +438,59 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('entity privately backfills normalized path and selector projections', async () => {
     type IIndexedUser = { id: string; profile: { email: string }; tags: string[] }
-    const store = await freshIndexedDb()
-    const baseline = defineEntity<IIndexedUser>({
-      features: entityTestFeatures,
-      name: 'backfilled-users',
-      key: 'id'
-    })
-    await baseline.connect(store).put({
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const baselineEntityPlugin = defineEntityPlugin<IIndexedUser>()(
+      'repository-indexeddb-spec-ts-354',
+      {
+        features: entityTestFeatures,
+        name: 'backfilled-users',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const baselineEntityPluginHost = await storeHost.use(baselineEntityPlugin)
+    await baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store).put({
       id: 'u1',
       profile: { email: 'ada@example.com' },
       tags: ['engineer', 'admin']
     })
-    await defineEntity<{ id: string; label: string }>({
-      features: entityTestFeatures,
-      name: 'other-backfill',
-      key: 'id'
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entity1EntityPlugin = defineEntityPlugin<{ id: string; label: string }>()(
+      'repository-indexeddb-spec-ts-364',
+      {
+        features: entityTestFeatures,
+        name: 'other-backfill',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entity1EntityPluginHost = await storeHost.use(entity1EntityPlugin)
+    await entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store).put({
+      id: 'other-1',
+      label: 'must not enter users index'
     })
-      .connect(store)
-      .put({ id: 'other-1', label: 'must not enter users index' })
-    await baseline.connect(store).migrate()
-    const indexed = defineEntity<IIndexedUser>()({
-      features: entityTestFeatures,
-      name: 'backfilled-users',
-      key: 'id',
-      indexes: {
-        email: { path: 'profile.email', unique: true },
-        tags: {
-          select: (value: IIndexedUser) => ({ kind: 'multiple' as const, keys: value.tags }),
-          revision: 3
+    await baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store).migrate()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const indexedEntityPlugin = defineEntityPlugin<IIndexedUser>()(
+      'repository-indexeddb-spec-ts-372',
+      {
+        features: entityTestFeatures,
+        name: 'backfilled-users',
+        key: 'id',
+        indexes: {
+          email: { path: 'profile.email', unique: true },
+          tags: {
+            select: (value: IIndexedUser) => ({ kind: 'multiple' as const, keys: value.tags }),
+            revision: 3
+          }
         }
       }
-    })
-    const repository = indexed.connect(store)
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const indexedEntityPluginHost = await storeHost.use(indexedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = indexedEntityPluginHost.extensions[indexedEntityPlugin.id](store)
     await expect(repository.query().index('email').all()).resolves.toEqual([
       { id: 'u1', profile: { email: 'ada@example.com' }, tags: ['engineer', 'admin'] }
     ])
@@ -414,36 +523,52 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('measures decoded custom-codec payloads before issuing a batch', async () => {
-    const store = await freshIndexedDb()
-    const baseline = defineEntity<{ id: string; email: string }>({
-      features: entityTestFeatures,
-      name: 'decoded-cap-codec',
-      key: 'id'
-    }).connect(store)
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const baselineEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'repository-indexeddb-spec-ts-418',
+      {
+        features: entityTestFeatures,
+        name: 'decoded-cap-codec',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const baselineEntityPluginHost = await storeHost.use(baselineEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const baseline = baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store)
     await baseline.put({ id: 'u1', email: 'large@example.com' })
     await baseline.put({ id: 'u2', email: 'small@example.com' })
     await baseline.migrate()
-    const indexed = defineEntity<{ id: string; email: string }>()({
-      features: entityTestFeatures,
-      name: 'decoded-cap-codec',
-      key: 'id',
-      codec: {
-        name: 'expanding-decoded-codec',
-        output: 'structured',
-        encode: async (value) => value,
-        decode: async (value) => {
-          const envelope = value as { version: number; state: { id: string; email: string } }
-          return {
-            version: envelope.version,
-            state: {
-              ...envelope.state,
-              expanded: envelope.state.id === 'u1' ? 'x'.repeat(1024 * 1024 + 32) : 'small'
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const indexedEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'repository-indexeddb-spec-ts-426',
+      {
+        features: entityTestFeatures,
+        name: 'decoded-cap-codec',
+        key: 'id',
+        codec: {
+          name: 'expanding-decoded-codec',
+          output: 'structured',
+          encode: async (value) => value,
+          decode: async (value) => {
+            const envelope = value as { version: number; state: { id: string; email: string } }
+            return {
+              version: envelope.version,
+              state: {
+                ...envelope.state,
+                expanded: envelope.state.id === 'u1' ? 'x'.repeat(1024 * 1024 + 32) : 'small'
+              }
             }
           }
-        }
-      },
-      indexes: { email: { path: 'email' } }
-    }).connect(store)
+        },
+        indexes: { email: { path: 'email' } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const indexedEntityPluginHost = await storeHost.use(indexedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const indexed = indexedEntityPluginHost.extensions[indexedEntityPlugin.id](store)
 
     const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     try {
@@ -475,32 +600,48 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('fails closed for nested undefined in decoded entity budget', async () => {
-    const store = await freshIndexedDb()
-    const baseline = defineEntity<{ id: string; email: string }>({
-      features: entityTestFeatures,
-      name: 'nested-undefined-codec',
-      key: 'id'
-    }).connect(store)
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const baselineEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'repository-indexeddb-spec-ts-479',
+      {
+        features: entityTestFeatures,
+        name: 'nested-undefined-codec',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const baselineEntityPluginHost = await storeHost.use(baselineEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const baseline = baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store)
     await baseline.put({ id: 'u1', email: 'nested@example.com' })
     await baseline.migrate()
-    const indexed = defineEntity<{ id: string; email: string }>()({
-      features: entityTestFeatures,
-      name: 'nested-undefined-codec',
-      key: 'id',
-      codec: {
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const indexedEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'repository-indexeddb-spec-ts-486',
+      {
+        features: entityTestFeatures,
         name: 'nested-undefined-codec',
-        output: 'structured',
-        encode: async (value) => value,
-        decode: async (value) => {
-          const envelope = value as { version: number; state: { id: string; email: string } }
-          return {
-            version: envelope.version,
-            state: { ...envelope.state, nested: { value: undefined } }
+        key: 'id',
+        codec: {
+          name: 'nested-undefined-codec',
+          output: 'structured',
+          encode: async (value) => value,
+          decode: async (value) => {
+            const envelope = value as { version: number; state: { id: string; email: string } }
+            return {
+              version: envelope.version,
+              state: { ...envelope.state, nested: { value: undefined } }
+            }
           }
-        }
-      },
-      indexes: { email: { path: 'email' } }
-    }).connect(store)
+        },
+        indexes: { email: { path: 'email' } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const indexedEntityPluginHost = await storeHost.use(indexedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const indexed = indexedEntityPluginHost.extensions[indexedEntityPlugin.id](store)
 
     const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     try {
@@ -520,23 +661,40 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('keeps the canonical record when a legacy shadow has the same id', async () => {
     type IShadowedUser = { id: string; email: string }
-    const store = await freshIndexedDb()
-    const entity = defineEntity<IShadowedUser>({
-      features: entityTestFeatures,
-      name: 'shadow-wins',
-      key: 'id'
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<IShadowedUser>()(
+      'repository-indexeddb-spec-ts-524',
+      {
+        features: entityTestFeatures,
+        name: 'shadow-wins',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+    await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).put({
+      id: 'same',
+      email: 'canonical@example.com'
     })
-    await entity.connect(store).put({ id: 'same', email: 'canonical@example.com' })
     await store.putRecord({ version: 1, state: { id: 'same', email: 'legacy@example.com' } }, [
       'shadow-wins',
       'same'
     ])
-    const indexed = defineEntity<IShadowedUser>()({
-      features: entityTestFeatures,
-      name: 'shadow-wins',
-      key: 'id',
-      indexes: { email: { path: 'email' } }
-    }).connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const indexedEntityPlugin = defineEntityPlugin<IShadowedUser>()(
+      'repository-indexeddb-spec-ts-534',
+      {
+        features: entityTestFeatures,
+        name: 'shadow-wins',
+        key: 'id',
+        indexes: { email: { path: 'email' } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const indexedEntityPluginHost = await storeHost.use(indexedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const indexed = indexedEntityPluginHost.extensions[indexedEntityPlugin.id](store)
 
     await expect(
       indexed
@@ -551,14 +709,20 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('scans nested legacy IDs across foreign-key adjacency', async () => {
     type INestedUser = { id: IStorageKey; email: string }
-    const store = await freshIndexedDb()
+    const { host: storeHost, store } = await freshIndexedDb()
     const diagnostics: string[] = []
-    const entity = defineEntity<INestedUser>({
-      features: entityTestFeatures,
-      name: 'nested-legacy',
-      key: 'id'
-    })
-    await entity.connect(store).migrate()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<INestedUser>()(
+      'repository-indexeddb-spec-ts-556',
+      {
+        features: entityTestFeatures,
+        name: 'nested-legacy',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+    await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate()
     const nestedId: IStorageKey = ['tenant', ['region', 'user-1']]
     await store.putRecord({ version: 1, state: { id: nestedId, email: 'nested@example.com' } }, [
       'nested-legacy',
@@ -568,13 +732,21 @@ describe('repository over real indexedDbHost backend', () => {
       'foreign-entity',
       ['tenant', ['region', 'foreign']]
     ])
-    const indexed = defineEntity<INestedUser>()({
-      features: entityTestFeatures,
-      name: 'nested-legacy',
-      key: 'id',
-      onDiagnostic: (message) => diagnostics.push(message),
-      indexes: { email: { path: 'email' } }
-    }).connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const indexedEntityPlugin = defineEntityPlugin<INestedUser>()(
+      'repository-indexeddb-spec-ts-571',
+      {
+        features: entityTestFeatures,
+        name: 'nested-legacy',
+        key: 'id',
+        onDiagnostic: (message) => diagnostics.push(message),
+        indexes: { email: { path: 'email' } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const indexedEntityPluginHost = await storeHost.use(indexedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const indexed = indexedEntityPluginHost.extensions[indexedEntityPlugin.id](store)
     await expect(indexed.query().index('email').all()).resolves.toEqual([
       { id: nestedId, email: 'nested@example.com' }
     ])
@@ -592,13 +764,21 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('rejects aggregate projection rows before any sidecar write', async () => {
-    const { store, capability } = await freshIndexedDbBackfill()
+    const { host: storeHost, store, capability } = await freshIndexedDbBackfill()
     const scope = 'backfill-projection-cap'
-    const repository = defineEntity<{ id: string }>({
-      features: entityTestFeatures,
-      name: scope,
-      key: 'id'
-    }).connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repositoryEntityPlugin = defineEntityPlugin<{ id: string }>()(
+      'repository-indexeddb-spec-ts-597',
+      {
+        features: entityTestFeatures,
+        name: scope,
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await storeHost.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
     for (let index = 0; index < 8; index += 1)
       await store.putRecord({ value: index }, repository.lockKey(`id-${index}`).key)
     const handle = await capability.ensureRecordIndexes(scope, [
@@ -639,18 +819,25 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('keeps readiness non-complete until legacy winners are migrated', async () => {
     type ILegacyUser = { id: string; email: string }
-    const store = await freshIndexedDb()
+    const { host: storeHost, store } = await freshIndexedDb()
     await store.putRecord({ version: 1, state: { id: 'legacy', email: 'legacy@example.com' } }, [
       'legacy-backfill',
       'legacy'
     ])
-    const entity = defineEntity<ILegacyUser>()({
-      features: entityTestFeatures,
-      name: 'legacy-backfill',
-      key: 'id',
-      indexes: { email: { path: 'email', unique: true } }
-    })
-    const repository = entity.connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<ILegacyUser>()(
+      'repository-indexeddb-spec-ts-647',
+      {
+        features: entityTestFeatures,
+        name: 'legacy-backfill',
+        key: 'id',
+        indexes: { email: { path: 'email', unique: true } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = entityEntityPluginHost.extensions[entityEntityPlugin.id](store)
     await expect(repository.query().index('email').all()).resolves.toEqual([
       { id: 'legacy', email: 'legacy@example.com' }
     ])
@@ -669,10 +856,10 @@ describe('repository over real indexedDbHost backend', () => {
       // still keeps this generation non-authoritative until the legacy winner is promoted.
       scanned: 1
     })
-    await entity.connect(store).migrate()
-    await expect(entity.connect(store).query().index('email').all()).resolves.toEqual([
-      { id: 'legacy', email: 'legacy@example.com' }
-    ])
+    await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate()
+    await expect(
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).query().index('email').all()
+    ).resolves.toEqual([{ id: 'legacy', email: 'legacy@example.com' }])
     await expect(capability.getRecordIndexReadiness(handle)).rejects.toMatchObject({
       code: 'INDEX_BACKFILL_STALE'
     })
@@ -691,22 +878,30 @@ describe('repository over real indexedDbHost backend', () => {
     })
   })
   it('custom codec 未 settle 时 abort 能结束等待且不写入', async () => {
-    const store = await freshIndexedDb()
-    const entity = defineEntity<{ id: string; name: string }>({
-      features: entityTestFeatures,
-      name: 'hanging-codec',
-      key: 'id',
-      codec: {
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'repository-indexeddb-spec-ts-695',
+      {
+        features: entityTestFeatures,
         name: 'hanging-codec',
-        output: 'structured',
-        encode: () => new Promise<unknown>(() => {}),
-        decode: async (value) => value
+        key: 'id',
+        codec: {
+          name: 'hanging-codec',
+          output: 'structured',
+          encode: () => new Promise<unknown>(() => {}),
+          decode: async (value) => value
+        }
       }
-    })
+    )
     const controller = new AbortController()
-    const pending = entity
-      .connect(store)
-      .put({ id: 'u1', name: 'Ada' }, { signal: controller.signal })
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const pending = entityEntityPluginHost.extensions[entityEntityPlugin.id](store).put(
+      { id: 'u1', name: 'Ada' },
+      { signal: controller.signal }
+    )
     await Promise.resolve()
     controller.abort('cancel hanging codec')
     await expect(pending).rejects.toMatchObject({ code: 'ABORTED' })
@@ -714,33 +909,54 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('query-owned backfill propagates cancellation through a hanging decoder', async () => {
-    const store = await freshIndexedDb()
-    await defineEntity<{ id: string; email: string }>({
-      features: entityTestFeatures,
-      name: 'abort-backfill',
-      key: 'id'
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entity2EntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'repository-indexeddb-spec-ts-718',
+      {
+        features: entityTestFeatures,
+        name: 'abort-backfill',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entity2EntityPluginHost = await storeHost.use(entity2EntityPlugin)
+    await entity2EntityPluginHost.extensions[entity2EntityPlugin.id](store).put({
+      id: 'u1',
+      email: 'ada@example.com'
     })
-      .connect(store)
-      .put({ id: 'u1', email: 'ada@example.com' })
-    await defineEntity<{ id: string; email: string }>({
-      features: entityTestFeatures,
-      name: 'abort-backfill',
-      key: 'id'
-    })
-      .connect(store)
-      .migrate()
-    const indexed = defineEntity<{ id: string; email: string }>()({
-      features: entityTestFeatures,
-      name: 'abort-backfill',
-      key: 'id',
-      codec: {
-        name: 'hanging-backfill-codec',
-        output: 'structured',
-        encode: async (value) => value,
-        decode: () => new Promise<never>(() => {})
-      },
-      indexes: { email: { path: 'email' } }
-    }).connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entity3EntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'repository-indexeddb-spec-ts-725',
+      {
+        features: entityTestFeatures,
+        name: 'abort-backfill',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entity3EntityPluginHost = await storeHost.use(entity3EntityPlugin)
+    await entity3EntityPluginHost.extensions[entity3EntityPlugin.id](store).migrate()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const indexedEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'repository-indexeddb-spec-ts-732',
+      {
+        features: entityTestFeatures,
+        name: 'abort-backfill',
+        key: 'id',
+        codec: {
+          name: 'hanging-backfill-codec',
+          output: 'structured',
+          encode: async (value) => value,
+          decode: () => new Promise<never>(() => {})
+        },
+        indexes: { email: { path: 'email' } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const indexedEntityPluginHost = await storeHost.use(indexedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const indexed = indexedEntityPluginHost.extensions[indexedEntityPlugin.id](store)
     const controller = new AbortController()
     const pending = indexed.query().index('email', undefined).all({
       signal: controller.signal
@@ -754,30 +970,48 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('active backfill lease keeps concurrent queries on authoritative fallback', async () => {
-    const { store, capability } = await freshIndexedDbBackfill()
-    const baseline = defineEntity<{ id: string; email: string }>({
-      features: entityTestFeatures,
-      name: 'leased-query-users',
-      key: 'id'
+    const { host: storeHost, store, capability } = await freshIndexedDbBackfill()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const baselineEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'repository-indexeddb-spec-ts-758',
+      {
+        features: entityTestFeatures,
+        name: 'leased-query-users',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const baselineEntityPluginHost = await storeHost.use(baselineEntityPlugin)
+    await baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store).put({
+      id: 'u1',
+      email: 'ada@example.com'
     })
-    await baseline.connect(store).put({ id: 'u1', email: 'ada@example.com' })
-    await baseline.connect(store).migrate()
+    await baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store).migrate()
     const handle = await capability.ensureRecordIndexes('leased-query-users', [
       { name: 'email', unique: false, multiEntry: false, revision: 1 }
     ])
-    const seedKey = baseline.connect(store).lockKey('u1').key
+    const seedKey =
+      baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store).lockKey('u1').key
     const owner = await capability.openBackfillSession(handle, {
       range: { lower: seedKey, upper: seedKey },
       allowComplete: true
     })
     const diagnostics: string[] = []
-    const repository = defineEntity<{ id: string; email: string }>()({
-      features: entityTestFeatures,
-      name: 'leased-query-users',
-      key: 'id',
-      indexes: { email: { path: 'email' } },
-      onDiagnostic: (message) => diagnostics.push(message)
-    }).connect(store)
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repositoryEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'repository-indexeddb-spec-ts-774',
+      {
+        features: entityTestFeatures,
+        name: 'leased-query-users',
+        key: 'id',
+        indexes: { email: { path: 'email' } },
+        onDiagnostic: (message) => diagnostics.push(message)
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repositoryEntityPluginHost = await storeHost.use(repositoryEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
 
     await expect(repository.query().index('email').all()).resolves.toEqual([
       { id: 'u1', email: 'ada@example.com' }
@@ -789,28 +1023,45 @@ describe('repository over real indexedDbHost backend', () => {
   it.each([false, true])(
     'preserves selector identity and ordered readiness persistence failure (%s)',
     async (failPersistence) => {
-      const store = await freshIndexedDb()
-      const baseline = defineEntity<{ id: string; email: string }>({
-        features: entityTestFeatures,
-        name: 'failed-selector-backfill',
-        key: 'id'
+      const { host: storeHost, store } = await freshIndexedDb()
+      /** Explicit native declaration owns this scenario's optional repository capabilities. */
+      const baselineEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+        'repository-indexeddb-spec-ts-793',
+        {
+          features: entityTestFeatures,
+          name: 'failed-selector-backfill',
+          key: 'id'
+        }
+      )
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const baselineEntityPluginHost = await storeHost.use(baselineEntityPlugin)
+      await baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store).put({
+        id: 'u1',
+        email: 'ada@example.com'
       })
-      await baseline.connect(store).put({ id: 'u1', email: 'ada@example.com' })
-      await baseline.connect(store).migrate()
+      await baselineEntityPluginHost.extensions[baselineEntityPlugin.id](store).migrate()
       const selectorFailure = new RangeError('selector projection failed')
-      const indexed = defineEntity<{ id: string; email: string }>()({
-        features: entityTestFeatures,
-        name: 'failed-selector-backfill',
-        key: 'id',
-        indexes: {
-          email: {
-            select: () => {
-              throw selectorFailure
-            },
-            revision: 1
+      /** Explicit native declaration owns this scenario's optional repository capabilities. */
+      const indexedEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+        'repository-indexeddb-spec-ts-801',
+        {
+          features: entityTestFeatures,
+          name: 'failed-selector-backfill',
+          key: 'id',
+          indexes: {
+            email: {
+              select: () => {
+                throw selectorFailure
+              },
+              revision: 1
+            }
           }
         }
-      }).connect(store)
+      )
+      /** Install once on the real fixture host and retain exact extension inference. */
+      const indexedEntityPluginHost = await storeHost.use(indexedEntityPlugin)
+      /** Borrow the supplied backend through the installed repository capability factories. */
+      const indexed = indexedEntityPluginHost.extensions[indexedEntityPlugin.id](store)
 
       const capability = store
       const handle = await capability.ensureRecordIndexes('failed-selector-backfill', [
@@ -866,32 +1117,48 @@ describe('repository over real indexedDbHost backend', () => {
   )
 
   it('custom codec 在 pre-abort 时不会被调用', async () => {
-    const store = await freshIndexedDb()
+    const { host: storeHost, store } = await freshIndexedDb()
     let calls = 0
-    const entity = defineEntity<{ id: string; name: string }>({
-      features: entityTestFeatures,
-      name: 'pre-abort-codec',
-      key: 'id',
-      codec: {
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'repository-indexeddb-spec-ts-871',
+      {
+        features: entityTestFeatures,
         name: 'pre-abort-codec',
-        output: 'structured',
-        encode: async (value) => {
-          calls += 1
-          return value
-        },
-        decode: async (value) => value
+        key: 'id',
+        codec: {
+          name: 'pre-abort-codec',
+          output: 'structured',
+          encode: async (value) => {
+            calls += 1
+            return value
+          },
+          decode: async (value) => value
+        }
       }
-    })
+    )
     const controller = new AbortController()
     controller.abort('already cancelled')
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
     await expect(
-      entity.connect(store).put({ id: 'u1', name: 'Ada' }, { signal: controller.signal })
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).put(
+        { id: 'u1', name: 'Ada' },
+        { signal: controller.signal }
+      )
     ).rejects.toMatchObject({ code: 'ABORTED' })
     expect(calls).toBe(0)
   })
 
   it('put/get/remove round trip', async () => {
-    const repo = users.connect(await freshIndexedDb())
+    const { host: usersEntityPluginBackendHost, store: usersEntityPluginBackendStore } =
+      await freshIndexedDb()
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      usersEntityPluginBackendStore
+    )
     await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', name: 'Ada', email: 'a@b.c' })
     await repo.remove('u1')
@@ -899,14 +1166,24 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('list/stream 只用 [entityName] range 就能正确限定在本 entity 内', async () => {
-    const store = await freshIndexedDb()
-    const posts = defineEntity<{ id: string; title: string }>({
-      features: entityTestFeatures,
-      name: 'posts',
-      key: 'id'
-    })
-    const userRepo = users.connect(store)
-    const postRepo = posts.connect(store)
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const postsEntityPlugin = defineEntityPlugin<{ id: string; title: string }>()(
+      'repository-indexeddb-spec-ts-903',
+      {
+        features: entityTestFeatures,
+        name: 'posts',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const usersEntityPluginHost = await storeHost.use(usersEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const userRepo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const postsEntityPluginHost = await storeHost.use(postsEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const postRepo = postsEntityPluginHost.extensions[postsEntityPlugin.id](store)
     await userRepo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
     await userRepo.put({ id: 'b', name: 'Bob', email: 'b@c.d' })
     await postRepo.put({ id: 'a', title: 'Hello' })
@@ -918,12 +1195,25 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('range 使用共享 comparator 过滤原始 ID，而不是依赖 v2 wire 编码排序', async () => {
-    const numericUsers = defineEntity<{ id: number; name: string }>({
-      features: entityTestFeatures,
-      name: 'numeric-users',
-      key: 'id'
-    })
-    const repo = numericUsers.connect(await freshIndexedDb())
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const numericUsersEntityPlugin = defineEntityPlugin<{ id: number; name: string }>()(
+      'repository-indexeddb-spec-ts-921',
+      {
+        features: entityTestFeatures,
+        name: 'numeric-users',
+        key: 'id'
+      }
+    )
+    const {
+      host: numericUsersEntityPluginBackendHost,
+      store: numericUsersEntityPluginBackendStore
+    } = await freshIndexedDb()
+    const numericUsersEntityPluginHost =
+      await numericUsersEntityPluginBackendHost.use(numericUsersEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = numericUsersEntityPluginHost.extensions[numericUsersEntityPlugin.id](
+      numericUsersEntityPluginBackendStore
+    )
     await repo.put({ id: 10, name: 'Ten' })
     await repo.put({ id: 2, name: 'Two' })
     await repo.put({ id: 1, name: 'One' })
@@ -939,12 +1229,23 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('完整 key domain 的 range 过滤与共享 comparator 保持一致', async () => {
     type IMixedRecord = { id: IStorageKey; label: string }
-    const mixed = defineEntity<IMixedRecord>({
-      features: entityTestFeatures,
-      name: 'mixed-key-users',
-      key: 'id'
-    })
-    const repo = mixed.connect(await freshIndexedDb())
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const mixedEntityPlugin = defineEntityPlugin<IMixedRecord>()(
+      'repository-indexeddb-spec-ts-942',
+      {
+        features: entityTestFeatures,
+        name: 'mixed-key-users',
+        key: 'id'
+      }
+    )
+    const { host: mixedEntityPluginBackendHost, store: mixedEntityPluginBackendStore } =
+      await freshIndexedDb()
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const mixedEntityPluginHost = await mixedEntityPluginBackendHost.use(mixedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = mixedEntityPluginHost.extensions[mixedEntityPlugin.id](
+      mixedEntityPluginBackendStore
+    )
     const keys: IStorageKey[] = [
       -2,
       new Date('2024-01-01T00:00:00Z'),
@@ -961,8 +1262,11 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('repository 使用保留 v2 物理键空间，并保留 legacy key 等待显式迁移', async () => {
-    const store = await freshIndexedDb()
-    const repo = users.connect(store)
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const usersEntityPluginHost = await storeHost.use(usersEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
     await repo.put({ id: 'v2', name: 'V2', email: 'v2@example.com' })
     const physicalKeys: unknown[] = []
     for await (const [key] of store.iterateRecords()) physicalKeys.push(key)
@@ -989,8 +1293,11 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('batch 对 legacy 使用 v2 优先 fallback，并在写删时清理旧键', async () => {
-    const store = await freshIndexedDb()
-    const repo = users.connect(store)
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const usersEntityPluginHost = await storeHost.use(usersEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
     await store.putRecord(
       { version: 1, state: { id: 'legacy-batch', name: 'Legacy', email: 'l@example.com' } },
       ['users', 'legacy-batch']
@@ -1005,8 +1312,11 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('普通 put/remove 在兼容窗口内同事务清理 legacy 键', async () => {
-    const store = await freshIndexedDb()
-    const repo = users.connect(store)
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const usersEntityPluginHost = await storeHost.use(usersEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
     await store.putRecord(
       { version: 1, state: { id: 'legacy-ordinary', name: 'Legacy', email: 'l@example.com' } },
       ['users', 'legacy-ordinary']
@@ -1023,34 +1333,55 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('显式 migrate 遇到 legacy/v2 重复键时保留 v2 winner', async () => {
-    const store = await freshIndexedDb()
-    const repo = defineEntity<{ id: string; name: string }>({
-      features: entityTestFeatures,
-      name: 'duplicate-migrate',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => value }
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const repoEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'repository-indexeddb-spec-ts-1027',
+      {
+        features: entityTestFeatures,
+        name: 'duplicate-migrate',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => value }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
+    await repoEntityPluginHost.extensions[repoEntityPlugin.id](store).put({
+      id: 'same',
+      name: 'Current'
     })
-    await repo.connect(store).put({ id: 'same', name: 'Current' })
     await store.putRecord({ version: 1, state: { id: 'same', name: 'Legacy' } }, [
       'duplicate-migrate',
       'same'
     ])
-    await expect(repo.connect(store).migrate({ batchSize: 1 })).resolves.toMatchObject({
+    await expect(
+      repoEntityPluginHost.extensions[repoEntityPlugin.id](store).migrate({ batchSize: 1 })
+    ).resolves.toMatchObject({
       migrated: 0,
       alreadyCurrent: 1
     })
-    await expect(repo.connect(store).get('same')).resolves.toEqual({ id: 'same', name: 'Current' })
+    await expect(
+      repoEntityPluginHost.extensions[repoEntityPlugin.id](store).get('same')
+    ).resolves.toEqual({ id: 'same', name: 'Current' })
     await expect(store.getRecord(['duplicate-migrate', 'same'])).resolves.toBeUndefined()
   })
 
   it('findBy 在真实 IndexedDB 上按属性扫描过滤', async () => {
-    const indexed = defineEntity<IUser>({
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const indexedEntityPlugin = defineEntityPlugin<IUser>()('repository-indexeddb-spec-ts-1048', {
       features: entityTestFeatures,
       name: 'users-idb-indexed',
       key: 'id'
     })
-    const repo = indexed.connect(await freshIndexedDb())
+    const { host: indexedEntityPluginBackendHost, store: indexedEntityPluginBackendStore } =
+      await freshIndexedDb()
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const indexedEntityPluginHost = await indexedEntityPluginBackendHost.use(indexedEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = indexedEntityPluginHost.extensions[indexedEntityPlugin.id](
+      indexedEntityPluginBackendStore
+    )
     await repo.put({ id: 'u1', name: 'Ada', email: 'ada@example.com' })
     await repo.put({ id: 'u2', name: 'Bob', email: 'bob@example.com' })
     await expect((await repo.list()).filter((user) => user.email === 'bob@example.com')).toEqual([
@@ -1059,8 +1390,11 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('batch 在真实 IndexedDB 事务上成功提交与失败回滚', async () => {
-    const store = await freshIndexedDb()
-    const repo = users.connect(store)
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const usersEntityPluginHost = await storeHost.use(usersEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
     await repo.put({ id: 'keep', name: 'Keep', email: 'k@x.y' })
 
     await repo.batch(async (tx) => {
@@ -1094,27 +1428,42 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('版本迁移在读取时执行且不隐式写回', async () => {
-    const store = await freshIndexedDb()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: entityTestFeatures,
-      name: 'migratable',
-      key: 'id',
-      version: 1
-    })
-    await v1.connect(store).put({ id: 'u1', name: 'Ada' })
-
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: entityTestFeatures,
-      name: 'migratable',
-      key: 'id',
-      version: 2,
-      migrations: {
-        2: async (prev: any) => ({ id: prev.id, displayName: prev.name })
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'repository-indexeddb-spec-ts-1098',
+      {
+        features: entityTestFeatures,
+        name: 'migratable',
+        key: 'id',
+        version: 1
       }
-    })
-    const repo = v2.connect(store)
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const v1EntityPluginHost = await storeHost.use(v1EntityPlugin)
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](store).put({ id: 'u1', name: 'Ada' })
+
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'repository-indexeddb-spec-ts-1106',
+      {
+        features: entityTestFeatures,
+        name: 'migratable',
+        key: 'id',
+        version: 2,
+        migrations: {
+          2: async (prev: any) => ({ id: prev.id, displayName: prev.name })
+        }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const v2EntityPluginHost = await storeHost.use(v2EntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.id](store)
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', displayName: 'Ada' })
-    await expect(store.getRecord(v1.connect(store).lockKey('u1').key)).resolves.toEqual({
+    await expect(
+      store.getRecord(v1EntityPluginHost.extensions[v1EntityPlugin.id](store).lockKey('u1').key)
+    ).resolves.toEqual({
       version: 1,
       state: { id: 'u1', name: 'Ada' }
     })
@@ -1123,21 +1472,35 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('显式 migrate 将 batch checkpoint 写入 metadata', async () => {
-    const store = await freshIndexedDb()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: entityTestFeatures,
-      name: 'checkpointed',
-      key: 'id'
-    })
-    await v1.connect(store).put({ id: 'u1', name: 'Ada' })
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: entityTestFeatures,
-      name: 'checkpointed',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
-    })
-    await expect(v2.connect(store).migrate({ batchSize: 1 })).resolves.toMatchObject({
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'repository-indexeddb-spec-ts-1127',
+      {
+        features: entityTestFeatures,
+        name: 'checkpointed',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const v1EntityPluginHost = await storeHost.use(v1EntityPlugin)
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](store).put({ id: 'u1', name: 'Ada' })
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'repository-indexeddb-spec-ts-1133',
+      {
+        features: entityTestFeatures,
+        name: 'checkpointed',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const v2EntityPluginHost = await storeHost.use(v2EntityPlugin)
+    await expect(
+      v2EntityPluginHost.extensions[v2EntityPlugin.id](store).migrate({ batchSize: 1 })
+    ).resolves.toMatchObject({
       migrated: 1
     })
     await expect(store.metadata!.get('repository:checkpointed:migration')).resolves.toMatchObject({
@@ -1148,60 +1511,101 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('migrate 只扫描目标 entity 的 v2 物理前缀，不触碰其他 entity', async () => {
-    const store = await freshIndexedDb()
-    const target = defineEntity<{ id: string; name: string }>({
-      features: entityTestFeatures,
-      name: 'target-migrate',
-      key: 'id'
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const targetEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'repository-indexeddb-spec-ts-1152',
+      {
+        features: entityTestFeatures,
+        name: 'target-migrate',
+        key: 'id'
+      }
+    )
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const otherEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'repository-indexeddb-spec-ts-1157',
+      {
+        features: entityTestFeatures,
+        name: 'other-migrate',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const targetEntityPluginHost = await storeHost.use(targetEntityPlugin)
+    await targetEntityPluginHost.extensions[targetEntityPlugin.id](store).put({
+      id: 'target',
+      name: 'Target'
     })
-    const other = defineEntity<{ id: string; name: string }>({
-      features: entityTestFeatures,
-      name: 'other-migrate',
-      key: 'id'
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const otherEntityPluginHost = await storeHost.use(otherEntityPlugin)
+    await otherEntityPluginHost.extensions[otherEntityPlugin.id](store).put({
+      id: 'other',
+      name: 'Other'
     })
-    await target.connect(store).put({ id: 'target', name: 'Target' })
-    await other.connect(store).put({ id: 'other', name: 'Other' })
-    const migrated = defineEntity<{ id: string; label: string }>({
-      features: entityTestFeatures,
-      name: 'target-migrate',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => ({ id: value.id, label: value.name }) }
-    })
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const migratedEntityPlugin = defineEntityPlugin<{ id: string; label: string }>()(
+      'repository-indexeddb-spec-ts-1164',
+      {
+        features: entityTestFeatures,
+        name: 'target-migrate',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => ({ id: value.id, label: value.name }) }
+      }
+    )
 
-    await expect(migrated.connect(store).migrate({ batchSize: 1 })).resolves.toMatchObject({
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const migratedEntityPluginHost = await storeHost.use(migratedEntityPlugin)
+    await expect(
+      migratedEntityPluginHost.extensions[migratedEntityPlugin.id](store).migrate({ batchSize: 1 })
+    ).resolves.toMatchObject({
       scanned: 1,
       eligible: 1,
       migrated: 1
     })
-    await expect(other.connect(store).get('other')).resolves.toEqual({
+    await expect(
+      otherEntityPluginHost.extensions[otherEntityPlugin.id](store).get('other')
+    ).resolves.toEqual({
       id: 'other',
       name: 'Other'
     })
   })
 
   it('重复执行 migrate 幂等，不重复覆盖已迁移记录', async () => {
-    const store = await freshIndexedDb()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: entityTestFeatures,
-      name: 'idempotent-migrate',
-      key: 'id'
-    })
-    await v1.connect(store).put({ id: 'u1', name: 'Ada' })
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'repository-indexeddb-spec-ts-1185',
+      {
+        features: entityTestFeatures,
+        name: 'idempotent-migrate',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const v1EntityPluginHost = await storeHost.use(v1EntityPlugin)
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](store).put({ id: 'u1', name: 'Ada' })
     let migrationCalls = 0
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: entityTestFeatures,
-      name: 'idempotent-migrate',
-      key: 'id',
-      version: 2,
-      migrations: {
-        2: async (value: any) => {
-          migrationCalls += 1
-          return { id: value.id, displayName: value.name }
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'repository-indexeddb-spec-ts-1192',
+      {
+        features: entityTestFeatures,
+        name: 'idempotent-migrate',
+        key: 'id',
+        version: 2,
+        migrations: {
+          2: async (value: any) => {
+            migrationCalls += 1
+            return { id: value.id, displayName: value.name }
+          }
         }
       }
-    })
-    const repo = v2.connect(store)
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const v2EntityPluginHost = await storeHost.use(v2EntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.id](store)
     await expect(repo.migrate({ batchSize: 1 })).resolves.toMatchObject({ migrated: 1 })
     expect(migrationCalls).toBe(1)
     await expect(repo.migrate({ batchSize: 1 })).resolves.toEqual({
@@ -1217,14 +1621,18 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('显式 migrate 分批搬迁 legacy 物理键并删除旧键', async () => {
-    const store = await freshIndexedDb()
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: entityTestFeatures,
-      name: 'legacy-batch-migrate',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
-    })
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'repository-indexeddb-spec-ts-1221',
+      {
+        features: entityTestFeatures,
+        name: 'legacy-batch-migrate',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
+      }
+    )
     await store.putRecord({ version: 1, state: { id: 'a', name: 'Ada' } }, [
       'legacy-batch-migrate',
       'a'
@@ -1233,7 +1641,11 @@ describe('repository over real indexedDbHost backend', () => {
       'legacy-batch-migrate',
       'b'
     ])
-    await expect(v2.connect(store).migrate({ batchSize: 1 })).resolves.toMatchObject({
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const v2EntityPluginHost = await storeHost.use(v2EntityPlugin)
+    await expect(
+      v2EntityPluginHost.extensions[v2EntityPlugin.id](store).migrate({ batchSize: 1 })
+    ).resolves.toMatchObject({
       scanned: 2,
       eligible: 2,
       migrated: 2,
@@ -1251,14 +1663,18 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('migrate 从 running checkpoint 的 exclusive physical key 继续', async () => {
-    const store = await freshIndexedDb()
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: entityTestFeatures,
-      name: 'checkpoint-resume',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
-    })
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'repository-indexeddb-spec-ts-1255',
+      {
+        features: entityTestFeatures,
+        name: 'checkpoint-resume',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
+      }
+    )
     await store.putRecord({ version: 1, state: { id: 'a', name: 'Ada' } }, [
       'checkpoint-resume',
       'a'
@@ -1283,7 +1699,11 @@ describe('repository over real indexedDbHost backend', () => {
       skipped: 0,
       conflicted: 0
     })
-    await expect(v2.connect(store).migrate({ batchSize: 1 })).resolves.toMatchObject({
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const v2EntityPluginHost = await storeHost.use(v2EntityPlugin)
+    await expect(
+      v2EntityPluginHost.extensions[v2EntityPlugin.id](store).migrate({ batchSize: 1 })
+    ).resolves.toMatchObject({
       scanned: 2,
       eligible: 2,
       migrated: 2
@@ -1291,14 +1711,20 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('migrate 非冲突批失败后保留前一批 checkpoint', async () => {
-    const source = await freshIndexedDb()
-    const v1 = defineEntity<{ id: string; name: string }>({
-      features: entityTestFeatures,
-      name: 'failure-resume',
-      key: 'id'
-    })
-    await v1.connect(source).put({ id: 'a', name: 'Ada' })
-    await v1.connect(source).put({ id: 'b', name: 'Bob' })
+    const { host: sourceHost, store: source } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const v1EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'repository-indexeddb-spec-ts-1295',
+      {
+        features: entityTestFeatures,
+        name: 'failure-resume',
+        key: 'id'
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const v1EntityPluginHost = await sourceHost.use(v1EntityPlugin)
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](source).put({ id: 'a', name: 'Ada' })
+    await v1EntityPluginHost.extensions[v1EntityPlugin.id](source).put({ id: 'b', name: 'Bob' })
     let calls = 0
     /**
      * Inject only the original transaction endpoint; cloning the store would lose its owner
@@ -1316,21 +1742,31 @@ describe('repository over real indexedDbHost backend', () => {
         )
       return originalTransaction(run, ctx)
     }
-    const v2 = defineEntity<{ id: string; displayName: string }>({
-      features: entityTestFeatures,
-      name: 'failure-resume',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
-    })
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
+      'repository-indexeddb-spec-ts-1319',
+      {
+        features: entityTestFeatures,
+        name: 'failure-resume',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => ({ id: value.id, displayName: value.name }) }
+      }
+    )
+    /** Reuse the same entity installation after restoring the original transaction endpoint. */
+    const v2EntityPluginHost = await sourceHost.use(v2EntityPlugin)
     try {
-      await expect(v2.connect(source).migrate({ batchSize: 1 })).rejects.toMatchObject({
+      await expect(
+        v2EntityPluginHost.extensions[v2EntityPlugin.id](source).migrate({ batchSize: 1 })
+      ).rejects.toMatchObject({
         code: 'TRANSACTION_FAILED'
       })
     } finally {
       source.transaction = originalTransaction
     }
-    await expect(v2.connect(source).migrate({ batchSize: 1 })).resolves.toMatchObject({
+    await expect(
+      v2EntityPluginHost.extensions[v2EntityPlugin.id](source).migrate({ batchSize: 1 })
+    ).resolves.toMatchObject({
       scanned: 2,
       eligible: 2,
       migrated: 2
@@ -1338,14 +1774,18 @@ describe('repository over real indexedDbHost backend', () => {
   })
 
   it('migrate 遇到 schema fingerprint 不匹配时从头扫描', async () => {
-    const store = await freshIndexedDb()
-    const entity = defineEntity<{ id: string; name: string }>({
-      features: entityTestFeatures,
-      name: 'checkpoint-mismatch',
-      key: 'id',
-      version: 2,
-      migrations: { 2: async (value: any) => value }
-    })
+    const { host: storeHost, store } = await freshIndexedDb()
+    /** Explicit native declaration owns this scenario's optional repository capabilities. */
+    const entityEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
+      'repository-indexeddb-spec-ts-1342',
+      {
+        features: entityTestFeatures,
+        name: 'checkpoint-mismatch',
+        key: 'id',
+        version: 2,
+        migrations: { 2: async (value: any) => value }
+      }
+    )
     await store.putRecord({ version: 1, state: { id: 'a', name: 'Ada' } }, [
       'checkpoint-mismatch',
       'a'
@@ -1362,7 +1802,11 @@ describe('repository over real indexedDbHost backend', () => {
       skipped: 0,
       conflicted: 0
     })
-    await expect(entity.connect(store).migrate()).resolves.toMatchObject({
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
+    await expect(
+      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate()
+    ).resolves.toMatchObject({
       scanned: 1,
       eligible: 1,
       migrated: 1

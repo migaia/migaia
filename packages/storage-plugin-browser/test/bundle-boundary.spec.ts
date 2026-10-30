@@ -103,7 +103,7 @@ const browserBundleHardCeiling = {
 /** Selected backend plus one entity where/select/all query, with owning cleanup. */
 const browserQueryEntry = [
   "import { createStorageHost } from '@migaia/storage-host'",
-  "import { defineEntity } from '@migaia/storage-host/entity'",
+  "import { defineEntityPlugin } from '@migaia/storage-host/entity'",
   "import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'",
   "import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-db'",
   '/** Read active user names and release the original owning host.',
@@ -113,7 +113,9 @@ const browserQueryEntry = [
   'export async function loadActiveUsers(options) {',
   '  const host = await createStorageHost({ plugins: [indexedDbBackendPlugin(options)] })',
   '  try {',
-  "    const users = defineEntity({ name: 'users', key: 'id', features: [entityQueryFeature()] }).connect(host.backend('indexed-db'))",
+  "    const usersEntityPlugin = defineEntityPlugin('users', { name: 'users', key: 'id', features: { query: entityQueryFeature() } })",
+  '    const entityHost = await host.use(usersEntityPlugin)',
+  "    const users = entityHost.extensions[usersEntityPlugin.id](host.backend('indexed-db'))",
   "    return await users.query().where({ active: true }).select('name').all()",
   '  } finally { await host.dispose() }',
   '}'
@@ -123,7 +125,7 @@ const browserQueryEntry = [
 const browserFullQueryEntry = [
   "import { createStorageHost } from '@migaia/storage-host'",
   "import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'",
-  "import { defineEntity } from '@migaia/storage-host/entity'",
+  "import { defineEntityPlugin } from '@migaia/storage-host/entity'",
   ...['query', 'unique', 'migration', 'indexes', 'keyset'].map(
     (name) =>
       `import { entity${name[0]!.toUpperCase()}${name.slice(1)}Feature } from '@migaia/storage-host/entity/features/${name}'`
@@ -154,9 +156,11 @@ const browserFullQueryEntry = [
   '    })]',
   '  })',
   '  try {',
-  "    const users = defineEntity({ name: 'users', key: 'id', features: [",
-  '      entityQueryFeature(), entityUniqueFeature(), entityMigrationFeature(), entityIndexesFeature(), entityKeysetFeature()',
-  "    ] }).connect(host.backend('indexed-db'))",
+  "    const usersEntityPlugin = defineEntityPlugin('users', { name: 'users', key: 'id', features: {",
+  '      query: entityQueryFeature(), unique: entityUniqueFeature(), migration: entityMigrationFeature(), indexes: entityIndexesFeature(), keyset: entityKeysetFeature()',
+  '    } })',
+  '    const entityHost = await host.use(usersEntityPlugin)',
+  "    const users = entityHost.extensions[usersEntityPlugin.id](host.backend('indexed-db'))",
   "    return await users.query().where({ active: true }).select('name').all()",
   '  } finally { await host.dispose() }',
   '}'

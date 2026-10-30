@@ -160,23 +160,22 @@ Await only native operations and activity-preserving microtasks within the callb
 
 ## Entity repositories
 
-Basic `defineEntity` supplies definition, connection and reads/writes. Select `entityQueryFeature()` from `@migaia/storage-host/entity/features/query` in the definition's `features` array for queries; `entityUniqueFeature()` from `/entity/features/unique` for uniqueness; `entityMigrationFeature()` from `/entity/features/migration` for migration; `entityIndexesFeature()` from `/entity/features/indexes` for index planning; and `entityKeysetFeature()` from `/entity/features/keyset` for keyset pages. Index queries combine query and indexes; pages combine query and keyset. Native IndexedDB indexes also require the backend's `indexedDbIndexesFeature()`. Each selection is explicit.
+`defineEntityPlugin` declares an entity plugin installed once into the storage host. Select `entityQueryFeature()` from `@migaia/storage-host/entity/features/query` in the definition's `features` record for queries, such as `{ lookup: entityQueryFeature() }`; `entityUniqueFeature()` from `/entity/features/unique` for uniqueness; `entityMigrationFeature()` from `/entity/features/migration` for migration; `entityIndexesFeature()` from `/entity/features/indexes` for index planning; and `entityKeysetFeature()` from `/entity/features/keyset` for keyset pages. Keys are caller-chosen names, while the native Feature identifies its role. Index queries combine query and indexes; pages combine query and keyset. Native IndexedDB indexes also require the backend's `indexedDbIndexesFeature()`. Each selection is explicit.
 
-Import the neutral repository owner from `@migaia/storage-host/entity` and connect it to the actual installed IndexedDB store.
+Import the neutral entity plugin from `@migaia/storage-host/entity`, install it, then obtain a repository for the actual IndexedDB store through its extension. The repository expires with the entity/host and never disposes the backend.
 
 ```ts
 import { createStorageHost } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-db'
 
 type IUser = { id: string; name: string }
+const usersEntityPlugin = defineEntityPlugin<IUser>()('users', { name: 'users', key: 'id' })
 const host = await createStorageHost({
-  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' })]
+  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }), usersEntityPlugin]
 })
 try {
-  const users = defineEntity<IUser>({ name: 'users', key: 'id' }).connect(
-    host.backend('indexed-db')
-  )
+  const users = host.extensions[usersEntityPlugin.id](host.backend('indexed-db'))
   await users.put({ id: 'a', name: 'Ada' })
   console.log(await users.get('a'))
 } finally {

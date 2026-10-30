@@ -132,7 +132,7 @@ Paths beginning `/sdk` below are prefixed with `@migaia/storage-host`.
 
 See [storage-contract](../storage-contract/README.en.md#entries-and-dependency-direction) for full paths and dependencies. The old contract root no longer exports these runtime tools.
 
-Entity assembly changes: `/entity` provides basic reads/writes. Previously automatic query, indexes, unique checks, migration and keyset now require their own `/entity/*` units in `features`. Import only the units used by the application; missing units throw `ENTITY_FEATURE_REQUIRED`. See [entity setup](./USEGUIDE.en.md#use-an-entity-repository).
+Entity plugins: `defineEntityPlugin` replaces `defineEntity` without an alias. Declare a named `xxxEntityPlugin` with a record of opaque native `/entity/features/*` values, install it through storage-host plugins or `host.use`, then obtain repositories from `host.extensions[xxxEntityPlugin.id](store)`. Feature installation runs once per entity; repositories reuse installed factory outputs and expire with entity/host disposal. Plugin IDs can differ from the persisted entity namespace. Missing roles and duplicate roles reject at install. See [entity setup](./USEGUIDE.en.md#use-an-entity-repository).
 
 ## Assemble optional capabilities explicitly
 

@@ -1,6 +1,6 @@
 import { entityTestFeatures } from './entity-features.ts'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { localStorageBackendPlugin } from '../../src/local-storage.ts'
 import { sessionStorageBackendPlugin } from '../../src/session-storage.ts'
 import { cookieBackendPlugin } from '../../src/cookies.ts'
@@ -23,13 +23,16 @@ export async function runBrowserTextOrgScenario() {
     uniqueConflicts: 0
   }
   /** The same public entity definition exercises each original value-commit implementation. */
-  const users = defineEntity<{ id: string; email: string }>()({
-    features: entityTestFeatures,
-    name: 'browser-org-users',
-    key: 'id',
-    indexes: { byEmail: { path: 'email', unique: true } },
-    onDiagnostic: () => {}
-  })
+  const usersEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+    'browser-org-ts-26',
+    {
+      features: entityTestFeatures,
+      name: 'browser-org-users',
+      key: 'id',
+      indexes: { byEmail: { path: 'email', unique: true } },
+      onDiagnostic: () => {}
+    }
+  )
   /** Native client selection changes only the backend plugin; no test Storage substitutes exist. */
   const plugins = [
     {
@@ -83,8 +86,12 @@ export async function runBrowserTextOrgScenario() {
             localStorage.getItem(
               lengthPrefixedNamespaceCodec.encode(namespace + '/' + first, 'key')
             ) === 'left'
-        const leftUsers = users.connect(left)
-        const rightUsers = users.connect(right)
+        /** Install once on the real fixture host and retain exact extension inference. */
+        const usersEntityPluginHost = await host.use(usersEntityPlugin)
+        /** Borrow the supplied backend through the installed repository capability factories. */
+        const leftUsers = usersEntityPluginHost.extensions[usersEntityPlugin.id](left)
+        /** Borrow the supplied backend through the installed repository capability factories. */
+        const rightUsers = usersEntityPluginHost.extensions[usersEntityPlugin.id](right)
         await leftUsers.put({ id: 'a', email: 'same' })
         await rightUsers.put({ id: 'a', email: 'same' })
         try {

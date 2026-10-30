@@ -3,7 +3,7 @@ import { entityTestFeatures } from './entity-features.ts'
 import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { indexedDbTestFeatures } from './indexed-db-features.ts'
 import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 import {
   runStorageProgramApp,
@@ -57,12 +57,21 @@ window.runStorageProgramAutomaticIndex = async () => {
     /** The real browser backend owns both index readiness and the native lookup cursor. */
     const store = host.backend('indexed-db')
     /** The declared path is the only index available to the automatic source selector. */
-    const repo = defineEntity<{ id: string; group: string }>()({
-      features: entityTestFeatures,
-      name: 'program-automatic-index',
-      key: 'id',
-      indexes: { byGroup: { path: 'group' } }
-    }).connect(store, { queryStages: host.queryStages(store) })
+    const repoEntityPlugin = defineEntityPlugin<{ id: string; group: string }>()(
+      'browser-program-app-ts-60',
+      {
+        features: entityTestFeatures,
+        name: 'program-automatic-index',
+        key: 'id',
+        indexes: { byGroup: { path: 'group' } }
+      }
+    )
+    /** Install once on the real fixture host and retain exact extension inference. */
+    const repoEntityPluginHost = await host.use(repoEntityPlugin)
+    /** Borrow the supplied backend through the installed repository capability factories. */
+    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store, {
+      queryStages: host.queryStages(store)
+    })
     for (let index = 0; index < 12; index++)
       await repo.put({ id: String(index), group: index % 2 ? 'one' : 'two' })
     // Use the repository's existing migration/readiness path before measuring the lookup.

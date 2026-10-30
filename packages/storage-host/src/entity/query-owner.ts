@@ -288,6 +288,7 @@ export class EntityQueryOwner<
   queryFor = <C extends IOperationContext | undefined>(
     scope?: ITransactionScope
   ): IEntityQuery<TDomain, TIndexes, C, TAugmentMethods> => {
+    /** Pure branches retain no admission; the real terminal checks before starting work. */
     /** Synchronous terminal opening shares these facts with its actual source. */
     const execution: IEntityQueryExecution<TDomain> = { scope }
     return createEntityQuery<TDomain, TIndexes, C, TAugmentMethods>({
@@ -395,28 +396,45 @@ export class EntityQueryOwner<
     selection: IEntityQuerySourceSelection<TDomain>,
     returnedCount: (value: R) => number
   ): Promise<R> => {
-    const collect = (current?: ITransactionScope) => {
-      const previous = execution.openingPlan
-      const previousSelection = execution.openingSelection
-      execution.openingPlan = plan
-      execution.openingSelection = selection
-      try {
-        return this.#sources.observeQueryRead(
-          invoke,
-          plan,
-          selection,
-          current,
-          () => execution.opened,
-          returnedCount
-        )
-      } finally {
-        execution.openingPlan = previous
-        execution.openingSelection = previousSelection
-      }
+    try {
+      this.#context.assertCurrent()
+    } catch (cause) {
+      return Promise.reject(cause)
     }
     return execution.scope === undefined
-      ? collect()
-      : runTransactionOperation(execution.scope, (current) => collect(current))
+      ? this.#collectEntityQuery(execution, invoke, plan, selection, returnedCount)
+      : runTransactionOperation(execution.scope, (current) =>
+          this.#collectEntityQuery(execution, invoke, plan, selection, returnedCount, current)
+        )
+  }
+  /** Share synchronous source-opening facts within one already-admitted terminal operation. */
+  #collectEntityQuery<R>(
+    execution: IEntityQueryExecution<TDomain>,
+    invoke: () => Promise<R>,
+    plan: IEntityQueryPlan,
+    selection: IEntityQuerySourceSelection<TDomain>,
+    returnedCount: (value: R) => number,
+    current?: ITransactionScope
+  ): Promise<R> {
+    /** Restore the branch facts even when native preparation rejects synchronously. */
+    const previous = execution.openingPlan
+    /** Each terminal lends only its own immutable source policy during synchronous opening. */
+    const previousSelection = execution.openingSelection
+    execution.openingPlan = plan
+    execution.openingSelection = selection
+    try {
+      return this.#sources.observeQueryRead(
+        invoke,
+        plan,
+        selection,
+        current,
+        () => execution.opened,
+        returnedCount
+      )
+    } finally {
+      execution.openingPlan = previous
+      execution.openingSelection = previousSelection
+    }
   }
   /** Reuse the original repository operation through its explicit owner context. */
   streamEntityQuery = <R>(
@@ -425,6 +443,7 @@ export class EntityQueryOwner<
     plan: IEntityQueryPlan,
     selection: IEntityQuerySourceSelection<TDomain>
   ): IStorageIterator<R> => {
+    this.#context.assertCurrent()
     const previous = execution.openingPlan
     const previousSelection = execution.openingSelection
     execution.openingPlan = plan
@@ -475,8 +494,13 @@ export class EntityQueryOwner<
   boundList = (
     binding: IEntityRepositoryBinding,
     options?: IListSnapshot<TDomain> | IIndexedListOptions<TDomain, TIndexes>
-  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['list']> =>
-    runTransactionOperation(binding.scope, async (current) => {
+  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['list']> => {
+    try {
+      this.#context.assertCurrent()
+    } catch (cause) {
+      return Promise.reject(cause)
+    }
+    return runTransactionOperation(binding.scope, async (current) => {
       this.#context.backend.assertScope(current)
       const context = readTransactionOperationContext(current)
       /** Metadata probes never build indexes or poison this transaction on a stale generation. */
@@ -523,6 +547,7 @@ export class EntityQueryOwner<
         (values) => values.length
       )
     })
+  }
   /** Reuse the original repository operation through its explicit owner context. */
   apiQuery: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['query'] = () =>
     this.queryFor<IOperationContext>() as ReturnType<
@@ -533,6 +558,7 @@ export class EntityQueryOwner<
     options,
     ctx
   ) => {
+    this.#context.assertCurrent()
     const indexed =
       (options as { readonly index?: string } | undefined)?.index === undefined
         ? undefined
@@ -573,6 +599,7 @@ export class EntityQueryOwner<
         ? undefined
         : this.#context.snapshotIndexedListOptions(options)
     const normalized = indexed?.options ?? this.normalizeListOptions(options)
+    this.#context.assertCurrent()
     const context = snapshotOperationContext(ctx)
     const counter = this.#context.queryStages === undefined ? undefined : { readCount: 0 }
     const onRead =

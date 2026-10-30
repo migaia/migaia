@@ -22,6 +22,7 @@ import {
 import { snapshotKeyValueStoreDetailed, snapshotRecordStore } from '../authoring/store.ts'
 import { compareStorageKeys } from '../authoring/key.ts'
 import { assertTransactionOwner } from '../authoring/transaction.ts'
+import { guardTransactionIterator } from '../authoring/transaction-registration.ts'
 
 import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
@@ -43,6 +44,8 @@ import type { IListOptions, IMigrateOptions, IEntityConnectStore } from './types
 import type { ISnapshotEntityIndexes } from './index-projection.ts'
 
 import { createOrderedRecordIndex } from '../core/ordered-record-index.ts'
+import { throwIfAborted } from '../core/operation.ts'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 
 import {
   StorageMigrationPhase,
@@ -91,8 +94,11 @@ export class EntityIteratorLifetime<T> {
     this.#runtime = runtime
   }
   /** Finish the original generator once, including its native finally block. */
-  dispose = (): Promise<void> =>
-    (this.#closing ??= this.#generator.return(undefined).then(() => undefined))
+  dispose = (): Promise<void> => (this.#closing ??= this.#close())
+  /** Existing resource iterators retain their own cleanup authority and cached completion. */
+  #close(): Promise<void> {
+    return this.#generator.return!(undefined).then(() => undefined)
+  }
   /** Observe a failed generator return through the operation's existing report channel. */
   symbolicDispose = (): Promise<void> =>
     (this.#symbolic ??= this.dispose().catch((cause) =>
@@ -105,6 +111,101 @@ export class EntityIteratorLifetime<T> {
       [asyncDisposeKey]: this.symbolicDispose
     })
   }
+}
+
+/** Public entity resources borrow native cleanup and check revocation only at next admission. */
+class EntityIteratorGuard<T> {
+  /** The original resource remains the only cleanup and accepted-operation owner. */
+  readonly #iterator: IStorageIterator<T>
+  /** This registration signal revokes public work without adding a resource lifecycle. */
+  readonly #signal: INativeAbortSignal
+  /** Observe revocation cleanup once while retaining the original resource's cached Promise. */
+  #cleanupObserved = false
+
+  /** Borrow the original resource and the entity installation's existing signal. */
+  constructor(iterator: IStorageIterator<T>, signal: INativeAbortSignal) {
+    this.#iterator = iterator
+    this.#signal = signal
+  }
+
+  /** Reject before backend admission and release the original resource after revocation. */
+  assertCurrent(): void {
+    try {
+      throwIfAborted(this.#signal)
+    } catch (cause) {
+      this.#closeRevoked()
+      throw cause
+    }
+  }
+
+  /** A cleanup failure uses the existing diagnostic channel only when an actual failure occurs. */
+  #reportCleanup(cause: unknown): void {
+    reportCleanupError(createStorageOperationRuntime().reporter, cause)
+  }
+
+  /** Cleanup authority stays on the native resource; only its rejected result is observed here. */
+  #closeRevoked(): void {
+    if (this.#cleanupObserved) return
+    this.#cleanupObserved = true
+    try {
+      void this.#iterator.dispose().catch((cause) => this.#reportCleanup(cause))
+    } catch (cause) {
+      this.#reportCleanup(cause)
+    }
+  }
+
+  /** An unregistered root resource keeps its original receiver and native next Promise. */
+  next(...args: [] | [unknown]): Promise<IteratorResult<T>> {
+    try {
+      this.assertCurrent()
+    } catch (cause) {
+      /** Preserve the caller's rejection while avoiding a secondary unhandled next rejection. */
+      const rejected = Promise.reject<IteratorResult<T>>(cause)
+      void rejected.then(undefined, () => undefined)
+      return rejected
+    }
+    return this.#iterator.next(...args)
+  }
+
+  /** Forward return without allocating or caching a different cleanup Promise. */
+  returned(value?: unknown): Promise<IteratorResult<T>> {
+    return this.#iterator.return!(value)
+  }
+
+  /** Forward explicit disposal to the original resource's cached main Promise. */
+  dispose(): Promise<void> {
+    return this.#iterator.dispose()
+  }
+
+  /** Forward symbolic disposal to its existing separately cached native Promise. */
+  symbolicDispose(): Promise<void> {
+    return this.#iterator[asyncDisposeKey]()
+  }
+
+  /** Unregistered roots need one stable-shaped public boundary without mutating their next method. */
+  boundary(): IStorageIterator<T> {
+    return {
+      next: (...args) => this.next(...args),
+      return: this.#iterator.return === undefined ? undefined : (value) => this.returned(value),
+      dispose: () => this.dispose(),
+      [asyncDisposeKey]: () => this.symbolicDispose(),
+      [Symbol.asyncIterator]() {
+        return this
+      }
+    }
+  }
+}
+
+/** Preserve registered iterator identity; guard only the final public resource boundary. */
+export function guardEntityIterator<T>(
+  iterator: IStorageIterator<T>,
+  signal: INativeAbortSignal
+): IStorageIterator<T> {
+  /** This owner adds admission only; it borrows every native resource and cleanup method. */
+  const guard = new EntityIteratorGuard(iterator, signal)
+  return guardTransactionIterator(iterator, () => guard.assertCurrent())
+    ? iterator
+    : guard.boundary()
 }
 
 /** Give one actual generator its explicit resource protocol without another iterator owner. */
@@ -251,11 +352,18 @@ export type IRepositoryConfig<TDomain, TStored> = {
   /** Selects a default from the backend kind when omitted. See `createRepository`. */
   readonly codec: ICodec<unknown, unknown> | undefined
   readonly migrationPlan: IMigrationPlan | undefined
-  readonly features: readonly import('./assembly.ts').IEntityFeature[]
+  /** Exact native outputs retain declaration order without per-repository Map entry allocation. */
+  readonly units: readonly import('./assembly.ts').IInstalledRepositoryUnit[]
+  /** The existing native registration signal revokes every repository obtained from this entity. */
+  readonly signal: import('@migaia/utils/promise').INativeAbortSignal
   readonly validateOnRead: boolean
   readonly onDiagnostic: (message: string) => void
   readonly defaultOrderBy: ((left: TDomain, right: TDomain) => number) | undefined
   readonly indexes: ISnapshotEntityIndexes<TDomain>
+  /** Installation-owned pure subsets share the admitted selectors and definition identities. */
+  readonly uniqueIndexes: ISnapshotEntityIndexes<TDomain>
+  /** Every repository's native and fallback commits borrow this readonly declaration projection. */
+  readonly uniqueDefinitions: readonly ISnapshotEntityIndexes<TDomain>[string]['definition'][]
 }
 
 export const idOf = <TDomain>(
@@ -385,7 +493,8 @@ export type IEntityScopedSourceContext<T> = {
 }
 /** One observed stream retains only its original iterator and accumulated diagnostics. */
 export type IEntityQueryObservation<T, R> = {
-  iterator: IStorageIterator<R>
+  /** Root observation advances the original receiver through one captured forwarding callback. */
+  readonly advance: () => Promise<IteratorResult<R>>
   plan: IEntityQueryPlan
   selection: IEntityQuerySourceSelection<T>
   counter: { readCount: number } | undefined
