@@ -8,6 +8,7 @@ import { redisBackendPlugin, type IRedisDriver } from '../src/index.ts'
 import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
 import { ioredisDriver } from '../src/adapters/ioredis.ts'
 import { createRedisLayout, encodeRedisValue } from '../src/layout.ts'
+import { namespaces } from './helpers/namespaces.ts'
 
 /** Independent genuine adapters contend only on fresh fixture keys. */
 for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
@@ -20,7 +21,7 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
     })
     it('pages a transaction draft in the same order and content a committed read returns', async () => {
       await pool.connect()
-      const prefix = crypto.randomUUID(),
+      const prefix = namespaces.prefix(),
         host = await createStorageHost({
           plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool), prefix })] as const
         })
@@ -68,7 +69,7 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
               })
             )
         },
-        prefix = crypto.randomUUID(),
+        prefix = namespaces.prefix(),
         policy = ConcurrencyPolicy.optimistic({ retries: 200, backoffMs: 1 }),
         first = await createStorageHost({
           plugins: [redisBackendPlugin({ driver: counted, prefix, concurrency: policy })] as const
@@ -100,7 +101,7 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
     })
     it('rechecks implicit native locks after an unrelated genuine WATCH abort', async () => {
       const original = nodeRedisDriver(pool),
-        prefix = crypto.randomUUID(),
+        prefix = namespaces.prefix(),
         org = createOrgId(),
         layout = createRedisLayout(prefix, org),
         acquired = deferred<void>(),
@@ -166,7 +167,7 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
     })
     it('keeps a fail-policy related WATCH conflict distinct from lock rejection', async () => {
       if (!pool.isOpen) await pool.connect()
-      const prefix = crypto.randomUUID(),
+      const prefix = namespaces.prefix(),
         org = createOrgId(),
         native = nodeRedisDriver(pool)
       const first = await createStorageHost({
@@ -220,7 +221,7 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
     })
     it('drains an executed but unconfirmed reply, seals further writes and preserves reads', async () => {
       const original = nodeRedisDriver(pool),
-        prefix = crypto.randomUUID(),
+        prefix = namespaces.prefix(),
         failure = new RangeError('fixture lost EXEC reply')
       let executions = 0
       const injected: IRedisDriver = {

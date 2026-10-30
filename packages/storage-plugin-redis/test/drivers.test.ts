@@ -5,6 +5,7 @@ import { ioredisDriver } from '../src/adapters/ioredis.ts'
 import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
 import { redisExecCause } from '../src/constants.ts'
 import type { IRedisDriver } from '../src/driver.ts'
+import { namespaces } from './helpers/namespaces.ts'
 
 /** Each selected service must be supplied by the repository's service launcher. */
 const services = [
@@ -139,7 +140,7 @@ for (const [name, url] of services)
     if (!url) throw new Error('Real Redis service URL is required')
     it('ioredis retains native execution evidence and the borrowed root', async () => {
       const client = new Redis(url, { lazyConnect: true }),
-        key = 'driver-test:' + crypto.randomUUID()
+        key = namespaces.key('driver-test:')
       await client.connect()
       const options = client.options,
         driver = ioredisDriver(client)
@@ -153,7 +154,7 @@ for (const [name, url] of services)
     })
     it('ioredis reuses its dedicated connections instead of opening one per operation', async () => {
       const client = new Redis(url, { lazyConnect: true }),
-        key = 'driver-reuse:' + crypto.randomUUID()
+        key = namespaces.key('driver-reuse:')
       await client.connect()
       const driver = ioredisDriver(client)
       /** Server-side ids of the dedicated connections the driver handed to callbacks. */
@@ -177,7 +178,7 @@ for (const [name, url] of services)
     })
     it('node-redis retains native execution evidence and the borrowed pool', async () => {
       const pool = createClientPool({ url }, { minimum: 1, maximum: 3 }),
-        key = 'driver-test:' + crypto.randomUUID()
+        key = namespaces.key('driver-test:')
       await pool.connect()
       try {
         await exercise(nodeRedisDriver(pool), key)

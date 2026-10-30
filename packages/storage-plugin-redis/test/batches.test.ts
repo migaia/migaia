@@ -13,6 +13,7 @@ import { redisRateLimitFeature } from '../src/features/rate-limit.ts'
 import { redisPubSubFeature } from '../src/features/pubsub.ts'
 import { rediSearchVectorFeature } from '../src/features/search.ts'
 import { createRedisLayout } from '../src/layout.ts'
+import { namespaces } from './helpers/namespaces.ts'
 
 /** Every physical renderer consumes the same original canonical namespace and org key owner. */
 it('keeps default, empty, brace and Unicode namespaces in one exact nonempty native hash tag', () => {
@@ -130,7 +131,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
     it('preserves a recreated point while pruning an observed missing ordered member', async () => {
       if (!pool.isOpen) await pool.connect()
       const original = nodeRedisDriver(pool),
-        prefix = crypto.randomUUID(),
+        prefix = namespaces.prefix(),
         org = createOrgId(),
         layout = createRedisLayout(prefix, org),
         physical = layout.value('text', 'recreated'),
@@ -221,7 +222,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
       const host = await createStorageHost({
         plugins: [
           storageProbe(),
-          redisBackendPlugin({ driver, prefix: crypto.randomUUID() }),
+          redisBackendPlugin({ driver, prefix: namespaces.prefix() }),
           counting
         ] as const,
         report: (cause) => {

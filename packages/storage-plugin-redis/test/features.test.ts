@@ -13,6 +13,7 @@ import { redisPubSubFeature } from '../src/features/pubsub.ts'
 import { redisSortedSetsFeature } from '../src/features/sorted-sets.ts'
 import { redisRateLimitFeature } from '../src/features/rate-limit.ts'
 import { createRedisLayout } from '../src/layout.ts'
+import { namespaces } from './helpers/namespaces.ts'
 
 /** All native feature fixtures use fresh same-slot namespaces on actual services. */
 for (const url of [
@@ -51,7 +52,7 @@ for (const url of [
       const host = await createStorageHost({
         plugins: [
           redisBackendPlugin(
-            { driver: observed, prefix: crypto.randomUUID() },
+            { driver: observed, prefix: namespaces.prefix() },
             { pubsub: redisPubSubFeature() }
           )
         ] as const
@@ -74,7 +75,7 @@ for (const url of [
     })
     it('drops historical native business keys without selecting their Features after reopening', async () => {
       if (!pool.isOpen) await pool.connect()
-      const prefix = crypto.randomUUID(),
+      const prefix = namespaces.prefix(),
         a = createOrgId(),
         b = createOrgId(),
         layoutA = createRedisLayout(prefix, a),
@@ -171,7 +172,7 @@ for (const url of [
             return {}
           }
         })),
-        prefix = crypto.randomUUID(),
+        prefix = namespaces.prefix(),
         host = await createStorageHost({
           plugins: [
             stage,

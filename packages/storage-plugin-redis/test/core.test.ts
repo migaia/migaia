@@ -4,6 +4,7 @@ import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { counter, kv, records, ttl } from '@migaia/storage-contract'
 import { redisBackendPlugin } from '../src/index.ts'
 import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
+import { namespaces } from './helpers/namespaces.ts'
 
 /** Native fixtures own their clients and a unique namespace; no unrelated key is modified. */
 for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL]) {
@@ -44,7 +45,7 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
                 return {}
               }
             })),
-            redisBackendPlugin({ driver: observed, prefix: crypto.randomUUID() })
+            redisBackendPlugin({ driver: observed, prefix: namespaces.prefix() })
           ] as const
         }),
         store = host.backend('redis')

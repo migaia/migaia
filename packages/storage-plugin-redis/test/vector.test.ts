@@ -12,6 +12,7 @@ import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
 import { ioredisDriver } from '../src/adapters/ioredis.ts'
 import { createRedisLayout } from '../src/layout.ts'
 import { vectorNames } from '../src/vector-protocol.ts'
+import { namespaces } from './helpers/namespaces.ts'
 
 /** Every native vector fixture owns its complete namespace and only cleans those physical keys. */
 for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
@@ -21,8 +22,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
       const pool = createClientPool({ url }, { maximum: 8 }),
         client = new Redis(url!, { lazyConnect: true }),
         driver = adapter === 'node' ? nodeRedisDriver(pool) : ioredisDriver(client),
-        hosts: { dispose(): Promise<void> }[] = [],
-        namespaces: string[] = []
+        hosts: { dispose(): Promise<void> }[] = []
       let connected = false
       const create = async (
         observe?: (commands: Parameters<IRedisConnection['exec']>[0]) => void,
@@ -58,7 +58,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
               })
             )
         }
-        const prefix = crypto.randomUUID(),
+        const prefix = namespaces.prefix(),
           host = await createStorageHost({
             plugins: [
               redisBackendPlugin(
@@ -71,31 +71,10 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
             ] as const
           })
         hosts.push(host)
-        namespaces.push(prefix)
         return { host, store: host.backend('redis'), prefix }
       }
       afterAll(async () => {
         for (const host of hosts) await host.dispose()
-        if (connected)
-          for (const prefix of namespaces) {
-            const tag = createRedisLayout(prefix, crypto.randomUUID()).tag,
-              indexes = (await driver.command(['FT._LIST'])) as string[]
-            for (const index of indexes)
-              if (index.startsWith(tag + ':vi:')) await driver.command(['FT.DROPINDEX', index])
-            let cursor = '0'
-            do {
-              const reply = (await driver.command([
-                'SCAN',
-                cursor,
-                'MATCH',
-                tag + ':*',
-                'COUNT',
-                '256'
-              ])) as [string, string[]]
-              cursor = reply[0]
-              if (reply[1].length) await driver.command(['DEL', ...reply[1]])
-            } while (cursor !== '0')
-          }
         if (pool.isOpen) await pool.close()
         if (client.status !== 'end') client.disconnect()
       })
@@ -232,7 +211,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
       it('ranks only after the index background scan finishes, so fresh points are never missed', async () => {
         if (!connected) await create()
         /** Unrelated keys make the scans started by FT.CREATE and FT.ALTER last several seconds. */
-        const filler = 'vector-scan-filler:' + crypto.randomUUID()
+        const filler = namespaces.key('vector-scan-filler:')
         for (let offset = 0; offset < 100000; offset += 5000)
           await driver.withConnection((connection) =>
             connection.exec(
@@ -267,14 +246,13 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
               })
             )
         }
-        const prefix = crypto.randomUUID()
+        const prefix = namespaces.prefix()
         const host = await createStorageHost({
           plugins: [
             redisBackendPlugin({ driver: observed, prefix }, { vector: rediSearchVectorFeature() })
           ] as const
         })
         hosts.push(host)
-        namespaces.push(prefix)
         try {
           const collection = host
             .backend('redis')
@@ -329,14 +307,13 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
               })
             )
         }
-        const prefix = crypto.randomUUID()
+        const prefix = namespaces.prefix()
         const host = await createStorageHost({
           plugins: [
             redisBackendPlugin({ driver: observed, prefix }, { vector: rediSearchVectorFeature() })
           ] as const
         })
         hosts.push(host)
-        namespaces.push(prefix)
         const collection = host
           .backend('redis')
           .use(vector)
@@ -363,6 +340,12 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
           collection = store
             .use(vector)
             .collection('deadlines', { dimensions: 2, metric: 'euclid' })
+        /**
+         * Create the index and let its background keyspace scan finish before any deadline is
+         * written; on Redis 8 that scan grows with the whole keyspace and would otherwise eat into
+         * the TTL window measured below.
+         */
+        expect(await collection.near([0, 0], { exact: true }).topK(1).all()).toEqual([])
         await collection.upsert(
           ['extend', 'persist', 'control', 'overwrite'].map((id) => ({
             id,
@@ -552,7 +535,7 @@ for (const url of [process.env.MIGAIA_VALKEY_URL]) {
           autoDetect: false,
           plugins: [
             redisBackendPlugin(
-              { driver, prefix: crypto.randomUUID() },
+              { driver, prefix: namespaces.prefix() },
               { search: rediSearchVectorFeature() }
             )
           ] as const
@@ -601,7 +584,7 @@ it.skipIf(!process.env.MIGAIA_REDIS_STACK_URL)(
         createStorageHost({
           plugins: [
             redisBackendPlugin(
-              { driver, prefix: crypto.randomUUID() },
+              { driver, prefix: namespaces.prefix() },
               { search: rediSearchVectorFeature() }
             )
           ] as const

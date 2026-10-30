@@ -26,6 +26,7 @@ import { rediSearchVectorFeature } from '../src/features/search.ts'
 import { redisStreamsFeature } from '../src/features/streams.ts'
 import { redisPubSubFeature } from '../src/features/pubsub.ts'
 import { createRedisLayout, decodeRedisValue } from '../src/layout.ts'
+import { namespaces } from './helpers/namespaces.ts'
 
 /** Real logger plugins retain their own durable owner and remain borrowed by storage. */
 const loggerOptions = {
@@ -45,17 +46,15 @@ for (const service of [
   const url = process.env[service]
   describe.skipIf(!url)(service + ' commit-only journal', () => {
     const pool = createClientPool({ url }, { maximum: 8 }),
-      driver = nodeRedisDriver(pool),
-      namespaces: string[] = []
+      driver = nodeRedisDriver(pool)
     const connect = async () => {
       if (!pool.isOpen) await pool.connect()
     }
     it('shares the current private log head across independent handles and reopen', async () => {
       await connect()
       const { redisBackendPlugin: backend } = await import('@migaia/storage-plugin-redis')
-      const prefix = crypto.randomUUID(),
+      const prefix = namespaces.prefix(),
         org = createOrgId()
-      namespaces.push(prefix)
       const first = await createStorageHost({
           org,
           plugins: [storageJournalPlugin(), backend({ driver, prefix })]
@@ -134,27 +133,6 @@ for (const service of [
     })
     afterAll(async () => {
       if (pool.isOpen) {
-        for (const prefix of namespaces) {
-          const tag = createRedisLayout(prefix, crypto.randomUUID()).tag
-          if (service !== 'MIGAIA_VALKEY_URL') {
-            const indexes = (await driver.command(['FT._LIST'])) as string[]
-            for (const index of indexes)
-              if (index.startsWith(tag + ':vi:')) await driver.command(['FT.DROPINDEX', index])
-          }
-          let cursor = '0'
-          do {
-            const reply = (await driver.command([
-              'SCAN',
-              cursor,
-              'MATCH',
-              tag + ':*',
-              'COUNT',
-              '256'
-            ])) as [string, string[]]
-            cursor = reply[0]
-            if (reply[1].length) await driver.command(['DEL', ...reply[1]])
-          } while (cursor !== '0')
-        }
         await pool.close()
       }
     })
@@ -162,12 +140,11 @@ for (const service of [
       await connect()
       /** The existing backend fixture borrows one real entry observation registration. */
       const observer = new StorageLogObserver()
-      const prefix = crypto.randomUUID(),
+      const prefix = namespaces.prefix(),
         entries = observer.entries,
         logger = createLogHost({ ...loggerOptions, plugins: [levelPlugin(), observer] }),
         entered = deferred<void>(),
         resume = deferred<void>()
-      namespaces.push(prefix)
       const host = await createStorageHost({
         plugins: [
           storageJournalPlugin({ logger, namespace: 'telemetry', telemetry: true }),
@@ -284,9 +261,8 @@ for (const service of [
     })
     it('retains ordered staged values and TTL changes in the committed binlog', async () => {
       await connect()
-      const prefix = crypto.randomUUID(),
+      const prefix = namespaces.prefix(),
         logger = createJournalLogger()
-      namespaces.push(prefix)
       const host = await createStorageHost({
         plugins: [
           storageJournalPlugin({ logger, namespace: 'ordered', binlogValues: true }),
@@ -354,11 +330,10 @@ for (const service of [
     })
     it('publishes actual ordered drafts per org only after full EXEC and awaits external settle', async () => {
       await connect()
-      const prefix = crypto.randomUUID(),
+      const prefix = namespaces.prefix(),
         loggers = new Map<string, ReturnType<typeof createJournalLogger>>(),
         entered = deferred<void>(),
         resume = deferred<void>()
-      namespaces.push(prefix)
       let pause = false
       const host = await createStorageHost({
         plugins: [
@@ -473,10 +448,9 @@ for (const service of [
     if (service !== 'MIGAIA_VALKEY_URL')
       it('captures complete HASH facts and logs historical org removal without selecting Search again', async () => {
         await connect()
-        const prefix = crypto.randomUUID(),
+        const prefix = namespaces.prefix(),
           orgId = createOrgId(),
           logger = createJournalLogger()
-        namespaces.push(prefix)
         const options = { logger, namespace: 'vector', binlogValues: true }
         const host = await createStorageHost({
           plugins: [
@@ -532,7 +506,7 @@ for (const service of [
     for (const outcome of ['partial', 'unknown'] as const)
       it('does not publish or replay an ' + outcome + ' EXEC', async () => {
         await connect()
-        const prefix = crypto.randomUUID(),
+        const prefix = namespaces.prefix(),
           org = createOrgId(),
           layout = createRedisLayout(prefix, org),
           logger = createLogHost({
@@ -540,7 +514,6 @@ for (const service of [
             plugins: [binlogPlugin({ store: memoryLogStore() })] as const
           }),
           failure = new RangeError('lost native EXEC evidence')
-        namespaces.push(prefix)
         let executions = 0
         const injected: IRedisDriver = {
           ...driver,
@@ -620,7 +593,7 @@ for (const service of [
                 namespace: 'unsupported',
                 ...(choice === 'atomic' ? { atomicBinlog: { redis: records } } : {})
               }),
-              redisBackendPlugin({ driver: observed, prefix: crypto.randomUUID() })
+              redisBackendPlugin({ driver: observed, prefix: namespaces.prefix() })
             ] as const
           }).then(
             () => undefined,

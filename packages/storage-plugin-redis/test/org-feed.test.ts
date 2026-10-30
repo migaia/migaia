@@ -7,6 +7,7 @@ import { redisBackendPlugin } from '../src/index.ts'
 import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
 import { redisChangeStreamFeature } from '../src/features/change-stream.ts'
 import { createRedisLayout, encodeRedisValue } from '../src/layout.ts'
+import { namespaces } from './helpers/namespaces.ts'
 
 /** Explicit default-org projections remain scoped, even though the root observes the shared Stream. */
 for (const url of [
@@ -17,7 +18,7 @@ for (const url of [
   describe.skipIf(!url)('organization feed ownership', () => {
     it('retains a quiet org history while another org exceeds the stream length', async () => {
       const pool = createClientPool({ url }, { maximum: 8 }),
-        prefix = crypto.randomUUID()
+        prefix = namespaces.prefix()
       await pool.connect()
       const driver = nodeRedisDriver(pool),
         host = await createStorageHost({
@@ -67,7 +68,7 @@ for (const url of [
 
     it('keeps default and two other orgs isolated in replay and confirmed tail delivery', async () => {
       const pool = createClientPool({ url }, { maximum: 8 }),
-        prefix = crypto.randomUUID()
+        prefix = namespaces.prefix()
       await pool.connect()
       const driver = nodeRedisDriver(pool),
         host = await createStorageHost({

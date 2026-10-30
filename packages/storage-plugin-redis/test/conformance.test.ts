@@ -10,6 +10,7 @@ import { ioredisDriver } from '../src/adapters/ioredis.ts'
 import { createRedisLayout } from '../src/layout.ts'
 import { redisCapabilities } from '../src/types.ts'
 import { redisChangeStreamFeature } from '../src/features/change-stream.ts'
+import { namespaces } from './helpers/namespaces.ts'
 
 /** Each canonical case receives an empty namespace and only its own native keys are removed. */
 for (const [service, url] of [
@@ -60,7 +61,7 @@ for (const [service, url] of [
           capabilities: [kv, records, ttl, counter, durableChangeFeed],
           features: redisCapabilities,
           async create() {
-            const prefix = crypto.randomUUID(),
+            const prefix = namespaces.prefix(),
               host = await createStorageHost({
                 plugins: [
                   redisBackendPlugin(

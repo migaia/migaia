@@ -7,40 +7,19 @@ import { deferred, sleep } from '@migaia/utils/promise'
 import { redisBackendPlugin, type IRedisDriver } from '../src/index.ts'
 import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
 import { createRedisLayout } from '../src/layout.ts'
+import { namespaces } from './helpers/namespaces.ts'
 
 /** These finite native lifecycle cases own only fresh namespaces and borrowed genuine clients. */
 for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
   const url = process.env[service]
   describe.skipIf(!url)(service + ' native lifecycle', () => {
     const pool = createClientPool({ url }, { maximum: 8 }),
-      driver = nodeRedisDriver(pool),
-      prefixes: string[] = []
+      driver = nodeRedisDriver(pool)
     const connect = async () => {
       if (!pool.isOpen) await pool.connect()
     }
-    const prefix = () => {
-      const value = crypto.randomUUID()
-      prefixes.push(value)
-      return value
-    }
     afterAll(async () => {
       if (!pool.isOpen) return
-      for (const value of prefixes) {
-        const tag = createRedisLayout(value, crypto.randomUUID()).tag
-        let cursor = '0'
-        do {
-          const reply = (await driver.command([
-            'SCAN',
-            cursor,
-            'MATCH',
-            tag + ':*',
-            'COUNT',
-            '256'
-          ])) as [string, string[]]
-          cursor = reply[0]
-          if (reply[1].length) await driver.command(['DEL', ...reply[1]])
-        } while (cursor !== '0')
-      }
       await pool.close()
     })
     it('rejects a pre-EXEC abort without sending a batch or leaving its isolated lease', async () => {
@@ -62,7 +41,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
         host = await createStorageHost({
           plugins: [
             storageProbe(),
-            redisBackendPlugin({ driver: observed, prefix: prefix() })
+            redisBackendPlugin({ driver: observed, prefix: namespaces.prefix() })
           ] as const
         }),
         controller = new AbortController()
@@ -85,7 +64,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
     })
     it('drains one admitted transaction before closing and keeps the root client borrowed', async () => {
       await connect()
-      const value = prefix(),
+      const value = namespaces.prefix(),
         org = createOrgId(),
         entered = deferred<void>(),
         resume = deferred<void>(),
@@ -125,7 +104,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
     })
     it('uses Redis time and preserves a successor lock when the first lease expires', async () => {
       await connect()
-      const value = prefix(),
+      const value = namespaces.prefix(),
         org = createOrgId(),
         entered = deferred<void>(),
         resume = deferred<void>(),
@@ -215,7 +194,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
         host = await createStorageHost({
           plugins: [
             storageProbe(),
-            redisBackendPlugin({ driver: observed, prefix: prefix() })
+            redisBackendPlugin({ driver: observed, prefix: namespaces.prefix() })
           ] as const
         }),
         store = host.backend('redis')
