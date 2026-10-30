@@ -93,12 +93,12 @@ const browserBaselineCommit = '4af04a168f09a4c852fbd94e7f8f6c2d3f335a03'
 const browserBundleOptimizationTarget = 1.15
 /**
  * User-approved ceilings retain exactly 2% headroom above the measured bundle. The current values
- * were raised a second time to accept shared plugin-host, capability and event-subscriber growth
- * from their owner-split refactors, measured at 721970 minified / 173539 gzip bytes.
+ * were raised a third time to accept the entity-as-plugin refactor (native entity feature records,
+ * install-time role assembly and revocation guards), measured at 734710 minified / 177408 gzip bytes.
  */
 const browserBundleHardCeiling = {
-  minified: { current: 736410, baseline: 551293 },
-  gzip: { current: 177010, baseline: 132349 }
+  minified: { current: 749404, baseline: 551293 },
+  gzip: { current: 180956, baseline: 132349 }
 } as const
 /** Selected backend plus one entity where/select/all query, with owning cleanup. */
 const browserQueryEntry = [
