@@ -208,3 +208,26 @@ it('keeps native stderr on the selected log and unsubscribes it before physical 
     byte.mockRestore()
   }
 })
+
+/** Admission of one request and one notification through a process host with these roots. */
+async function echoThrough(
+  features: NonNullable<Parameters<typeof processPlugin>[0]['features']>
+): Promise<void> {
+  const host = await createRpcHost({
+    self: { name: 'flow-root-parent', instanceId: 'flow-root-parent' },
+    plugins: [processPlugin({ spawn: { entry: child }, features })]
+  })
+  try {
+    expect(await host.process.request('echo', 7)).toBe(7)
+    await host.process.notify('echo', 'notified')
+  } finally {
+    await host.close()
+  }
+}
+
+it('routes writes through a root flow-control feature with and without a send queue', async () => {
+  /** One shared admission owner is both a root and the queue's declared dependency. */
+  const admission = flow.flowControlFeature({ maxPendingData: 4 })
+  await echoThrough({ admission })
+  await echoThrough({ admission, queue: queueFeature({ flow: admission }) })
+})
