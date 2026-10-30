@@ -1,3 +1,4 @@
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import { entityHost } from '../helpers/memory.ts'
 import type { IMemoryBackendWithChangeFeed } from '../helpers/memory.ts'
 import type { IStorageBorrowedBackend } from '../../src/types.ts'
@@ -110,4 +111,20 @@ it('keeps transaction scopes free of native watch and preserves strict page admi
     expect.objectContaining({ code: 'QUERY_NOT_PUSHABLE' })
   )
   expect(await store.get('watch-owner')).toBe('same transaction')
+})
+
+it('exposes the guarded watcher protocol and rejects advances after entity removal', async () => {
+  /** This actual storage host owns the entity installation for this test scope. */
+  const watchHost = await entityHost(definitionEntityPlugin)
+  const store = await memoryBackend()
+  const repo = watchHost.extensions[definitionEntityPlugin.id](store)
+  /** Early return and symbolic disposal reach the borrowed native watcher. */
+  const early = repo.query().where({ group: 'one' }).watch()
+  await early.return?.(undefined)
+  await early[asyncDisposeKey]()
+  /** A watcher retained across removal rejects every later advance and closes its source once. */
+  const retained = repo.query().where({ group: 'one' }).watch()
+  await watchHost.unUse(definitionEntityPlugin.id)
+  await expect(retained.next()).rejects.toMatchObject({ code: 'ABORTED' })
+  await expect(retained.next()).rejects.toMatchObject({ code: 'ABORTED' })
 })

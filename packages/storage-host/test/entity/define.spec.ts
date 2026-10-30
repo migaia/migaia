@@ -463,3 +463,61 @@ describe('defineEntityPlugin runtime contract', () => {
     await expect(entityHost(admission9EntityPlugin)).resolves.toBeDefined()
   })
 })
+
+describe('defineEntityPlugin feature record admission', () => {
+  it('rejects an array feature record at definition with the native cause attached', () => {
+    expect(() =>
+      defineEntityPlugin<{ id: string }>()('entity-define-array-record', {
+        name: 'array-record',
+        key: 'id',
+        features: [entityQueryFeature()]
+      } as never)
+    ).toThrow(
+      expect.objectContaining({
+        code: StorageHostErrorCode.invalidConfig,
+        cause: expect.objectContaining({ cause: expect.anything() })
+      })
+    )
+  })
+
+  it('rejects a duplicate role at installation without a native cause', async () => {
+    const duplicateEntityPlugin = defineEntityPlugin<{ id: string }>()('entity-define-dup-role', {
+      name: 'dup-role',
+      key: 'id',
+      features: { a: entityQueryFeature(), b: entityQueryFeature() }
+    })
+    await expect(entityHost(duplicateEntityPlugin).catch(walkErrorCauses)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: StorageHostErrorCode.invalidConfig })
+      ])
+    )
+  })
+
+  it('snapshots indexes through the unique role alone and requires it for unique indexes', async () => {
+    const uniqueOnlyEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'entity-define-unique-only',
+      {
+        name: 'unique-only',
+        key: 'id',
+        indexes: { email: { path: 'email', unique: true } },
+        features: { unique: entityUniqueFeature() }
+      }
+    )
+    const host = await entityHost(uniqueOnlyEntityPlugin)
+    await host.dispose()
+    const missingUniqueEntityPlugin = defineEntityPlugin<{ id: string; email: string }>()(
+      'entity-define-missing-unique',
+      {
+        name: 'missing-unique',
+        key: 'id',
+        indexes: { email: { path: 'email', unique: true } },
+        features: { indexes: entityIndexesFeature() }
+      }
+    )
+    await expect(entityHost(missingUniqueEntityPlugin).catch(walkErrorCauses)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: StorageHostErrorCode.entityFeatureRequired })
+      ])
+    )
+  })
+})

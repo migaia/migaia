@@ -1,3 +1,4 @@
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import { walkErrorCauses } from '@migaia/utils/error'
 import {
   entityHost as sourceEntityHost,
@@ -599,3 +600,38 @@ describe('explicit entity assembly', () => {
     )
   })
 })
+
+/** A retained non-transaction query stream exposes its resource protocol and closes on revocation. */
+async function retainedQueryStreamProtocol(): Promise<void> {
+  const store = await memoryBackend()
+  const streamEntityPlugin = defineEntityPlugin<IRow>()('stream-protocol-entity', {
+    name: 'stream-protocol-entity',
+    key: 'id',
+    features: { reads: entityQueryFeature() }
+  })
+  const host = await entityHost(streamEntityPlugin)
+  const repository = host.extensions[streamEntityPlugin.id](store)
+  await repository.put({ id: 'a', group: 'one' })
+  await repository.put({ id: 'b', group: 'two' })
+  /** Early return and both disposal forms reach the guarded original iterator. */
+  const early = repository.query().stream()
+  expect(await early.next()).toMatchObject({ done: false })
+  await early.return?.(undefined)
+  await early.dispose()
+  await early[asyncDisposeKey]()
+  /** Repository streams keep their own symbolic disposal channel. */
+  const direct = repository.stream()
+  await direct[asyncDisposeKey]()
+  /** A stream opened before removal rejects every later advance and closes its source once. */
+  const retained = repository.query().stream()
+  expect(await retained.next()).toMatchObject({ done: false })
+  await host.unUse(streamEntityPlugin.id)
+  await expect(retained.next()).rejects.toMatchObject({ code: 'ABORTED' })
+  await expect(retained.next()).rejects.toMatchObject({ code: 'ABORTED' })
+  await store.dispose()
+}
+
+it(
+  'A8 exposes the guarded stream protocol and closes it on revocation',
+  retainedQueryStreamProtocol
+)
