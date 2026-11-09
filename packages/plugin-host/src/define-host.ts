@@ -1,3 +1,10 @@
+import type {
+  IHostHandle,
+  IDefineHostOptions,
+  IInstalledPipelineMode
+} from './host-selection-types.ts'
+export type { IHostHandle, IDefineHostOptions } from './host-selection-types.ts'
+import type { IHostModule } from './module-runtime.ts'
 /**
  * Owns defineHost public types and construction; runtime hooks and bound surface callables have
  * separate explicit owners.
@@ -6,11 +13,11 @@ import { HostSurfaceKey } from './host-constants.ts'
 import { DefinedHostRuntime } from './defined-host-runtime.ts'
 import { DefinedHostSurface, type IHandleReference } from './host-handle-surface.ts'
 import type { IPipelineDefinitions, IPipelineOwner } from './pipeline-spec.ts'
-import { identifyPluginHostCallbackFailure } from './error-text.ts'
+import { identifyPluginHostCallbackFailure } from './errors.ts'
 
 import { aliasManagedHost } from './composition.ts'
 
-import type { PluginHostError } from './error-text.ts'
+import type { PluginHostError } from './errors.ts'
 import { issueHostIdentity } from './host-identity.ts'
 import { type IPluginHostIdentity } from './host-identity-types.ts'
 import type {
@@ -88,7 +95,7 @@ type IHostSurfaceOperations<
   TValue,
   TPipelines extends IPipelineDefinitions
 > = Pick<
-  IHostHandle<TDomainCore, TValue, readonly [], Record<never, never>, TPipelines>,
+  ICompleteHostHandle<TDomainCore, TValue, readonly [], Record<never, never>, TPipelines>,
   'use' | 'unUse'
 >
 
@@ -100,18 +107,20 @@ type IHostSurfaceFactory<
   TPipelines extends IPipelineDefinitions
 > = (native: IHostSurfaceOperations<TDomainCore, TValue, TPipelines>) => TPublicSurface & {
   readonly [K in Exclude<
-    keyof IHostHandle<Record<string, never>, never, readonly []>,
+    keyof ICompleteHostHandle<Record<string, never>, never, readonly []>,
     'use' | 'unUse'
   >]?: never
 }
 
 /** Construction options retain their original type axes; the final axis types borrowed mutations. */
-export type IDefineHostOptions<
+export type ICompleteDefineHostOptions<
   TDomainCore extends object,
   TPublicSurface extends object = Record<never, never>,
   TPipelines extends IPipelineDefinitions = Record<never, never>,
   TValue = never
 > = Readonly<{
+  /** Built-in capabilities; the core never imports their implementation files. */
+  readonly modules?: readonly IHostModule[]
   /**
    * Forwarded to the host unchanged; identical in shape to the class constructor's options.
    * Omission uses every Host default.
@@ -126,7 +135,7 @@ export type IDefineHostOptions<
    */
   readonly surface?:
     | (TPublicSurface & {
-        readonly [K in keyof IHostHandle<Record<string, never>, never, readonly []>]?: never
+        readonly [K in keyof ICompleteHostHandle<Record<string, never>, never, readonly []>]?: never
       })
     | IHostSurfaceFactory<TDomainCore, TValue, TPublicSurface, TPipelines>
   /** Replaces the `protected createPluginDomainCore` override; absent means an empty object. */
@@ -153,7 +162,7 @@ export type IDefineHostOptions<
  * `runPipelineSync` and `runPipelineAsync`. Handle possession expresses execution authority instead
  * of subclass access.
  */
-export type IHostHandle<
+export type ICompleteHostHandle<
   TDomainCore extends object,
   TValue,
   TInstalled extends readonly IPluginConstraint<any>[],
@@ -165,7 +174,7 @@ export type IHostHandle<
     readonly identity: IPluginHostIdentity
     /** Reversible availability controls; disabling retains resources rather than unloading. */
     readonly plugin: IPluginEnablement<
-      IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>,
+      ICompleteHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>,
       TInstalled,
       TDomainCore,
       TValue
@@ -244,19 +253,19 @@ export type IHostHandle<
     /** Adds an unowned sync stage and returns this same handle; incompatible runner modes fail. */
     usePipeline(
       stage: ISyncMiddlewareStage<TValue>
-    ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
+    ): ICompleteHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
     /** Adds an unowned async stage, subject to canonical mode lifting and execution guards. */
     useAsyncPipeline(
       stage: IAsyncMiddlewareStage<TValue>
-    ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
+    ): ICompleteHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
     /** Adds an unowned generator stage using the middleware generator-return protocol. */
     useGeneratorPipeline(
       stage: IGeneratorMiddlewareStage<TValue>
-    ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
+    ): ICompleteHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
     /** Adds an unowned async-generator stage; the Host still owns execution cancellation/leases. */
     useAsyncGeneratorPipeline(
       stage: IAsyncGeneratorMiddlewareStage<TValue>
-    ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
+    ): ICompleteHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
     /**
      * Runs the current stage snapshot; done receives the final delivered value if traversal reaches
      * it.
@@ -299,12 +308,24 @@ export type IHostHandle<
 export function defineHost<
   TDomainCore extends object = Record<string, never>,
   TValue = never,
+  const TModules extends readonly IHostModule[] = readonly [],
+  const TMode extends IInstalledPipelineMode<TModules> = never,
   TInstalled extends readonly IPluginConstraint<any>[] = readonly [],
   TPublicSurface extends object = Record<never, never>,
   const TPipelines extends IPipelineDefinitions = Record<never, never>
 >(
-  options: IDefineHostOptions<TDomainCore, TPublicSurface, TPipelines, TValue> = {}
-): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines> {
+  options?: IDefineHostOptions<TDomainCore, TModules, TMode, TPublicSurface, TPipelines, TValue>
+): IHostHandle<TDomainCore, TValue, TModules, TMode, TInstalled, TPublicSurface, TPipelines>
+
+export function defineHost<
+  TDomainCore extends object = Record<string, never>,
+  TValue = never,
+  TInstalled extends readonly IPluginConstraint<any>[] = readonly [],
+  TPublicSurface extends object = Record<never, never>,
+  const TPipelines extends IPipelineDefinitions = Record<never, never>
+>(
+  options: ICompleteDefineHostOptions<TDomainCore, TPublicSurface, TPipelines, TValue> = {}
+): ICompleteHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines> {
   /** Snapshot descriptors before acquiring a runtime; do not evaluate domain accessors. */
   let surfaceDescriptors: PropertyDescriptorMap | undefined
   /** Composition runs once after native entries exist, without exposing the mutable handle target. */
@@ -368,7 +389,7 @@ export function defineHost<
   })
   Object.freeze(handleSurface)
   aliasManagedHost(handle, runtime)
-  return handle as unknown as IHostHandle<
+  return handle as unknown as ICompleteHostHandle<
     TDomainCore,
     TValue,
     TInstalled,

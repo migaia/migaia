@@ -1,13 +1,12 @@
+import { MiddlewarePipelineErrorCode } from './error-code.ts'
+import { MIDDLEWARE_PIPELINE_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /** Owns shared signal admission, cooperative checkpoints, invocation and iterator cleanup. */
 import { admitAbortSignal, type IAbortSignal } from '@migaia/utils/promise'
 import { tryReadProperty } from '@migaia/utils/error'
 import { MiddlewarePipelineErrorText } from './error-text.ts'
-import {
-  createMiddlewarePipelineAbortCleanupError,
-  createMiddlewarePipelineAbortError,
-  createMiddlewarePipelineInvalidOptionError
-} from './errors.ts'
-import type { IMiddlewarePipelineContext } from './runtime.ts'
+import { identifyMiddlewarePipelineFailure } from './errors.ts'
+import type { IMiddlewarePipelineContext } from './runtime-types.ts'
 
 /** Invoke a terminal or generator directly, appending context only when a signal was admitted. */
 export function invokeWithContext<TFirst, TResult>(
@@ -39,7 +38,14 @@ export const snapshotStages = <TStage>(stages: readonly TStage[]): readonly TSta
 /** Reads one observed abort reason and applies the package's Error identity policy. */
 const makeAbortError = (signal: IAbortSignal): Error => {
   const read = tryReadProperty(signal, 'reason')
-  return createMiddlewarePipelineAbortError(read.threw ? read.error : read.value)
+  /** Preserve the exact observed reason; native failures retain their existing owner. */
+  const reason = read.threw ? read.error : read.value
+  if (reason instanceof Error)
+    return identifyMiddlewarePipelineFailure(reason, MiddlewarePipelineErrorCode.aborted)
+  return attachErrorIdentity(new Error(MiddlewarePipelineErrorText.aborted, { cause: reason }), {
+    source: MIDDLEWARE_PIPELINE_SOURCE,
+    code: MiddlewarePipelineErrorCode.aborted
+  })
 }
 /**
  * Frozen run context per admitted signal. A host usually passes the same signal to every run, so
@@ -64,9 +70,12 @@ export const admit = (signal: IAbortSignal | undefined): IMiddlewarePipelineCont
   }
   const admission = admitAbortSignal(signal)
   if (admission.kind === 'invalid')
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption, {
-      cause: admission.cause
-    })
+    throw attachErrorIdentity(
+      new TypeError(MiddlewarePipelineErrorText.invalidOption, {
+        cause: admission.cause
+      }),
+      { source: MIDDLEWARE_PIPELINE_SOURCE, code: MiddlewarePipelineErrorCode.invalidOption }
+    )
   if (admission.aborted) throw makeAbortError(signal)
   /** One frozen context serves every run that uses this signal. */
   const context: IMiddlewarePipelineContext = Object.freeze({ signal })
@@ -78,9 +87,12 @@ const readAborted = (signal: IAbortSignal): boolean => {
   /** Structural signals may fail on a later read; preserve that failure on the coded boundary. */
   const aborted = tryReadProperty(signal, 'aborted')
   if (aborted.threw)
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption, {
-      cause: aborted.error
-    })
+    throw attachErrorIdentity(
+      new TypeError(MiddlewarePipelineErrorText.invalidOption, {
+        cause: aborted.error
+      }),
+      { source: MIDDLEWARE_PIPELINE_SOURCE, code: MiddlewarePipelineErrorCode.invalidOption }
+    )
   return Boolean(aborted.value)
 }
 /** Rechecks cooperative cancellation between public runner transitions. */
@@ -101,7 +113,13 @@ export const cleanupSyncIterator = (
     let step = returned
     while (!step.done) step = iterator.next()
   } catch (cleanupFailure) {
-    throw createMiddlewarePipelineAbortCleanupError(abortFailure, cleanupFailure)
+    throw attachErrorIdentity(
+      new AggregateError(
+        [abortFailure, cleanupFailure],
+        MiddlewarePipelineErrorText.abortCleanupFailed
+      ),
+      { source: MIDDLEWARE_PIPELINE_SOURCE, code: MiddlewarePipelineErrorCode.abortCleanupFailed }
+    )
   }
   throw abortFailure
 }
@@ -115,7 +133,13 @@ export const cleanupAsyncIterator = async (
     let step = await iterator.return(undefined)
     while (!step.done) step = await iterator.next()
   } catch (cleanupFailure) {
-    throw createMiddlewarePipelineAbortCleanupError(abortFailure, cleanupFailure)
+    throw attachErrorIdentity(
+      new AggregateError(
+        [abortFailure, cleanupFailure],
+        MiddlewarePipelineErrorText.abortCleanupFailed
+      ),
+      { source: MIDDLEWARE_PIPELINE_SOURCE, code: MiddlewarePipelineErrorCode.abortCleanupFailed }
+    )
   }
   throw abortFailure
 }

@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../../fixtures/native-modules.ts'
 import { expect, it } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import type { IRpcDispatchContext } from '@migaia/rpc-contract/interfaces'
@@ -56,6 +57,7 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
   )
   /** Query dispatch uses the actual fixed slot, without executing another provider or claim path. */
   const flow = defineHost({
+    modules: rpcNativeTestModules,
     domainCore(request) {
       /** The genuine native request fixes this registration's execution authority. */
       const domain = rpc.domainCore(request)

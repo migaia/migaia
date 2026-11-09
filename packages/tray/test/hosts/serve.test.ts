@@ -1,3 +1,4 @@
+import { trayNativeTestModules } from '../native-modules.ts'
 import { TrayInternal } from '../../src/hosts/constants.ts'
 import { describe, expect, it } from 'vitest'
 import { defineHost } from '@migaia/plugin-host'
@@ -19,6 +20,7 @@ describe('Tray child topology', () => {
       )
       /** PluginHost owns Feature activation and the dispatcher registration. */
       const local = defineHost({
+        modules: trayNativeTestModules,
         ...rpc,
         host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       })

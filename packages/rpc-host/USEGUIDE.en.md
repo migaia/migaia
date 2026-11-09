@@ -428,3 +428,11 @@ verifyCredentials may return { principalId: nonemptyString } to lend the authent
 The six former `/features/{auth,batch,chunk,idempotency,limits,schema}` entries are removed; import their factories from `/plugins/*` or `/plugins`. `rpcHostPipelines` removes its third argument and `pipelines` output; pass the construction request to `domainCore(request)`. Transports declare their own pipelines. The following unused error codes are removed without replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`.
 
 Overridden identity fields in `onWarning` are under `data`, including only the name or instanceId items that actually conflict. Small signed buffers may be inline only without explicit `transfer`; explicit transfer still hands over and detaches the original buffer. Carrier implementations must adopt the [current manifest format](../rpc-contract/USEGUIDE.en.md#carriers-binary-and-stage-order).
+
+## Default-policy installation boundary
+
+Install `linkPolicy` and feature carriers before the first transport starts. After startup, `host.use(linkPolicy(...))` and new feature carriers reject with existing `INVALID_CONFIG` and `RPC flow hooks cannot be installed after transport startup`; rejection leaves compiled call policies unchanged. Per-call timeout/retry options and `false` overrides remain supported. Installation-rollback fixtures must install policies before startup. Native withdrawal and cleanup retain their existing lifecycle receipts.
+
+## Duplicate call-policy roles
+
+Timeout/retry roles are singular, independently of caller aliases. A duplicate in transport-local declarations or global/default policy admission rejects with `source: plugin.host`, `code: FEATURE_ROLE_CONFLICT` through the shared rule owner. Flow and transport-native role conflicts retain `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`; alias/configuration conflicts keep their existing RPC identity. No compatibility error alias is provided.

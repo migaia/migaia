@@ -1,3 +1,7 @@
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+import { featuresModule } from '@migaia/plugin-host/features'
+import { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'
+import { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'
 /** Assemble one child Tray host and its RPC exit lifetime; transport protocols stay in plugins. */
 import { defineHost } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
@@ -104,6 +108,7 @@ export async function serveChild(
   )
   /** PluginHost cleanup diagnostics retain their native errors on the configured reporter. */
   const host = defineHost({
+    modules: [featuresModule, featureDependenciesModule, namedPipelinesModule, asyncPipelineModule],
     ...rpc,
     host: {
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },

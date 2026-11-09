@@ -208,7 +208,12 @@
         "MiddlewarePipelineNext",
         "MiddlewarePipelineViolation",
         "createPipeline"
-      ]
+      ],
+      "./sync": ["syncMode"],
+      "./async": ["asyncMode"],
+      "./generator": ["generatorMode"],
+      "./async-generator": ["asyncGeneratorMode"],
+      "./admission": ["admitPipelineNext"]
     },
     "@migaia/plugin-host": {
       ".": [
@@ -221,7 +226,6 @@
         "PluginHostRegistrationLifecycle",
         "PluginHostStatus",
         "asyncDisposeKey",
-        "defineFeature",
         "defineHost",
         "definePlugin",
         "getPluginRuntimeIntegration",
@@ -231,7 +235,18 @@
         "readPluginDependencies",
         "readPluginHostDisposalProvenance"
       ],
-      "./composition": ["createView", "inspectFeatures", "isManagedHost", "openComposition"]
+      "./composition": ["createView", "inspectFeatures", "isManagedHost", "openComposition"],
+      "./features": ["defineFeature", "featuresModule", "inspectFeatures"],
+      "./feature-dependencies": ["featureDependenciesModule"],
+      "./enablement": ["enablementModule"],
+      "./activation": ["activationModule"],
+      "./named-pipelines": ["namedPipelinesModule"],
+      "./feature-overlay": ["FeatureOverlay"],
+      "./feature-overlay/notifications": ["FeatureOverlay"],
+      "./pipeline-modes/sync": ["syncPipelineModule"],
+      "./pipeline-modes/async": ["asyncPipelineModule"],
+      "./pipeline-modes/generator": ["generatorPipelineModule"],
+      "./pipeline-modes/async-generator": ["asyncGeneratorPipelineModule"]
     },
     "@migaia/reactive": {
       ".": [

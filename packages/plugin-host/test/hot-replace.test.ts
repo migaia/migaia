@@ -1,5 +1,7 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 
 /** Creates a provider with one stable feature name and a versioned output. */
 const createProvider = (version: number, installError?: Error) => {
@@ -16,7 +18,15 @@ const createProvider = (version: number, installError?: Error) => {
 
 describe('hot replacement', () => {
   it('rebinds hooks, restarts other dependents, and preserves the old provider on install failure', async () => {
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const first = createProvider(1)
@@ -56,8 +66,15 @@ describe('hot replacement', () => {
       dispose: restartedDispose
     })
     const [providerHandle] = await host.use(first, rebound, restarted)
+    /** Detached calls retain the exact generation from which they were published. */
+    const previousVersion = providerHandle.extensions.version
+    expect(previousVersion()).toBe(1)
 
     await host.replace('A', createProvider(2))
+    expect(() => previousVersion()).toThrow(
+      expect.objectContaining({ code: 'REGISTRATION_REVOKED' })
+    )
+    expect(providerHandle.extensions.version()).toBe(2)
     expect(reboundVersion).toBe(2)
     expect(rebindCalls).toBe(1)
     expect(reboundDispose).not.toHaveBeenCalled()

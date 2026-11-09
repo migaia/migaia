@@ -1,11 +1,15 @@
-import { isManagedHost, openComposition } from '../src/composition-entry.ts'
+import { nativeModules } from './native-modules.ts'
+import {
+  isManagedHost,
+  openComposition
+} from '../src/modules/feature-dependencies/composition-entry.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { mergeCleanupResults } from '@migaia/lifecycle'
 import { runInNewContext } from 'node:vm'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { defineHost, PluginHost, type IPluginHostCore } from '../src/index.ts'
-import { createView } from '../src/composition-entry.ts'
+import { createView } from '../src/modules/feature-dependencies/composition-entry.ts'
 import { PluginHostErrorCode } from '../src/error-code.ts'
 
 /** 八个托管协议方法；它们经 `openComposition` 取得，不再挂在宿主实例上。 */
@@ -24,7 +28,22 @@ const hostOptions = {
   execution: { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
 }
 
-class ManagedStageHost extends PluginHost<Record<string, never>, string> {
+class ManagedStageHost extends PluginHost<
+  Record<string, never>,
+  string,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   /** Executes the current pipeline and exposes its final value to the test fixture. */
   async run(value: string): Promise<string> {
     let result = value
@@ -561,7 +580,11 @@ describe('managed host', () => {
   })
 
   it('returns a usable port for a defineHost handle', async () => {
-    const host = defineHost({ host: hostOptions })
+    const host = defineHost({
+      modules: nativeModules,
+
+      host: hostOptions
+    })
     expect(isManagedHost(host)).toBe(true)
     const composition = openComposition(host)
     const slot = composition.createDataOrderSlot('probe')
@@ -590,7 +613,11 @@ describe('protocol removed from host surface', () => {
   })
 
   it('keeps all eight managed methods off a defineHost handle as well', async () => {
-    const host = defineHost({ host: hostOptions })
+    const host = defineHost({
+      modules: nativeModules,
+
+      host: hostOptions
+    })
     for (const method of MANAGED_PROTOCOL)
       expect((host as unknown as Record<string, unknown>)[method]).toBeUndefined()
     const composition = openComposition(host) as unknown as Record<string, unknown>

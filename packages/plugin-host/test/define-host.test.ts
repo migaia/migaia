@@ -1,9 +1,14 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { defineHost, definePlugin, type IHostDomainCoreRequest } from '../src/index.ts'
-import { isManagedHost, openComposition } from '../src/composition-entry.ts'
+import {
+  isManagedHost,
+  openComposition
+} from '../src/modules/feature-dependencies/composition-entry.ts'
 import { readHostIdentity } from '../src/host-identity.ts'
 
 const hostOptions = {
+  pipeline: { mode: 'sync' as const },
   execution: { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
 }
 
@@ -16,6 +21,8 @@ describe('defineHost', () => {
     let borrowed: object | undefined
     /** Replacing use changes only its public return contract; installation stays native. */
     const host = defineHost({
+      modules: nativeModules,
+
       host: hostOptions,
       surface: (native) => {
         borrowed = native
@@ -60,10 +67,14 @@ describe('defineHost', () => {
       }
     }
     /** The original defineHost path still owns identity, composition and all lifecycle state. */
-    const host = defineHost<Record<never, never>, number, readonly [], typeof surface>({
-      host: hostOptions,
-      surface
-    })
+    const host = defineHost<
+      Record<never, never>,
+      number,
+      typeof nativeModules,
+      'sync',
+      readonly [],
+      typeof surface
+    >({ modules: nativeModules, host: hostOptions, surface })
     try {
       expect(isManagedHost(host)).toBe(true)
       expect(Object.isFrozen(host)).toBe(true)
@@ -79,10 +90,18 @@ describe('defineHost', () => {
   })
 
   it('rejects an empty identity label and admits only identities issued for an exact Host', async () => {
-    expect(() => defineHost({ host: { ...hostOptions, identity: { name: '' } } })).toThrow(
-      expect.objectContaining({ source: 'plugin.host', code: 'INVALID_OPTION' })
-    )
-    const host = defineHost({ host: hostOptions })
+    expect(() =>
+      defineHost({
+        modules: nativeModules,
+
+        host: { ...hostOptions, identity: { name: '' } }
+      })
+    ).toThrow(expect.objectContaining({ source: 'plugin.host', code: 'INVALID_OPTION' }))
+    const host = defineHost({
+      modules: nativeModules,
+
+      host: hostOptions
+    })
     try {
       expect(readHostIdentity(host)).toBe(host.identity)
       for (const value of [null, undefined, 'DEFAULT', 0, () => undefined, {}])
@@ -95,7 +114,11 @@ describe('defineHost', () => {
 
   it('keeps dry-run removal observational and preserves cleanup causes', async () => {
     /** A dry-run reaches the same dependency owner without releasing the live registration. */
-    const host = defineHost({ host: hostOptions })
+    const host = defineHost({
+      modules: nativeModules,
+
+      host: hostOptions
+    })
     const [registered] = await host.use(plugin('planned'))
     const revision = host.revision
     const plan = await host.unUse('planned', { dryRun: true })
@@ -107,7 +130,11 @@ describe('defineHost', () => {
 
     /** Functional disposal reports the same original resource failure without rerunning cleanup. */
     const original = new RangeError('functional-host cleanup failure')
-    const failing = defineHost({ host: hostOptions })
+    const failing = defineHost({
+      modules: nativeModules,
+
+      host: hostOptions
+    })
     await failing.use(
       definePlugin({
         name: 'cleanup',
@@ -129,7 +156,9 @@ describe('defineHost', () => {
 
   it('keeps owner pipeline dispatch, synchronous registration and snapshots on the original runtime', async () => {
     /** The functional owner uses the same registration transaction and revision as the class. */
-    const sync = defineHost<Record<string, never>, number>({
+    const sync = defineHost<Record<string, never>, number, typeof nativeModules, 'sync'>({
+      modules: nativeModules,
+
       host: { ...hostOptions, pipeline: { mode: 'sync' } }
     })
     try {
@@ -150,7 +179,9 @@ describe('defineHost', () => {
     }
     /** All supported modes retain their original completion and same handle chaining. */
     for (const mode of ['async', 'generator', 'async-generator'] as const) {
-      const host = defineHost<Record<string, never>, number>({
+      const host = defineHost<Record<string, never>, number, typeof nativeModules, typeof mode>({
+        modules: nativeModules,
+
         host: { ...hostOptions, pipeline: { mode } }
       })
       try {
@@ -182,6 +213,8 @@ describe('defineHost', () => {
   it('domain core contract: one request per registration, indexed within its batch', async () => {
     const requests: IHostDomainCoreRequest[] = []
     const host = defineHost({
+      modules: nativeModules,
+
       host: hostOptions,
       domainCore: (request) => {
         requests.push(request)
@@ -206,6 +239,8 @@ describe('defineHost', () => {
   it('dispose memoized: the chain runs exactly once however often it is called', async () => {
     let entered = 0
     const host = defineHost({
+      modules: nativeModules,
+
       host: hostOptions,
       dispose: async (next) => {
         entered += 1
@@ -223,7 +258,11 @@ describe('defineHost', () => {
   })
 
   it('is a managed host on the same terms as a class instance', async () => {
-    const host = defineHost({ host: hostOptions })
+    const host = defineHost({
+      modules: nativeModules,
+
+      host: hostOptions
+    })
     expect(isManagedHost(host)).toBe(true)
     const composition = openComposition(host)
     expect(openComposition(host)).toBe(composition)

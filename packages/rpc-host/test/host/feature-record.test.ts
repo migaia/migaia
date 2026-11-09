@@ -70,7 +70,7 @@ function duplicateRolesStillFail(): void {
       features: { primary: budget, secondary: budget },
       open: openEmptyTransport
     })
-  ).toThrowError(expect.objectContaining({ code: 'FEATURE_COMBINATION_CONFLICT' }))
+  ).toThrowError(expect.objectContaining({ source: 'plugin.host', code: 'FEATURE_ROLE_CONFLICT' }))
 }
 
 /** Hand-written descriptors cannot enter a native record through structural role fields. */

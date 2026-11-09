@@ -1,3 +1,7 @@
+import { asyncMode } from '../src/modes/async.ts'
+import { syncMode } from '../src/modes/sync.ts'
+import { asyncGeneratorMode } from '../src/modes/async-generator.ts'
+import { generatorMode } from '../src/modes/generator.ts'
 import { describe, expect, it } from 'vitest'
 import {
   createPipeline,
@@ -21,7 +25,7 @@ describe('createPipeline', () => {
     sentinels[(pair + 1) % 3] = sentinels[pair]
     expect(() =>
       createPipeline({
-        mode: MiddlewarePipelineMode.generator,
+        mode: generatorMode,
         signals: { undefined: sentinels[0], halt: sentinels[1], continue: sentinels[2] }
       })
     ).toThrow(expect.objectContaining({ code: MiddlewarePipelineErrorCode.invalidOption }))
@@ -48,7 +52,7 @@ describe('createPipeline', () => {
       }
     }
     /** Public generator entry is the only admission boundary under test. */
-    const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator, signals })
+    const pipeline = createPipeline<number>({ mode: generatorMode, signals })
     continueValue = Symbol('replacement')
     /** Final values detect any accidental re-read or misclassification of the old sentinel. */
     const values: number[] = []
@@ -103,14 +107,14 @@ describe('createPipeline', () => {
     ]
 
     /** Sync runner proves the conditional result remains synchronous. */
-    const sync = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
+    const sync = createPipeline<number>({ mode: syncMode })
     /** Async runner proves the conditional result remains a Promise. */
-    const async = createPipeline<number>({ mode: MiddlewarePipelineMode.async })
+    const async = createPipeline<number>({ mode: asyncMode })
     /** Generator runner proves the conditional result remains synchronous. */
-    const generator = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })
+    const generator = createPipeline<number>({ mode: generatorMode })
     /** Async-generator runner proves the conditional result remains a Promise. */
     const asyncGenerator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.asyncGenerator
+      mode: asyncGeneratorMode
     })
     /** Compile-time and runtime sync result. */
     const syncResult: void = sync.run(syncStages, 1, (value) => values.push(value))
@@ -156,7 +160,7 @@ describe('createPipeline', () => {
 
     /** Sync pipeline under the shared activity policy. */
     const sync = createPipeline<number>({
-      mode: MiddlewarePipelineMode.sync,
+      mode: syncMode,
       assertActive: createAssertActive()
     })
     expect(() =>
@@ -178,7 +182,7 @@ describe('createPipeline', () => {
 
     /** Generator pipeline under the shared activity policy. */
     const generator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.generator,
+      mode: generatorMode,
       assertActive: createAssertActive()
     })
     expect(() =>
@@ -202,7 +206,7 @@ describe('createPipeline', () => {
 
     /** Async pipeline under the shared activity policy. */
     const async = createPipeline<number>({
-      mode: MiddlewarePipelineMode.async,
+      mode: asyncMode,
       assertActive: createAssertActive()
     })
     await expect(
@@ -226,7 +230,7 @@ describe('createPipeline', () => {
 
     /** Async-generator pipeline under the shared activity policy. */
     const asyncGenerator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.asyncGenerator,
+      mode: asyncGeneratorMode,
       assertActive: createAssertActive()
     })
     await expect(
@@ -261,7 +265,7 @@ describe('createPipeline', () => {
     let stageCalls = 0
     /** Sync pipeline used to prove signal precedence without async timing. */
     const signalPipeline = createPipeline<number>({
-      mode: MiddlewarePipelineMode.sync,
+      mode: syncMode,
       signal: creationController.signal
     })
     expect(() =>
@@ -284,7 +288,7 @@ describe('createPipeline', () => {
     const violations: string[] = []
     /** Async target owns violation reporting for lifted sync stages. */
     const async = createPipeline<number>({
-      mode: MiddlewarePipelineMode.async,
+      mode: asyncMode,
       onViolation: (kind) => violations.push(kind)
     })
     /** Sync stage deliberately violates the single-next contract. */
@@ -300,7 +304,7 @@ describe('createPipeline', () => {
     expect(async.lift(asyncStage, MiddlewarePipelineMode.async)).toBe(asyncStage)
 
     /** Sync target rejects an async source even when runtime input bypasses type safety. */
-    const sync = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
+    const sync = createPipeline<number>({ mode: syncMode })
     /** Captured unsupported-lift failure for native-type and identity assertions. */
     let unsupportedFailure: unknown
     try {
@@ -322,7 +326,7 @@ describe('createPipeline', () => {
     }
     /** Async-generator target receives the lifted generator stage. */
     const asyncGenerator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.asyncGenerator
+      mode: asyncGeneratorMode
     })
     /** Terminal values prove the promoted stage retained its first yield. */
     const values: number[] = []
@@ -341,10 +345,10 @@ describe('createPipeline', () => {
     const invalidCalls: readonly (() => unknown)[] = [
       () => createPipeline(null as never),
       () => createPipeline({ mode: 'parallel' } as never),
-      () => createPipeline({ mode: MiddlewarePipelineMode.sync, onViolation: 1 } as never),
+      () => createPipeline({ mode: syncMode, onViolation: 1 } as never),
       () =>
         createPipeline({
-          mode: MiddlewarePipelineMode.generator,
+          mode: generatorMode,
           signals: { halt: Symbol('halt') }
         } as never)
     ]
@@ -383,7 +387,7 @@ describe('createPipeline', () => {
     let combineCalls = 0
     /** Async pipeline proving a later abort does not replace downstream failure. */
     const async = createPipeline<number>({
-      mode: MiddlewarePipelineMode.async,
+      mode: asyncMode,
       signal: asyncSignal,
       combineStageAndDownstreamError: () => {
         combineCalls += 1
@@ -418,7 +422,7 @@ describe('createPipeline', () => {
     const combinedFailure = new Error('host-combined')
     /** Pipeline proving independent ordinary failures still use the host combiner once. */
     const combined = createPipeline<number>({
-      mode: MiddlewarePipelineMode.async,
+      mode: asyncMode,
       combineStageAndDownstreamError: (stage, downstream) => {
         combinedPair = [stage, downstream]
         return combinedFailure
@@ -442,7 +446,7 @@ describe('createPipeline', () => {
     expect(combinedPair).toEqual([stageFailure, independentDownstreamFailure])
 
     /** Pipeline proving default dual-failure composition preserves ordered identities. */
-    const aggregate = createPipeline<number>({ mode: MiddlewarePipelineMode.async })
+    const aggregate = createPipeline<number>({ mode: asyncMode })
     /** Captured default aggregate for code and ordered-error assertions. */
     let aggregateFailure: unknown
     try {
@@ -482,7 +486,7 @@ describe('createPipeline', () => {
       removeEventListener() {}
     }
     /** Sync pipeline proving user throw precedes post-stage abort. */
-    const sync = createPipeline<number>({ mode: MiddlewarePipelineMode.sync, signal: syncSignal })
+    const sync = createPipeline<number>({ mode: syncMode, signal: syncSignal })
     expect(() =>
       sync.run(
         [
@@ -511,7 +515,7 @@ describe('createPipeline', () => {
     }
     /** Generator pipeline proving iterator throw precedes abort. */
     const generator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.generator,
+      mode: generatorMode,
       signal: generatorSignal
     })
     expect(() =>
@@ -542,7 +546,7 @@ describe('createPipeline', () => {
     }
     /** Async-generator pipeline proving iterator rejection precedes abort. */
     const asyncGenerator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.asyncGenerator,
+      mode: asyncGeneratorMode,
       signal: asyncGeneratorSignal
     })
     await expect(
@@ -568,7 +572,7 @@ describe('createPipeline', () => {
     const combined = new Error('combined')
     /** Async runner retaining the pre-BC3 ordinary dual-failure rule. */
     const pipeline = createPipeline<number>({
-      mode: MiddlewarePipelineMode.async,
+      mode: asyncMode,
       combineStageAndDownstreamError: (stage, child) => {
         pairs.push([stage, child])
         return combined
@@ -611,7 +615,7 @@ describe('createPipeline', () => {
     let combineCalls = 0
     /** Runner for the fire-and-forget branch. */
     const pipeline = createPipeline<number>({
-      mode: MiddlewarePipelineMode.async,
+      mode: asyncMode,
       signal,
       combineStageAndDownstreamError: () => {
         combineCalls += 1
@@ -663,7 +667,7 @@ describe('createPipeline', () => {
     /** Sync terminal callback sets cancellation before throwing. */
     const syncControl = createControl()
     const sync = createPipeline<number>({
-      mode: MiddlewarePipelineMode.sync,
+      mode: syncMode,
       signal: syncControl.signal
     })
     expect(() =>
@@ -677,7 +681,7 @@ describe('createPipeline', () => {
     const asyncControl = createControl()
     let combineCalls = 0
     const async = createPipeline<number>({
-      mode: MiddlewarePipelineMode.async,
+      mode: asyncMode,
       signal: asyncControl.signal,
       combineStageAndDownstreamError: () => {
         combineCalls += 1
@@ -695,7 +699,7 @@ describe('createPipeline', () => {
     /** Generator terminal callback sets cancellation before throwing. */
     const generatorControl = createControl()
     const generator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.generator,
+      mode: generatorMode,
       signal: generatorControl.signal
     })
     expect(() =>
@@ -716,7 +720,7 @@ describe('createPipeline', () => {
     /** Async-generator terminal callback sets cancellation before rejecting. */
     const asyncGeneratorControl = createControl()
     const asyncGenerator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.asyncGenerator,
+      mode: asyncGeneratorMode,
       signal: asyncGeneratorControl.signal
     })
     await expect(
@@ -771,7 +775,7 @@ describe('createPipeline', () => {
     const syncControl = createSignal()
     /** Sync pipeline under one mutable signal. */
     const sync = createPipeline<number>({
-      mode: MiddlewarePipelineMode.sync,
+      mode: syncMode,
       signal: syncControl.signal
     })
     expect(() =>
@@ -793,7 +797,7 @@ describe('createPipeline', () => {
     const asyncControl = createSignal()
     /** Async pipeline under one mutable signal. */
     const async = createPipeline<number>({
-      mode: MiddlewarePipelineMode.async,
+      mode: asyncMode,
       signal: asyncControl.signal
     })
     await expect(
@@ -818,7 +822,7 @@ describe('createPipeline', () => {
     const generatorControl = createSignal()
     /** Generator pipeline under one mutable signal. */
     const generator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.generator,
+      mode: generatorMode,
       signal: generatorControl.signal
     })
     expect(() =>
@@ -843,7 +847,7 @@ describe('createPipeline', () => {
     const asyncGeneratorControl = createSignal()
     /** Async-generator pipeline under one mutable signal. */
     const asyncGenerator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.asyncGenerator,
+      mode: asyncGeneratorMode,
       signal: asyncGeneratorControl.signal
     })
     await expect(
@@ -879,7 +883,7 @@ describe('createPipeline', () => {
 
     /** Sync pipeline has no lower source mode to lift. */
     const sync = createPipeline<number>({
-      mode: MiddlewarePipelineMode.sync,
+      mode: syncMode,
       signal: creationSignal
     })
     sync.run([(_value, _next, context) => seen.push(context?.signal)], 1, () => undefined, {
@@ -888,7 +892,7 @@ describe('createPipeline', () => {
 
     /** Async pipeline observes both native and sync-lifted context. */
     const async = createPipeline<number>({
-      mode: MiddlewarePipelineMode.async,
+      mode: asyncMode,
       signal: creationSignal
     })
     await async.run(
@@ -909,7 +913,7 @@ describe('createPipeline', () => {
 
     /** Generator pipeline observes both native and sync-lifted context. */
     const generator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.generator,
+      mode: generatorMode,
       signal: creationSignal
     })
     generator.run(
@@ -930,7 +934,7 @@ describe('createPipeline', () => {
 
     /** Async-generator pipeline observes both native and sync-lifted context. */
     const asyncGenerator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.asyncGenerator,
+      mode: asyncGeneratorMode,
       signal: creationSignal
     })
     await asyncGenerator.run(

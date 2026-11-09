@@ -11,10 +11,8 @@ import { createRpcDevtools } from './collector/devtools.ts'
 import { CollectorText } from './collector/text.ts'
 import type { IRpcDevtools, IRpcDevtoolsOptions } from './collector-types.ts'
 
-/** Native metadata retains the caller's collector; each installed emitter has its own lifetime. */
-export type IDevtoolsPlugin = IRpcFlowPlugin &
-  Readonly<{ collector: IRpcDevtools }> &
-  Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>
+/** Caller explicitly owns the collector; the thin native plugin carries only install identity. */
+export type IDevtoolsBundle = Readonly<{ plugin: IRpcFlowPlugin; collector: IRpcDevtools }>
 
 /** The actual receiving installation owns its emitter; the caller retains the collector lifetime. */
 function setupDevtools(
@@ -31,22 +29,14 @@ function setupDevtools(
   return { observe: emitter.observe, dispose: () => emitter.dispose() }
 }
 
-/** Construct one original collector and publish its methods on the actual frozen native definition. */
-export function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin {
-  /** This caller-owned collector can aggregate several hosts without borrowing their lifetimes. */
+/** Construct separate explicit owners without attaching collector methods to a native definition. */
+export function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsBundle {
+  /** Collector can aggregate multiple hosts and retains its independent caller-owned lifetime. */
   const collector = createRpcDevtools(options)
-  return defineFlowPlugin(
-    {
-      name: CollectorText.pluginName,
-      setup: (context) => setupDevtools(collector, context)
-    },
-    {
-      collector,
-      query: collector.query,
-      watch: collector.watch,
-      stats: collector.stats,
-      describe: collector.describe,
-      close: collector.close
-    }
-  )
+  /** Each native installation creates its own actual observer/emitter state. */
+  const plugin = defineFlowPlugin({
+    name: CollectorText.pluginName,
+    setup: (context) => setupDevtools(collector, context)
+  })
+  return Object.freeze({ plugin, collector })
 }

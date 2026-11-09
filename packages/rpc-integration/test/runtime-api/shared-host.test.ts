@@ -1,7 +1,9 @@
+import { rpcNativeTestModules } from '../../../rpc-host/test/fixtures/native-modules.ts'
 /** Original shared Host business runs over genuine Process and Worker native installations. */
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { defineHost, defineFeature, definePlugin } from '@migaia/plugin-host'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { it, vi } from 'vitest'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
@@ -186,6 +188,7 @@ it('default native source retains ordinary Host calls and truthfully negotiated 
   )
   /** The same native owner declares its transport group before installation. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
@@ -247,6 +250,7 @@ it('genuine process and thread Plugin installs share one final Host provider key
   )
   /** All transport groups borrow this exact original provider and installation owner. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })

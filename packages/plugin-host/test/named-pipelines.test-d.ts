@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 /** Proves named payload/mode inference and the separation of owner and plugin authority. */
 import {
   defineHost,
@@ -10,7 +11,9 @@ import {
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
 /** Different payloads and modes must be inferred from their own construction descriptions. */
 const host = defineHost({
-  host: { execution },
+  modules: nativeModules,
+
+  host: { pipeline: { mode: 'sync' }, execution },
   pipelines: {
     count: pipelineSpec<{ count: number }>()({ mode: 'sync' }),
     text: pipelineSpec<{ text: string }>()({ mode: 'async', next: 'multiple', order: 'reverse' }),
@@ -71,16 +74,24 @@ core.pipeline('count').run({ count: 1 }, (value: { count: number }) => value)
 core.pipeline('missing')
 
 /** Existing callers with explicit old generics retain their empty named mapping. */
-const defaultOnly = defineHost<Record<string, never>, number>({ host: { execution } })
+const defaultOnly = defineHost<Record<string, never>, number, typeof nativeModules, 'sync'>({
+  modules: nativeModules,
+
+  host: { pipeline: { mode: 'sync' }, execution }
+})
 defaultOnly.usePipeline((value, next) => next(value + 1))
 // @ts-expect-error no named declaration was supplied.
 defaultOnly.pipeline('count')
 
 /** Supplying old explicit generics does not silently invent a new inferred trailing axis. */
-const explicitWithoutAxis = defineHost<Record<string, never>, number>({
-  host: { execution },
-  pipelines: { count: pipelineSpec<number>()({ mode: 'sync' }) }
-})
+const explicitWithoutAxis = defineHost<Record<string, never>, number, typeof nativeModules, 'sync'>(
+  {
+    modules: nativeModules,
+
+    host: { pipeline: { mode: 'sync' }, execution },
+    pipelines: { count: pipelineSpec<number>()({ mode: 'sync' }) }
+  }
+)
 // @ts-expect-error explicit generics require explicitly carrying the new pipeline axis too.
 explicitWithoutAxis.pipeline('count')
 
@@ -92,11 +103,15 @@ const declarations = {
 const explicitWithAxis = defineHost<
   Record<string, never>,
   number,
+  typeof nativeModules,
+  'sync',
   readonly [],
   Record<never, never>,
   typeof declarations
 >({
-  host: { execution },
+  modules: nativeModules,
+
+  host: { pipeline: { mode: 'sync' }, execution },
   pipelines: declarations
 })
 explicitWithAxis.pipeline('count').use((value, next) => next(value + 1))

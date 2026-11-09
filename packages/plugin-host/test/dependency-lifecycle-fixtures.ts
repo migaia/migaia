@@ -1,6 +1,6 @@
+import { nativeModules } from './native-modules.ts'
 /** Owns shared fixture construction; test assertions remain in their focused suites. */
 import {
-  defineFeature,
   definePlugin,
   PluginHost,
   type IPluginConstraint,
@@ -9,6 +9,7 @@ import {
   type IFeatureReference,
   type IPluginConfig
 } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 
 /** Keeps dependency scenarios independent from wall-clock lifecycle deadlines. */
 export const execution = {
@@ -21,13 +22,27 @@ export type IDiagnosticRecord = Readonly<{ message: string; code: unknown; error
 
 /** Creates an isolated host and retains diagnostics in their original reporting order. */
 export const createObservedHost = (): {
-  host: PluginHost<Record<string, never>>
+  host: PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >
   seen: IDiagnosticRecord[]
 } => {
   /** Ordered diagnostic receipt owned by this host fixture. */
   const seen: IDiagnosticRecord[] = []
   /** Host publishes its diagnostic objects directly into the receipt. */
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution,
     diagnostic: (message, code, error) => {
       seen.push({ message, code, error })
@@ -107,7 +122,22 @@ export const createRequiredPair = (
 }
 
 /** Exposes the supported constructor-time installation seam to synchronous cases. */
-export class SyncHost extends PluginHost<Record<string, never>> {
+export class SyncHost extends PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   /** Runs the synchronous installation path against the current committed registrations. */
   installNow(plugins: readonly IPluginConstraint<any>[]): unknown {
     return this.useSync(plugins)

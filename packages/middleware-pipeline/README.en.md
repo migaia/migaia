@@ -25,9 +25,10 @@
 Run directly with Node 24. Input 2 is incremented, then doubled, and the final callback receives 6. A stage uses next to commit a value for the following stages.
 
 ```ts doc-test=run
+import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
+const pipeline = createPipeline<number>({ mode: syncMode })
 pipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {
   console.log('result:', value)
 })

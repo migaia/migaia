@@ -1,6 +1,7 @@
 import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin } from '@migaia/plugin-host'
+import { definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { coroutinePlugin, type ICoroutineConnect } from '@migaia/rpc-plugin-coroutines'
 import { service, ordinaryHost, outlet, values } from './fixture.ts'

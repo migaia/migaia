@@ -1,6 +1,8 @@
+import { nativeModules } from './native-modules.ts'
 /** A rebind hook is bounded by the Host mutation budget like every other lifecycle hook. */
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 
 /** Creates the provider `A` whose Feature output changes with each version. */
 const createProvider = (version: number) =>
@@ -12,7 +14,15 @@ const createProvider = (version: number) =>
 
 describe('hung rebind hook', () => {
   it('treats an overdue rebind as failed and restarts the dependent', async () => {
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: 20, pipelineDrainTimeoutMs: false }
     })
     const first = createProvider(1)

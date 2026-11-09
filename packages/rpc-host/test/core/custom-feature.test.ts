@@ -1,12 +1,13 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original custom Feature values and lifecycle effects belong to the genuine receiving Host. */
 import {
-  defineFeature,
   defineHost,
   definePlugin,
   PluginHostErrorCode,
   type IFeatureCore
 } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { createRpcHost } from '@migaia/rpc-host'
 import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
 import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
@@ -31,6 +32,7 @@ function receivingHost(name: string) {
   )
   /** The original endpoint label now uses native identity.name; the runtime keeps its actual id. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: {
       identity: { name },

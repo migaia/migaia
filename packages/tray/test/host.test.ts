@@ -1,11 +1,8 @@
+import { trayNativeTestModules } from './native-modules.ts'
 import { openComposition } from '@migaia/plugin-host/composition'
 import { describe, expect, it } from 'vitest'
-import {
-  defineFeature,
-  definePlugin,
-  PluginHostErrorCode,
-  type IPluginConstraint
-} from '@migaia/plugin-host'
+import { definePlugin, PluginHostErrorCode, type IPluginConstraint } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { DependencyPolicy } from '@migaia/capability/graph/dependency'
 import { createHost } from '../src/host/index.ts'
 import { TrayErrorCode } from '../src/error-code.ts'
@@ -47,6 +44,7 @@ describe('@migaia/tray/host', () => {
         ],
         () => {
           raw = new TestHost({
+            modules: trayNativeTestModules,
             execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
           })
           return raw
@@ -173,6 +171,7 @@ describe('@migaia/tray/host', () => {
       const create = () => {
         /** Concrete Host whose composition port records admission failures. */
         const raw = new TestHost({
+          modules: trayNativeTestModules,
           execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
         })
         /** Original port remains owner of every admission and publication. */
@@ -289,6 +288,7 @@ describe('@migaia/tray/host', () => {
     managed = await createHost(
       options([], () => {
         raw = new PublicationBarrierHost({
+          modules: trayNativeTestModules,
           execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
         })
         return raw
@@ -327,6 +327,7 @@ describe('@migaia/tray/host', () => {
     const managed = await createHost(
       options([plugin('one', [], events)], () => {
         raw = new TestHost({
+          modules: trayNativeTestModules,
           execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
         })
         return raw

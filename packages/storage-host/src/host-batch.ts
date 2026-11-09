@@ -13,6 +13,7 @@ import type { IStorageBackendPluginHandle } from './types.ts'
 import { pluginNameFromBackendId } from './names.ts'
 import type {
   IStorageHostCore,
+  IStorageInstallCore,
   IStorageInstallBatchContext,
   IStorageInstallEntryResult,
   IStorageBatchToken,
@@ -90,7 +91,9 @@ export class StorageHostBatch {
       this.#owner.installer.createInstallEntry(installState, plugin, nativeMetadata[index]!, index)
     )
     /** Pass only the original definitions to the canonical install batch. */
-    const materialized = entries.map((entry) => entry.plugin)
+    const materialized: IPluginConstraint<IStorageInstallCore>[] = entries.map(
+      (entry) => entry.plugin
+    )
     /** A final original registration prepares candidates before the atomic public registry swap. */
     installState.installedJournalPipeline = false
     const candidates = [...installState.nativeContexts.values()]
@@ -104,7 +107,7 @@ export class StorageHostBatch {
           (core) => ({
             install: () => this.installJournalBootstrap(installState, candidates, core)
           })
-        ) as (typeof materialized)[number]
+        )
       )
     }
     this.#owner.inner.setNativeContexts(

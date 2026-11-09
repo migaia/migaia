@@ -1,9 +1,21 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 
 /** Creates an unbounded Host for deterministic dependency installation. */
-const createHost = (): PluginHost<Record<string, never>> =>
-  new PluginHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
+const createHost = (): PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> =>
+  new PluginHost({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  })
 
 /** Creates a provider/consumer pair and records the injected object identity. */
 const createPair = () => {

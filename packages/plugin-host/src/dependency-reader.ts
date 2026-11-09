@@ -1,6 +1,6 @@
-import { snapshotPluginDefinitions } from './admission-runtime.ts'
+import { snapshotPluginDefinitions } from './definition-snapshots.ts'
 import { readAdmissionDefinition } from './composition.ts'
-import { isFeatureReference, readDefinedFeature } from './define-feature.ts'
+import { isFeatureReference, readDefinedFeature } from './feature-definition-snapshots.ts'
 import { readDefinedPluginDefinition } from './define-plugin.ts'
 import type { IFeatureReference } from './feature-types.ts'
 import type { IPluginDefinition } from './registry.ts'

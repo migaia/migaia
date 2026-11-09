@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../../fixtures/native-modules.ts'
 import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -47,6 +48,7 @@ async function fixture() {
   )
   /** Native plugin-host owns the only snapshot, lease and multiple-submission execution path. */
   const flow = defineHost({
+    modules: rpcNativeTestModules,
     domainCore(request) {
       /** The genuine native request fixes this registration's execution authority. */
       const domain = rpc.domainCore(request)

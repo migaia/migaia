@@ -1,3 +1,5 @@
+import { nativeModules } from './native-modules.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import * as pluginHost from '../src/index.ts'
@@ -30,13 +32,14 @@ for (const kind of ['class', 'frozen'] as const) {
   it(`genuine ${kind} Host shares one family slot and retires only exact contributions`, async () => {
     /** Both supported public Host entries retain their original mutation/disposal owner. */
     const hostOptions = {
+      modules: nativeModules,
       execution: { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
     }
     /** A real managed Host, never a structural substitute, performs every use and unUse. */
     const host =
       kind === 'class'
         ? new pluginHost.PluginHost(hostOptions)
-        : pluginHost.defineHost({ host: hostOptions })
+        : pluginHost.defineHost({ modules: nativeModules, host: hostOptions })
     /** Feature execution is counted independently from the returned facade's metadata. */
     let calls = 0
     /** One same-family token authorizes sharing; equal values alone do not. */
@@ -44,7 +47,7 @@ for (const kind of ['class', 'frozen'] as const) {
     /** The baseline publishes its genuine old single-registration extension before the RED. */
     let firstFacade: IFixtureFacade | undefined
     /** Stable contribution ids are fixture data, not native-resource authority. */
-    const feature = pluginHost.defineFeature(() => ({
+    const feature = defineFeature(() => ({
       read: () => {
         calls += 1
         return 42

@@ -1,3 +1,7 @@
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+import { featuresModule } from '@migaia/plugin-host/features'
+import { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'
+import { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'
 /** Own parent admission, subscriptions and Tray lifecycle; RPC retains native generations and IO. */
 import { LaunchCause } from '@migaia/supervision'
 import { defineHost } from '@migaia/plugin-host'
@@ -142,6 +146,12 @@ class TrayRuntime<
 
     /** Parent PluginHost remains separate from every instance's plain PluginHost. */
     this.#host = defineHost({
+      modules: [
+        featuresModule,
+        featureDependenciesModule,
+        namedPipelinesModule,
+        asyncPipelineModule
+      ],
       ...rpc,
       host: {
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },

@@ -1,3 +1,4 @@
+import { nativeModules } from '../native-modules.ts'
 /** Exercises through at the public named-pipeline registration and native lifetime boundaries. */
 import { expect, it, vi } from 'vitest'
 import { defineHost, definePlugin, pipelineSpec, type IPluginHostCoreFor } from '../../src/index.ts'
@@ -9,7 +10,12 @@ type IThroughValue = Readonly<{ count: number }>
 /** Fixed declarations distinguish traversal order, runner mode and multiple-next admission. */
 function createThroughHost(order: 'install' | 'reverse' = 'install') {
   return defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
+    modules: nativeModules,
+
+    host: {
+      pipeline: { mode: 'sync' },
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    },
     pipelines: {
       y: pipelineSpec<IThroughValue>()({ mode: 'async', order }),
       z: pipelineSpec<IThroughValue>()({ mode: 'async' }),

@@ -1,10 +1,11 @@
+import { defineFeature } from '@migaia/plugin-host/features'
 /**
  * Owns native data/control lane admission, watermarks and backlog diagnostics through physical
  * write completion. It borrows the original write operation without becoming an RPC pending-call
  * owner.
  */
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { defineFeature, type IFeature } from '@migaia/plugin-host'
+import { type IFeature } from '@migaia/plugin-host'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { markRpcCarrierAdmissionFailure, registerRpcNativeFeature } from '@migaia/rpc-host/sdk'
 import {

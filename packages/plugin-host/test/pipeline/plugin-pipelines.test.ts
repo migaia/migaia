@@ -1,8 +1,8 @@
+import { nativeModules } from '../native-modules.ts'
 /** Uses genuine definitions, Feature dependencies and the native owner transaction. */
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
-  defineFeature,
   defineHost,
   definePlugin,
   pipelineSpec,
@@ -10,6 +10,7 @@ import {
   type IPluginHostCoreFor,
   type IHostDomainCoreRequest
 } from '../../src/index.ts'
+import { defineFeature } from '../../src/modules/features/index.ts'
 
 /** Host and plugin declarations carry distinct payloads and remain the only type authority. */
 const hostPipelines = { request: pipelineSpec<{ count: number }>()({ mode: 'async' }) }
@@ -53,7 +54,17 @@ it('plugin and Feature register host and own lanes; dependency-qualified lookup 
   /** This Feature reference is the existing dependency declaration, not a pipeline permission list. */
   const dependentFeature = defineFeature(() => ({}), { provider: thread.getFeature('feature') })
   /** Known installed definitions let the Host owner's existing lookup infer qualified names. */
-  const host = defineHost<{}, never, readonly [typeof thread], {}, typeof hostPipelines>({
+  const host = defineHost<
+    {},
+    never,
+    typeof nativeModules,
+    'sync',
+    readonly [typeof thread],
+    {},
+    typeof hostPipelines
+  >({
+    modules: nativeModules,
+
     host: hostOptions,
     pipelines: hostPipelines
   })
@@ -121,6 +132,8 @@ it('failed groups roll back and host declarations cannot be overridden', async (
   const requests: IHostDomainCoreRequest[] = []
   /** No forged scope reaches candidate pipelines. */
   const host = defineHost({
+    modules: nativeModules,
+
     host: hostOptions,
     pipelines: hostPipelines,
     domainCore(request) {
@@ -182,6 +195,8 @@ it('native removal drains the real group before releasing its registered resourc
   const requests: IHostDomainCoreRequest[] = []
   /** No plugin core receives run authority; the Host owner performs candidate execution. */
   const host = defineHost({
+    modules: nativeModules,
+
     host: hostOptions,
     domainCore(request) {
       requests.push(request)

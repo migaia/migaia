@@ -20,9 +20,10 @@ Start with a runnable scenario, then consult the full modes, options and failure
 Validation and formatting steps get copied between entry points, then one copy calls them in a different order. Pass the chosen steps to `run()`. Each `next(value)` hands the transformed value to the following step; the final callback receives the result. In `sync` mode, a step must return before downstream starts.
 
 ```ts doc-test=run
+import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
+const pipeline = createPipeline<number>({ mode: syncMode })
 pipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {
   console.log('result:', value)
 })
@@ -41,9 +42,11 @@ Prints `result: 6`: the input 2 becomes 3, then 6. `run()` returns `void`; a ste
 A request timer stops before the async work finishes because a callback chain returns before its downstream Promise. In `async` mode, `next()` starts downstream and returns its Promise. Await it inside `try/finally` so the outer cleanup follows downstream completion; this before-and-after nesting is the onion model.
 
 ```ts doc-test=run
+import { asyncMode } from '@migaia/middleware-pipeline/async'
+import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.async })
+const pipeline = createPipeline<number>({ mode: asyncMode })
 const trace: string[] = []
 await pipeline.run(
   [
@@ -81,14 +84,16 @@ Prints `start timing | validate | result 6 | finish timing`. The outer finalizer
 A synchronous normalization step is rewritten as an async callback to fit another pipeline, and code after `next()` unexpectedly moves after downstream work. `lift(stage, from)` reuses the sync step with its original linear ordering: calling its `next()` records a value; downstream waits until that step returns.
 
 ```ts doc-test=run
+import { asyncMode } from '@migaia/middleware-pipeline/async'
+import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })
+const pipeline = createPipeline<string>({ mode: asyncMode })
 const trim = pipeline.lift((value, next) => {
   console.log('sync before next')
   next(value.trim())
   console.log('sync after next')
-}, MiddlewarePipelineMode.sync)
+}, syncMode)
 await pipeline.run(
   [
     trim,
@@ -120,13 +125,15 @@ Prints `sync before next`, `sync after next`, `async input: ready`, then `result
 A reusable pipeline has an application signal, but one request needs its own cancellation boundary. Checking only the default signal lets cancelled work enter the next step. Pass `control.signal` to `run()` to override the default. Stages see that same signal in `context.signal`; cancellation is checked before entering downstream work.
 
 ```ts doc-test=run
+import { asyncMode } from '@migaia/middleware-pipeline/async'
+import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
 const application = new AbortController()
 application.abort(new Error('application stopped'))
 const request = new AbortController()
 const pipeline = createPipeline<number>({
-  mode: MiddlewarePipelineMode.async,
+  mode: asyncMode,
   signal: application.signal
 })
 let completed = false
@@ -166,9 +173,10 @@ Prints `request signal: true`, `failure: request cancelled`, then `final callbac
 A generator validator detects an invalid value but accidentally returns it, so the save stage still runs. Return `GENERATOR_HALT` to stop the whole generator pipeline explicitly. Later stages and the final callback are skipped. This symbol belongs to generator modes, not sync/async `next()` callbacks.
 
 ```ts doc-test=run
+import { generatorMode } from '@migaia/middleware-pipeline/generator'
 import { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })
+const pipeline = createPipeline<number>({ mode: generatorMode })
 let written = false
 let completed = false
 pipeline.run(
@@ -204,13 +212,14 @@ Prints `write ran: false` and `final callback: false`. Returning the halt symbol
 Clearing a cached value needs a real `undefined` payload, but a generator’s plain `return undefined` means stop and never reaches the final callback. `GENERATOR_UNDEFINED` distinguishes an intentional empty value from stopping. The pipeline payload type must include `undefined`.
 
 ```ts doc-test=run
+import { generatorMode } from '@migaia/middleware-pipeline/generator'
 import {
   createPipeline,
   MiddlewarePipelineMode,
   GENERATOR_UNDEFINED
 } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<string | undefined>({ mode: MiddlewarePipelineMode.generator })
+const pipeline = createPipeline<string | undefined>({ mode: generatorMode })
 let ordinaryCompleted = false
 pipeline.run(
   [
@@ -260,12 +269,13 @@ The default `next: 'single'` keeps the existing one-submission rule. Choose `nex
 The async runner still joins every started traversal. If a stage completes normally without ever observing a rejected next Promise, run rejects with that original failure. Several unobserved failures form an aggregate in start order with code `MULTIPLE_DOWNSTREAM_FAILED`. Calling `then` transfers responsibility for its resulting Promise chain to the caller; it does not itself report an error. Cancellation and host activity checks still apply.
 
 ```ts doc-test=run
+import { asyncMode } from '@migaia/middleware-pipeline/async'
 import { createPipeline } from '@migaia/middleware-pipeline'
 
 const failure = new Error('second value failed')
 const received: number[] = []
 const reported: unknown[] = []
-const pipeline = createPipeline<number>({ mode: 'async', next: 'multiple' })
+const pipeline = createPipeline<number>({ mode: asyncMode, next: 'multiple' })
 await pipeline.run(
   [
     async (_value, next) => {
@@ -292,12 +302,13 @@ Prints `1,2,3 true`. The stage handles the second traversal's failure, and the t
 A multiple generator catches a suffix failure at its own yield:
 
 ```ts doc-test=run
+import { generatorMode } from '@migaia/middleware-pipeline/generator'
 import { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'
 
 const failure = new Error('yielded suffix failed')
 const reported: unknown[] = []
 const completed: number[] = []
-const pipeline = createPipeline<number>({ mode: 'generator', next: 'multiple' })
+const pipeline = createPipeline<number>({ mode: generatorMode, next: 'multiple' })
 pipeline.run(
   [
     function* () {
@@ -336,7 +347,7 @@ A stage receives the current value and chooses whether to continue, stop or fail
 
 | Field                                               | Default                              | Meaning and accepted values                                                                                                                                                                                                                                                  |
 | --------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`                                              | Required; no default                 | `'sync'`, `'async'`, `'generator'` or `'async-generator'`, exposed as `MiddlewarePipelineMode.sync`, `async`, `generator` and `asyncGenerator`. Fixed after creation.                                                                                                        |
+| `mode`                                              | Required; no default                 | The authentic `syncMode`, `asyncMode`, `generatorMode` or `asyncGeneratorMode` object from its corresponding package subpath. Fixed after creation.                                                                                                                          |
 | `next`                                              | `'single'`                           | `'single'` or `'multiple'`, also exposed by `MiddlewarePipelineNext`. Fixed for every stage and lift; multiple allows independent suffix traversals in all four modes.                                                                                                       |
 | `onViolation(kind)`                                 | A no-op function                     | Synchronously receives `'duplicate'` or `'late'`, also exposed as `MiddlewarePipelineViolation.duplicate` and `late`. Reports an invalid next call without restarting downstream.                                                                                            |
 | `assertActive()`                                    | `undefined`                          | A synchronous host lifecycle assertion, checked at entry and after each stage. Async downstream entry also checks it. A throw prevents continuation; the pipeline does not change host state.                                                                                |

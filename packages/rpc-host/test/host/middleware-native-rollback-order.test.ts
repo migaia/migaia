@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Original native rollback preserves exact cleanup leaves, reverse order and terminal promises. */
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
@@ -14,6 +15,7 @@ function receivingHost() {
   )
   /** Original transactions and their genuine pipelines belong to this one receiving runtime. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })

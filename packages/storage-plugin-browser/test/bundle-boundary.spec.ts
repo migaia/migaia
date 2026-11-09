@@ -94,7 +94,8 @@ const browserBundleOptimizationTarget = 1.15
 /**
  * User-approved ceilings retain exactly 2% headroom above the measured bundle. The current values
  * were raised a third time to accept the entity-as-plugin refactor (native entity feature records,
- * install-time role assembly and revocation guards), measured at 734710 minified / 177408 gzip bytes.
+ * install-time role assembly and revocation guards), measured at 734710 minified / 177408 gzip
+ * bytes.
  */
 const browserBundleHardCeiling = {
   minified: { current: 749404, baseline: 551293 },

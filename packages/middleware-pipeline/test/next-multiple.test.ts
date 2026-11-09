@@ -1,3 +1,8 @@
+import { pipelineModes } from './pipeline-test-helpers.ts'
+import { asyncMode } from '../src/modes/async.ts'
+import { syncMode } from '../src/modes/sync.ts'
+import { asyncGeneratorMode } from '../src/modes/async-generator.ts'
+import { generatorMode } from '../src/modes/generator.ts'
 import { describe, expect, it } from 'vitest'
 import {
   createPipeline,
@@ -13,7 +18,7 @@ import {
 describe('multiple downstream submissions', () => {
   it('keeps frozen own runner functions callable after destructuring', () => {
     /** The named runtime owner must preserve the factory's existing callable own surface. */
-    const pipeline = createPipeline<number>({ mode: 'sync' })
+    const pipeline = createPipeline<number>({ mode: syncMode })
     /** Detached calls retain the construction options without a caller-provided receiver. */
     const { run, lift } = pipeline
     /** One ordinary single-mode stage proves detached lifting and execution. */
@@ -30,9 +35,9 @@ describe('multiple downstream submissions', () => {
     expect(Object.isFrozen(pipeline)).toBe(true)
   })
   it('rejects an explicitly null next policy instead of selecting the default', () => {
-    expect(() => createPipeline({ mode: 'sync', next: null as never })).toThrowError(TypeError)
+    expect(() => createPipeline({ mode: syncMode, next: null as never })).toThrowError(TypeError)
     try {
-      createPipeline({ mode: 'sync', next: null as never })
+      createPipeline({ mode: syncMode, next: null as never })
     } catch (error) {
       expect(error).toMatchObject({
         source: MIDDLEWARE_PIPELINE_SOURCE,
@@ -49,7 +54,7 @@ describe('multiple downstream submissions', () => {
     /** The stage cancels only after accepting its first branch. */
     const controller = new AbortController()
     await expect(
-      createPipeline<number>({ mode: 'async', next: 'multiple', signal: controller.signal }).run(
+      createPipeline<number>({ mode: asyncMode, next: 'multiple', signal: controller.signal }).run(
         [
           async (_value, next) => {
             /** The first traversal fails before cancellation, but remains independently observed. */
@@ -77,7 +82,7 @@ describe('multiple downstream submissions', () => {
     /** A rejected reentrant submission must never reach the terminal. */
     const completed: number[] = []
     await createPipeline<number>({
-      mode: 'async',
+      mode: asyncMode,
       onViolation: (kind) => {
         violations.push(kind)
       }
@@ -112,7 +117,7 @@ describe('multiple downstream submissions', () => {
     /** Reentrant submission may fail first without changing aggregate order. */
     const second = new Error('reentrant submission')
     await expect(
-      createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+      createPipeline<number>({ mode: asyncMode, next: 'multiple' }).run(
         [
           (_value, next) => {
             upstream = next
@@ -140,7 +145,7 @@ describe('multiple downstream submissions', () => {
     /** The second started branch must still be awaited and retained once. */
     const second = new Error('second concurrent failure')
     await expect(
-      createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+      createPipeline<number>({ mode: asyncMode, next: 'multiple' }).run(
         [
           async (_value, next) => {
             await Promise.all([next(1), next(2)])
@@ -156,7 +161,7 @@ describe('multiple downstream submissions', () => {
   it('sync traverses every submitted value after the submitting stage returns', () => {
     /** Interleaving proves local submission and one terminal per traversal. */
     const events: Array<number | string> = []
-    createPipeline<number>({ mode: 'sync', next: 'multiple' }).run(
+    createPipeline<number>({ mode: syncMode, next: 'multiple' }).run(
       [
         (_value, next) => {
           next(1)
@@ -183,7 +188,7 @@ describe('multiple downstream submissions', () => {
     /** Independent later submissions still reach the same terminal. */
     const completed: number[] = []
     expect(() =>
-      createPipeline<number>({ mode: 'sync', next: 'multiple' }).run(
+      createPipeline<number>({ mode: syncMode, next: 'multiple' }).run(
         [
           (_value, next) => {
             next(1)
@@ -216,7 +221,7 @@ describe('multiple downstream submissions', () => {
     /** Completion flag proves unawaited next is still runner-owned. */
     let settled = false
     /** Reusable public runner owns three concurrent branches. */
-    const task = createPipeline<number>({ mode: 'async', next: 'multiple' })
+    const task = createPipeline<number>({ mode: asyncMode, next: 'multiple' })
       .run(
         [
           (_value, next) => {
@@ -256,7 +261,7 @@ describe('multiple downstream submissions', () => {
       rejectFirst = reject
     })
     /** Terminal failures are observed even when stages do not await next. */
-    const task = createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+    const task = createPipeline<number>({ mode: asyncMode, next: 'multiple' }).run(
       [
         (_value, next) => {
           void next(1)
@@ -281,7 +286,7 @@ describe('multiple downstream submissions', () => {
     const received: number[] = []
     /** Reporting is caller policy after the rejected next is observed. */
     const reported: unknown[] = []
-    await createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+    await createPipeline<number>({ mode: asyncMode, next: 'multiple' }).run(
       [
         async (_value, next) => {
           await next(1)
@@ -308,7 +313,7 @@ describe('multiple downstream submissions', () => {
     const failure = new Error('then observed failure')
     /** Only the caller's rejection callback records the original object. */
     const reported: unknown[] = []
-    await createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+    await createPipeline<number>({ mode: asyncMode, next: 'multiple' }).run(
       [
         (_value, next) => {
           void next(2).then(undefined, (error) => {
@@ -333,7 +338,7 @@ describe('multiple downstream submissions', () => {
     /** Every registered payload enters its own traversal. */
     const received: number[] = []
     expect(() =>
-      createPipeline<number>({ mode: 'sync', next: 'multiple' }).run(
+      createPipeline<number>({ mode: syncMode, next: 'multiple' }).run(
         [
           (_value, next) => {
             next(1)
@@ -362,7 +367,7 @@ describe('multiple downstream submissions', () => {
     /** Later branches must remain independent even after a failure settled. */
     const received: number[] = []
     await expect(
-      createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+      createPipeline<number>({ mode: asyncMode, next: 'multiple' }).run(
         [
           async (_value, next) => {
             void next(2)
@@ -387,7 +392,7 @@ describe('multiple downstream submissions', () => {
     const received: number[] = []
     /** Explicit caller reporting retains original error identity. */
     const reported: unknown[] = []
-    createPipeline<number>({ mode: 'generator', next: 'multiple' }).run(
+    createPipeline<number>({ mode: generatorMode, next: 'multiple' }).run(
       [
         function* () {
           yield 1
@@ -417,7 +422,7 @@ describe('multiple downstream submissions', () => {
     const received: number[] = []
     /** Caller reporting proves the failure entered catch at the original yield. */
     const reported: unknown[] = []
-    await createPipeline<number>({ mode: 'async-generator', next: 'multiple' }).run(
+    await createPipeline<number>({ mode: asyncGeneratorMode, next: 'multiple' }).run(
       [
         async function* () {
           yield 1
@@ -444,7 +449,7 @@ describe('multiple downstream submissions', () => {
   it('generator traverses each yield before resuming and traverses its ordinary return', () => {
     /** Yield/resume order distinguishes multiple from the old terminal reduction. */
     const events: Array<number | string> = []
-    createPipeline<number>({ mode: 'generator', next: 'multiple' }).run(
+    createPipeline<number>({ mode: generatorMode, next: 'multiple' }).run(
       [
         function* () {
           yield 1
@@ -470,7 +475,7 @@ describe('multiple downstream submissions', () => {
     for (const signal of [GENERATOR_CONTINUE, GENERATOR_HALT] as const) {
       /** Only explicit yields reach the terminal. */
       const completed: number[] = []
-      createPipeline<number>({ mode: 'generator', next: 'multiple' }).run(
+      createPipeline<number>({ mode: generatorMode, next: 'multiple' }).run(
         [
           function* (): Generator<number, typeof GENERATOR_CONTINUE | typeof GENERATOR_HALT, void> {
             yield 1
@@ -492,7 +497,7 @@ describe('multiple downstream submissions', () => {
     /** Finally proves the stopped generator is closed. */
     let cleaned = false
     expect(() =>
-      createPipeline<number>({ mode: 'generator', next: 'multiple' }).run(
+      createPipeline<number>({ mode: generatorMode, next: 'multiple' }).run(
         [
           function* () {
             try {
@@ -516,7 +521,7 @@ describe('multiple downstream submissions', () => {
     expect(cleaned).toBe(true)
     /** Explicit sentinel reaches downstream once as undefined. */
     const values: Array<number | undefined> = []
-    createPipeline<number | undefined>({ mode: 'generator', next: 'multiple' }).run(
+    createPipeline<number | undefined>({ mode: generatorMode, next: 'multiple' }).run(
       [
         function* () {
           yield GENERATOR_UNDEFINED
@@ -534,7 +539,7 @@ describe('multiple downstream submissions', () => {
   it('async-generator awaits each traversal before resuming', async () => {
     /** Awaited yield transitions serialize downstream completion. */
     const events: Array<number | string> = []
-    await createPipeline<number>({ mode: 'async-generator', next: 'multiple' }).run(
+    await createPipeline<number>({ mode: asyncGeneratorMode, next: 'multiple' }).run(
       [
         async function* () {
           yield 1
@@ -564,7 +569,7 @@ describe('multiple downstream submissions', () => {
     /** Finally establishes physical iterator cleanup after downstream failure. */
     let cleaned = false
     await expect(
-      createPipeline<number>({ mode: 'async-generator', next: 'multiple' }).run(
+      createPipeline<number>({ mode: asyncGeneratorMode, next: 'multiple' }).run(
         [
           async function* () {
             try {
@@ -593,7 +598,7 @@ describe('multiple downstream submissions', () => {
     for (const signal of [GENERATOR_CONTINUE, GENERATOR_HALT] as const) {
       /** Only explicit yields publish payloads under either control return. */
       const values: Array<number | undefined> = []
-      await createPipeline<number | undefined>({ mode: 'async-generator', next: 'multiple' }).run(
+      await createPipeline<number | undefined>({ mode: asyncGeneratorMode, next: 'multiple' }).run(
         [
           async function* (): AsyncGenerator<
             number | typeof GENERATOR_UNDEFINED,
@@ -620,7 +625,7 @@ describe('multiple downstream submissions', () => {
     /** Only accepted terminal entries are recorded. */
     const entered: number[] = []
     await expect(
-      createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+      createPipeline<number>({ mode: asyncMode, next: 'multiple' }).run(
         [
           async (_value, next) => {
             await next(1)
@@ -646,7 +651,7 @@ describe('multiple downstream submissions', () => {
     /** Second original failure must remain reachable within the downstream aggregate. */
     const second = new Error('second downstream')
     /** The public runner keeps the preexisting stage-and-downstream combination policy. */
-    const task = createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+    const task = createPipeline<number>({ mode: asyncMode, next: 'multiple' }).run(
       [
         (_value, next) => {
           void next(1)
@@ -674,7 +679,11 @@ describe('multiple downstream submissions', () => {
     /** Only the first accepted branch reaches the terminal before cancellation. */
     const syncValues: number[] = []
     expect(() =>
-      createPipeline<number>({ mode: 'sync', next: 'multiple', signal: syncController.signal }).run(
+      createPipeline<number>({
+        mode: syncMode,
+        next: 'multiple',
+        signal: syncController.signal
+      }).run(
         [
           (_value, next) => {
             next(1)
@@ -695,7 +704,7 @@ describe('multiple downstream submissions', () => {
     const asyncValues: number[] = []
     await expect(
       createPipeline<number>({
-        mode: 'async',
+        mode: asyncMode,
         next: 'multiple',
         signal: asyncController.signal
       }).run(
@@ -725,7 +734,7 @@ describe('multiple downstream submissions', () => {
     /** Only accepted values reach terminal. */
     const completed: number[] = []
     createPipeline<number>({
-      mode: 'sync',
+      mode: syncMode,
       next: 'multiple',
       onViolation: (kind) => {
         violations.push(kind)
@@ -744,7 +753,7 @@ describe('multiple downstream submissions', () => {
     )
     syncNext(2)
     await createPipeline<number>({
-      mode: 'async',
+      mode: asyncMode,
       next: 'multiple',
       onViolation: (kind) => {
         violations.push(kind)
@@ -778,7 +787,10 @@ describe('multiple downstream submissions', () => {
       /** Collected terminal values verify all lifted submissions. */
       const completed: number[] = []
       /** Generic mode stays tied to its stage shape. */
-      const pipeline = createPipeline<number, typeof mode>({ mode, next: 'multiple' })
+      const pipeline = createPipeline<number, typeof mode>({
+        mode: pipelineModes[mode],
+        next: 'multiple'
+      })
       await pipeline.run([pipeline.lift(stage, 'sync')], 0, (value) => {
         completed.push(value)
       })
@@ -787,9 +799,11 @@ describe('multiple downstream submissions', () => {
   })
 
   it('rejects an invalid next option synchronously and preserves single defaults', async () => {
-    expect(() => createPipeline({ mode: 'sync', next: 'invalid' as never })).toThrowError(TypeError)
+    expect(() => createPipeline({ mode: syncMode, next: 'invalid' as never })).toThrowError(
+      TypeError
+    )
     try {
-      createPipeline({ mode: 'sync', next: 'invalid' as never })
+      createPipeline({ mode: syncMode, next: 'invalid' as never })
     } catch (error) {
       expect(error).toMatchObject({
         source: MIDDLEWARE_PIPELINE_SOURCE,
@@ -808,7 +822,7 @@ describe('multiple downstream submissions', () => {
         await forward(2)
       }
       await createPipeline<number>({
-        mode: 'async',
+        mode: asyncMode,
         next,
         onViolation: (kind) => {
           violations.push(kind)
@@ -836,7 +850,10 @@ describe('multiple downstream submissions', () => {
       /** Entry count proves the adapter did not stop at its first rejected traversal. */
       const received: number[] = []
       /** Generic mode keeps the public stage inference without an adapter shim. */
-      const pipeline = createPipeline<number, typeof mode>({ mode, next: 'multiple' })
+      const pipeline = createPipeline<number, typeof mode>({
+        mode: pipelineModes[mode],
+        next: 'multiple'
+      })
       /** The actual public runner keeps its mode-specific throw or rejection timing. */
       const run = () =>
         pipeline.run([pipeline.lift(stage, 'sync')], 0, (value) => {
@@ -860,7 +877,7 @@ describe('multiple downstream submissions', () => {
       release = resolve
     })
     /** Runner ownership must keep this original rejection handled before stage completion. */
-    const task = createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+    const task = createPipeline<number>({ mode: asyncMode, next: 'multiple' }).run(
       [
         async (_value, next) => {
           void next(1)

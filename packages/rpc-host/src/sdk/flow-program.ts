@@ -6,6 +6,7 @@ import {
   type IFeatureInspection
 } from '@migaia/plugin-host'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
+import { FeatureOverlay } from '@migaia/plugin-host/feature-overlay'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
@@ -17,6 +18,9 @@ import {
   readRpcFeature,
   registerRpcDefinition,
   RpcDefinitionKind,
+  callFeatureRole,
+  RpcFeatureCategory,
+  type IRpcFeatureMetadata,
   type IRpcFlowEntry,
   type IRpcSharedFlows
 } from './metadata.ts'
@@ -58,22 +62,24 @@ export function inspectRpcFeatures<F extends IFeatureRecord>(
       const definition = readRpcDefinition(descriptor.value)
       /** Unknown identities reach canonical native admission before RPC can interpret their role. */
       const role = readRpcFeature(descriptor.value)
-      if (definition && (!role || (callOnly && role.category !== 'call'))) invalidFeature()
+      if (definition && (!role || (callOnly && role.category !== RpcFeatureCategory.call)))
+        invalidFeature()
     }
   }
   /** Preserve the exact native rejection and graph error without wrapping or replacing it. */
   const inspection = inspectFeatures(features)
   if (callOnly)
     for (const feature of Object.values(inspection.roots))
-      if (readRpcFeature(feature)?.category !== 'call') invalidFeature()
+      if (readRpcFeature(feature)?.category !== RpcFeatureCategory.call) invalidFeature()
   return inspection
 }
 
 /** Admit each private role once while retaining the caller's arbitrary local aliases. */
 function selectFlows(features: IFeatureRecord): ReadonlyMap<PropertyKey, IRpcFlowFeature<object>> {
-  /** Call, flow and transport-native roles share the same scope conflict rule. */
+  /** Call roles use the same canonical conflict owner as installed namespace/default policies. */
+  let calls: FeatureOverlay<IRpcFeatureMetadata> | undefined
+  /** Flow and transport-native placement remain outside shared call-policy composition. */
   const roles = {
-    call: new Set<PropertyKey>(),
     flow: new Set<PropertyKey>(),
     native: new Set<PropertyKey>()
   }
@@ -83,13 +89,19 @@ function selectFlows(features: IFeatureRecord): ReadonlyMap<PropertyKey, IRpcFlo
     /** Native inspection separately authenticates helpers with no RPC-specific role. */
     const metadata = readRpcFeature(feature)
     if (!metadata) continue
+    if (metadata.category === RpcFeatureCategory.call) {
+      /** Validate in original root order so an earlier call conflict retains primary precedence. */
+      calls ??= new FeatureOverlay<IRpcFeatureMetadata>(callFeatureRole)
+      calls.prepare(feature, [{ alias: metadata.role, value: metadata }])
+      continue
+    }
     if (roles[metadata.category].has(metadata.role))
       throw tagRpcError(
         new TypeError(HostErrorText.featureCombinationConflict),
         RpcCoreErrorCode.featureCombinationConflict
       )
     roles[metadata.category].add(metadata.role)
-    if (metadata.category === 'flow')
+    if (metadata.category === RpcFeatureCategory.flow)
       selected.set(metadata.role, feature as IRpcFlowFeature<object>)
   }
   return selected
@@ -225,7 +237,7 @@ export class RpcTransportFlowProgram {
     for (const feature of inspectSelection(selected).ordered) {
       /** Helper outputs contribute no RPC stage. */
       const metadata = readRpcFeature(feature)
-      if (metadata?.category !== 'flow') continue
+      if (metadata?.category !== RpcFeatureCategory.flow) continue
       /** Explicit local role selection suppresses an older dependency's same-role stage. */
       const root = selected.get(metadata.role)
       if (root && root !== feature) continue
@@ -284,7 +296,7 @@ class RpcFeatureProgram {
     /** Shared dependencies are prepared once, independently from namespace count. */
     const entries = new Map<object, IRpcFlowEntry>()
     for (const feature of this.#record.ordered) {
-      if (readRpcFeature(feature)?.category !== 'flow') continue
+      if (readRpcFeature(feature)?.category !== RpcFeatureCategory.flow) continue
       entries.set(
         feature,
         await prepareEntry(core, this.#record.alias(feature), feature, rootSignal, context)

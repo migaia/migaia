@@ -1,3 +1,4 @@
+import { nativeModules } from '../native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import {
   GENERATOR_CONTINUE,
@@ -8,9 +9,16 @@ import { PluginHost, PluginHostError } from '../../src/index.ts'
 
 /** Exercises Host dispatch, canonical lifting, mismatch causality and lane atomicity. */
 /** Host exposing pipeline execution for each canonical runner mode. */
-class PipelineHost extends PluginHost<Record<string, never>, number> {
+class PipelineHost extends PluginHost<
+  Record<string, never>,
+  number,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   constructor(mode: IMiddlewarePipelineMode) {
     super({
+      modules: nativeModules,
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       pipeline: { mode }
     })

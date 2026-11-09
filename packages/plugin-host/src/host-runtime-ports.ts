@@ -3,14 +3,10 @@
  * lifecycle algorithms stay in their original owners.
  */
 import type { INativeAbortSignal } from '@migaia/utils/promise'
-import ERROR_TEXT, {
-  attachPluginHostIdentity,
-  formatPluginHostDiagnostic,
-  PluginHostError,
-  PluginHostInternalText
-} from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
+import { attachPluginHostIdentity, formatPluginHostDiagnostic, PluginHostError } from './errors.ts'
 import { readHostNodeId } from './host-identity-authority.ts'
-import { snapshotPluginDefinitions } from './admission-runtime.ts'
+import { snapshotPluginDefinitions } from './definition-snapshots.ts'
 import { type IInstallBatchContext } from './install-runtime.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import { matchesManagedHost } from './composition.ts'
@@ -29,7 +25,6 @@ import type { IPipelineDefinitions } from './pipeline-spec.ts'
 import { reportDiagnostic } from './diagnostic-report.ts'
 
 import { type IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { planTeardown } from '@migaia/capability/graph/dependency'
 
 import { createPluginHostPublication } from './publication.ts'
 import { createPluginHandle } from './plugin-handle.ts'
@@ -135,6 +130,20 @@ export class PluginHostRuntimePorts<
   get removal() {
     return this.#context.removalRuntime
   }
+  /** Optional feature construction is lent from the installed module, never imported here. */
+  get featureRuntime() {
+    return this.#context.featureRuntime
+  }
+  /** Installation borrows the same graph validation operation as structural mutations. */
+  get validateInstallBatch() {
+    return this.#context.validateInstallBatch
+  }
+  /** Mode identities are immutable per-host construction inputs. */
+  get pipelineModes() {
+    return this.#context.pipelineModes
+  }
+  /** Module cleanup is sequenced by the native host disposal owner. */
+  readonly disposeModules = () => this.#context.modules.dispose()
   /** Borrows the canonical enablementRuntime owner or admitted policy. */
   get enablement() {
     return this.#context.enablementRuntime
@@ -252,7 +261,8 @@ export class PluginHostRuntimePorts<
     attachPluginHostIdentity(error, this.host)
   /** Provider recovery delegates to its sole orchestration owner. */
   readonly resumeAfterProvider = (provider: string, generationChanged: boolean): Promise<void> =>
-    this.#context.resumeRuntime.resumeAfterProvider(provider, generationChanged)
+    this.#context.resumeRuntime?.resumeAfterProvider(provider, generationChanged) ??
+    Promise.resolve()
   /** Returns the same registration-scoped core facade. */
   readonly createCore = (
     registration: IRegistration<TDomainCore, TValue>,
@@ -271,7 +281,7 @@ export class PluginHostRuntimePorts<
   readonly preparePipelines = (
     registration: IRegistration<TDomainCore, TValue>,
     batch?: IInstallBatchContext<TDomainCore, TValue>
-  ): void => this.#context.pipelines.prepare(registration, batch)
+  ): void => this.#context.pipelines.prepare?.(registration, batch)
   /** Features and plugin cores borrow the same registration-scoped pipeline entry. */
   readonly pipeline = (
     name: string,
@@ -302,9 +312,16 @@ export class PluginHostRuntimePorts<
     for (const slot of this.state.stageSlots.values()) slot.retired = true
     this.state.stageSlots.clear()
   }
-  /** Snapshot admission retains the entry's original trusted-definition authority. */
-  readonly snapshotPlugins = (plugins: readonly IPluginConstraint<any>[]) =>
-    snapshotPluginDefinitions<TDomainCore, TValue>(plugins, this.#context.trustedDefinitionReader)
+  /** Snapshot admission preserves reader authority and rejects absent modules before acquisition. */
+  readonly snapshotPlugins = (plugins: readonly IPluginConstraint<any>[]) => {
+    /** Definition validation precedes module claims on every native, raw and managed entry. */
+    const definitions = snapshotPluginDefinitions<TDomainCore, TValue>(
+      plugins,
+      this.#context.trustedDefinitionReader
+    )
+    this.#context.modules.assertDefinitions(definitions, this.#context.pipelineModes)
+    return definitions
+  }
   /** Managed composition reads the canonical committed revision. */
   readonly readRevision = (): number => this.state.revision
   /** Rejects closing or terminal access with original Host identity. */
@@ -335,11 +352,8 @@ export class PluginHostRuntimePorts<
    * keeps the dependency graph acyclic, so the teardown plan always exists.
    */
   readonly registrationsInReverse = (): IRegistration<TDomainCore, TValue>[] => {
-    /** Dependency order is canonical; this projection visits each returned name once. */
-    const registrations: IRegistration<TDomainCore, TValue>[] = []
-    for (const name of planTeardown(this.#context.state.dependencyIndex()).order)
-      registrations.push(this.#context.state.registrations.get(name)!)
-    return registrations
+    if (this.#context.teardownOrder) return this.#context.teardownOrder()
+    return Array.from(this.#context.state.registrations.values()).reverse()
   }
 
   /** Rethrows a synchronous package error after attributing it to this exact Host. */
@@ -427,7 +441,7 @@ export class PluginHostRuntimePorts<
   ): void => {
     this.#context.state.publishInstallBatch(installed, batch)
     for (const registration of installed)
-      if (registration.activated) this.#context.enablementRuntime.notifyInstalled(registration)
+      if (registration.activated) this.#context.enablementRuntime?.notifyInstalled(registration)
   }
 
   /**

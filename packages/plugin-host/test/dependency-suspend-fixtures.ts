@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 /** Owns shared fixture construction; test assertions remain in their focused suites. */
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { PluginHost } from '../src/index.ts'
@@ -6,7 +7,22 @@ import { PluginHost } from '../src/index.ts'
 export type IRecoveryDiagnostic = { code?: string; error?: unknown }
 
 /** Runs the synchronous pipeline used to observe suspension visibility. */
-export class SuspendHost extends PluginHost<Record<string, never>, number> {
+export class SuspendHost extends PluginHost<
+  Record<string, never>,
+  number,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   /** Returns the terminal pipeline value while preserving synchronous execution. */
   run(value: number): number {
     /** Terminal value assigned by the existing pipeline callback. */
@@ -19,10 +35,17 @@ export class SuspendHost extends PluginHost<Record<string, never>, number> {
 }
 
 /** Runs asynchronous recovery scenarios and reports their original errors. */
-export class RecoveryHost extends PluginHost<Record<string, never>, number> {
+export class RecoveryHost extends PluginHost<
+  Record<string, never>,
+  number,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   /** Binds recovery diagnostics to the receipt owned by the calling test. */
   constructor(diagnostics: IRecoveryDiagnostic[]) {
     super({
+      modules: nativeModules,
       execution,
       pipeline: { mode: MiddlewarePipelineMode.async },
       diagnostic: (_message, code, error) => diagnostics.push({ code, error })

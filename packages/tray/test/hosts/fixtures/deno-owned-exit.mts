@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { defineFeature, definePlugin } from '@migaia/plugin-host'
+import { definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { isThreadChild } from '@migaia/rpc-plugin-thread'
 import { createTray, defineTrayHost, serveTrayHost } from '@migaia/tray'
 

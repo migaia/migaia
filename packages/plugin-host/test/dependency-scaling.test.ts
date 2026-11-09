@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { ITopologyIndex } from '@migaia/capability/graph/topology'
 
@@ -16,11 +17,20 @@ vi.mock('@migaia/capability/graph/topology', async (importOriginal) => {
   }
 })
 
-import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 
 /** Builds a host with a long required chain and exercises one leaf-only mutation sequence. */
 const measure = async (size: number) => {
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   const plugins: any[] = []

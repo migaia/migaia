@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Genuine native Session and Table fixtures preserve admission, controls and supported cleanup. */
 import {
   defineProbe,
@@ -102,6 +103,7 @@ class Host {
     )
     /** Each domain core receives its original native construction request. */
     const native = defineHost({
+      modules: rpcNativeTestModules,
       domainCore(request) {
         /** The captured port belongs to this exact namespace's native registration. */
         const domain = rpc.domainCore(request)

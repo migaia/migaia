@@ -1,4 +1,5 @@
-import { defineFeature, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
+import { definePlugin } from '@migaia/plugin-host'
 import type {
   IPluginDependency,
   IPluginFeatureName,

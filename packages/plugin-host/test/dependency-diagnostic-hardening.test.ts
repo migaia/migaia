@@ -1,5 +1,7 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { execution } from './dependency-lifecycle-fixtures.ts'
 
 describe('Feature rejection reporting through the host outlet', () => {
@@ -9,7 +11,15 @@ describe('Feature rejection reporting through the host outlet', () => {
     const reporterFailure = new Error('reporter failed')
     const seen: unknown[] = []
     let calls = 0
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution,
       diagnostic: (_message, _code, error) => {
         calls += 1
@@ -44,7 +54,15 @@ describe('diagnostic outlet failures', () => {
   it('routes a throwing diagnostic outlet to onDiagnosticFailure with the exact failure', async () => {
     const outletFailure = new Error('outlet failed')
     const failures: unknown[] = []
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution,
       diagnostic: () => {
         throw outletFailure
@@ -69,7 +87,15 @@ describe('diagnostic outlet failures', () => {
   it('routes the second reporter failure of a Feature rejection to onDiagnosticFailure', async () => {
     const outletFailure = new Error('outlet always fails')
     const failures: unknown[] = []
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution,
       diagnostic: () => {
         throw outletFailure
@@ -95,7 +121,19 @@ describe('diagnostic outlet failures', () => {
 
   it('rejects a non-function onDiagnosticFailure as INVALID_OPTION', () => {
     expect(
-      () => new PluginHost<Record<string, never>>({ execution, onDiagnosticFailure: 1 as never })
+      () =>
+        new PluginHost<
+          Record<string, never>,
+          never,
+          readonly [],
+          Record<never, never>,
+          typeof nativeModules
+        >({
+          modules: nativeModules,
+          pipeline: { mode: 'sync' },
+          execution,
+          onDiagnosticFailure: 1 as never
+        })
     ).toThrow(expect.objectContaining({ code: PluginHostErrorCode.invalidOption }))
   })
 })

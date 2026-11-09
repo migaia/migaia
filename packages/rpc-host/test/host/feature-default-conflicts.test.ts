@@ -57,7 +57,7 @@ async function duplicateDefaultRoleFails(): Promise<void> {
         emptyTransport()
       ]
     })
-  ).rejects.toSatisfy(hasCode(RpcCoreErrorCode.featureCombinationConflict))
+  ).rejects.toSatisfy(hasCode('FEATURE_ROLE_CONFLICT'))
 }
 
 /** Two shared carriers cannot publish one caller alias for different outputs. */
@@ -72,6 +72,26 @@ async function duplicateSharedAliasFails(): Promise<void> {
       ]
     })
   ).rejects.toSatisfy(hasCode(RpcCoreErrorCode.invalidConfig))
+}
+
+/**
+ * Startup admission distinguishes late admission from duplicate names by starting without any
+ * policy.
+ */
+async function latePolicyRejectedAfterStartup(): Promise<void> {
+  const host = await createRpcHost({ self, plugins: [emptyTransport()] })
+  try {
+    await expect(
+      host.use(linkPolicy({ features: { late: retryFeature({ attempts: 2 }) } }))
+    ).rejects.toMatchObject({
+      name: 'TypeError',
+      code: RpcCoreErrorCode.invalidConfig,
+      message: 'RPC flow hooks cannot be installed after transport startup'
+    })
+    expect(Object.hasOwn(host.local.features, 'late')).toBe(false)
+  } finally {
+    await host.close()
+  }
 }
 
 /** Search the native install wrapper's cause chain for the semantic RPC code. */
@@ -94,6 +114,10 @@ describe('RPC host-wide feature defaults', registerCases)
 
 /** One case per ownership rule. */
 function registerCases(): void {
+  it(
+    'Startup admission rejects a late policy before any policy name was registered',
+    latePolicyRejectedAfterStartup
+  )
   it('merges disjoint roles from a link policy and a carrier', disjointDefaultsMerge)
   it('rejects a second host-wide owner of one call role', duplicateDefaultRoleFails)
   it('rejects one shared control alias from two owners', duplicateSharedAliasFails)

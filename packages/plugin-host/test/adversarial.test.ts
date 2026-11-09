@@ -1,11 +1,20 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { PluginHost, PluginHostError } from '../src/index.ts'
 import { createManualScheduler } from '@migaia/utils/testing'
 
-class Host extends PluginHost<Record<string, never>, string> {
+class Host extends PluginHost<
+  Record<string, never>,
+  string,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   /** Supplies an explicit test policy while preserving each test's option override. */
   constructor(options: any = {}) {
     super({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       ...options,
       execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })

@@ -1,11 +1,13 @@
+import { HostModuleText, HostModuleKey } from './module-constants.ts'
+import { PluginHostErrorCode } from './error-code.ts'
 /**
  * Owns the public PluginHost class boundary and protected subclass hooks; internal owners assemble,
  * mutate and publish through explicit ports.
  */
 
-import { PluginHostError } from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import { type IPluginHostIdentity } from './host-identity-types.ts'
-import { type ITrustedDefinitionReader } from './admission-runtime.ts'
+import { type ITrustedDefinitionReader } from './definition-snapshots.ts'
 
 import type { IHostCoreConstructionRequest } from './define-host.ts'
 
@@ -106,7 +108,13 @@ class PluginHostConstructor<
   /** Narrow Host admission capability used by protected pipeline entries. */
   readonly #contextPort: PluginHostRuntimePorts<TDomainCore, TValue, TInstalled, TPipelines>
   /** Readonly enablement facade over this Host's canonical registrations. */
-  readonly plugin: IPluginEnablement<this, TInstalled, TDomainCore, TValue>
+  get plugin(): IPluginEnablement<this, TInstalled, TDomainCore, TValue> {
+    if (!this.#context.plugin)
+      throw new PluginHostError(PluginHostErrorCode.hostModuleMissing, HostModuleText.missing, {
+        detail: { module: HostModuleKey.enablement }
+      })
+    return this.#context.plugin as IPluginEnablement<this, TInstalled, TDomainCore, TValue>
+  }
   /**
    * Creates an empty Host. Mutation and pipeline-drain budgets each default to 5000 ms; numeric
    * budgets must be finite and nonnegative and false waits without a deadline. Pipeline mode
@@ -132,7 +140,6 @@ class PluginHostConstructor<
     this.#context = context
     this.#mutations = new PluginHostMutationRuntime(context, port)
     this.identity = context.identity
-    this.plugin = context.plugin as IPluginEnablement<this, TInstalled, TDomainCore, TValue>
   }
 
   /** Current runner mode; closing or disposed Hosts reject access with their lifecycle code. */
@@ -268,7 +275,11 @@ class PluginHostConstructor<
    * be retried; success returns a name-addressed handle. Do not await this activation from itself.
    */
   activate(name: string): Promise<IPluginHandle<IPluginConstraint<any>>> {
-    return this.#mutations.activate(name)
+    if (!this.#context.activationOperations)
+      throw new PluginHostError(PluginHostErrorCode.hostModuleMissing, HostModuleText.missing, {
+        detail: { module: HostModuleKey.activation }
+      })
+    return this.#context.activationOperations.activate(name)
   }
 
   /**
@@ -281,7 +292,11 @@ class PluginHostConstructor<
     name: string,
     next: TPlugin
   ): Promise<IPluginHandle<TPlugin>> {
-    return this.#mutations.replace(name, next)
+    if (!this.#context.featureOperations)
+      throw new PluginHostError(PluginHostErrorCode.hostModuleMissing, HostModuleText.missing, {
+        detail: { module: HostModuleKey.features }
+      })
+    return this.#context.featureOperations.replace(name, next)
   }
 
   /** Installs constructor-time plugins synchronously or throws before the host escapes. */

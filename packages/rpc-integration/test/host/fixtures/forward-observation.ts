@@ -51,7 +51,7 @@ export class ForwardObservation {
 
   /** Actual Host installation receives the two complete existing flow plugins. */
   get plugins() {
-    return [this.#probe, this.#devtools] as const
+    return [this.#probe, this.#devtools.plugin] as const
   }
 
   /** Copy only portable metadata; errors and captured business graphs are not fixture transport. */

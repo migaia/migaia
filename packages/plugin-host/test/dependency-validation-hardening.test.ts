@@ -1,11 +1,23 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { openComposition } from '../src/composition-entry.ts'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
+import { definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { execution, createRequiredPair, SyncHost } from './dependency-lifecycle-fixtures.ts'
 
 describe('enablement prerequisites', () => {
   it('rejects enabling a dependent while its required provider stays disabled', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const { provider, consumer } = createRequiredPair()
     await host.use(provider, consumer)
     await host.plugin.disable('A', { policy: 'cascade' })
@@ -20,13 +32,33 @@ describe('dependency validation codes', () => {
   it('throws the dependency code itself rather than an install wrapper', async () => {
     const missing = createRequiredPair()
     await expect(
-      new PluginHost<Record<string, never>>({ execution }).use(missing.consumer)
+      new PluginHost<
+        Record<string, never>,
+        never,
+        readonly [],
+        Record<never, never>,
+        typeof nativeModules
+      >({
+        modules: nativeModules,
+        pipeline: { mode: 'sync' },
+        execution
+      }).use(missing.consumer)
     ).rejects.toMatchObject({
       code: PluginHostErrorCode.prerequisiteMissing
     })
 
     const disabled = createRequiredPair()
-    const disabledHost = new PluginHost<Record<string, never>>({ execution })
+    const disabledHost = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     await disabledHost.use(disabled.provider)
     await disabledHost.plugin.disable('A')
     await expect(disabledHost.use(disabled.consumer)).rejects.toMatchObject({
@@ -34,7 +66,17 @@ describe('dependency validation codes', () => {
     })
 
     const removed = createRequiredPair()
-    const removedHost = new PluginHost<Record<string, never>>({ execution })
+    const removedHost = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     await removedHost.use(removed.provider)
     await removedHost.unUse('A')
     await expect(removedHost.use(removed.consumer)).rejects.toMatchObject({
@@ -47,14 +89,34 @@ describe('dependency validation codes', () => {
   it('names the missing Feature in the prerequisite message', async () => {
     const { consumer } = createRequiredPair()
     await expect(
-      new PluginHost<Record<string, never>>({ execution }).use(consumer)
+      new PluginHost<
+        Record<string, never>,
+        never,
+        readonly [],
+        Record<never, never>,
+        typeof nativeModules
+      >({
+        modules: nativeModules,
+        pipeline: { mode: 'sync' },
+        execution
+      }).use(consumer)
     ).rejects.toThrow(/value/)
   })
 })
 
 describe('post-install graph stays acyclic', () => {
   it('rejects a member that closes a cycle through a committed optional edge', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const bValue = defineFeature(() => ({ b: true }))
     const bSeed = definePlugin({ name: 'B', features: { value: bValue }, install: () => ({}) })
     const a = definePlugin({
@@ -77,7 +139,17 @@ describe('post-install graph stays acyclic', () => {
   })
 
   it('rejects a replacement that closes a cycle and keeps the previous provider serving', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const { provider, consumer } = createRequiredPair()
     const [providerHandle] = await host.use(provider, consumer)
     const cyclic = definePlugin({
@@ -96,7 +168,17 @@ describe('post-install graph stays acyclic', () => {
 
 describe('dependency plans', () => {
   it('lists every transitive required dependent as blockers', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const { provider, consumer } = createRequiredPair()
     const leaf = definePlugin({
       name: 'C',
@@ -130,12 +212,32 @@ describe('dependency plans', () => {
       },
       install: () => ({})
     })
-    const present = new PluginHost<Record<string, never>>({ execution })
+    const present = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     await present.use(provider, consumer)
     expect((await present.unUse('A', { dryRun: true })).edges).toEqual([
       { provider: 'A', consumer: 'B', optional: true }
     ])
-    const absent = new PluginHost<Record<string, never>>({ execution })
+    const absent = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     await absent.use(consumer)
     expect((await absent.unUse('B', { dryRun: true })).edges).toEqual([
       { provider: 'A', consumer: 'B', optional: true, status: 'optional-absent' }
@@ -145,7 +247,17 @@ describe('dependency plans', () => {
 
 describe('managed removal respects dependency edges', () => {
   it('rejects a managed removal that leaves a required dependent behind', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const composition = openComposition(host)
     const { provider, consumer } = createRequiredPair()
     const prepared = await composition.prepareAdmissions([
@@ -172,7 +284,17 @@ describe('managed removal respects dependency edges', () => {
 
 describe('lazy activation boundaries', () => {
   it('does not activate a lazy provider when dependency validation fails', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const install = vi.fn(() => ({}))
     const value = defineFeature(() => ({ value: 1 }))
     const lazy = definePlugin({ name: 'L', activation: 'lazy', features: { value }, install })
@@ -195,7 +317,17 @@ describe('lazy activation boundaries', () => {
   })
 
   it('keeps lazy consumers lazy and activates lazy providers before explicit activation', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const order: string[] = []
     const value = defineFeature(() => ({ value: 1 }))
     const provider = definePlugin({
@@ -228,7 +360,17 @@ describe('lazy activation boundaries', () => {
   })
 
   it('keeps lazy batch members inactive when only lazy members require them', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const { provider } = createRequiredPair({ lazyProvider: true })
     const lazyConsumer = definePlugin({
       name: 'B',

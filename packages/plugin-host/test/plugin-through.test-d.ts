@@ -1,9 +1,15 @@
+import { nativeModules } from './native-modules.ts'
 /** Keeps through payloads exact and preserves use as stage-only registration. */
 import { defineHost, pipelineSpec, type IPluginHostCoreFor } from '../src/index.ts'
 
 /** Genuine declarations provide both the current registration and target-name payload types. */
 const host = defineHost({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
+  modules: nativeModules,
+
+  host: {
+    pipeline: { mode: 'sync' },
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  },
   pipelines: {
     y: pipelineSpec<{ count: number }>()({ mode: 'async' }),
     z: pipelineSpec<{ count: number }>()({ mode: 'async' }),

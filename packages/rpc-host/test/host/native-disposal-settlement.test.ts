@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Native disposal retains C157's completion, cleanup leaf and actual RPC resource ownership. */
 import { Session as InspectorSession } from 'node:inspector/promises'
 import type { Runtime } from 'node:inspector'
@@ -185,6 +186,7 @@ async function nativeCleanupFailure(): Promise<void> {
   )
   /** Native lifecycle and transaction owners remain unmodified, including disposal completion. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: {
       identity: { name: 'cycle-l-discovery-cleanup' },
@@ -390,6 +392,7 @@ function nativeResourceHost(name: string) {
   )
   /** Native scopes, rollback and terminal completion remain the actual implementation. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: {
       identity: { name },

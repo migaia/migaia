@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { defineFeature, definePlugin } from '../src/index.ts'
+import { definePlugin } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { FeatureHost } from './plugin-host-fixtures.ts'
 
 describe('PluginHost', () => {

@@ -1,27 +1,58 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import {
   definePlugin,
-  defineFeature,
   PluginHost,
   type IPluginBeforeReleaseContext,
   type IPluginConstraint,
   type IPluginHostCore,
   type IPluginRemoval
 } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { readDefinedPluginDefinition } from '../src/define-plugin.ts'
-import { snapshotPluginDefinitions } from '../src/admission-runtime.ts'
+import { snapshotPluginDefinitions } from '../src/definition-snapshots.ts'
 import ERROR_TEXT from '../src/error-text.ts'
 
 /** Exposes synchronous admission to prove it rejects malformed hooks before mutation. */
-class SyncHost extends PluginHost<Record<string, never>> {
+class SyncHost extends PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   admit(plugins: readonly IPluginConstraint<any>[]) {
     return this.useSync(plugins)
   }
 }
 
 /** Exposes one sync pipeline traversal to observe lease visibility during release. */
-class NumberHost extends PluginHost<Record<string, never>, number> {
+class NumberHost extends PluginHost<
+  Record<string, never>,
+  number,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   run(value: number): number {
     let output = value
     this.runPipeline(value, (next) => {
@@ -33,7 +64,15 @@ class NumberHost extends PluginHost<Record<string, never>, number> {
 
 describe('committed removal result', () => {
   it('returns the applied frozen plan rather than a dry-run result', async () => {
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     await host.use(definePlugin({ name: 'a', install: () => ({}) }))
@@ -57,7 +96,15 @@ describe('committed removal result', () => {
   })
 
   it('uses the mutation-time plan after an intervening admission and omits old suspensions', async () => {
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const p = definePlugin({
@@ -181,7 +228,8 @@ describe('release hook definition capture', () => {
     const source = { name: 'valid', install: () => ({}), beforeRelease: original }
     const defined = definePlugin(source)
     const trusted = readDefinedPluginDefinition(defined)
-    expect(trusted?.beforeRelease).toBe(defined.beforeRelease)
+    expect(trusted?.beforeRelease).toBe(original)
+    expect(Object.hasOwn(defined, 'beforeRelease')).toBe(false)
     source.beforeRelease = replacement
     trusted?.beforeRelease?.({
       signal: new AbortController().signal,
@@ -336,7 +384,15 @@ describe('pre-release transaction', () => {
     const hookFailure = new Error('hook failure')
     const disposeFailure = new Error('dispose failure')
     const resourceFailure = new Error('resource failure')
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     await host.use(
@@ -372,7 +428,15 @@ describe('pre-release transaction', () => {
   })
 
   it('rejects precommit failures without changing the Host revision or disposing work', async () => {
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const dispose = vi.fn()
@@ -404,7 +468,15 @@ describe('pre-release transaction', () => {
   })
 
   it('runs once for disabled and suspended registrations but skips an inactive lazy plugin', async () => {
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const disabledHook = vi.fn((context: IPluginBeforeReleaseContext) => {
@@ -465,7 +537,15 @@ describe('pre-release transaction', () => {
     const entered = new Promise<void>((resolve) => {
       enterHook = resolve
     })
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       scheduler,
       disposeStepTimeoutMs: 100,
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -528,7 +608,15 @@ describe('pre-release transaction', () => {
       enterSecond?.()
       return secondPending
     }
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       scheduler,
       disposeStepTimeoutMs: 100,
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -570,7 +658,15 @@ describe('pre-release transaction', () => {
 
   it('reports no deadline when the admitted disposer budget is unbounded', async () => {
     let observed: IPluginBeforeReleaseContext | undefined
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       disposeStepTimeoutMs: false,
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })

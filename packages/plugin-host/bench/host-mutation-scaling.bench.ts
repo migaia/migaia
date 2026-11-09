@@ -1,11 +1,25 @@
+import { nativeModules } from '../test/native-modules.ts'
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 
 /** Builds a real host with the requested number of unrelated committed registrations. */
-const createHost = async (size: number): Promise<PluginHost<Record<string, never>>> => {
+const createHost = async (
+  size: number
+): Promise<
+  PluginHost<Record<string, never>, never, readonly [], Record<never, never>, typeof nativeModules>
+> => {
   /** Host whose config facade is measured after all installations finish. */
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   /** Independent registrations make lookup cost the only size-dependent read work. */
@@ -21,7 +35,15 @@ const createHost = async (size: number): Promise<PluginHost<Record<string, never
 }
 
 /** Measures one 10,000-read sample after a short JIT warmup. */
-const measureConfigGet = (host: PluginHost<Record<string, never>>): number => {
+const measureConfigGet = (
+  host: PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >
+): number => {
   for (let index = 0; index < 1000; index += 1) host.config.get('config-0.value' as never)
   /** Monotonic clock around the exact operation count. */
   const started = performance.now()
@@ -33,8 +55,20 @@ const measureConfigGet = (host: PluginHost<Record<string, never>>): number => {
 }
 
 /** Builds the required dependency chain before measuring leaf-only work. */
-const createChainHost = async (size: number): Promise<PluginHost<Record<string, never>>> => {
-  const host = new PluginHost<Record<string, never>>({
+const createChainHost = async (
+  size: number
+): Promise<
+  PluginHost<Record<string, never>, never, readonly [], Record<never, never>, typeof nativeModules>
+> => {
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   const plugins: any[] = []
@@ -217,12 +251,22 @@ const measureMutation = async (size: number, operation: IOperation): Promise<num
 
 /** Measures constructor-only synchronous leaf installations after the chain is present. */
 const measureUseSync = async (size: number): Promise<number> => {
-  class ConstructorHost extends PluginHost<Record<string, never>> {
+  class ConstructorHost extends PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  > {
     /** Mean cost of 950 timed single-leaf calls after 50 warmup calls. */
     readonly leafMs: number
 
     constructor() {
-      super({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
+      super({
+        modules: nativeModules,
+        pipeline: { mode: 'sync' },
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       const plugins: any[] = []
       let previous: any
       for (let index = 0; index < size; index += 1) {
@@ -258,12 +302,20 @@ const measureUseSync = async (size: number): Promise<number> => {
 
 /** Records E-c's alternating mutation and run cost without imposing a ratio. */
 const measureAlternatingRun = async (size: number): Promise<number> => {
-  class RunningHost extends PluginHost<Record<string, never>, number> {
+  class RunningHost extends PluginHost<
+    Record<string, never>,
+    number,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  > {
     run(): void {
       this.runPipeline(0, () => {})
     }
   }
   const host = new RunningHost({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   try {
@@ -336,7 +388,15 @@ describe('host mutation scaling', () => {
   it('keeps dependency-chain mutations independent of the chain length', async () => {
     /** Builds a required chain and returns the host plus the tail feature reference. */
     const chainWithTail = async (size: number) => {
-      const host = new PluginHost<Record<string, never>>({
+      const host = new PluginHost<
+        Record<string, never>,
+        never,
+        readonly [],
+        Record<never, never>,
+        typeof nativeModules
+      >({
+        modules: nativeModules,
+        pipeline: { mode: 'sync' },
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
       })
       /** Chain members in dependency order. */
@@ -400,7 +460,15 @@ describe('host mutation scaling', () => {
     }
     /** Builds the chain one `use` at a time, the pre-fix procedure, per member. */
     const sequentialBuild = async (size: number) => {
-      const host = new PluginHost<Record<string, never>>({
+      const host = new PluginHost<
+        Record<string, never>,
+        never,
+        readonly [],
+        Record<never, never>,
+        typeof nativeModules
+      >({
+        modules: nativeModules,
+        pipeline: { mode: 'sync' },
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
       })
       try {

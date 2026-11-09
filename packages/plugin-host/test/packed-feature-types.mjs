@@ -23,7 +23,10 @@ const run = (command, args, cwd) => execFileSync(command, args, { cwd, stdio: 'i
 const packageDirectory = extractPackedPackage(temporary, resolve(archive))
 
 const fixtures = {
-  storage: String.raw`import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
+  storage: String.raw`import { PluginHost, definePlugin } from '@migaia/plugin-host'
+import {defineFeature,featuresModule} from '@migaia/plugin-host/features'
+import {featureDependenciesModule} from '@migaia/plugin-host/feature-dependencies'
+const modules=[featuresModule,featureDependenciesModule] as const
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IFeatureCore } from '@migaia/plugin-host'
 type IStore = Readonly<{ id: 'memory'; custom(): 'custom' }>
@@ -64,7 +67,7 @@ const bindKind = <TId extends string>(value: IKind<TId, IStore>, id: TId): void 
 bindKind<'memory'>(wrongKind, 'memory')
 const inspection = inspectFeatures({ selected })
 if (observedCalls() !== 0 || inspection.ordered.length !== 3) throw new Error('storage inspection')
-class ConsumerHost extends PluginHost<Record<string, never>> { constructor() { super({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }) } }
+class ConsumerHost extends PluginHost<Record<string, never>,never,readonly [],Record<never,never>,typeof modules> { constructor() { super({modules, execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }) } }
 const firstHost = new ConsumerHost()
 const secondHost = new ConsumerHost()
 const [first] = await firstHost.use(plugin)
@@ -77,7 +80,10 @@ if (observedCalls() !== 6 || first.extensions.getStore() === second.extensions.g
 await firstHost.dispose()
 await secondHost.dispose()
 `,
-  webRpc: String.raw`import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
+  webRpc: String.raw`import { PluginHost, definePlugin } from '@migaia/plugin-host'
+import {defineFeature,featuresModule} from '@migaia/plugin-host/features'
+import {featureDependenciesModule} from '@migaia/plugin-host/feature-dependencies'
+const modules=[featuresModule,featureDependenciesModule] as const
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IFeatureCore } from '@migaia/plugin-host'
 type IOutboundExpose = Readonly<{ send(value: string): Promise<string>; send<T>(value: T): Promise<T> }>
@@ -94,7 +100,7 @@ const plugin = definePlugin({ name: 'rpc', features: { combined }, featureExpose
 } })
 const inspection = inspectFeatures({ combined })
 if (observedCalls() !== 0 || inspection.ordered.length !== 3) throw new Error('rpc inspection')
-class ConsumerHost extends PluginHost<Record<string, never>> { constructor() { super({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }) } }
+class ConsumerHost extends PluginHost<Record<string, never>,never,readonly [],Record<never,never>,typeof modules> { constructor() { super({modules, execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }) } }
 const host = new ConsumerHost()
 const [view] = await host.use(plugin)
 const literal: string = await view.extensions.connect('rpc')
@@ -104,7 +110,10 @@ if (false) view.extensions.send('hidden')
 if (observedCalls() !== 3 || literal !== 'rpc' || generic.id !== 1 || 'send' in view.extensions) throw new Error('rpc runtime')
 await host.dispose()
 `,
-  native: String.raw`import { PluginHost, defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+  native: String.raw`import { PluginHost, defineHost, definePlugin } from '@migaia/plugin-host'
+import {defineFeature,featuresModule} from '@migaia/plugin-host/features'
+import {featureDependenciesModule} from '@migaia/plugin-host/feature-dependencies'
+const modules=[featuresModule,featureDependenciesModule] as const
 import type { IFeatureCore } from '@migaia/plugin-host'
 type IExpose = Readonly<{ add(value: number): number }>
 const feature = defineFeature((core: IFeatureCore<IExpose>) => ({ run: <T,>(value: T) => value, add: core.featureExpose.add }))
@@ -148,7 +157,7 @@ if (false) {
   const domainHandle = defineHost<{ domain: number }>({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }, domainCore: () => ({ domain: 1 }) })
   await domainHandle.use(domainPlugin)
 }
-class Host extends PluginHost<Record<never, never>> { constructor() { super({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }) } }
+class Host extends PluginHost<Record<never, never>,never,readonly [],Record<never,never>,typeof modules> { constructor() { super({modules, execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }) } }
 const host = new Host()
 const [nativeHandle, , exposeHandle] = await host.use(plugin, empty, exposeOnly)
 const generic: { id: number } = nativeHandle.extensions.run({ id: 1 })
@@ -177,12 +186,13 @@ if (false) {
     }
   })
   const plain = definePlugin({ name: 'plain', install: () => ({}) })
-  type IPreparedLength = IAssert<IEqual<Parameters<typeof prepared.install>['length'], 2>>
-  type IPlainLength = IAssert<IEqual<Parameters<typeof plain.install>['length'], 1>>
+  type IPreparedLength = IAssert<IEqual<'install' extends keyof typeof prepared ? true : false, false>>
+  type IPlainLength = IAssert<IEqual<'install' extends keyof typeof plain ? true : false, false>>
   const preparedLength: IPreparedLength = true
   const plainLength: IPlainLength = true
   // @ts-expect-error No setup means no second install argument.
   definePlugin({ name: 'invalid', install: (_core, _out: number) => ({}) })
+  // @ts-expect-error Native results do not expose lifecycle hooks.
   plain.install({} as never)
   void preparedLength; void plainLength
 }

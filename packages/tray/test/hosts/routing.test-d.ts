@@ -1,4 +1,5 @@
-import { defineFeature, definePlugin } from '@migaia/plugin-host'
+import { definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { createTray, defineTrayHost, defineRoutingPolicy } from '@migaia/tray'
 import type { ITrayRoutingPolicy, ITrayRouting, ITrayRoutedRemote } from '@migaia/tray'
 /** Exact method metadata exercises routing without recursively expanding the plugin graph. */

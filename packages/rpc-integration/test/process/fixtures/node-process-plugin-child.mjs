@@ -1,4 +1,5 @@
-import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
+import { definePlugin, PluginHost } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 
 /** The real child serves the original scalar and two-yield generator through its native Host. */

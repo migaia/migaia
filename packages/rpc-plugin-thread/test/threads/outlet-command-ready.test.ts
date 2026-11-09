@@ -7,9 +7,8 @@ import {
 } from '../../dist/threads/node-launcher.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { defineHost } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
-import type { INativeFixtureHost } from './fixture.ts'
+import { createNativeFixtureHost, type INativeFixtureHost } from './fixture.ts'
 
 /** A real Worker uses only public factories and exposes its own admitted instance identity. */
 const entry = fileURLToPath(new URL('./fixtures/outlet-command-worker.mjs', import.meta.url))
@@ -24,10 +23,7 @@ describe('thread outlet command readiness', () => {
         () => host,
         (name, request) => host.pipeline(name, request)
       )
-      const host = defineHost({
-        ...rpc,
-        host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-      }) as INativeFixtureHost
+      const host = createNativeFixtureHost(rpc) as INativeFixtureHost
       /** Keep native diagnostics observable without changing their objects. */
       const reported: unknown[] = []
       /** Native channel and supervisor share the same scheduler. */

@@ -1,8 +1,11 @@
+import { PluginHostErrorCode } from './error-code.ts'
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns Host identity admission, monotonic issuance and entropy; the authority leaf owns
  * exact-target records.
  */
-import ERROR_TEXT, { createPluginHostTypeError } from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
 import type { IPluginHostIdentity } from './host-identity-types.ts'
 import { readHostIdentityRecord, recordHostIdentity } from './host-identity-authority.ts'
 export type { IPluginHostIdentity } from './host-identity-types.ts'
@@ -18,7 +21,10 @@ export const issueHostIdentity = (
   nodeOwner?: object
 ): IPluginHostIdentity => {
   if (typeof name !== 'string' || name.length === 0)
-    throw createPluginHostTypeError(ERROR_TEXT.HOST_IDENTITY_NAME)
+    throw attachErrorIdentity(new TypeError(ERROR_TEXT.HOST_IDENTITY_NAME), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   /** A public facade and its runtime represent one Host, including identity and private node. */
   const owner = nodeOwner ? readHostIdentityRecord(nodeOwner) : undefined
   if (owner) {
@@ -39,7 +45,13 @@ export const issueHostIdentity = (
     const bytes = entropy!.getRandomValues(new Uint8Array(16))
     nodeId = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
   } catch (cause) {
-    throw createPluginHostTypeError(ERROR_TEXT.HOST_IDENTITY_ENTROPY, { cause })
+    throw attachErrorIdentity(
+      new TypeError(
+        ERROR_TEXT.HOST_IDENTITY_ENTROPY,
+        cause !== undefined ? { cause: cause } : undefined
+      ),
+      { source: PLUGIN_HOST_SOURCE, code: PluginHostErrorCode.invalidOption }
+    )
   }
   recordHostIdentity(host, Object.freeze({ identity, nodeId }))
   return identity

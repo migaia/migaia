@@ -5,7 +5,7 @@ import type { IFilePluginConfig } from './typing.ts'
 /** Create a portable file output only with an explicit writer; no native filesystem is imported. */
 export function filePlugin<const F extends ILogFeatureRecord = Record<never, never>>(
   options: IFilePluginConfig<F>
-) {
+): ReturnType<typeof createFilePlugin<F>> {
   return createFilePlugin(options)
 }
 

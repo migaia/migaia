@@ -101,6 +101,8 @@ class CoreMemoryServer {
   #closed = false
   /** A cold optional codec factory lends real SDK capture to each original physical endpoint. */
   readonly #codec: ICoreCodec | undefined
+  /** Optional acceptance barrier holds the real transport open continuation before commit. */
+  readonly #onOpen: (() => Promise<void>) | undefined
   /** Public root options keep the original baseline construction shape. */
   readonly options: IRpcHostOptions
   /** The genuine cold definition may join a public host with other transport namespaces. */
@@ -113,16 +115,18 @@ class CoreMemoryServer {
     namespace: string,
     features: IFeatureRecord,
     expose: readonly string[],
-    codec?: ICoreCodec
+    codec?: ICoreCodec,
+    onOpen?: () => Promise<void>
   ) {
     this.#codec = codec
+    this.#onOpen = onOpen
     this.transport = defineTransportPlugin({
       name: `${namespace}-${name}-transport`,
       namespace,
       closingWrites: codec?.closingWrites,
       features,
       expose,
-      open: this.#open
+      open: onOpen ? this.#openHeld : this.#open
     })
     this.options = {
       self: { name, instanceId },
@@ -166,6 +170,14 @@ class CoreMemoryServer {
     await connection.link(this.#context)
   }
 
+  /** Only a barrier scenario delays the original open result; ordinary fixtures stay synchronous. */
+  readonly #openHeld = async (context: IRpcTransportContext) => {
+    /** This original result retains the real listener resource and disposer identity. */
+    const installed = this.#open(context)
+    await this.#onOpen!()
+    return installed
+  }
+
   /** Native plugin-host owns the exact listener cleanup returned here. */
   readonly #open = (context: IRpcTransportContext) => {
     this.#context = context
@@ -185,9 +197,10 @@ export function coreMemoryServer(
   namespace = 'memory',
   features: IFeatureRecord = {},
   expose: readonly string[] = [],
-  codec?: ICoreCodec
+  codec?: ICoreCodec,
+  onOpen?: () => Promise<void>
 ) {
-  return new CoreMemoryServer(name, instanceId, namespace, features, expose, codec)
+  return new CoreMemoryServer(name, instanceId, namespace, features, expose, codec, onOpen)
 }
 
 /** Connect public hosts over the original pair; remote plugins precede its actual native transport. */

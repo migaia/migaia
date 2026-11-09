@@ -1,3 +1,7 @@
+import { pipelineModes } from './pipeline-test-helpers.ts'
+import { syncMode } from '../src/modes/sync.ts'
+import { asyncGeneratorMode } from '../src/modes/async-generator.ts'
+import { generatorMode } from '../src/modes/generator.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -43,7 +47,7 @@ const runMode = (
   done = vi.fn()
 ): unknown => {
   if (mode === MiddlewarePipelineMode.sync) {
-    const pipeline = createPipeline<number>({ mode, signal })
+    const pipeline = createPipeline<number>({ mode: pipelineModes[mode], signal })
     const stages = [
       (value: number, next: (value: number) => void) => {
         duringStage?.()
@@ -54,7 +58,7 @@ const runMode = (
     return pipeline.run(stages, 1, done)
   }
   if (mode === MiddlewarePipelineMode.async) {
-    const pipeline = createPipeline<number>({ mode, signal })
+    const pipeline = createPipeline<number>({ mode: pipelineModes[mode], signal })
     const stages = [
       async (value: number, next: (value: number) => Promise<void>) => {
         duringStage?.()
@@ -65,7 +69,7 @@ const runMode = (
     return pipeline.run(stages, 1, done)
   }
   if (mode === MiddlewarePipelineMode.generator) {
-    const pipeline = createPipeline<number>({ mode, signal })
+    const pipeline = createPipeline<number>({ mode: pipelineModes[mode], signal })
     const stages: readonly IGeneratorMiddlewareStage<number>[] = [
       function* (value: number) {
         duringStage?.()
@@ -80,7 +84,7 @@ const runMode = (
     ]
     return pipeline.run(stages, 1, done)
   }
-  const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.asyncGenerator, signal })
+  const pipeline = createPipeline<number>({ mode: asyncGeneratorMode, signal })
   const stages: readonly IAsyncGeneratorMiddlewareStage<number>[] = [
     async function* (value: number) {
       duringStage?.()
@@ -178,10 +182,10 @@ describe('pipeline internal cleanup', () => {
       invalidMode
     )
     expectInvalidOption(
-      thrown(() => createPipeline({ mode: MiddlewarePipelineMode.sync, onViolation: 1 } as never)),
+      thrown(() => createPipeline({ mode: syncMode, onViolation: 1 } as never)),
       invalidSignal
     )
-    const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
+    const pipeline = createPipeline<number>({ mode: syncMode })
     expectInvalidOption(
       thrown(() => pipeline.lift((() => {}) as never, MiddlewarePipelineMode.async as never)),
       unsupportedLift
@@ -219,7 +223,7 @@ describe('pipeline internal cleanup', () => {
       for (const control of invalidControls) {
         const stage = vi.fn()
         const done = vi.fn()
-        const pipeline = createPipeline<number>({ mode } as never)
+        const pipeline = createPipeline<number>({ mode: pipelineModes[mode] } as never)
         const run = () => pipeline.run([stage] as never, 1, done, control as never)
         if (mode === MiddlewarePipelineMode.sync || mode === MiddlewarePipelineMode.generator)
           expectInvalidOption(thrown(run), 'middleware pipeline signal option is invalid')
@@ -233,7 +237,7 @@ describe('pipeline internal cleanup', () => {
       }
       const reason = new Error('cancelled')
       const stage = vi.fn()
-      const pipeline = createPipeline<number>({ mode } as never)
+      const pipeline = createPipeline<number>({ mode: pipelineModes[mode] } as never)
       const run = () =>
         pipeline.run([stage] as never, 1, vi.fn(), { signal: AbortSignal.abort(reason) })
       if (mode === MiddlewarePipelineMode.sync || mode === MiddlewarePipelineMode.generator)
@@ -277,7 +281,7 @@ describe('pipeline internal cleanup', () => {
       throw cleanup
     }
     const pipeline = createPipeline<number>({
-      mode: MiddlewarePipelineMode.generator,
+      mode: generatorMode,
       signal: fixture.signal
     })
     const failure = thrown(() =>

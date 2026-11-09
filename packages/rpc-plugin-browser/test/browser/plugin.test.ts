@@ -1,5 +1,7 @@
+import { rpcNativeTestModules } from '../../../rpc-host/test/fixtures/native-modules.ts'
 import { expect, it } from 'vitest'
-import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
 /** The existing ordinary thread outlet accepts a registration and its remote method. */
@@ -217,6 +219,7 @@ it.each(['window', 'worker', 'shared', 'rtc'] as const)(
       (name, request) => host.pipeline(name, request)
     )
     const host = defineHost({
+      modules: rpcNativeTestModules,
       ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })

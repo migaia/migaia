@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 import { definePlugin, PluginHost, type IPluginConstraint } from '../src/index.ts'
 import type { IPluginSetup, IPluginSetupContext, IPluginSetupOperation } from '@migaia/plugin-host'
 
@@ -35,18 +36,20 @@ const withSetup = definePlugin({
     }
   }
 })
-type ISetupArity = IAssert<IEqual<Parameters<typeof withSetup.install>['length'], 2>>
+type ISetupArity = IAssert<IEqual<'install' extends keyof typeof withSetup ? true : false, false>>
 declare const setupArity: ISetupArity
 void setupArity
 
-const noSetup = definePlugin({ name: 'q', install: () => ({ plain: () => 1 }) })
-type IPlainArity = IAssert<IEqual<Parameters<typeof noSetup.install>['length'], 1>>
+/** Source hook retains its declared arity while the returned definition hides hooks. */
+const plainInstall = (_core: unknown) => ({ plain: () => 1 as const })
+const noSetup = definePlugin({ name: 'q', install: plainInstall })
+type IPlainArity = IAssert<IEqual<Parameters<typeof plainInstall>['length'], 1>>
 declare const plainArity: IPlainArity
 void plainArity
-const one: 1 = (undefined as unknown as Parameters<typeof noSetup.install>).length
+const one: 1 = (undefined as unknown as Parameters<typeof plainInstall>).length
 void one
 // @ts-expect-error A plain hook has exactly one declared parameter.
-const two: 2 = (undefined as unknown as Parameters<typeof noSetup.install>).length
+const two: 2 = (undefined as unknown as Parameters<typeof plainInstall>).length
 void two
 
 definePlugin({
@@ -61,7 +64,13 @@ definePlugin({
   install: () => ({})
 })
 
-declare const host: PluginHost<Record<string, never>>
+declare const host: PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+>
 // @ts-expect-error Raw plain definitions cannot receive a setup output.
 host.use({ name: 'raw-install', install: (_core: unknown, _out: number) => ({}) })
 // @ts-expect-error Raw plain feature exposure cannot receive a setup output.
@@ -90,7 +99,7 @@ void setupExt
 void plainExt
 
 declare const generic: IPluginConstraint<any>
-generic.install({} as never)
+if (typeof generic.install === 'function') generic.install({} as never)
 
 definePlugin(
   'functional',

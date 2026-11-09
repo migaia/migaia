@@ -1,18 +1,29 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  defineFeature,
-  defineHost,
-  definePlugin,
-  PluginHost,
-  PluginHostErrorCode
-} from '../src/index.ts'
+import { defineHost, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import type { IPluginHostCore } from '../src/index.ts'
 
 /** Explicit unbounded policy keeps enablement tests independent of wall-clock timing. */
 const execution = { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
 
 /** Test Host exposing the protected synchronous pipeline runner. */
-class Host extends PluginHost<Record<string, never>, string> {
+class Host extends PluginHost<
+  Record<string, never>,
+  string,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   run(value = ''): string {
     let result = value
     this.runPipeline(value, (next) => {
@@ -28,7 +39,11 @@ const extensionPlugin = (name: string) =>
 
 describe('plugin enablement', () => {
   it('class and handle share one enablement runtime through the functional Host', async () => {
-    const handle = defineHost({ host: { execution } })
+    const handle = defineHost({
+      modules: nativeModules,
+
+      host: { pipeline: { mode: 'sync' }, execution }
+    })
     const [pluginHandle] = await handle.use(extensionPlugin('bridge'))
     await handle.plugin.disable('bridge')
     expect(handle.plugin.disabled()).toEqual(['bridge'])

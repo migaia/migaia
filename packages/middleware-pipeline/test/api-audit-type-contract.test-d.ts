@@ -1,3 +1,5 @@
+import { asyncGeneratorMode } from '../src/modes/async-generator.ts'
+import { generatorMode } from '../src/modes/generator.ts'
 import { createPipeline, GENERATOR_UNDEFINED, type ICreatePipelineOptions } from '../src/index.ts'
 // @ts-expect-error Internal mode predicate is not a public type contract.
 import type { IMiddlewarePipelineSyncMode } from '../src/index.ts'
@@ -8,7 +10,7 @@ void hidden
 
 /** Custom sentinels are control values; the payload remains strictly numeric. */
 const signals = { undefined: Symbol('u'), halt: Symbol('h'), continue: Symbol('c') }
-const generator = createPipeline<number>({ mode: 'generator', signals })
+const generator = createPipeline<number>({ mode: generatorMode, signals })
 generator.run(
   [
     function* () {
@@ -20,7 +22,7 @@ generator.run(
     value.toFixed()
   }
 )
-const asyncGenerator = createPipeline<number>({ mode: 'async-generator', signals })
+const asyncGenerator = createPipeline<number>({ mode: asyncGeneratorMode, signals })
 void asyncGenerator.run(
   [
     async function* () {
@@ -34,7 +36,7 @@ void asyncGenerator.run(
 )
 
 /** Default sentinels keep the existing guard against undefined payload in a numeric pipeline. */
-const defaults = createPipeline<number>({ mode: 'generator' })
+const defaults = createPipeline<number>({ mode: generatorMode })
 defaults.run(
   [
     // @ts-expect-error An explicit undefined terminal requires undefined in the payload type.
@@ -50,7 +52,7 @@ defaults.run(
  * Annotated supported options must retain custom control support even when signals is optional in
  * the annotation.
  */
-const typedOptions: ICreatePipelineOptions<'generator'> = { mode: 'generator', signals }
+const typedOptions: ICreatePipelineOptions<'generator'> = { mode: generatorMode, signals }
 const typedGenerator = createPipeline<number>(typedOptions)
 typedGenerator.run(
   [

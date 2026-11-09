@@ -1,3 +1,5 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns Host stage admission and execution settlement; middleware and lifecycle retain runner and
  * lease authority.
@@ -13,12 +15,8 @@ import {
   type IMiddlewarePipelineStage,
   type IMiddlewarePipelineViolationHandler
 } from '@migaia/middleware-pipeline'
-import ERROR_TEXT, {
-  PluginHostError,
-  attachPluginHostIdentity,
-  createPluginHostTypeError,
-  PluginHostInternalText
-} from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
+import { PluginHostError, attachPluginHostIdentity } from './errors.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import type { IDataOrderSlotState } from './composition.ts'
 import type { IRegistration } from './registry.ts'
@@ -104,7 +102,10 @@ export const registerPluginHostStage = <TDomainCore extends object, TValue>(
 ): (() => void) => {
   const { stage, owner } = options
   if (typeof stage !== 'function')
-    throw createPluginHostTypeError(PluginHostInternalText.PIPELINE_STAGE_FUNCTION)
+    throw attachErrorIdentity(new TypeError(PluginHostInternalText.PIPELINE_STAGE_FUNCTION), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   if (owner && owner.lifecycle !== PluginHostRegistrationLifecycle.install)
     throw new PluginHostError(
       PluginHostErrorCode.resourceOutsideInstall,

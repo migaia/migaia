@@ -1,5 +1,7 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 
 /** Creates one optional provider-consumer pair and captures the injected value. */
 const createPair = () => {
@@ -21,14 +23,30 @@ const createPair = () => {
 describe('optional dependencies', () => {
   it('resolves once without blocking provider removal', async () => {
     const absent = createPair()
-    const first = new PluginHost<Record<string, never>>({
+    const first = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     await first.use(absent.consumer)
     expect(absent.received()).toBeUndefined()
 
     const present = createPair()
-    const second = new PluginHost<Record<string, never>>({
+    const second = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     await second.use(present.provider, present.consumer)

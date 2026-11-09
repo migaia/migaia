@@ -1,16 +1,12 @@
+import { trayNativeTestModules } from './native-modules.ts'
 import type {
   IHostBaselinePlugins,
   ICanResolveReadyDefinitions,
   IResolveReadyTrayPlugins
 } from '../src/host/typing.ts'
 import { describe, expect, it } from 'vitest'
-import {
-  defineFeature,
-  definePlugin,
-  PluginHost,
-  type IFeatureReference,
-  type IPlugin
-} from '@migaia/plugin-host'
+import { definePlugin, PluginHost, type IFeatureReference, type IPlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import {
   createHost,
   type ITrayHost,
@@ -245,7 +241,10 @@ const replacementPlugin = {
 
 const hostOptions = {
   create: () =>
-    new TypeHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }),
+    new TypeHost({
+      modules: trayNativeTestModules,
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    }),
   plugins: [readyPlugin, blockedPlugin] as const,
   mutationAdmissionMs: 100,
   quiescenceMs: 100,

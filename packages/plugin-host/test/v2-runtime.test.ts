@@ -1,8 +1,25 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 
-class V2Host extends PluginHost<Record<string, never>, string> {}
+class V2Host extends PluginHost<
+  Record<string, never>,
+  string,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+}
 
 describe('PluginHost V2 runtime contract', () => {
   it('validates execution policy before touching unrelated option getters', () => {
@@ -61,6 +78,8 @@ describe('PluginHost V2 runtime contract', () => {
       secondInstallStarted = resolve
     })
     const host = new V2Host({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: 1000, pipelineDrainTimeoutMs: 1000 }
     })
     const staged = defineFeature(() => ({ value: 'visible-inside-batch' }))
@@ -97,6 +116,8 @@ describe('PluginHost V2 runtime contract', () => {
     /** Exact synchronous cleanup failure retained by the structured disposal result. */
     const cleanupError = new Error('settled cleanup failure')
     const host = new V2Host({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: 100, pipelineDrainTimeoutMs: 100 }
     })
     await host.use({
@@ -116,6 +137,8 @@ describe('PluginHost V2 runtime contract', () => {
   it('publishes immutable extension views and revokes stale views', async () => {
     /** Host under test with explicit bounded operation policy. */
     const host = new V2Host({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: 100, pipelineDrainTimeoutMs: 100 }
     })
     /** Materialized V2 view returned by composition. */
@@ -148,6 +171,8 @@ describe('PluginHost V2 runtime contract', () => {
   it('keeps operation and registration signals distinct', async () => {
     /** Host under test with explicit bounded operation policy. */
     const host = new V2Host({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: 100, pipelineDrainTimeoutMs: 100 }
     })
     /** Signal supplied for the current install operation. */
@@ -156,7 +181,7 @@ describe('PluginHost V2 runtime contract', () => {
     let lifecycleSignal: unknown
     await host.use({
       name: 'signals',
-      install: (core) => {
+      install: (core: import('../src/plugin-core-types.ts').IPluginHostCore<string>) => {
         operationSignal = core.operation.signal
         lifecycleSignal = core.lifecycle.signal
         return {}

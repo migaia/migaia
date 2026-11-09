@@ -1,6 +1,8 @@
+import { CAPABILITY_SOURCE } from './errors.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { CapabilityErrorCode } from './error-code.ts'
 import { CapabilityErrorText } from './error-text.ts'
-import { createCapabilityError, tagCapabilityError } from './errors.ts'
+
 import { isNativeErrorValue } from '@migaia/utils/error'
 
 /** Read-only Host boundary consumed once during Graph admission. */
@@ -52,10 +54,10 @@ export function snapshotGraphReadiness(
     state !== GraphReadinessState.blocked &&
     state !== GraphReadinessState.failed
   ) {
-    throw createCapabilityError(
-      CapabilityErrorCode.invalidOption,
-      CapabilityErrorText.invalidReadinessState
-    )
+    throw attachErrorIdentity(new Error(CapabilityErrorText.invalidReadinessState), {
+      source: CAPABILITY_SOURCE,
+      code: CapabilityErrorCode.invalidOption
+    })
   }
   let error: unknown | undefined
   try {
@@ -73,14 +75,16 @@ export function snapshotGraphReadiness(
 function normalizeReadinessGetterFailure(thrown: unknown): Error {
   if (isNativeErrorValue(thrown)) {
     try {
-      return tagCapabilityError(thrown, CapabilityErrorCode.invalidOption)
+      return attachErrorIdentity(thrown, {
+        source: CAPABILITY_SOURCE,
+        code: CapabilityErrorCode.invalidOption
+      })
     } catch {
       // Immutable or foreign-coded failures retain their original identity through the fallback cause.
     }
   }
-  return createCapabilityError(
-    CapabilityErrorCode.invalidOption,
-    CapabilityErrorText.optionsSnapshotFailed,
-    { cause: thrown }
+  return attachErrorIdentity(
+    new Error(CapabilityErrorText.optionsSnapshotFailed, { cause: thrown }),
+    { source: CAPABILITY_SOURCE, code: CapabilityErrorCode.invalidOption }
   )
 }

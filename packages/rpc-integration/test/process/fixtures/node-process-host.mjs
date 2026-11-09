@@ -1,6 +1,7 @@
 import { RpcCapability } from '@migaia/rpc-contract'
 import { readFileSync } from 'node:fs'
-import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
+import { definePlugin, PluginHost } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   dialProcessByteChannel,

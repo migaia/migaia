@@ -1,4 +1,6 @@
-import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
@@ -30,13 +32,13 @@ function receivingHost() {
     (key, request) => host.pipeline(key, request)
   )
   /** Original native lifecycle options remain unchanged on the sole transaction owner. */
-  const host = defineHost({ ...rpc, ...nativeFixture.options })
+  const host = defineHost({ modules: rpcNativeTestModules, ...rpc, ...nativeFixture.options })
   return host
 }
 
 it('cold native Host disposal preserves the original Promise before any installation', async () => {
   /** C049 creates the actual native owner but never installs its prepared descriptor inventory. */
-  const native = defineHost(nativeFixture.options)
+  const native = defineHost({ ...nativeFixture.options, modules: rpcNativeTestModules })
   /** This is the original PluginHost completion, without an RPC Root or disposal facade. */
   const hostDispose = native.dispose()
   expect(native.dispose()).toBe(hostDispose)

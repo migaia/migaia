@@ -1,3 +1,5 @@
+import { CAPABILITY_SOURCE } from './errors.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Captures capability options, allowlists and activation recipes before publication. This module
  * owns input and thenable admission; it does not retain resources or drive host transitions.
@@ -6,7 +8,6 @@ import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migai
 import type { ICapabilityDefinition, ICapabilityHandle, ICapabilityHostOptions } from './index.ts'
 import { CapabilityErrorCode } from './error-code.ts'
 import { CapabilityErrorText } from './error-text.ts'
-import { createCapabilityError, tagCapabilityError } from './errors.ts'
 
 /** Construction snapshot preserves the original reporter receiver without rereading options. */
 export type IHostOptionsSnapshot = {
@@ -18,10 +19,10 @@ export type IHostOptionsSnapshot = {
 /** Validate option reads in their original order before creating lifecycle owners. */
 export function snapshotHostOptions(options: ICapabilityHostOptions): IHostOptionsSnapshot {
   if (options === null || (typeof options !== 'object' && typeof options !== 'function')) {
-    throw tagCapabilityError(
-      new TypeError(CapabilityErrorText.invalidOptions),
-      CapabilityErrorCode.invalidOption
-    )
+    throw attachErrorIdentity(new TypeError(CapabilityErrorText.invalidOptions), {
+      source: CAPABILITY_SOURCE,
+      code: CapabilityErrorCode.invalidOption
+    })
   }
   /** Reporter is captured first, so its failure precedes all flag reads. */
   let onError: ICapabilityHostOptions['onError']
@@ -30,25 +31,23 @@ export function snapshotHostOptions(options: ICapabilityHostOptions): IHostOptio
   try {
     onError = options.onError
   } catch (error) {
-    throw createCapabilityError(
-      CapabilityErrorCode.invalidOption,
-      CapabilityErrorText.optionsSnapshotFailed,
-      { cause: error }
+    throw attachErrorIdentity(
+      new Error(CapabilityErrorText.optionsSnapshotFailed, { cause: error }),
+      { source: CAPABILITY_SOURCE, code: CapabilityErrorCode.invalidOption }
     )
   }
   if (onError !== undefined && typeof onError !== 'function') {
-    throw tagCapabilityError(
-      new TypeError(CapabilityErrorText.invalidOnError),
-      CapabilityErrorCode.invalidOption
-    )
+    throw attachErrorIdentity(new TypeError(CapabilityErrorText.invalidOnError), {
+      source: CAPABILITY_SOURCE,
+      code: CapabilityErrorCode.invalidOption
+    })
   }
   try {
     flags = options.flags
   } catch (error) {
-    throw createCapabilityError(
-      CapabilityErrorCode.invalidOption,
-      CapabilityErrorText.optionsSnapshotFailed,
-      { cause: error }
+    throw attachErrorIdentity(
+      new Error(CapabilityErrorText.optionsSnapshotFailed, { cause: error }),
+      { source: CAPABILITY_SOURCE, code: CapabilityErrorCode.invalidOption }
     )
   }
   return { flags: copyHostFlags(flags), onError, receiver: options }
@@ -66,10 +65,9 @@ export function copyHostFlags(
   try {
     descriptors = Object.getOwnPropertyDescriptors(source)
   } catch (error) {
-    throw createCapabilityError(
-      CapabilityErrorCode.invalidOption,
-      CapabilityErrorText.flagsSnapshotFailed,
-      { cause: error }
+    throw attachErrorIdentity(
+      new Error(CapabilityErrorText.flagsSnapshotFailed, { cause: error }),
+      { source: CAPABILITY_SOURCE, code: CapabilityErrorCode.invalidOption }
     )
   }
   for (const [name, descriptor] of Object.entries(descriptors)) {
@@ -91,23 +89,22 @@ export function snapshotHostDefinition<Context>(
     name = definition?.name
     activate = definition?.activate
   } catch (error) {
-    throw createCapabilityError(
-      CapabilityErrorCode.invalidOption,
-      CapabilityErrorText.definitionSnapshotFailed,
-      { cause: error }
+    throw attachErrorIdentity(
+      new Error(CapabilityErrorText.definitionSnapshotFailed, { cause: error }),
+      { source: CAPABILITY_SOURCE, code: CapabilityErrorCode.invalidOption }
     )
   }
   if (typeof name !== 'string' || name.trim().length === 0) {
-    throw tagCapabilityError(
-      new TypeError(CapabilityErrorText.invalidName),
-      CapabilityErrorCode.invalidName
-    )
+    throw attachErrorIdentity(new TypeError(CapabilityErrorText.invalidName), {
+      source: CAPABILITY_SOURCE,
+      code: CapabilityErrorCode.invalidName
+    })
   }
   if (typeof activate !== 'function') {
-    throw tagCapabilityError(
-      new TypeError(CapabilityErrorText.invalidActivate(name)),
-      CapabilityErrorCode.invalidActivate
-    )
+    throw attachErrorIdentity(new TypeError(CapabilityErrorText.invalidActivate(name)), {
+      source: CAPABILITY_SOURCE,
+      code: CapabilityErrorCode.invalidActivate
+    })
   }
   /** Native method invocation preserves this.name without retaining the mutable definition. */
   const receiver = Object.freeze({
@@ -127,16 +124,16 @@ export function snapshotHostDisposer(
   try {
     disposer = handle?.dispose
   } catch (error) {
-    throw tagCapabilityError(
+    throw attachErrorIdentity(
       new TypeError(CapabilityErrorText.invalidHandle(name), { cause: error }),
-      CapabilityErrorCode.invalidHandle
+      { source: CAPABILITY_SOURCE, code: CapabilityErrorCode.invalidHandle }
     )
   }
   if (!handle || typeof disposer !== 'function') {
-    throw tagCapabilityError(
-      new TypeError(CapabilityErrorText.invalidHandle(name)),
-      CapabilityErrorCode.invalidHandle
-    )
+    throw attachErrorIdentity(new TypeError(CapabilityErrorText.invalidHandle(name)), {
+      source: CAPABILITY_SOURCE,
+      code: CapabilityErrorCode.invalidHandle
+    })
   }
   return disposer
 }

@@ -1,3 +1,7 @@
+import { featuresModule } from '@migaia/plugin-host/features'
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+import { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'
+import { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
 import { defineHost } from '@migaia/plugin-host'
@@ -30,6 +34,12 @@ if (child) {
       (name, request) => host.pipeline(name, request)
     )
     const host = defineHost({
+      modules: [
+        featuresModule,
+        featureDependenciesModule,
+        namedPipelinesModule,
+        asyncPipelineModule
+      ],
       ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })

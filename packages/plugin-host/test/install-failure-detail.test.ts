@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { PluginHost, PluginHostError } from '../src/index.ts'
 import type { IPluginInstallFailureDetail } from '../src/index.ts'
@@ -6,10 +7,18 @@ type IInstallCore = {
   onDispose(resource: () => void): void
 }
 
-class Host extends PluginHost<Record<string, never>, number> {
+class Host extends PluginHost<
+  Record<string, never>,
+  number,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   /** Supplies an explicit unbounded test policy while preserving test overrides. */
   constructor(options: any = {}) {
     super({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       ...options,
       execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })

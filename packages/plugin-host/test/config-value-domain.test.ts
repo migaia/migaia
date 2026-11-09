@@ -1,12 +1,28 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { definePlugin, PluginHost } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 import { PluginHostErrorCode, type IPluginHostErrorCode } from '../src/error-code.ts'
 import type { IPluginConfig } from '../src/plugin-lifecycle-types.ts'
 
 const options = { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } as const
-class ConfigHost extends PluginHost<Record<string, never>, unknown> {
+class ConfigHost extends PluginHost<
+  Record<string, never>,
+  unknown,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   protected createPluginDomainCore(): Record<string, never> {
     return {}
   }

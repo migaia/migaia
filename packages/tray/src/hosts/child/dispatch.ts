@@ -1,10 +1,6 @@
+import { defineFeature } from '@migaia/plugin-host/features'
 /** Admit one child's declared Feature paths and coordinate its original initialization/cleanup. */
-import {
-  defineFeature,
-  definePlugin,
-  type IPluginHandle,
-  type IPluginConstraint
-} from '@migaia/plugin-host'
+import { definePlugin, type IPluginHandle, type IPluginConstraint } from '@migaia/plugin-host'
 import type { IRpcContext } from '@migaia/rpc-host'
 import { DependencyAction, DependencyPolicy } from '@migaia/capability/graph/dependency'
 import { withTimeout } from '@migaia/utils/promise'

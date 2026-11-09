@@ -1,3 +1,4 @@
+import { trayNativeTestModules } from './native-modules.ts'
 import { getEventListeners } from 'node:events'
 import { defineLoader, loadIntoHost } from '../src/loader/index.ts'
 import { defineAdapter } from '../src/adapter/index.ts'
@@ -13,7 +14,10 @@ describe('Tray API audit', () => {
     /** Observe disposal through the actual installed plugin, without replacing an engine. */
     let disposals = 0
     /** This concrete host is intentionally offered twice through the supported factory option. */
-    const concrete = defineHost<Record<string, never>, string>({ host: { execution } })
+    const concrete = defineHost<Record<string, never>, string, typeof trayNativeTestModules>({
+      modules: trayNativeTestModules,
+      host: { execution }
+    })
     /** The first managed facade keeps ownership after the duplicate is rejected. */
     const first = await createHost({
       create: () => concrete,
@@ -53,7 +57,11 @@ describe('Tray API audit', () => {
 it('Tray-S01 ends admission cancellation while generation custody keeps the artifact', async () => {
   /** Actual managed Host owns the installed generation until explicit cleanup. */
   const host = await createHost({
-    create: () => defineHost<Record<string, never>, string>({ host: { execution } }),
+    create: () =>
+      defineHost<Record<string, never>, string, typeof trayNativeTestModules>({
+        modules: trayNativeTestModules,
+        host: { execution }
+      }),
     plugins: [],
     mutationAdmissionMs: 500,
     quiescenceMs: 0,
@@ -149,7 +157,11 @@ it('Tray-S02 snapshots the validated adapter getter once', () => {
 it('Tray-D02 publishes one disposal Promise before disposing observers run', async () => {
   /** Actual managed Host owns the installed generation until explicit cleanup. */
   const host = await createHost({
-    create: () => defineHost<Record<string, never>, string>({ host: { execution } }),
+    create: () =>
+      defineHost<Record<string, never>, string, typeof trayNativeTestModules>({
+        modules: trayNativeTestModules,
+        host: { execution }
+      }),
     plugins: [definePlugin({ name: 'work', install: () => ({}) })],
     mutationAdmissionMs: 500,
     quiescenceMs: 0,

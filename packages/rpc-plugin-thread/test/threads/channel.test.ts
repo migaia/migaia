@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../../../rpc-host/test/fixtures/native-modules.ts'
 import { MessageChannel } from 'node:worker_threads'
 import { EventEmitter } from 'node:events'
 import { defineHost } from '@migaia/plugin-host'
@@ -92,6 +93,7 @@ describe('thread channel ownership and portable boundary', () => {
         (name, request) => host.pipeline(name, request)
       )
       const host = defineHost({
+        modules: rpcNativeTestModules,
         ...rpc,
         host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       })

@@ -1,9 +1,19 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 
 /** Creates the required provider-consumer fixture used by removal and disable policy checks. */
 const createFixture = async () => {
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   const value = defineFeature(() => ({ value: 1 }))

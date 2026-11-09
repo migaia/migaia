@@ -1,3 +1,5 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns one setup attempt, its resource admission and abort subscriptions; publication stays in
  * install.
@@ -6,7 +8,8 @@ import { observeAbortSubscription } from '@migaia/lifecycle/abort'
 import { resolveDisposer } from './disposal.ts'
 import { reportDiagnostic } from './diagnostic-report.ts'
 import { PluginHostErrorCode } from './error-code.ts'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import { invokeCaptured } from './invocation.ts'
 import type { IInstallBatchContext } from './install-runtime.ts'
 import type { PluginHostOperationRuntime } from './operation-runtime.ts'
@@ -110,9 +113,19 @@ export class PluginHostSetupAttempt<TDomainCore extends object, TValue> {
     try {
       disposer = resolveDisposer(resource)
     } catch (cause) {
-      throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION, { cause })
+      throw attachErrorIdentity(
+        new TypeError(
+          ERROR_TEXT.INVALID_OPTION,
+          cause !== undefined ? { cause: cause } : undefined
+        ),
+        { source: PLUGIN_HOST_SOURCE, code: PluginHostErrorCode.invalidOption }
+      )
     }
-    if (!disposer) throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_RESOURCE_DISPOSER)
+    if (!disposer)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.PLUGIN_RESOURCE_DISPOSER), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     try {
       void Promise.resolve(disposer()).catch((error) => this.#reportLateRelease(error))
     } catch (error) {

@@ -1,3 +1,7 @@
+import { asyncMode } from '@migaia/middleware-pipeline/async'
+import { syncMode } from '@migaia/middleware-pipeline/sync'
+import { asyncGeneratorMode } from '@migaia/middleware-pipeline/async-generator'
+import { generatorMode } from '@migaia/middleware-pipeline/generator'
 import { describe, expect, it } from 'vitest'
 import {
   createPipeline,
@@ -49,11 +53,11 @@ describe('package exports', () => {
     /** Terminal values emitted by the four public modes. */
     const values: number[] = []
     /** Public mode instances resolved through the package boundary. */
-    const sync = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
-    const async = createPipeline<number>({ mode: MiddlewarePipelineMode.async })
-    const generator = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })
+    const sync = createPipeline<number>({ mode: syncMode })
+    const async = createPipeline<number>({ mode: asyncMode })
+    const generator = createPipeline<number>({ mode: generatorMode })
     const asyncGenerator = createPipeline<number>({
-      mode: MiddlewarePipelineMode.asyncGenerator
+      mode: asyncGeneratorMode
     })
 
     sync.run([stage], 1, (value) => values.push(value))

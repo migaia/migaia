@@ -1,6 +1,7 @@
 import type { IAsyncMiddlewareStage } from '@migaia/middleware-pipeline'
 import type {
   IFeature,
+  IDefinedPluginConstraint,
   IFeatureRecord,
   IHostHandle,
   IMergePluginExts,
@@ -74,6 +75,13 @@ export type ILogPlugin<
   F extends IFeatureRecord = Record<never, never>,
   E extends object = Record<never, never>
 > = IPlugin<ILogPluginCore, O, C, Record<never, never>, F, E>
+/** Native helper results expose the thin identity while raw ILogPlugin remains an authoring input. */
+export type IDefinedLogPlugin<
+  N extends string,
+  O extends Record<string, unknown>,
+  C extends IPluginConfig,
+  F extends IFeatureRecord
+> = IDefinedPluginConstraint<ILogPluginCore, ILogEntry, O, C, Record<never, never>, N, F>
 /** Plugin tuples retain each member's actual declaration instead of erasing extensions. */
 export type ILogPluginConstraint = IPluginConstraint<any>
 /** The peer owns extension intersection and overloaded method inference. */
@@ -99,6 +107,13 @@ export type ILogFeature<C extends object = Record<never, never>> = IFeature<
 >
 /** Plugin-host aliases retain exact feature output inference. */
 export type ILogFeatureRecord = Readonly<Record<string, ILogFeature<any>>>
+/** Output-only false entries disable the inherited role named by that record key. */
+export type ILogOutputFeatureRecord = Readonly<Record<string, ILogFeature<any> | false>>
+/** Disabled selections never enter plugin-host's native feature record. */
+export type IEnabledLogFeatures<F extends ILogOutputFeatureRecord> = {
+  readonly [K in keyof F as F[K] extends false ? never : K]: Exclude<F[K], false>
+}
+
 /** Installed format observations carry behavior without exposing a feature definition token. */
 export type ILogFormat = Extract<IFeatureImplementation, { phase: 'format' }>
 /** Merge separately named controls without erasing the empty-feature case. */
@@ -110,7 +125,7 @@ type IUnionToIntersection<T> = (T extends unknown ? (value: T) => void : never) 
 /** Controls use plugin and record names so host-wide and local policies can coexist. */
 export type ILogControlExtensions<
   N extends string,
-  F extends ILogFeatureRecord
+  F extends ILogOutputFeatureRecord
 > = keyof F extends never
   ? Record<never, never>
   : IUnionToIntersection<
@@ -152,7 +167,16 @@ export type ILogHostOptions<P extends readonly ILogPluginConstraint[] = readonly
 /** The frozen facade exposes host methods and the initially installed plugin extensions. */
 export type ILogHost<P extends readonly ILogPluginConstraint[] = readonly []> = Readonly<{
   ctx: ILogContext
-  config: IHostHandle<ILogPluginCore, ILogEntry, P>['config']
+  config: IHostHandle<
+    ILogPluginCore,
+    ILogEntry,
+    readonly [
+      typeof import('@migaia/plugin-host/features').featuresModule,
+      typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule
+    ],
+    'async',
+    P
+  >['config']
   status: LogHostStatus
   log(tag: string, message: string, ...args: unknown[]): void
   dispatchRaw(input: IRawEntryInput): void
@@ -164,6 +188,15 @@ export type ILogHost<P extends readonly ILogPluginConstraint[] = readonly []> = 
   use<const NewP extends readonly ILogPluginConstraint[]>(
     ...plugins: NewP
   ): Promise<IPluginHandleTuple<NewP>>
-  unUse: IHostHandle<ILogPluginCore, ILogEntry, P>['unUse']
+  unUse: IHostHandle<
+    ILogPluginCore,
+    ILogEntry,
+    readonly [
+      typeof import('@migaia/plugin-host/features').featuresModule,
+      typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule
+    ],
+    'async',
+    P
+  >['unUse']
 }> &
   IPluginExtensions<P>

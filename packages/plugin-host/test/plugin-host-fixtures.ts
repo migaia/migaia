@@ -1,7 +1,8 @@
+import { nativeModules } from './native-modules.ts'
 /** Owns shared fixture construction; test assertions remain in their focused suites. */
 import { vi, type Mock } from 'vitest'
-import { PluginHost } from '../src/host-runtime.ts'
-import { PluginHostError } from '../src/error-text.ts'
+import { PluginHost } from '../src/index.ts'
+import { PluginHostError } from '../src/errors.ts'
 import { PluginHost as PublicPluginHost } from '../src/index.ts'
 import type { IPluginConstraint } from '../src/plugin-definition-types.ts'
 import type { IPluginHostCore } from '../src/plugin-core-types.ts'
@@ -16,10 +17,18 @@ export type IStageCore = IExt & {
 }
 
 /** Numeric host preserves the original pipeline result and deadline policy. */
-export class Host extends PluginHost<IExt, number> {
+export class Host extends PluginHost<
+  IExt,
+  number,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   /** Supplies an explicit unbounded test policy while preserving test overrides. */
   constructor(options: any = {}) {
     super({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       ...options,
       execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
@@ -38,13 +47,21 @@ export class Host extends PluginHost<IExt, number> {
 }
 
 /** Native Feature host exposes the original synchronous installation seam. */
-export class FeatureHost extends PublicPluginHost<{}> {
+export class FeatureHost extends PublicPluginHost<
+  {},
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   /** Supplies the same unbounded lifecycle policy for native Feature integration checks. */
   constructor(
-    options: Omit<IPluginHostOptions, 'execution'> &
+    options: Omit<IPluginHostOptions, 'execution' | 'modules'> &
       Partial<Pick<IPluginHostOptions, 'execution'>> = {}
   ) {
     super({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       ...options,
       execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
@@ -64,13 +81,21 @@ export const plugin = (
 ) => ({ name, install, ...extra }) as never
 
 /** Records attempts to translate disposal errors through the protected host hook. */
-export class TranslatingHost extends PluginHost<Record<string, never>> {
+export class TranslatingHost extends PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   /** Per-instance receipt proves whether the host invokes the translation hook. */
   readonly translations: Mock = vi.fn()
 
   /** Supplies an explicit unbounded test policy while preserving test overrides. */
   constructor(options: any = {}) {
     super({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       ...options,
       execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })

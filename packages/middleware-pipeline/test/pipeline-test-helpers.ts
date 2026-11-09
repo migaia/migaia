@@ -1,3 +1,7 @@
+import { asyncMode } from '../src/modes/async.ts'
+import { syncMode } from '../src/modes/sync.ts'
+import { asyncGeneratorMode } from '../src/modes/async-generator.ts'
+import { generatorMode } from '../src/modes/generator.ts'
 import {
   createPipeline,
   MiddlewarePipelineMode,
@@ -22,13 +26,7 @@ export const runSyncForTest = <TValue>(
   done: (value: TValue, context?: IMiddlewarePipelineContext) => void,
   onViolation: IMiddlewarePipelineViolationHandler,
   control?: IMiddlewarePipelineControlOptions
-): void =>
-  createPipeline<TValue>({ mode: MiddlewarePipelineMode.sync, onViolation }).run(
-    stages,
-    value,
-    done,
-    control
-  )
+): void => createPipeline<TValue>({ mode: syncMode, onViolation }).run(stages, value, done, control)
 
 /** Runs one async baseline through the unified public factory. */
 export const runAsyncForTest = <TValue>(
@@ -36,12 +34,7 @@ export const runAsyncForTest = <TValue>(
   value: TValue,
   done: (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>,
   options: IAsyncTestOptions
-): Promise<void> =>
-  createPipeline<TValue>({ mode: MiddlewarePipelineMode.async, ...options }).run(
-    stages,
-    value,
-    done
-  )
+): Promise<void> => createPipeline<TValue>({ mode: asyncMode, ...options }).run(stages, value, done)
 
 /** Runs one generator baseline through the unified public factory. */
 export const runGeneratorForTest = <TValue>(
@@ -51,12 +44,7 @@ export const runGeneratorForTest = <TValue>(
   signals?: IGeneratorMiddlewareSignals,
   control?: IMiddlewarePipelineControlOptions
 ): void =>
-  createPipeline<TValue>({ mode: MiddlewarePipelineMode.generator, signals }).run(
-    stages,
-    value,
-    done,
-    control
-  )
+  createPipeline<TValue>({ mode: generatorMode, signals }).run(stages, value, done, control)
 
 /** Runs one async-generator baseline through the unified public factory. */
 export const runAsyncGeneratorForTest = <TValue>(
@@ -66,29 +54,21 @@ export const runAsyncGeneratorForTest = <TValue>(
   signals?: IGeneratorMiddlewareSignals,
   control?: IMiddlewarePipelineControlOptions
 ): Promise<void> =>
-  createPipeline<TValue>({ mode: MiddlewarePipelineMode.asyncGenerator, signals }).run(
-    stages,
-    value,
-    done,
-    control
-  )
+  createPipeline<TValue>({ mode: asyncGeneratorMode, signals }).run(stages, value, done, control)
 
 /** Lifts one sync stage into async mode through the unified public factory. */
 export const liftSyncToAsyncForTest = <TValue>(
   stage: ISyncMiddlewareStage<TValue>,
   onViolation: IMiddlewarePipelineViolationHandler = () => undefined
 ): IAsyncMiddlewareStage<TValue> =>
-  createPipeline<TValue>({ mode: MiddlewarePipelineMode.async, onViolation }).lift(
-    stage,
-    MiddlewarePipelineMode.sync
-  )
+  createPipeline<TValue>({ mode: asyncMode, onViolation }).lift(stage, MiddlewarePipelineMode.sync)
 
 /** Lifts one sync stage into generator mode through the unified public factory. */
 export const liftSyncToGeneratorForTest = <TValue>(
   stage: ISyncMiddlewareStage<TValue>,
   onViolation: IMiddlewarePipelineViolationHandler
 ): IGeneratorMiddlewareStage<TValue> =>
-  createPipeline<TValue>({ mode: MiddlewarePipelineMode.generator, onViolation }).lift(
+  createPipeline<TValue>({ mode: generatorMode, onViolation }).lift(
     stage,
     MiddlewarePipelineMode.sync
   )
@@ -97,17 +77,22 @@ export const liftSyncToGeneratorForTest = <TValue>(
 export const liftGeneratorToAsyncGeneratorForTest = <TValue>(
   stage: IGeneratorMiddlewareStage<TValue>
 ): IAsyncGeneratorMiddlewareStage<TValue> =>
-  createPipeline<TValue>({ mode: MiddlewarePipelineMode.asyncGenerator }).lift(
-    stage,
-    MiddlewarePipelineMode.generator
-  )
+  createPipeline<TValue>({ mode: asyncGeneratorMode }).lift(stage, MiddlewarePipelineMode.generator)
 
 /** Lifts one sync stage into async-generator mode through the unified public factory. */
 export const liftSyncToAsyncGeneratorForTest = <TValue>(
   stage: ISyncMiddlewareStage<TValue>,
   onViolation: IMiddlewarePipelineViolationHandler
 ): IAsyncGeneratorMiddlewareStage<TValue> =>
-  createPipeline<TValue>({ mode: MiddlewarePipelineMode.asyncGenerator, onViolation }).lift(
+  createPipeline<TValue>({ mode: asyncGeneratorMode, onViolation }).lift(
     stage,
     MiddlewarePipelineMode.sync
   )
+
+/** Fixed public mode objects for behavior-baseline cases parameterized by mode keys. */
+export const pipelineModes = {
+  sync: syncMode,
+  async: asyncMode,
+  generator: generatorMode,
+  'async-generator': asyncGeneratorMode
+} as const

@@ -1,21 +1,30 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
-  defineFeature,
   definePlugin,
   getPluginRuntimeIntegration,
   PluginHost,
   PluginHostErrorCode,
   type IPluginHostCore
 } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 
 describe('lazy activation', () => {
   it.each(['notification', 'update'] as const)(
     'preserves a cold %s signal through activation and removal',
     async (entry) => {
       /** Cold enablement can observe lifetime before any core or install attempt exists. */
-      const host = new PluginHost<Record<string, never>>({
+      const host = new PluginHost<
+        Record<string, never>,
+        never,
+        readonly [],
+        Record<never, never>,
+        typeof nativeModules
+      >({
+        modules: nativeModules,
+        pipeline: { mode: 'sync' },
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
       })
       /** Every observer must receive the same exact registration signal. */
@@ -58,7 +67,15 @@ describe('lazy activation', () => {
     'rejects synchronous %s activation reentry before sharing the pending request',
     async (phase) => {
       /** Reentry targets the same public registration and pending activation. */
-      const host = new PluginHost<Record<string, never>>({
+      const host = new PluginHost<
+        Record<string, never>,
+        never,
+        readonly [],
+        Record<never, never>,
+        typeof nativeModules
+      >({
+        modules: nativeModules,
+        pipeline: { mode: 'sync' },
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
       })
       /** A synchronous hook must not receive the Promise that depends on its own completion. */
@@ -89,7 +106,15 @@ describe('lazy activation', () => {
     async (timeout) => {
       /** The operation deadline advances only when the test explicitly advances its clock. */
       const scheduler = createManualScheduler()
-      const host = new PluginHost<Record<string, never>>({
+      const host = new PluginHost<
+        Record<string, never>,
+        never,
+        readonly [],
+        Record<never, never>,
+        typeof nativeModules
+      >({
+        modules: nativeModules,
+        pipeline: { mode: 'sync' },
         scheduler,
         execution: { mutationTimeoutMs: timeout, pipelineDrainTimeoutMs: false }
       })
@@ -145,7 +170,15 @@ describe('lazy activation', () => {
 
   it('releases committed resources after shared publication fails on a non-extensible Host', async () => {
     /** Non-extensible Host instances already support public handle publication. */
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     Object.preventExtensions(host)
@@ -195,7 +228,22 @@ describe('lazy activation', () => {
 
   it('clears candidate stages and extension owners after failed activation', async () => {
     /** Host exposes stage execution count after each activation attempt. */
-    class LazyStageHost extends PluginHost<Record<string, never>, number> {
+    class LazyStageHost extends PluginHost<
+      Record<string, never>,
+      number,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    > {
+      /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+      constructor(
+        options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+          modules?: typeof nativeModules
+        } = {}
+      ) {
+        super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+      }
+
       run(): number {
         let result = 0
         this.runPipeline(0, (value) => {
@@ -253,7 +301,15 @@ describe('lazy activation', () => {
   })
 
   it('activates explicitly once and transitively for required consumers', async () => {
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const install = vi.fn(() => ({ call: () => 1 }))
@@ -280,7 +336,15 @@ describe('lazy activation', () => {
       install: () => ({})
     })
     await host.unUse('L')
-    const nextHost = new PluginHost<Record<string, never>>({
+    const nextHost = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     await nextHost.use(dependent, lazy)

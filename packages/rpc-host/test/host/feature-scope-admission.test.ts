@@ -1,3 +1,6 @@
+import { FeatureOverlay } from '@migaia/plugin-host/feature-overlay'
+import { defineHost, type IPluginHostCore, type IFeatureRecord } from '@migaia/plugin-host'
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Cold call-policy admission, per-call overlays and link-policy record checks. */
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -8,7 +11,7 @@ import { timeoutFeature, createRpcTimeoutExecution } from '../../src/features/ti
 import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 import { defineFlowFeature, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
-import { defineFeature } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { createManualScheduler } from '@migaia/utils/testing'
 import type { IRpcAttempt, IRpcAvailableAttempt } from '@migaia/rpc-contract/interfaces'
 import { FeatureScope } from '../../src/feature/scope.ts'
@@ -23,15 +26,39 @@ function bareAttempt(): IRpcAttempt<number> {
   return { signal: new AbortController().signal, invoke: resolveAttempt }
 }
 
-/** Outputs a native install would build for one record of call tokens. */
-function outputsFor(record: Readonly<Record<string, object>>): Record<string, object> {
-  /** Alias to installed execution owner, keyed exactly like core.features. */
-  const outputs: Record<string, object> = {}
-  for (const alias of Object.keys(record))
-    outputs[alias] = alias.startsWith('t')
-      ? createRpcTimeoutExecution({ ms: 1000 })
-      : createRpcRetryExecution({ attempts: 1 })
-  return outputs
+/**
+ * Fixture declaration state is explicit; all outputs and cleanup belong to the actual native
+ * install.
+ */
+class ScopePolicyInstallation {
+  /** Exact native outputs observed by this real install, used to check the actual cache's payload. */
+  outputs: Readonly<Record<string, unknown>> | undefined
+  /** Actual domain scope under examination. */
+  readonly #scope: FeatureScope
+  /** Native definitions are passed unchanged through the highest existing Host boundary. */
+  readonly #features: IFeatureRecord
+  /** One negative deliberately withholds installed output data from the domain admission call. */
+  readonly #missing: boolean
+  /** Retain fixture input only; construction performs no native installation. */
+  constructor(scope: FeatureScope, features: IFeatureRecord, missing: boolean) {
+    this.#scope = scope
+    this.#features = features
+    this.#missing = missing
+  }
+  /** The original native core owns the lifetime used by FeatureOverlay's compilation rules. */
+  readonly install = (
+    core: IPluginHostCore & { readonly features: Readonly<Record<string, unknown>> }
+  ): Record<never, never> => {
+    this.outputs = core.features
+    this.#scope.setDefaults(core, this.#features, this.#missing ? {} : core.features)
+    return {}
+  }
+}
+/** Assemble a supported raw plugin; the Host still authenticates and installs every native feature. */
+function scopePolicy(scope: FeatureScope, name: string, features: IFeatureRecord, missing = false) {
+  /** Named fixture owner avoids a closure-backed installer. */
+  const owner = new ScopePolicyInstallation(scope, features, missing)
+  return { name, features, install: owner.install }
 }
 
 /** Empty native transports acquire no resources while exercising genuine installation. */
@@ -59,38 +86,45 @@ describe('FeatureScope admission', () => {
           })
         ]
       })
-    ).rejects.toSatisfy(hasCode(RpcCoreErrorCode.featureCombinationConflict))
+    ).rejects.toSatisfy(hasCode('FEATURE_ROLE_CONFLICT'))
   })
 
-  it('rejects a duplicate call role inside one record', () => {
+  it('rejects a duplicate call role inside one record', async () => {
+    const scope = new FeatureScope()
+    const host = defineHost({ modules: rpcNativeTestModules })
     const record = { r1: retryFeature(), r2: retryFeature() }
-    expect(() => new FeatureScope().setDefaults(record, outputsFor(record))).toThrow(
-      expect.objectContaining({ code: RpcCoreErrorCode.featureCombinationConflict })
+    await expect(host.use(scopePolicy(scope, 'duplicate', record))).rejects.toSatisfy(
+      hasCode('FEATURE_ROLE_CONFLICT')
     )
+    await host.dispose()
   })
 
-  it('rejects a call token whose installed output is missing', () => {
-    expect(() => new FeatureScope().setDefaults({ r: retryFeature() }, {})).toThrow(
-      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
-    )
+  it('rejects a call token whose installed output is missing', async () => {
+    const host = defineHost({ modules: rpcNativeTestModules })
+    await expect(
+      host.use(scopePolicy(new FeatureScope(), 'missing', { r: retryFeature() }, true))
+    ).rejects.toSatisfy(hasCode(RpcCoreErrorCode.invalidConfig))
+    await host.dispose()
   })
 
   it.each([
     ['timeout', { t1: timeoutFeature({ ms: 10 }) }, { t2: timeoutFeature({ ms: 20 }) }],
     ['retry', { r1: retryFeature() }, { r2: retryFeature() }]
-  ])('rejects a second policy owning %s and releases defaults on disposal', (_role, a, b) => {
+  ])('rejects a second policy owning %s and releases defaults on disposal', async (_role, a, b) => {
     const scope = new FeatureScope()
-    const release = scope.setDefaults(a, outputsFor(a))
-    expect(() => scope.setDefaults(b, outputsFor(b))).toThrow(
-      expect.objectContaining({ code: RpcCoreErrorCode.featureCombinationConflict })
+    const host = defineHost({ modules: rpcNativeTestModules })
+    await host.use(scopePolicy(scope, 'first', a))
+    await expect(host.use(scopePolicy(scope, 'second', b))).rejects.toSatisfy(
+      hasCode('FEATURE_ROLE_CONFLICT')
     )
-    release()
-    scope.setDefaults(b, outputsFor(b))
+    await host.unUse('first')
+    await host.use(scopePolicy(scope, 'second', b))
+    await host.dispose()
   })
 
-  it('registers and prepares namespaces with default empty records', () => {
+  it('prepares namespaces with default empty records', () => {
     const scope = new FeatureScope()
-    scope.register('a')
+    scope.prepare('a')()
     scope.prepare('b')()
     expect(scope.resolve('a')).toEqual({})
     scope.unregister('a')
@@ -104,6 +138,35 @@ describe('FeatureScope admission', () => {
     expect(() =>
       new FeatureScope().resolve('a', options as unknown as Parameters<FeatureScope['resolve']>[1])
     ).toThrow(expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig }))
+  })
+
+  it('reuses the real namespace cache and native execution identity without any hot overlay calls', async () => {
+    /** This is the production namespace cache owner, not a fixture projection. */
+    const scope = new FeatureScope()
+    /** Genuine native installation supplies the selected retry execution. */
+    const host = defineHost({ modules: rpcNativeTestModules })
+    /** One original policy token is materialized exactly once by the native feature owner. */
+    const record = { retry: retryFeature({ attempts: 1 }) }
+    /** Capture the actual output borrowed by FeatureScope's installed-default admission. */
+    const installed = new ScopePolicyInstallation(scope, record, false)
+    await host.use({ name: 'cached-policy', features: record, install: installed.install })
+    scope.prepare('cached')()
+    /** The same returned cache must retain the native execution identity. */
+    const cached = scope.resolve('cached')
+    expect(cached.retry).toBe(installed.outputs!.retry)
+    /** Neither inherited reads nor per-call overrides may re-enter shared composition. */
+    const compile = vi.spyOn(FeatureOverlay.prototype, 'compile')
+    try {
+      for (let index = 0; index < 100; index += 1) {
+        expect(scope.resolve('cached')).toBe(cached)
+        expect(scope.resolve('cached', { retry: false }).retry).toBe(false)
+      }
+      expect(compile).not.toHaveBeenCalled()
+    } finally {
+      compile.mockRestore()
+      await host.dispose()
+      scope.close()
+    }
   })
 
   it('builds per-call executions from plain options', async () => {

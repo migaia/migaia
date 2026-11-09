@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 import type {
   IPluginBeforeReleaseContext,
   IPluginDependencyPlan,
@@ -13,7 +14,13 @@ type IAssert<T extends true> = T
 /** Type-only oracle for both public unUse receivers and the relative release budget. */
 export const checkUnUseTypes = (
   handle: IHostHandle<Record<string, never>, never, readonly []>,
-  host: PluginHost<Record<string, never>>,
+  host: PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >,
   context: IPluginBeforeReleaseContext,
   wide: boolean
 ) => {

@@ -1,3 +1,4 @@
+import type { IRawPluginConstraint } from './plugin-definition-types.ts'
 import type { IPluginConfig, IPluginDisposer } from './plugin-lifecycle-types.ts'
 import type { IPluginConstraint } from './plugin-definition-types.ts'
 import type { IPluginHostCore } from './plugin-core-types.ts'
@@ -12,20 +13,23 @@ import type { IStageEntry, IStageOwnerSegment } from './stage-lanes.ts'
 import type { IPluginSetupAttempt } from './setup-runtime.ts'
 
 export type IPluginDefinition<TCore> = {
+  /** Original optional fields claim modules before any installation side effect. */
+  readonly claimed?: readonly (readonly [string, string])[]
+
   readonly owner: IPluginConstraint<TCore>
   readonly name: string
   readonly config: IPluginConfig
-  readonly install: IPluginConstraint<TCore>['install']
+  readonly install: IRawPluginConstraint<TCore>['install']
   /** Captured preparation hook; absent on the one-argument installation path. */
   readonly setup?: (context: import('./plugin-lifecycle-types.ts').IPluginSetupContext) => unknown
-  readonly update?: IPluginConstraint<TCore>['update']
-  readonly onEnable?: IPluginConstraint<TCore>['onEnable']
-  readonly onDisable?: IPluginConstraint<TCore>['onDisable']
-  readonly onDependencyReplaced?: IPluginConstraint<TCore>['onDependencyReplaced']
+  readonly update?: IRawPluginConstraint<TCore>['update']
+  readonly onEnable?: IRawPluginConstraint<TCore>['onEnable']
+  readonly onDisable?: IRawPluginConstraint<TCore>['onDisable']
+  readonly onDependencyReplaced?: IRawPluginConstraint<TCore>['onDependencyReplaced']
   readonly activation: 'eager' | 'lazy'
-  readonly dispose?: IPluginConstraint<TCore>['dispose']
+  readonly dispose?: IRawPluginConstraint<TCore>['dispose']
   /** Captured release hook; never re-read from a mutable owner object. */
-  readonly beforeRelease?: IPluginConstraint<TCore>['beforeRelease']
+  readonly beforeRelease?: IRawPluginConstraint<TCore>['beforeRelease']
   /** Symbol disposer captured with the plugin admission snapshot; never re-probe owner at cleanup. */
   readonly disposer?: IPluginDisposer
   /** Frozen own-data declarations; actual runners belong to each install generation. */

@@ -1,7 +1,9 @@
-import { openComposition } from '../src/composition-entry.ts'
+import { nativeModules } from './native-modules.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { PluginHostErrorCode } from '../src/error-code.ts'
 
 const hostOptions = {
@@ -9,7 +11,22 @@ const hostOptions = {
 } as const
 
 /** Concrete fixture host exposes canonical PluginHost behavior for acceptance probes. */
-class AcceptanceHost extends PluginHost<Record<string, never>, unknown> {
+class AcceptanceHost extends PluginHost<
+  Record<string, never>,
+  unknown,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   /** Supplies the empty domain core required by the abstract V2 host fixture. */
   protected createPluginDomainCore(): Record<string, never> {
     return {}
@@ -206,8 +223,10 @@ describe('acceptance contract', () => {
   })
 
   it('uses structural fallback for clones', async () => {
-    const trusted = definePlugin({ name: 'trusted', install: () => ({ trusted: true }) })
-    const clone = { ...trusted }
+    const original = { name: 'trusted', install: () => ({ trusted: true }) }
+    const trusted = definePlugin(original)
+    const clone = { ...original }
+    expect(Reflect.ownKeys(trusted)).toEqual(['name', 'config', 'activation', 'getFeature'])
     const host = new AcceptanceHost(hostOptions)
     const [handle] = await host.use(clone as never)
     expect((handle.extensions as Record<string, unknown>).trusted).toBe(true)
@@ -359,7 +378,21 @@ describe('acceptance contract', () => {
       exports: Record<string, unknown>
     }
     // 导出拓扑收敛为根入口与组合出口两项：`./defined` 与 `./structural` 已并入根入口。
-    expect(Object.keys(packageJson.exports).sort()).toEqual(['.', './composition'])
+    expect(Object.keys(packageJson.exports).sort()).toEqual([
+      '.',
+      './activation',
+      './composition',
+      './enablement',
+      './feature-dependencies',
+      './feature-overlay',
+      './feature-overlay/notifications',
+      './features',
+      './named-pipelines',
+      './pipeline-modes/async',
+      './pipeline-modes/async-generator',
+      './pipeline-modes/generator',
+      './pipeline-modes/sync'
+    ])
     expect(readFileSync(new URL('../dist/index.js', import.meta.url), 'utf8')).toContain(
       'definePlugin'
     )
@@ -381,13 +414,14 @@ describe('acceptance contract', () => {
     await host.dispose()
   })
 
-  it('retains immutable enumerable metadata', () => {
+  it('omits arbitrary metadata from the immutable thin definition', () => {
     const plugin = definePlugin({
       name: 'metadata',
       install: () => ({}),
       marker: 'literal' as const
     })
-    expect(plugin.marker).toBe('literal')
+    expect(Object.hasOwn(plugin, 'marker')).toBe(false)
+    expect(Reflect.ownKeys(plugin)).toEqual(['name', 'config', 'activation', 'getFeature'])
     expect(Object.isFrozen(plugin)).toBe(true)
   })
 })

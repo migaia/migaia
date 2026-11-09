@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../../fixtures/native-modules.ts'
 import { expect, it } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
@@ -73,6 +74,7 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   )
   /** The same native declarations own ordering, snapshots and both traversal directions. */
   const flow = defineHost({
+    modules: rpcNativeTestModules,
     domainCore(request) {
       /** The genuine native request fixes this registration's execution authority. */
       const domain = rpc.domainCore(request)

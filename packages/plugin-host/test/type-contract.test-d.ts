@@ -1,11 +1,13 @@
+import { nativeModules } from './native-modules.ts'
 import {
   createView,
   openComposition,
   type IPluginHostCompositionIntegration,
   type IRegistrationToken,
   type IRegistrationView
-} from '../src/composition-entry.ts'
-import { defineFeature, definePlugin, type IPlugin, PluginHost } from '../src/index.ts'
+} from '../src/modules/feature-dependencies/composition-entry.ts'
+import { definePlugin, type IPlugin, PluginHost } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 
 const dependency = defineFeature(() => ({ read: () => 1 }))
 // @ts-expect-error Feature factories are synchronous; returned methods may be async instead.
@@ -32,7 +34,13 @@ const plugin = definePlugin({
 // @ts-expect-error Selected Feature roots enforce their required expose surface.
 definePlugin({ name: 'missing-expose', features: { root }, featureExpose: {}, install: () => ({}) })
 
-declare const host: PluginHost<Record<string, never>>
+declare const host: PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+>
 const [handle] = await host.use(plugin)
 const result: string = handle.extensions.result
 const output: string = handle.getFeature('root').value()
@@ -48,7 +56,13 @@ host.getShared('retired')
 
 type IRequiredCore = { adminOnly(): void }
 declare const adminPlugin: IPlugin<IRequiredCore>
-declare const restrictedHost: PluginHost<Record<string, never>>
+declare const restrictedHost: PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+>
 // @ts-expect-error Host rejects plugins requiring domain capabilities it does not provide.
 await restrictedHost.use(adminPlugin)
 
@@ -68,7 +82,13 @@ const coreBound = definePlugin<
   never,
   'core-bound'
 >('core-bound', (core) => ({ install: () => ({ domainValue: core.domain }) }))
-declare const corefulHost: PluginHost<{ readonly domain: number }>
+declare const corefulHost: PluginHost<
+  { readonly domain: number },
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+>
 // @ts-expect-error Root Host use retains the descriptor core requirement.
 await restrictedHost.use(coreBound)
 const [corefulHandle] = await corefulHost.use(coreBound)

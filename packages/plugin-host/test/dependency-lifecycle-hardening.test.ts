@@ -1,6 +1,8 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { execution, createObservedHost } from './dependency-lifecycle-fixtures.ts'
 
 describe('hot replacement transaction', () => {
@@ -78,7 +80,22 @@ describe('hot replacement transaction', () => {
   })
 
   it('drains pipeline leases held by the previous registration before disposing it', async () => {
-    class PipelineHost extends PluginHost<Record<string, never>, number> {
+    class PipelineHost extends PluginHost<
+      Record<string, never>,
+      number,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    > {
+      /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+      constructor(
+        options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+          modules?: typeof nativeModules
+        } = {}
+      ) {
+        super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+      }
+
       /** Executes the live async pipeline for lease observations. */
       run(value: number): unknown {
         return this.runPipeline(value, () => undefined)
@@ -121,7 +138,22 @@ describe('hot replacement transaction', () => {
 
   it('drains every retired snapshot containing the same owner', async () => {
     /** Executes two versions while their common plugin remains in flight. */
-    class PipelineHost extends PluginHost<Record<string, never>, number> {
+    class PipelineHost extends PluginHost<
+      Record<string, never>,
+      number,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    > {
+      /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+      constructor(
+        options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+          modules?: typeof nativeModules
+        } = {}
+      ) {
+        super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+      }
+
       run(value: number): Promise<void> {
         return this.runPipeline(value, () => undefined) as Promise<void>
       }
@@ -178,7 +210,22 @@ describe('hot replacement transaction', () => {
   })
 
   it('keeps the previous lease key while a replace candidate stages before publication', async () => {
-    class PipelineHost extends PluginHost<Record<string, never>, number> {
+    class PipelineHost extends PluginHost<
+      Record<string, never>,
+      number,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    > {
+      /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+      constructor(
+        options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+          modules?: typeof nativeModules
+        } = {}
+      ) {
+        super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+      }
+
       run(): Promise<void> {
         return this.runPipeline(1, () => undefined) as Promise<void>
       }
@@ -245,7 +292,22 @@ describe('hot replacement transaction', () => {
   })
 
   it('preserves the old lease after a staged replace candidate fails', async () => {
-    class PipelineHost extends PluginHost<Record<string, never>, number> {
+    class PipelineHost extends PluginHost<
+      Record<string, never>,
+      number,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    > {
+      /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+      constructor(
+        options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+          modules?: typeof nativeModules
+        } = {}
+      ) {
+        super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+      }
+
       run(): Promise<void> {
         return this.runPipeline(1, () => undefined) as Promise<void>
       }
@@ -305,7 +367,17 @@ describe('hot replacement transaction', () => {
   })
 
   it('keeps a restarted dependent runtime config instead of its definition default', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const value = defineFeature(() => ({ value: 1 }))
     const previous = definePlugin({ name: 'A', features: { value }, install: () => ({}) })
     const seenLevels: unknown[] = []

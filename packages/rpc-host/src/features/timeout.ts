@@ -1,3 +1,4 @@
+import { defineFeature } from '@migaia/plugin-host/features'
 /** An executing timeout owns one attempt deadline; Host selects the complete instance only. */
 import {
   createAbortTimeoutSignal,
@@ -23,7 +24,7 @@ import {
 } from '../host/error-owner.ts'
 import { defaultRpcReporter, reportDiagnostic } from '../host/report.ts'
 import { RpcTimeoutFeatureText } from './timeout-text.ts'
-import { defineFeature } from '@migaia/plugin-host'
+
 import { registerRpcFeature, RpcCallFeatureRole } from '../sdk/metadata.ts'
 export type { ITimeoutFeatureOptions } from '@migaia/rpc-contract/interfaces'
 

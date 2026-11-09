@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -9,8 +10,18 @@ import {
 } from '../src/index.ts'
 
 /** Creates an unbounded Host so lifecycle timing does not affect handle assertions. */
-const createHost = (): PluginHost<Record<string, never>> =>
-  new PluginHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
+const createHost = (): PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> =>
+  new PluginHost({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  })
 
 describe('plugin handles', () => {
   it('returns handles', async () => {

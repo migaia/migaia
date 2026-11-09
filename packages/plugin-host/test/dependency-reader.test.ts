@@ -1,11 +1,23 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
-import * as admissionRuntime from '../src/admission-runtime.ts'
+import { definePlugin, PluginHost, readPluginDependencies } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
+import * as admissionRuntime from '../src/definition-snapshots.ts'
 
 /** Creates an unbounded Host so admission and ordering need no scheduler timing. */
-const createHost = (): PluginHost<Record<string, never>> =>
-  new PluginHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
+const createHost = (): PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> =>
+  new PluginHost({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  })
 
 /** Builds direct and nested references while recording accidental lifecycle evaluation. */
 const createDefinitions = () => {

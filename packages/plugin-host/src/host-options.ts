@@ -1,10 +1,8 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { snapshotScheduler } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import ERROR_TEXT, {
-  createPluginHostTypeError,
-  PluginHostInternalText,
-  tagPluginHostError
-} from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 
 /**
@@ -20,7 +18,10 @@ import { PluginHostErrorCode } from './error-code.ts'
 export const assertTimeoutOption = (value: number | false | undefined, label: string): void => {
   if (value === undefined || value === false) return
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
-    throw createPluginHostTypeError(PluginHostInternalText.TIMEOUT_OPTION(label))
+    throw attachErrorIdentity(new TypeError(PluginHostInternalText.TIMEOUT_OPTION(label)), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
 }
 
 /**
@@ -40,14 +41,17 @@ export const admitHostScheduler = (option: unknown): IScheduler | undefined => {
       error && typeof error === 'object' && 'cause' in error
         ? (error as { readonly cause?: unknown }).cause
         : undefined
-    throw tagPluginHostError(
+    throw attachErrorIdentity(
       new TypeError(ERROR_TEXT.SCHEDULER_GETTER_FAILED, {
         cause: lifecycleCause !== undefined ? lifecycleCause : error
       }),
-      PluginHostErrorCode.invalidOption
+      { source: PLUGIN_HOST_SOURCE, code: PluginHostErrorCode.invalidOption }
     )
   }
   if (snapshot === undefined)
-    throw createPluginHostTypeError(PluginHostInternalText.SCHEDULER_FUNCTIONS)
+    throw attachErrorIdentity(new TypeError(PluginHostInternalText.SCHEDULER_FUNCTIONS), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   return snapshot
 }

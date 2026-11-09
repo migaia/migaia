@@ -4,7 +4,7 @@ import type {
   ILogEntry,
   ILogFailure,
   ILogFeature,
-  ILogFeatureRecord,
+  ILogOutputFeatureRecord,
   ILogFormat,
   ILogOutputRecord
 } from '../../src/typing.ts'
@@ -12,7 +12,7 @@ import type {
 /** Shared transport fixture options describe independently observable delivery behavior. */
 type ICaptureOptions = {
   name?: string
-  features?: ILogFeatureRecord
+  features?: ILogOutputFeatureRecord
   defaultFormat?: 'json' | 'plain' | ILogFeature
   failures?: number
   blocked?: Promise<void>
@@ -54,7 +54,7 @@ export class CaptureOutput {
     this.#options = options
   }
   /** Create a normal output plugin with actual feature and format selection. */
-  plugin() {
+  plugin(): ReturnType<typeof defineOutputPlugin> {
     return defineOutputPlugin({
       name: this.#options.name ?? 'capture',
       batchable: this.#options.batchable ?? true,

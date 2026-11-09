@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 import { createRpcTimeoutExecution, timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Actual feature and native Host clocks replace the removed kernel/time-port configuration. */
@@ -65,6 +66,7 @@ it('times out construction through the original native Host injected scheduler',
   const scheduler = createManualScheduler()
   /** There is no RPC kernel or timeout translation layer around native installation. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     host: { scheduler, execution: { mutationTimeoutMs: 100, pipelineDrainTimeoutMs: false } }
   })
   /** The real install hook intentionally never completes its setup work. */
@@ -98,6 +100,7 @@ it('retains the supplied native scheduler clock without freezing the caller obje
   const observed: number[] = []
   /** The real Host borrows the unchanged supplied object. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     host: { scheduler, execution: { mutationTimeoutMs: 100, pipelineDrainTimeoutMs: false } }
   })
   /** A genuine plugin setup reads the actual native operation's clock. */

@@ -8,7 +8,7 @@ describe('trusted plugin identity', () => {
     /** The returned plugin is recorded by the package private identity map. */
     const defined = definePlugin(source)
     /** Matching public fields must not grant trusted identity. */
-    const forged = { name: defined.name, install: defined.install }
+    const forged = { ...defined }
 
     expect(isDefinedPlugin(defined)).toBe(true)
     expect(isDefinedPlugin(source)).toBe(false)

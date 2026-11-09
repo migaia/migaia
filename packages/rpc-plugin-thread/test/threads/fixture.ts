@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../../../rpc-host/test/fixtures/native-modules.ts'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { type INodeThreadHandle } from '../../dist/threads/node-launcher.js'
 import { resolve } from 'node:path'
@@ -20,8 +21,17 @@ import {
 
 import type { IThreadSpawn } from '../../src/threads/source.ts'
 
+/** Build the exact native fixture combination so its selected pipeline surface remains inferred. */
+export function createNativeFixtureHost(rpc: ReturnType<typeof rpcHostPipelines>) {
+  return defineHost({
+    modules: rpcNativeTestModules,
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+}
+
 /** The genuine native Host contributes one actual thread namespace after installation. */
-export type INativeFixtureHost = ReturnType<typeof defineHost> &
+export type INativeFixtureHost = ReturnType<typeof createNativeFixtureHost> &
   Readonly<{
     thread: Readonly<{
       members: IRpcNativeMemberControls<'thread'>
@@ -144,10 +154,7 @@ function nativeThreadFixtureState(
     () => host,
     (name, request) => host.pipeline(name, request)
   )
-  const host = defineHost({
-    ...rpc,
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-  }) as INativeFixtureHost
+  const host = createNativeFixtureHost(rpc) as INativeFixtureHost
   const budget = createUnitBudget({
     kind: 'thread',
     maxUnits: 1,

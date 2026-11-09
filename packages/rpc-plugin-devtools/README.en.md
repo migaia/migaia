@@ -27,17 +27,17 @@ try {
   const text = tools.collector.exportRecord(recording.stop())
   console.log(tools.collector.importRecord(text).header.version)
 } finally {
-  tools.close()
+  tools.collector.close()
 }
 ```
 
-It prints `true`, `false`, and `1`. Observe real work by installing the same tools with a selected transport in `createRpcHost({ plugins: [tools, transport] })`; see the guide for a complete Coroutine example. No additional probe forwarding plugin is needed.
+It prints `true`, `false`, and `1`. Observe real work by installing tools.plugin with a selected transport in `createRpcHost({ plugins: [tools.plugin, transport] })`; see the guide for a complete Coroutine example. No additional probe forwarding plugin is needed.
 
 ## Installation and ownership
 
 One tools object may be installed on several real Hosts. Each installation has its own observation lifetime and feeds the same collector. Install that definition once per Host. A Host allows transports with distinct namespaces; calls remain under `host.<ns>.*`, without root call methods added by Devtools.
 
-Host.close removes its observation. The application calls tools.close or collector.close after all uses end. Collector closure does not close business Hosts. Convenience query/watch/stats/describe/close methods borrow the same collector. Use tools.collector for pause/resume, record, clear, export/import, and service.
+Host.close removes its observation. The application calls tools.close or collector.close after all uses end. Collector closure does not close business Hosts. Use tools.collector for query/watch/stats/describe/close, pause/resume, record, clear, export/import, and service.
 
 ## Observation and retention
 

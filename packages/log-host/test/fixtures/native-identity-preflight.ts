@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
-import { defineFeature } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import {
   batchFeature,
   filterFeature,

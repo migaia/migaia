@@ -123,7 +123,7 @@ The complete scenarios import only the root entry and need no framework or exter
 
 ## Typed named pipelines
 
-Declare each payload with `pipelineSpec<TPayload>()({ mode?, next?, order? })`, then pass the map as top-level `pipelines` to defineHost. Owners receive use/run; installing plugin cores receive only use/through registration authority. Defaults are sync, single, and install order. Declarations share the existing Host revision, snapshots, ordering, and lease drain; omitting them preserves the default pipeline and existing generic calls.
+Declare each payload with `pipelineSpec<TPayload>()({ mode?, next?, order? })`, then pass the map as top-level `pipelines` to defineHost. Owners receive use/run; installing plugin cores receive only use/through registration authority. Defaults are sync, single, and install order. Declarations share the existing Host revision, snapshots, ordering, and lease drain; omitting declarations leaves named pipelines absent; default pipelines still require their selected mode module.
 
 See the [complete typed example](./USEGUIDE.en.md#declare-separate-pipelines-for-different-payloads), including explicit generic calls and removal across both pipelines. Plugin-owned declarations and through composition are covered in the [advanced guide](./USEGUIDE.en.md#advanced-plugin-owned-pipelines).
 
@@ -135,7 +135,7 @@ This package owns plugin installation, Feature dependencies, configuration, stag
 
 The public entries are `@migaia/plugin-host` and `@migaia/plugin-host/composition`. Do not import internal files. Applications normally use the root Host, plugin, Feature, handle, and error APIs. Composition is a narrow protocol for one composition owner rather than an alternative application Host.
 
-The class `PluginHost<TDomainCore, TValue, TInstalled, TPipelines>` requires its first type parameter, TDomainCore. Its runtime createPluginDomainCore implementation returns an empty object by default. The final TPipelines axis defaults to `Record<never, never>`. The pipeline value type defaults to `never` and the declared installed tuple to `readonly []`; defineHost separately provides a default domain type. TInstalled informs installation constraints and configuration types. Runtime use() returns an exact input-order handle tuple; it does not change the static type of the Host variable. Published declarations cover the type-only extraction and merging helpers. `IPluginHostCoreFor<THost>` extracts a Host's domain and pipeline axes; type metadata adds no runtime capability.
+The class `PluginHost<TDomainCore, TValue, TInstalled, TPipelines, TModules>` requires its first type parameter, TDomainCore. Its runtime createPluginDomainCore implementation returns an empty object by default. TPipelines defaults to `Record<never, never>` and class TModules to `readonly IHostModule[]`. The runtime module list is still empty when omitted; the functional defineHost entry separately defaults its module tuple to `readonly []`. The pipeline value type defaults to `never` and the declared installed tuple to `readonly []`; defineHost separately provides a default domain type. TInstalled informs installation constraints and configuration types. Runtime use() returns an exact input-order handle tuple; it does not change the static type of the Host variable. Published declarations cover the type-only extraction and merging helpers. `IPluginHostCoreFor<THost>` extracts a Host's domain and pipeline axes; type metadata adds no runtime capability.
 
 Simple options or composed functions can suffice for a few static extension points. Use middleware-pipeline directly when only middleware execution is needed. This Host is useful when a library or application needs consistent plugin resources, dependencies, configuration, and reachability. Logger is an existing repository consumer.
 
@@ -150,10 +150,10 @@ The class entry can override `createPluginDomainCore()` to create a domain core 
 | `domainCore(request)`           | Optional; omission returns an empty object. The Host supplies pluginName, zero-based batchIndex, and batch identity                                    |
 | `translateDisposalError(error)` | Optional; omission preserves the original PluginHostError. Default structured disposal does not invoke this hook or translate individual cleanupErrors |
 | `dispose(next)`                 | Optional disposal middleware; it must call next itself to include core cleanup. Repeated core disposal shares the original promise                     |
-| `surface`                       | Optional; no domain public members by default, and the fourth type parameter defaults to an empty surface                                              |
+| `surface`                       | Optional; no domain public members by default, and the sixth type parameter defaults to an empty surface                                               |
 | `pipelines`                     | Optional fixed map of authentic `pipelineSpec<TPayload>()(config)` values; use this top-level option for defineHost.                                   |
 
-`surface` accepts an object or a factory. Object-form own descriptors are captured once before Runtime acquisition; accessors remain live, and all canonical Host keys, including identity, use, and unUse, remain reserved. The factory form `surface: (native) => ({ ... })` runs once while creating the final handle. It receives the frozen native `use` and `unUse` operations and may compose and replace those two methods; other canonical Host keys remain reserved. Domain members, Host identity, shared outlets, and fluent pipeline methods belong to the same frozen handle. Composing packages should provide methods through surface rather than copy the returned handle. Surface-read or factory failures retain the original through CALLBACK_FAILED. Existing object forms and calls with three type parameters remain valid.
+`surface` accepts an object or a factory. Object-form own descriptors are captured once before Runtime acquisition; accessors remain live, and all canonical Host keys, including identity, use, and unUse, remain reserved. The factory form `surface: (native) => ({ ... })` runs once while creating the final handle. It receives the frozen native `use` and `unUse` operations and may compose and replace those two methods; other canonical Host keys remain reserved. Domain members, Host identity, shared outlets, and fluent pipeline methods belong to the same frozen handle. Composing packages should provide methods through surface rather than copy the returned handle. Surface-read or factory failures retain the original through CALLBACK_FAILED. Object-form surfaces remain supported. Explicit generic calls use the selected module tuple as their third parameter.
 
 Class constructor options are optional, and so is defineHost's host field; omitted fields use the defaults below.
 
@@ -162,7 +162,7 @@ Class constructor options are optional, and so is defineHost's host field; omitt
 | `identity?: { name?: string }`                       | name is `'DEFAULT'`                   | Optional readable name; the Host issues a unique id separately                                               |
 | `execution.mutationTimeoutMs?: number \| false`      | `5000`                                | Active mutation hook budget; false removes the deadline                                                      |
 | `execution.pipelineDrainTimeoutMs?: number \| false` | `5000`                                | Pipeline lease drain budget; false waits for actual draining                                                 |
-| `pipeline?.mode`                                     | `'sync'`                              | sync / async / generator / async-generator; fixed after construction                                         |
+| `pipeline?.mode`                                     | Absent                                | sync / async / generator / async-generator; fixed after construction Requires the matching module.           |
 | `diagnostic(message, code?, error?)`                 | No-op                                 | Diagnostics and exact contained failure objects                                                              |
 | `onDiagnosticFailure(error)`                         | globalThis.reportError when available | Terminal outlet for a diagnostic callback that throws or rejects                                             |
 | `scheduler?: IScheduler`                             | Internal systemScheduler              | Shared now()/schedule() clock and timer owner                                                                |
@@ -174,7 +174,7 @@ Time values must be finite and non-negative. Invalid options, nonfunction callba
 
 ### Plugin definitions and published handles
 
-`definePlugin(name, descriptorFactory, features?)` captures a definition without installing it. Each installation synchronously creates one descriptor, then uses its install(), expose(), and featureExpose() hooks. The two expose hooks return synchronous surfaces. Use `definePlugin(definition)` for configuration, setup, update, and disposal hooks. Both forms and valid raw descriptors share admission. Defining them does not execute an installer or Feature factory. Names are required, nonempty, unique within a Host, and cannot contain a dot. Object definitions capture own data fields and are frozen. The retired shared field has no compatibility fallback: migrate cross-plugin capabilities to Features; adapter-owned shared outlets still use their canonical owner protocol.
+`definePlugin(name, descriptorFactory, features?)` captures a definition without installing it. Each installation synchronously creates one descriptor, then uses its install(), expose(), and featureExpose() hooks. The two expose hooks return synchronous surfaces. Use `definePlugin(definition)` for configuration, setup, update, and disposal hooks. Both forms and valid raw descriptors share admission. Defining them does not execute an installer or Feature factory. Names are required, nonempty, unique within a Host, and cannot contain a dot. Object definitions snapshot fields in the same order as raw descriptors, reading each selected getter once. A throwing getter retains its original cause on TypeError / INVALID_OPTION. Empty names use PLUGIN_NAME_REQUIRED and dotted names use PLUGIN_NAME_DOT. Omitted config is a frozen empty record. The returned native identity is frozen. The retired shared field has no compatibility fallback: migrate cross-plugin capabilities to Features; adapter-owned shared outlets still use their canonical owner protocol.
 
 | Object definition field                               | Requirement, default, and role                                                          |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -267,7 +267,7 @@ Named sync/generator runs return `TResult | undefined`; async/async-generator ru
 
 Pipeline publication belongs to the same Host commit. Each pipeline reuses its compiled snapshot within a visible stage revision; reverse ordering is also compiled once. Empty lanes call the terminal directly without a snapshot or lease. Nonempty lanes reuse the same registration, ordering, and quiescence/lease owners. Rollback, unUse, replace, disablement, and suspension affect all of a plugin's pipelines in one commit. Existing runs retain their original snapshots and generation leases distinguished by pipeline; drain joins that actual work under the existing lifecycle budgets. Owner registration on any pipeline while another is executing throws `PIPELINE_EXECUTING`.
 
-Without Host declarations, its named axis defaults to `Record<never, never>`; known plugin definitions still infer their qualified names. If neither the Host nor any plugin declares a named group, no extra named runner, lane, or lease key is allocated. Existing TValue, pipeline.mode, use*Pipeline, runPipeline/runPipelineSync/runPipelineAsync, and pipelineMode still address only the default pipeline; old explicit generic calls remain valid. Its private symbol occupies no string name. When explicitly supplying defineHost generics together with named declarations, pass `typeof pipelines` as the fifth parameter. Omitting that axis keeps it empty, so pipeline(name) accepts only never.
+Without Host declarations, its named axis defaults to `Record<never, never>`; known plugin definitions still infer their qualified names. If neither the Host nor any plugin declares a named group, no extra named runner, lane, or lease key is allocated. Existing TValue, pipeline.mode, use*Pipeline, runPipeline/runPipelineSync/runPipelineAsync, and pipelineMode still address only the default pipeline; explicit generic calls include the selected module tuple and mode axes. Its private symbol occupies no string name. When explicitly supplying defineHost generics together with named declarations, pass `typeof pipelines` as the seventh parameter; the third and fourth parameters are the selected module tuple and default mode. Omitting that axis keeps it empty, so pipeline(name) accepts only never.
 
 Invalid maps, names, specs, and order fail synchronously during construction as a native TypeError / `INVALID_PIPELINE_OPTION`, without returning a handle. Invalid mode retains `INVALID_PIPELINE_MODE`. Invalid next uses outer `INVALID_PIPELINE_OPTION` with middleware-pipeline's TypeError / `INVALID_OPTION` on cause. A spec configuration getter failure also keeps its original cause under `INVALID_PIPELINE_OPTION`.
 
@@ -297,11 +297,15 @@ When returned from a stage, these three symbols control traversal rather than re
 This example uppercases the input `migaia`, then adds square brackets. The first stage returns `GENERATOR_CONTINUE` to pass its last yielded value to the second stage; the second returns the final string directly.
 
 ```ts doc-test=run
+import { generatorPipelineModule } from '@migaia/plugin-host/pipeline-modes/generator'
+/** Explicit capabilities used by this example. */
+const selectedModules = [generatorPipelineModule] as const
 import { defineHost } from '@migaia/plugin-host'
 import { GENERATOR_CONTINUE, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
 /** This host owns the two string transformations and their cleanup. */
-const textHost = defineHost<Record<never, never>, string>({
+const textHost = defineHost<Record<never, never>, string, typeof selectedModules, 'generator'>({
+  modules: selectedModules,
   host: { pipeline: { mode: MiddlewarePipelineMode.generator } }
 })
 textHost.useGeneratorPipeline(function* (value) {
@@ -430,3 +434,33 @@ On sync/async hosts, owners can call `runPipelineSync(value, terminal)` or `runP
 The sync entry returns `TResult | undefined`; the async entry accepts a terminal returning `Promise<TResult>` and returns `Promise<TResult | undefined>`. A stage that omits next halts with undefined. Empty lanes invoke the terminal directly, preserving its exact value or Promise identity. Nonempty async execution waits for the actual terminal operation before cleanup. Generator hosts retain `runPipeline`; explicit sync/async entries reject them with `PIPELINE_MODE_MISMATCH`.
 
 `getPluginRuntimeIntegration(core).assertPreparedRegistration()` checks the original registration only. Current installation uses original operation admission; a completed candidate in the same unpublished batch requires its exact batch identity and a current installation; published registrations use the original handle admission. Rollback, removal, and host closing revoke access. It returns no registration object and grants no late resource or installation rights. Existing `assertCurrent()` and `core.config.get()` semantics remain unchanged.
+
+## Selecting host modules
+
+The default host provides installation, configuration, removal and disposal. Optional methods require explicitly selected modules; select a pipeline mode as well as its module. `defineFeature` is imported from `@migaia/plugin-host/features`.
+
+```ts
+import { defineHost } from '@migaia/plugin-host'
+import { featuresModule } from '@migaia/plugin-host/features'
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+import { syncPipelineModule } from '@migaia/plugin-host/pipeline-modes/sync'
+const host = defineHost({
+  modules: [featuresModule, featureDependenciesModule, syncPipelineModule],
+  host: { pipeline: { mode: 'sync' } }
+})
+await host.dispose()
+```
+
+Enablement, activation and named pipelines have their own `enablementModule`, `activationModule` and `namedPipelinesModule` exports from the matching subpaths. Feature dependency planning requires both feature modules. Omitted modules contribute no optional handle members. Class hosts pass `modules` and `pipeline` directly to their constructor.
+
+`definePlugin` returns a frozen native definition with exactly `name`, `config`, `activation` and `getFeature` as own keys. Installation hooks, setup, dependency declarations and custom metadata remain in its private captured definition; read custom metadata from an explicit caller-owned object. Keep the original definition for installation: spreading a native result does not copy its authority or its hidden install hook. Raw definitions remain supported through the same admission path. A descriptor factory runs once per installation, not during definition capture. Configuration is captured at definition time, and object-definition hooks retain their original receiver.
+
+`FeatureOverlay` is available from `/feature-overlay`; its notification subclass is available from `/feature-overlay/notifications`. Global contributions are compiled by role and then installation order within each role. Repeatable roles require unique global aliases. Local selections replace matching aliases; `false` disables an inherited role. Consumers with runtime propagation use the notification entry; static consumers use the light entry.
+
+| Code (`source: plugin.host`)  | Scenario and recovery                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `INVALID_HOST_MODULE`         | A module identity was fabricated; import the registered module.                                              |
+| `DUPLICATE_HOST_MODULE`       | A module key was selected twice; remove the duplicate.                                                       |
+| `HOST_MODULE_MISSING`         | A definition or module requires an omitted module; install the module named in error detail before retrying. |
+| `PIPELINE_MODE_NOT_INSTALLED` | A requested mode has no selected module; add its mode module.                                                |
+| `FEATURE_ROLE_CONFLICT`       | A global singular role or a repeatable-role alias is duplicated; remove the conflicting contribution.        |

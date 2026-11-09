@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { PluginHost, defineHost, definePlugin, getPluginRuntimeIntegration } from '../src/index.ts'
@@ -19,7 +20,12 @@ function connection(name: string, key: string, family: object, answer: number) {
 it('[C4-fix:L1] a shared then key rejects before constructing its facade', async () => {
   /** The genuine frozen Host supplies its original install core and publication Proxy. */
   const host = defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    modules: nativeModules,
+
+    host: {
+      pipeline: { mode: 'sync' },
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    }
   })
   /** Only successful physical facade construction can increment this independent discriminator. */
   let created = 0
@@ -56,6 +62,8 @@ it('[C4-fix:L1] a shared then key rejects before constructing its facade', async
 it('[C4-fix:L2] a class slot is immutable while its canonical owner retires and republishes', async () => {
   /** The original class owns the property descriptor as well as the same receipt registry. */
   const host = new PluginHost({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   /** Exact family identity remains fixed across final withdrawal and later installation. */
@@ -92,7 +100,12 @@ it('[C4-fix:L2] a class slot is immutable while its canonical owner retires and 
 it('single-receipt find reads the canonical bucket without a Set iterator', async () => {
   /** This genuine Host publishes one actual original integration receipt. */
   const host = defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    modules: nativeModules,
+
+    host: {
+      pipeline: { mode: 'sync' },
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    }
   })
   try {
     await host.use(connection('single', 'runtimeAudit', {}, 42))

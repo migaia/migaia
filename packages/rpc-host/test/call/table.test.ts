@@ -52,7 +52,7 @@ class CallFixture {
 
   /** Only the existing replacement test borrows current-selection queries from this fixture. */
   constructor(refreshSelection = false) {
-    this.features.register('fixture')
+    this.features.prepare('fixture')()
     this.table = new CallTable({
       assertTransfer: () => undefined,
       features: this.features,

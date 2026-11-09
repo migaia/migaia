@@ -1,11 +1,12 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Native cold definitions retain original installation capture, values and per-Host isolation. */
 import {
-  defineFeature,
   defineHost,
   definePlugin,
   getPluginRuntimeIntegration,
   type IPluginHostCore
 } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from './core-fixture.ts'
@@ -19,6 +20,7 @@ function receivingHost(name: string) {
   )
   /** The original configured identity still selects its own native Feature output. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: {
       identity: { name },

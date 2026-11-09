@@ -3,9 +3,13 @@
  * dependency algorithms stay in their canonical packages.
  */
 
-import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 
-import { preflightPluginDefinitions, snapshotPluginDefinitions } from './admission-runtime.ts'
+import {
+  preflightPluginDefinitions,
+  type snapshotPluginDefinitions
+} from './definition-snapshots.ts'
 
 import { PluginHostErrorCode } from './error-code.ts'
 
@@ -13,25 +17,14 @@ import type { IPipelineDefinitions } from './pipeline-spec.ts'
 
 import { reportDiagnostic } from './diagnostic-report.ts'
 
-import {
-  DependencyAction,
-  DependencyMutationKind,
-  planDependencyMutation
-} from '@migaia/capability/graph/dependency'
-
-import {
-  admitDependencyMutationOptions,
-  PluginInactiveProviderPolicy,
-  toPluginPlan,
-  projectAffected,
-  validateInstallBatch
-} from './dependency-runtime.ts'
+import { PluginInactiveProviderPolicy } from './dependency-constants.ts'
+import { planCoreInstallBatch } from './core-install-plan.ts'
+import { HostModuleText, HostModuleKey, CoreRemovalProjection } from './module-constants.ts'
 
 import type { IRegistration } from './registry.ts'
 import type { IPluginConstraint } from './plugin-definition-types.ts'
 
 import type {
-  IPluginHandle,
   IPluginHandleTuple,
   IPluginDependencyMutationOptions,
   IPluginDependencyPlan,
@@ -76,10 +69,7 @@ export class PluginHostMutationRuntime<
      * Definition snapshots are captured at public admission, before queued work can observe caller
      * mutation.
      */
-    const definitions = snapshotPluginDefinitions<TDomainCore, TValue>(
-      plugins,
-      this.#context.trustedDefinitionReader
-    )
+    const definitions = this.#port.snapshotPlugins(plugins)
     return this.#port.enqueue(() => this.#installDefinitions<TPlugins>(definitions))
   }
 
@@ -102,7 +92,7 @@ export class PluginHostMutationRuntime<
     if (activation.length > 0) await this.#activateInOrder(activation)
     await this.#context.installRuntime.installBatch(entries)
     for (const entry of entries)
-      await this.#context.resumeRuntime.resumeAfterProvider(entry.name, true)
+      await this.#context.resumeRuntime?.resumeAfterProvider(entry.name, true)
     return Object.freeze(
       entries.map((entry) => this.#port.createHandle(entry.name))
     ) as IPluginHandleTuple<TPlugins>
@@ -113,59 +103,8 @@ export class PluginHostMutationRuntime<
    * name. Missing, disabled or suspended targets fail explicitly. Failed attempts clean up and may
    * be retried; success returns a name-addressed handle. Do not await this activation from itself.
    */
-  activate(name: string): Promise<IPluginHandle<IPluginConstraint<any>>> {
-    this.#port.assertActive()
-    // Direct hook nesting must reject before coalescing. After an await, callers share the
-    // request regardless of origin; a finite operation deadline bounds any resulting self-wait.
-    if (this.#context.hookInvocationDepth > 0) this.#port.assertMutationAllowed()
-    /** Same-name lazy requests share this exact pending Promise until its finally cleanup. */
-    const current = this.#context.activationRequests.get(name)
-    if (current) return current
-    this.#port.assertMutationAllowed()
-    /** The queue Promise is stored before later calls can join this activation. */
-    const activation = this.#port
-      .enqueue(() => this.#activateNow(name))
-      .finally(() => {
-        this.#context.activationRequests.delete(name)
-      })
-    this.#context.activationRequests.set(name, activation)
-    return activation
-  }
 
   /** Executes the queued lazy activation under the original provider-first order. */
-  async #activateNow(name: string): Promise<IPluginHandle<IPluginConstraint<any>>> {
-    /** Resolve the current exact registration once for this operation step. */
-    const registration = this.#context.state.registrations.get(name)
-    if (!registration)
-      throw new PluginHostError(
-        PluginHostErrorCode.pluginNotInstalled,
-        ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
-      )
-    if (!registration.enabled)
-      throw new PluginHostError(
-        PluginHostErrorCode.pluginDisabled,
-        ERROR_TEXT.PLUGIN_DISABLED(name)
-      )
-    if (registration.suspended)
-      throw new PluginHostError(
-        PluginHostErrorCode.pluginSuspended,
-        ERROR_TEXT.PLUGIN_SUSPENDED(name)
-      )
-    if (!registration.activated) {
-      // Validate first so a rejected activation leaves every lazy provider untouched; then
-      // activate the lazy provider chain providers-first before this registration.
-      const { activationOrder } = this.#validateBatch(
-        [{ name, plugin: registration.plugin }],
-        PluginInactiveProviderPolicy.admit,
-        [name]
-      )
-      await this.#activateInOrder(
-        activationOrder.map((provider) => this.#context.state.registrations.get(provider)!)
-      )
-      await this.#context.installRuntime.activate(registration)
-    }
-    return this.#port.createHandle(name)
-  }
 
   /**
    * Installs a same-name replacement before revoking the previous generation. Candidate failure
@@ -173,46 +112,6 @@ export class PluginHostMutationRuntime<
    * the new provider back. Old captured callable extensions reject, while name-addressed handles
    * resolve the successor. Names that differ reject with REPLACE_NAME_MISMATCH before enqueue.
    */
-  replace<TPlugin extends IPluginConstraint<any>>(
-    name: string,
-    next: TPlugin
-  ): Promise<IPluginHandle<TPlugin>> {
-    this.#port.assertActive()
-    this.#port.assertMutationAllowed()
-    /**
-     * Definition snapshots are captured at public admission, before queued work can observe caller
-     * mutation.
-     */
-    const definitions = snapshotPluginDefinitions<TDomainCore, TValue>(
-      [next],
-      this.#context.trustedDefinitionReader
-    )
-    /** The snapshotted candidate is used consistently for name admission and replacement. */
-    const definition = definitions[0]!
-    if (definition.name !== name)
-      return Promise.reject(
-        new PluginHostError(
-          PluginHostErrorCode.replaceNameMismatch,
-          ERROR_TEXT.REPLACE_NAME_MISMATCH(name, definition.name)
-        )
-      )
-    return this.#port.enqueue(async () => {
-      /** Replacement retains this exact generation until the candidate publishes. */
-      const previous = this.#context.state.registrations.get(name)
-      if (!previous)
-        throw new PluginHostError(
-          PluginHostErrorCode.pluginNotInstalled,
-          ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
-        )
-      if (previous.suspended)
-        throw new PluginHostError(
-          PluginHostErrorCode.pluginSuspended,
-          ERROR_TEXT.PLUGIN_SUSPENDED(name)
-        )
-      await this.#context.replaceRuntime.replace(previous, definition)
-      return this.#port.createHandle<TPlugin>(name)
-    })
-  }
 
   /** Installs constructor-time plugins synchronously or throws before the host escapes. */
   useSync<TViewPlugins extends readonly IPluginConstraint<any>[]>(
@@ -225,23 +124,23 @@ export class PluginHostMutationRuntime<
        * Definition snapshots are captured at public admission, before queued work can observe
        * caller mutation.
        */
-      const definitions = snapshotPluginDefinitions<TDomainCore, TValue>(
-        plugins,
-        this.#context.trustedDefinitionReader
-      )
+      const definitions = this.#port.snapshotPlugins(plugins)
       /** Preflight admits every member before installation can produce side effects. */
       const entries = preflightPluginDefinitions(definitions, (name) =>
         this.#context.state.registrations.has(name)
       )
       this.#context.installRuntime.installBatchSync(entries)
       for (const entry of entries) {
-        if (this.#context.resumeRuntime.planAfterProvider(entry.name, true).steps.length === 0)
+        if (
+          !this.#context.resumeRuntime ||
+          this.#context.resumeRuntime.planAfterProvider(entry.name, true).steps.length === 0
+        )
           continue
         // Recovery drains, disposes and reinstalls registrations, so it must run inside the
         // mutation queue like every other structural change instead of racing queued mutations.
         /** Queued recovery for this entry; failures are reported, never rethrown to the caller. */
         const task = this.#port
-          .enqueue(() => this.#context.resumeRuntime.resumeAfterProvider(entry.name, true))
+          .enqueue(() => this.#context.resumeRuntime!.resumeAfterProvider(entry.name, true))
           .catch((error) => {
             reportDiagnostic(
               this.#context.diagnostic,
@@ -265,13 +164,17 @@ export class PluginHostMutationRuntime<
    * Existing same-name nodes are projected with transaction-local dependencies for activation and
    * replacement validation.
    */
+  /** Optional graph planning preserves the existing validated batch boundary. */
   #validateBatch(
     entries: readonly import('./registry.ts').IInstallEntry<TDomainCore, TValue>[],
     inactive: PluginInactiveProviderPolicy,
-    activationRoots?: readonly string[]
-  ): ReturnType<typeof validateInstallBatch<TDomainCore, TValue>> {
+    roots?: readonly string[]
+  ) {
     try {
-      return validateInstallBatch(entries, this.#context.state, inactive, activationRoots)
+      return (
+        this.#context.validateInstallBatch?.(entries, inactive, roots) ??
+        planCoreInstallBatch(entries)
+      )
     } catch (error) {
       return this.#port.rethrowWithIdentity(error)
     }
@@ -292,86 +195,51 @@ export class PluginHostMutationRuntime<
   ): Promise<IPluginRemoval | IPluginDependencyPlan> {
     this.#port.assertActive()
     this.#port.assertMutationAllowed()
-    return this.#port.enqueue(() => this.#removeNow(name, options))
+    return this.#port.enqueue(() =>
+      this.#context.featureOperations
+        ? this.#context.featureOperations.remove(name, options)
+        : this.#removeCore(name, options)
+    )
   }
 
   /** Runs the admitted removal plan, retaining original cleanup ordering and commit finally. */
-  async #removeNow(
+  /** Core-only removal retains the same before-release, drain and cleanup owners. */
+  async #removeCore(
     name: string,
     options: IPluginDependencyMutationOptions
-  ): Promise<IPluginRemoval | IPluginDependencyPlan> {
-    if (!this.#context.state.registrations.has(name))
+  ): Promise<IPluginRemoval> {
+    const registration = this.#context.state.registrations.get(name)
+    if (!registration)
       throw new PluginHostError(
         PluginHostErrorCode.pluginNotInstalled,
         ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
       )
-    /** Validated breaking option shape and default reject policy. */
-    const admitted = admitDependencyMutationOptions(options)
-    /** Capability-owned dependency decision for this exact committed state. */
-    const plan = planDependencyMutation(
-      this.#context.state.dependencyIndex(),
-      (pluginName) => this.#context.state.readDependencyState(pluginName),
-      {
-        roots: [name],
-        kind: DependencyMutationKind.remove,
-        policy: admitted.policy
-      }
-    )
-    if (plan.blockedBy.length > 0)
-      throw new PluginHostError(
-        PluginHostErrorCode.dependencyBlocked,
-        ERROR_TEXT.DEPENDENCY_BLOCKED(name),
-        { detail: { blockedBy: plan.blockedBy } }
-      )
-    if (admitted.dryRun) return toPluginPlan(plan, admitted.policy)
-    /** The complete removal is admitted atomically before cleanup can alter any registration. */
-    for (const step of plan.steps) {
-      if (step.action !== DependencyAction.release) continue
-      /** A plan names only the current original registrations selected by the native owner. */
-      const registration = this.#context.state.registrations.get(step.id)
-      if (registration) this.#context.removalRuntime.assertRemovalAllowed(registration)
-    }
-    /** Cleanup failures accumulate in execution order without replacing the mutation result. */
-    const cleanupErrors: unknown[] = []
-    /** Names whose planned removal or suspension actually changed this Host. */
-    const applied: string[] = []
+    if (options.policy !== undefined || options.dryRun === true)
+      throw new PluginHostError(PluginHostErrorCode.hostModuleMissing, HostModuleText.missing, {
+        detail: { module: HostModuleKey.features }
+      })
+    this.#context.removalRuntime.assertRemovalAllowed(registration)
+    /** Cleanup failures preserve execution order and the exact native failures. */
+    const errors: unknown[] = []
     try {
-      for (const step of plan.steps) {
-        /** Resolve the current exact registration once for this operation step. */
-        const registration = this.#context.state.registrations.get(step.id)
-        if (!registration) continue
-        try {
-          if (step.action === DependencyAction.suspend) {
-            if (this.#context.enablementRuntime.suspend(registration)) applied.push(step.id)
-            continue
-          }
-          if (step.action !== DependencyAction.release) continue
-          /** Only an installed hook produces a bounded pre-release result. */
-          const beforeRelease = this.#context.removalRuntime.runBeforeRelease(registration)
-          if (beforeRelease) cleanupErrors.push(...(await beforeRelease).cleanupErrors)
-          await this.#port.drainLeases(registration, cleanupErrors)
-          cleanupErrors.push(
-            ...(await this.#context.removalRuntime.disposeRegistration(registration)).cleanupErrors
-          )
-          this.#context.enablementRuntime.forget(step.id)
-          this.#context.state.removedNames.add(step.id)
-          applied.push(step.id)
-        } catch (error) {
-          cleanupErrors.push(error)
-          if (
-            step.action === DependencyAction.release &&
-            !this.#context.state.registrations.has(step.id)
-          )
-            applied.push(step.id)
-        }
-      }
+      const before = this.#context.removalRuntime.runBeforeRelease(registration)
+      if (before) errors.push(...(await before).cleanupErrors)
+      await this.#port.drainLeases(registration, errors)
+      errors.push(
+        ...(await this.#context.removalRuntime.disposeRegistration(registration)).cleanupErrors
+      )
+      this.#context.state.removedNames.add(name)
     } finally {
       this.#context.state.commit()
     }
-    /** The public receipt includes only changes actually applied by this plan. */
-    const affected = projectAffected(plan, applied, admitted.policy)
-    return cleanupErrors.length === 0
-      ? Object.freeze({ ok: true as const, affected })
-      : Object.freeze({ ok: false as const, errors: Object.freeze(cleanupErrors), affected })
+    const affected = Object.freeze({
+      policy: CoreRemovalProjection.policy,
+      order: Object.freeze([name]),
+      steps: Object.freeze([Object.freeze({ name, action: CoreRemovalProjection.action })]),
+      edges: Object.freeze([])
+    })
+    return errors.length === 0
+      ? Object.freeze({ ok: true, affected })
+      : Object.freeze({ ok: false, errors: Object.freeze(errors), affected })
   }
 }

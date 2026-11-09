@@ -1,3 +1,4 @@
+import { nativeModules } from '../native-modules.ts'
 /** Exercises named pipeline execution, shared publication/drain and existing lane cost counters. */
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
@@ -19,7 +20,10 @@ type ITextValue = Readonly<{ text: string }>
 /** Explicit unbounded budgets keep these business barriers independent from wall-clock deadlines. */
 function createNamedHost() {
   return defineHost({
+    modules: nativeModules,
+
     host: {
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     },
     pipelines: {
@@ -36,7 +40,10 @@ type INamedCore = IPluginHostCoreFor<ReturnType<typeof createNamedHost>>
 /** Both async lanes can hold independent leases for one installed owner. */
 function createDrainHost() {
   return defineHost({
+    modules: nativeModules,
+
     host: {
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     },
     pipelines: {

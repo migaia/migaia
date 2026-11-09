@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
-import { defineFeature } from '../src/index.ts'
-import { compileFeatures, instantiateFeatures } from '../src/feature-runtime.ts'
+import {} from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
+import { compileFeatures, instantiateFeatures } from '../src/modules/features/feature-runtime.ts'
 
 it('re-reports a rejected Feature with both the rejection and reporter failure reachable', async () => {
   const originalCause = new Error('original cause')

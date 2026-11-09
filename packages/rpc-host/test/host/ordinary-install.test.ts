@@ -1,5 +1,7 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Ordinary installation uses the receiving native core and its actual namespace publication. */
-import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import {
   defineTransportPlugin,
   defineFlowFeature,
@@ -29,6 +31,7 @@ function ordinaryHost() {
   )
   /** Native execution authority refers to this actual owner after construction completes. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
@@ -85,6 +88,7 @@ describe('ordinary native Host RPC installation', () => {
   it('rejects missing SDK pipeline configuration before native acquisition', async () => {
     /** A plain native Host has no RPC execution authority until explicitly configured. */
     const host = defineHost({
+      modules: rpcNativeTestModules,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     /** Cold SDK definition is real; its acquisition must remain untouched after admission failure. */
@@ -114,6 +118,7 @@ describe('ordinary native Host RPC installation', () => {
     )
     /** No cold namespace inventory or pipeline declaration belongs to this actual Host. */
     const host = defineHost({
+      modules: rpcNativeTestModules,
       domainCore: rpc.domainCore,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })

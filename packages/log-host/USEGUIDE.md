@@ -276,3 +276,5 @@ try {
   await Promise.all([records.dispose(), intents.dispose(), images.dispose()])
 }
 ```
+
+输出 Feature 可使用 `false` 禁用继承角色。本地 format、batch、retry、timeout 替换对应全局角色，entry 与 gate 按别名替换。两个全局载体重复提供同一单例角色时，以 `plugin.host / FEATURE_ROLE_CONFLICT` 拒绝；重复宿主别名与单个记录格式错误仍使用 `logging / INVALID_OPTION`。全局默认值通过共享 overlay 在策略安装提交或移除后通知已安装输出。

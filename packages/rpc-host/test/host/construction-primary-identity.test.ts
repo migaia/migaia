@@ -1,6 +1,6 @@
 import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public construction retains its primary failure after dependency setup and failing rollback. */
-import { defineFeature } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowFeature, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { walkErrorCauses } from '@migaia/utils/error'

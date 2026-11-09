@@ -6,7 +6,9 @@ const packageDirectory = resolve(process.argv[2] ?? new URL('..', import.meta.ur
 const packageUrl = pathToFileURL(`${packageDirectory}/`)
 const packageJson = JSON.parse(readFileSync(new URL('package.json', packageUrl), 'utf8'))
 const root = await import(new URL('dist/index.js', packageUrl))
-const composition = await import(new URL('dist/composition-entry.js', packageUrl))
+const composition = await import(
+  new URL('dist/modules/feature-dependencies/composition-entry.js', packageUrl)
+)
 if (
   typeof root.definePlugin !== 'function' ||
   typeof root.defineHost !== 'function' ||
@@ -16,6 +18,23 @@ if (
 if (typeof composition.openComposition !== 'function')
   throw new Error('packed composition consumer missing managed protocol')
 const exports = Object.keys(packageJson.exports).sort()
-if (JSON.stringify(exports) !== JSON.stringify(['.', './composition']))
+if (
+  JSON.stringify(exports) !==
+  JSON.stringify([
+    '.',
+    './activation',
+    './composition',
+    './enablement',
+    './feature-dependencies',
+    './feature-overlay',
+    './feature-overlay/notifications',
+    './features',
+    './named-pipelines',
+    './pipeline-modes/async',
+    './pipeline-modes/async-generator',
+    './pipeline-modes/generator',
+    './pipeline-modes/sync'
+  ])
+)
   throw new Error(`packed export topology mismatch: ${JSON.stringify(exports)}`)
 console.log(JSON.stringify({ root: true, composition: true, sourcemap: true }))

@@ -1,3 +1,5 @@
+import { snapshotOwnDescriptors } from '@migaia/utils/object'
+import type { IFeatureOverlayEntry } from '@migaia/plugin-host/feature-overlay'
 import { boundedWait } from '@migaia/lifecycle'
 import { retry, type IRetryContext, type IRetryFailureContext } from '@migaia/utils/promise'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -13,10 +15,12 @@ import type {
   ILogEntry,
   ILogFeature,
   ILogFeatureRecord,
+  ILogOutputFeatureRecord,
+  IEnabledLogFeatures,
   ILogFormat,
   ILogControlExtensions,
   ILogOutputRecord,
-  ILogPlugin,
+  IDefinedLogPlugin,
   ILogPluginCore,
   ILogFailure
 } from './typing.ts'
@@ -26,7 +30,6 @@ import {
   featureScope,
   featureMetadata,
   installedFeatureScope,
-  resolveFeatureScope,
   acceptsEntry,
   deliveryFeature,
   type IBatchOptions,
@@ -35,7 +38,7 @@ import {
 import {
   featureControlExtensions,
   composeFeatureExtensions,
-  LogPolicyInstallation
+  registerLogPolicy
 } from './feature-policy.ts'
 import { formatFeature } from './features/format.ts'
 import {
@@ -54,7 +57,7 @@ import { DeliveryAttempt } from './delivery-attempt.ts'
 /** Common output policy is independent of whether the transport consumes formatted text. */
 type IOutputOptions<
   O extends Record<string, unknown>,
-  F extends ILogFeatureRecord = ILogFeatureRecord
+  F extends ILogOutputFeatureRecord = ILogOutputFeatureRecord
 > = {
   name: string
   batchable: boolean
@@ -66,7 +69,7 @@ type IOutputOptions<
 /** Existing text consumers keep their definite record text and selected format context. */
 type ITextOutputDefinition<
   O extends Record<string, unknown>,
-  F extends ILogFeatureRecord = ILogFeatureRecord
+  F extends ILogOutputFeatureRecord = ILogOutputFeatureRecord
 > = IOutputOptions<O, F> & {
   consumesText?: true
   defaultFormat: 'json' | 'plain' | ILogFeature
@@ -78,7 +81,7 @@ type ITextOutputDefinition<
 /** Entry-only transports receive no text or synthetic format descriptor. */
 type IEntryOutputDefinition<
   O extends Record<string, unknown>,
-  F extends ILogFeatureRecord = ILogFeatureRecord
+  F extends ILogOutputFeatureRecord = ILogOutputFeatureRecord
 > = IOutputOptions<O, F> & {
   consumesText: false
   defaultFormat?: never
@@ -90,7 +93,7 @@ type IEntryOutputDefinition<
 /** One public discriminant preserves inference without adding another SDK export. */
 type IOutputDefinition<
   O extends Record<string, unknown>,
-  F extends ILogFeatureRecord = ILogFeatureRecord
+  F extends ILogOutputFeatureRecord = ILogOutputFeatureRecord
 > = ITextOutputDefinition<O, F> | IEntryOutputDefinition<O, F>
 /** Every internal output record retains its logical entry; only text consumers add text. */
 type IEntryRecord = Pick<ILogOutputRecord, 'entry'>
@@ -515,8 +518,12 @@ abstract class OutputInstallation<R extends IEntryRecord> {
     this.local = local
   }
   /** Compile host overrides only after native publication, retaining unchanged batch state. */
-  configure(defaults: ReadonlyMap<string, IFeatureImplementation>): void {
-    this.features = resolveFeatureScope(defaults, this.local)
+  configure(entries: readonly IFeatureOverlayEntry<IFeatureImplementation>[]): void {
+    /** Output cache excludes ingress stages, which remain owned by the host entry. */
+    const features: IFeatureImplementation[] = []
+    for (const entry of entries)
+      if (entry.value.phase !== FeaturePhase.entry) features.push(entry.value)
+    this.features = Object.freeze(features)
     /** Phase classification stays on the cold configuration path. */
     const gates: Array<Extract<IFeatureImplementation, { phase: 'gate' }>> = []
     for (const implementation of this.features)
@@ -590,8 +597,8 @@ class TextOutputInstallation extends OutputInstallation<ILogOutputRecord> {
   /** Fallback comes from this plugin's own native-installed default feature. */
   readonly #fallback: ILogFormat
   /** Select an installed formatter during configuration, never through a per-entry lookup. */
-  override configure(defaults: ReadonlyMap<string, IFeatureImplementation>): void {
-    super.configure(defaults)
+  override configure(entries: readonly IFeatureOverlayEntry<IFeatureImplementation>[]): void {
+    super.configure(entries)
     this.#format = explicitFormat(this.features) ?? this.#fallback
   }
   /** Render once with the cached installed formatter before buffering. */
@@ -630,7 +637,7 @@ class EntryOutputInstallation extends OutputInstallation<IEntryRecord> {
 /** A reusable authoring owner delegates feature construction and lifecycle to definePlugin. */
 class OutputPlugin<
   N extends string,
-  F extends ILogFeatureRecord,
+  F extends ILogOutputFeatureRecord,
   O extends Record<string, unknown>
 > {
   /** Native roots include explicit local policies and this output’s fallback formatter. */
@@ -638,7 +645,9 @@ class OutputPlugin<
   /** Stable callbacks and shallow option snapshots belong to this definition. */
   readonly #configuration: IOutputConfiguration<O>
   /** Caller aliases alone determine public control names and local overrides. */
-  readonly local: F
+  readonly local: IEnabledLogFeatures<F>
+  /** Explicit disabled roles are cold selections and never native feature roots. */
+  readonly #disabledRoles: readonly PropertyKey[]
   /** Native lifetime signals select the installed transport without owning registration identity. */
   readonly #outputs = new WeakMap<object, OutputInstallation<IEntryRecord>>()
   /**
@@ -661,8 +670,38 @@ class OutputPlugin<
     )
       throw invalidOption()
     this.#name = definition.name
-    featureScope(definition.features, true)
-    this.local = Object.freeze({ ...definition.features }) as F
+    /** Preserve native container and descriptor rejection before removing output-only false values. */
+    const input = definition.features
+    if (input !== undefined && (!input || typeof input !== 'object' || Array.isArray(input)))
+      throw invalidOption()
+    /** The native inspector receives the same prototype and surviving descriptors as the input. */
+    const local =
+      input === undefined
+        ? {}
+        : (Object.create(Object.getPrototypeOf(input)) as Record<string, ILogFeature<any>>)
+    /** False entries are domain selections rather than native feature identities. */
+    const disabled: PropertyKey[] = []
+    /** Shared descriptor capture never evaluates getters and retains reflective failures on cause. */
+    const captured = snapshotOwnDescriptors(input)
+    if (!captured.ok) throw invalidOption(captured.error)
+    for (const key of Reflect.ownKeys(captured.descriptors)) {
+      /** Descriptor preservation lets canonical native admission reject accessors and hidden roots. */
+      const descriptor = captured.descriptors[key]!
+      if (typeof key === 'string' && 'value' in descriptor && descriptor.value === false) {
+        if (
+          key !== FeaturePhase.format &&
+          key !== FeaturePhase.gate &&
+          key !== LogDeliveryPolicy.batch &&
+          key !== LogDeliveryPolicy.retry &&
+          key !== LogDeliveryPolicy.timeout
+        )
+          throw invalidOption()
+        disabled.push(key)
+      } else Object.defineProperty(local, key, descriptor)
+    }
+    featureScope(local, true)
+    this.local = Object.freeze({ ...local }) as IEnabledLogFeatures<F>
+    this.#disabledRoles = Object.freeze(disabled)
     /** Any suffix on the longest declared alias is longer than every caller-owned key. */
     let longestAlias = ''
     for (const alias of Object.keys(this.local))
@@ -701,12 +740,7 @@ class OutputPlugin<
         )
       : new EntryOutputInstallation(core, configuration.definition, local)
     /** The scope prepares this output against current and earlier same-batch declarations. */
-    const policy = new LogPolicyInstallation(core, {
-      name: this.#name,
-      output: true,
-      features: local,
-      configure: (defaults) => output.configure(defaults)
-    })
+    registerLogPolicy(core, local, (entries) => output.configure(entries), this.#disabledRoles)
     /** This signal is issued and revoked by the native registration. */
     const signal = core.lifecycle.signal
     this.#outputs.set(signal, output)
@@ -719,10 +753,13 @@ class OutputPlugin<
     const combined = composeFeatureExtensions(
       this.#name,
       extensions,
-      featureControlExtensions(this.#name, this.local, core.features as IFeatureOutputs<F>)
+      featureControlExtensions(
+        this.#name,
+        this.local,
+        core.features as IFeatureOutputs<IEnabledLogFeatures<F>>
+      )
     )
-    policy.commit()
-    return combined
+    return combined as O & ILogControlExtensions<N, F>
   }
   /** Drain output work before native release revokes its borrowed resources. */
   beforeRelease(context: IPluginBeforeReleaseContext): void | Promise<void> {
@@ -738,11 +775,11 @@ class OutputPlugin<
 /** Assemble an output with native feature roots and ordinary guarded plugin extensions. */
 export function defineOutputPlugin<
   const N extends string,
-  const F extends ILogFeatureRecord = Record<never, never>,
+  const F extends ILogOutputFeatureRecord = Record<never, never>,
   O extends Record<string, unknown> = Record<never, never>
 >(
   definition: IOutputDefinition<O, F> & { name: N }
-): ILogPlugin<O & ILogControlExtensions<N, F>, IPluginConfig, F> {
+): IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, IPluginConfig, IEnabledLogFeatures<F>> {
   /** Definition callbacks forward to one named owner; plugin-host owns actual installation. */
   const owner = new OutputPlugin(definition)
   return definePlugin<
@@ -758,5 +795,5 @@ export function defineOutputPlugin<
     features: owner.features as ILogFeatureRecord,
     install: (core) => owner.install(core),
     beforeRelease: (context) => owner.beforeRelease(context)
-  }) as ILogPlugin<O & ILogControlExtensions<N, F>, IPluginConfig, F>
+  }) as IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, IPluginConfig, IEnabledLogFeatures<F>>
 }

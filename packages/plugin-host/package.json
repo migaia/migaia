@@ -25,8 +25,52 @@
       "default": "./dist/index.js"
     },
     "./composition": {
-      "types": "./dist/composition-entry.d.ts",
-      "default": "./dist/composition-entry.js"
+      "types": "./dist/modules/feature-dependencies/composition-entry.d.ts",
+      "default": "./dist/modules/feature-dependencies/composition-entry.js"
+    },
+    "./features": {
+      "types": "./dist/modules/features/index.d.ts",
+      "default": "./dist/modules/features/index.js"
+    },
+    "./enablement": {
+      "types": "./dist/modules/enablement/index.d.ts",
+      "default": "./dist/modules/enablement/index.js"
+    },
+    "./activation": {
+      "types": "./dist/modules/activation/index.d.ts",
+      "default": "./dist/modules/activation/index.js"
+    },
+    "./named-pipelines": {
+      "types": "./dist/modules/named-pipelines/index.d.ts",
+      "default": "./dist/modules/named-pipelines/index.js"
+    },
+    "./pipeline-modes/sync": {
+      "types": "./dist/modules/pipeline-modes/sync.d.ts",
+      "default": "./dist/modules/pipeline-modes/sync.js"
+    },
+    "./pipeline-modes/async": {
+      "types": "./dist/modules/pipeline-modes/async.d.ts",
+      "default": "./dist/modules/pipeline-modes/async.js"
+    },
+    "./pipeline-modes/generator": {
+      "types": "./dist/modules/pipeline-modes/generator.d.ts",
+      "default": "./dist/modules/pipeline-modes/generator.js"
+    },
+    "./pipeline-modes/async-generator": {
+      "types": "./dist/modules/pipeline-modes/async-generator.d.ts",
+      "default": "./dist/modules/pipeline-modes/async-generator.js"
+    },
+    "./feature-dependencies": {
+      "types": "./dist/modules/feature-dependencies/index.d.ts",
+      "default": "./dist/modules/feature-dependencies/index.js"
+    },
+    "./feature-overlay": {
+      "types": "./dist/feature-overlay.d.ts",
+      "default": "./dist/feature-overlay.js"
+    },
+    "./feature-overlay/notifications": {
+      "types": "./dist/feature-overlay-notifications.d.ts",
+      "default": "./dist/feature-overlay-notifications.js"
     }
   },
   "publishConfig": {

@@ -1,11 +1,7 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Native installation commit, rollback and cancellation retain the original business oracles. */
-import {
-  defineFeature,
-  defineHost,
-  definePlugin,
-  PluginHostError,
-  PluginHostErrorCode
-} from '@migaia/plugin-host'
+import { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
@@ -45,6 +41,7 @@ function observe<T>(operation: Promise<T>) {
 /** Infer the actual native Host without making its lazy owner callback infer itself. */
 function barrierHost(getHost: () => object, pipeline: Parameters<typeof rpcHostPipelines>[1]) {
   return defineHost({
+    modules: rpcNativeTestModules,
     ...rpcHostPipelines(getHost, pipeline),
     host: {
       identity: { name: 'provider' },
@@ -61,7 +58,15 @@ class ServeCommitBarrier {
     (name, request) => this.#host.pipeline(name, request)
   )
   /** The canonical memory listener lends actual SDK attach and bilateral Session negotiation. */
-  readonly #server = coreMemoryServer('provider', 'provider-1', 'memory', {}, ['business'])
+  readonly #server = coreMemoryServer(
+    'provider',
+    'provider-1',
+    'memory',
+    {},
+    ['business'],
+    undefined,
+    () => this.#holdOpen()
+  )
   /** Only the native installation's existing continuation is held by this acceptance fixture. */
   readonly #release = deferred<void>()
   /** This receipt means the actual SDK transport install has returned its original resources. */
@@ -193,20 +198,10 @@ class ServeCommitBarrier {
     this.#downstream = connected.host
   }
 
-  /** Hold only the original SDK install result before the actual native batch may commit. */
-  #runtime() {
-    /** Canonical memory admission supplies all real carrier and handshake behavior. */
-    const transport = this.#server.transport
-    return definePlugin({
-      ...transport,
-      install: async (core) => {
-        /** Original native resources are already acquired before this continuation is withheld. */
-        const installed = await transport.install!(core)
-        this.#prepared.resolve()
-        await this.#release.promise
-        return installed
-      }
-    })
+  /** Hold the genuine transport open continuation before native installation can commit. */
+  async #holdOpen(): Promise<void> {
+    this.#prepared.resolve()
+    await this.#release.promise
   }
 
   /** Open the real listener batch before connecting its actual public caller. */
@@ -229,7 +224,7 @@ class ServeCommitBarrier {
     /** Keep the definite original Promise in the public scenario receipt. */
     const installing = this.#host.use(
       ...(this.#forwarded ? [] : [this.#business()]),
-      this.#runtime(),
+      this.#server.transport,
       tail
     )
     this.#installing = installing

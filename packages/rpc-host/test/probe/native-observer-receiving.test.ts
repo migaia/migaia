@@ -135,7 +135,7 @@ it('keeps genuine control and cancellation observations through both echo filter
       self: { name: 'observer-left', instanceId: 'observer-left' },
       plugins: [
         observer,
-        devtools,
+        devtools.plugin,
         observedSource('observer-left-source', leftCarrier, leftSource)
       ],
       provide: { echo: leftEcho.echo, other: unchanged },
@@ -145,7 +145,7 @@ it('keeps genuine control and cancellation observations through both echo filter
       self: { name: 'observer-right', instanceId: 'observer-right' },
       plugins: [
         observer,
-        devtools,
+        devtools.plugin,
         observedSource('observer-right-source', rightCarrier, rightSource)
       ],
       provide: { echo: rightEcho.echo, other: unchanged },
@@ -194,7 +194,7 @@ it('keeps genuine control and cancellation observations through both echo filter
       ).toMatchObject({ route: { remainingMs: 0 } })
     await Promise.all([left.close(), right.close()])
     /** The original method whitelist never hides methodless native control or cancellation facts. */
-    const events = devtools.query({ stages: ['message'] }).events
+    const events = devtools.collector.query({ stages: ['message'] }).events
     expect(events.some((event) => event.method === 'echo')).toBe(true)
     expect(events.some((event) => event.method === 'other')).toBe(false)
     for (const variation of ['ping', 'pong', 'close'])
@@ -263,7 +263,7 @@ it('keeps genuine control and cancellation observations through both echo filter
     )
   } finally {
     await Promise.allSettled([left.close(), right.close()])
-    devtools.close()
+    devtools.collector.close()
   }
 })
 

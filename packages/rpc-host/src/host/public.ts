@@ -38,7 +38,18 @@ type IRpcHostRoot<TRemote, TPlugins extends readonly IRpcHostPlugin[]> = Readonl
     ...plugins: TAdded
   ): Promise<IRpcHost<TRemote, readonly [...TPlugins, ...TAdded]>>
   /** Native dependency-aware removal closes the transport's Sessions before deleting its group. */
-  unUse: IHostHandle<Record<never, never>, never, readonly []>['unUse']
+  unUse: IHostHandle<
+    Record<never, never>,
+    never,
+    readonly [
+      typeof import('@migaia/plugin-host/features').featuresModule,
+      typeof import('@migaia/plugin-host/feature-dependencies').featureDependenciesModule,
+      typeof import('@migaia/plugin-host/named-pipelines').namedPipelinesModule,
+      typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule
+    ],
+    'async',
+    readonly []
+  >['unUse']
   provide(input: IRpcProvide, options?: IRpcProvideOptions): void
   close(reason?: unknown): Promise<void>
   [Symbol.asyncDispose](): Promise<void>

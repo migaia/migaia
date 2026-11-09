@@ -1,5 +1,7 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Genuine native source transactions share a cold namespace without exposing pending peers. */
-import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
 import {
@@ -20,6 +22,7 @@ function nativeSourceHost() {
   )
   /** Actual native transactions own Features, source commit and rollback. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: {
       identity: { name: 'source-native' },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { PluginHostError } from '../src/error-text.ts'
+import { PluginHostError } from '../src/errors.ts'
 import { PluginHostErrorCode } from '../src/error-code.ts'
 import { type IExt, type IStageCore, Host, plugin } from './plugin-host-fixtures.ts'
 

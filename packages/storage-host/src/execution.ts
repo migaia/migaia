@@ -4,7 +4,18 @@ import type { IStorageExecutionPort, IStoragePipelineInput } from './types.ts'
 /** Forward one registration to the original shared runners; no stage or retry state is retained. */
 export function forwardStorageExecution(
   host: Pick<
-    IHostHandle<object, IStoragePipelineInput, readonly []>,
+    IHostHandle<
+      object,
+      IStoragePipelineInput,
+      readonly [
+        typeof import('@migaia/plugin-host/features').featuresModule,
+        typeof import('@migaia/plugin-host/feature-dependencies').featureDependenciesModule,
+        typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule,
+        typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule
+      ],
+      'async',
+      readonly []
+    >,
     'runPipelineSync' | 'runPipelineAsync'
   >,
   assertCurrent: () => void,

@@ -1,3 +1,4 @@
+import { nativeModules } from '../native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import {
   GENERATOR_CONTINUE,
@@ -8,9 +9,16 @@ import {
 import { PluginHost } from '../../src/index.ts'
 
 /** : every host mode hands stages the lifecycle abort signal that disposal aborts. */
-class SignalHost extends PluginHost<Record<string, never>, number> {
+class SignalHost extends PluginHost<
+  Record<string, never>,
+  number,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   constructor(mode: IMiddlewarePipelineMode) {
     super({
+      modules: nativeModules,
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       pipeline: { mode }
     })

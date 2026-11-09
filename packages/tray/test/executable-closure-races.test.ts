@@ -1,3 +1,4 @@
+import { trayNativeTestModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { type IPluginHostCore } from '@migaia/plugin-host'
 import { createHost } from '../src/host/index.ts'
@@ -27,6 +28,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
         quiescenceMs: 0,
         create: () => {
           raw = new AsyncRuntimeHost({
+            modules: trayNativeTestModules,
             pipeline: { mode: 'async' },
             execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
           })

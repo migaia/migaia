@@ -433,8 +433,8 @@ export class FlowRegistry {
   }
 
   /**
-   * Native policy removal withdraws only its own output references; late policy admission stays
-   * valid.
+   * Native policy removal withdraws only its own output references; RpcHost rejects policy
+   * admission after the first transport commit under the startup admission contract.
    */
   registerControls(core: IPluginHostCore, controls: Readonly<Record<string, object>>): void {
     this.registerShared(core, {

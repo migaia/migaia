@@ -1,3 +1,6 @@
+import { pipelineModes } from './pipeline-test-helpers.ts'
+import { asyncMode } from '../src/modes/async.ts'
+import { syncMode } from '../src/modes/sync.ts'
 import { describe, expect, it } from 'vitest'
 import { createPipeline } from '../src/index.ts'
 import { walkErrorCauses } from '@migaia/utils/error'
@@ -12,7 +15,7 @@ describe('audited middleware contracts', () => {
         continue: Symbol('continue'),
         undefined: Symbol('undefined')
       }
-      const pipeline = createPipeline<number, typeof mode>({ mode, signals })
+      const pipeline = createPipeline<number, typeof mode>({ mode: pipelineModes[mode], signals })
       /** Forwarded numbers must stay in the payload domain rather than becoming default symbols. */
       const values: number[] = []
       await pipeline.run([pipeline.lift((value, next) => next(value + 1), 'sync')], 1, (value) => {
@@ -36,7 +39,7 @@ describe('audited middleware contracts', () => {
       let active = true
       let done = 0
       const pipeline = createPipeline<number>({
-        mode: 'async',
+        mode: asyncMode,
         signal: controller.signal,
         assertActive: () => {
           if (!active) throw inactive
@@ -66,7 +69,7 @@ describe('audited middleware contracts', () => {
     let reads = 0
     const pipeline = createPipeline<number>({
       get mode() {
-        return ++reads === 1 ? 'sync' : 'invalid'
+        return ++reads === 1 ? syncMode : 'invalid'
       }
     } as never)
     expect(reads).toBe(1)
@@ -75,7 +78,7 @@ describe('audited middleware contracts', () => {
     const original = new Error('callback getter failed')
     expect(() =>
       createPipeline<number>({
-        mode: 'sync',
+        mode: syncMode,
         get assertActive(): () => void {
           throw original
         }
@@ -94,7 +97,7 @@ describe('audited middleware contracts', () => {
     async (mode) => {
       /** A native error keeps its identity and stack while gaining the owning boundary's code. */
       const original = new RangeError('stage failed')
-      const pipeline = createPipeline<number, typeof mode>({ mode })
+      const pipeline = createPipeline<number, typeof mode>({ mode: pipelineModes[mode] })
       let failure: unknown
       try {
         await pipeline.run(
@@ -126,7 +129,7 @@ describe('audited middleware contracts', () => {
       const combinerFailure = new Error('combiner failed')
       if (frozen) Object.freeze(combinerFailure)
       const pipeline = createPipeline<number>({
-        mode: 'async',
+        mode: asyncMode,
         combineStageAndDownstreamError: () => {
           throw combinerFailure
         }
@@ -156,7 +159,7 @@ describe('audited middleware contracts', () => {
   it.each([false, true])('propagates one downstream failure once (lifted: %s)', async (lifted) => {
     /** Awaiting next propagates the same failure; it does not create an independent stage failure. */
     const original = new TypeError('downstream failed')
-    const pipeline = createPipeline<number>({ mode: 'async' })
+    const pipeline = createPipeline<number>({ mode: asyncMode })
     const outer = lifted
       ? pipeline.lift((value, next) => next(value), 'sync')
       : async (value: number, next: (value: number) => Promise<void>) => {
@@ -182,7 +185,7 @@ describe('audited middleware contracts', () => {
     let late!: (value: number) => void
     const original = new Error('late violation reporter failed')
     const pipeline = createPipeline<number>({
-      mode: 'sync',
+      mode: syncMode,
       onViolation: () => {
         throw original
       }

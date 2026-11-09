@@ -1,3 +1,5 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /** Owns immutable named-pipeline declarations and their payload/mode inference, not execution. */
 import type {
   IMiddlewarePipelineMode,
@@ -5,7 +7,7 @@ import type {
   IAsyncMiddlewareStage,
   MiddlewarePipelineNext
 } from '@migaia/middleware-pipeline'
-import ERROR_TEXT, { tagPluginHostError } from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import type { PipelineOrder } from './pipeline-constants.ts'
 
@@ -138,19 +140,19 @@ export const pipelineSpec =
   > &
     TConfig => {
     if (config === null || typeof config !== 'object' || Array.isArray(config))
-      throw tagPluginHostError(
-        new TypeError(ERROR_TEXT.INVALID_PIPELINE_OPTION),
-        PluginHostErrorCode.invalidPipelineOption
-      )
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.INVALID_PIPELINE_OPTION), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidPipelineOption
+      })
     /** Copy configuration once; a caller getter failure keeps its exact original on cause. */
     let spec: Readonly<TConfig>
     try {
       spec = Object.freeze({ ...config })
     } catch (cause) {
-      throw tagPluginHostError(
-        new TypeError(ERROR_TEXT.INVALID_PIPELINE_OPTION, { cause }),
-        PluginHostErrorCode.invalidPipelineOption
-      )
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.INVALID_PIPELINE_OPTION, { cause }), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidPipelineOption
+      })
     }
     pipelineSpecs.add(spec)
     return spec as IPipelineSpec<

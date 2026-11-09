@@ -1,5 +1,7 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Original native Feature dependency order is owned by the single actual PluginHost transaction. */
-import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { describe, expect, it } from 'vitest'
 import { coreMemoryServer } from './core-fixture.ts'
@@ -29,6 +31,7 @@ describe('native capability topology', () => {
       (name, request) => native.pipeline(name, request)
     )
     const native = defineHost({
+      modules: rpcNativeTestModules,
       ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })

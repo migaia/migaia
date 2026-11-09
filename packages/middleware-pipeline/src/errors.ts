@@ -11,58 +11,18 @@ import {
 } from '@migaia/utils/error'
 import { MiddlewarePipelineErrorText } from './error-text.ts'
 
-/**
- * Preserves both original stage and downstream errors and attaches the package-boundary identity to
- * the default `AggregateError`.
- */
-export const createMiddlewarePipelineExecutionError = (
-  stageError: unknown,
-  downstreamError: unknown
-): AggregateError & {
-  readonly source: typeof MIDDLEWARE_PIPELINE_SOURCE
-  readonly code: IMiddlewarePipelineErrorCode
-} => {
-  /** AggregateError is retained so both original failures remain identity-reachable. */
-  const error = new AggregateError(
-    [stageError, downstreamError],
-    MiddlewarePipelineErrorText.executionFailed
-  )
-  return attachErrorIdentity(error, {
-    source: MIDDLEWARE_PIPELINE_SOURCE,
-    code: MiddlewarePipelineErrorCode.executionFailed
-  }) as AggregateError & {
-    readonly source: typeof MIDDLEWARE_PIPELINE_SOURCE
-    readonly code: IMiddlewarePipelineErrorCode
-  }
-}
-
-/** Preserves independent branch errors in their submission order. */
-export const createMiddlewarePipelineMultipleDownstreamError = (
-  errors: readonly unknown[]
-): AggregateError =>
-  attachErrorIdentity(
-    new AggregateError(errors, MiddlewarePipelineErrorText.multipleDownstreamFailed),
-    {
-      source: MIDDLEWARE_PIPELINE_SOURCE,
-      code: MiddlewarePipelineErrorCode.multipleDownstreamFailed
-    }
-  ) as AggregateError
-
 /** Finish independent sync or lifted submissions without replacing a lone original failure. */
 export function throwMiddlewarePipelineDownstreamFailures(failures: readonly unknown[]): void {
   if (failures.length === 1) throw failures[0]
-  if (failures.length > 1) throw createMiddlewarePipelineMultipleDownstreamError(failures)
+  if (failures.length > 1)
+    throw attachErrorIdentity(
+      new AggregateError(failures, MiddlewarePipelineErrorText.multipleDownstreamFailed),
+      {
+        source: MIDDLEWARE_PIPELINE_SOURCE,
+        code: MiddlewarePipelineErrorCode.multipleDownstreamFailed
+      }
+    )
 }
-
-/** Owns all package invalid-option errors while preserving each caller's cause shape. */
-export const createMiddlewarePipelineInvalidOptionError = (
-  message: string,
-  options?: ErrorOptions
-): TypeError =>
-  attachErrorIdentity(new TypeError(message, options), {
-    source: MIDDLEWARE_PIPELINE_SOURCE,
-    code: MiddlewarePipelineErrorCode.invalidOption
-  }) as TypeError
 
 /**
  * Classifies otherwise uncoded boundary failures without replacing native errors or existing
@@ -102,26 +62,3 @@ export function identifyMiddlewarePipelineFailure(
     { source: MIDDLEWARE_PIPELINE_SOURCE, code }
   )
 }
-
-/** Preserves Error abort reasons and tags package-created primitive-reason failures. */
-export const createMiddlewarePipelineAbortError = (reason: unknown): Error => {
-  if (reason instanceof Error)
-    return identifyMiddlewarePipelineFailure(reason, MiddlewarePipelineErrorCode.aborted)
-  return attachErrorIdentity(new Error(MiddlewarePipelineErrorText.aborted, { cause: reason }), {
-    source: MIDDLEWARE_PIPELINE_SOURCE,
-    code: MiddlewarePipelineErrorCode.aborted
-  }) as Error
-}
-
-/** Builds the fixed primary-first abort cleanup aggregate. */
-export const createMiddlewarePipelineAbortCleanupError = (
-  abortFailure: unknown,
-  cleanupFailure: unknown
-): AggregateError =>
-  attachErrorIdentity(
-    new AggregateError(
-      [abortFailure, cleanupFailure],
-      MiddlewarePipelineErrorText.abortCleanupFailed
-    ),
-    { source: MIDDLEWARE_PIPELINE_SOURCE, code: MiddlewarePipelineErrorCode.abortCleanupFailed }
-  ) as AggregateError

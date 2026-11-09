@@ -1,3 +1,4 @@
+import { trayNativeTestModules } from '../native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { defineProbe } from '@migaia/rpc-host/plugins/probe'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
@@ -269,6 +270,7 @@ describe('mesh routing and admission accounting', () => {
       (name, request) => host.pipeline(name, request)
     )
     const host = defineHost({
+      modules: trayNativeTestModules,
       ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })

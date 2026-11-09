@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHostError } from '../src/index.ts'
+import { definePlugin, PluginHostError } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { Host } from './hardening-fixtures.ts'
 
 describe('#1 config.get 丢弃第一段，插件名含点号时路径解析错位', () => {

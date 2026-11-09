@@ -7,8 +7,8 @@ import type {
   IPluginHostRuntimeExtensions,
   IPlugin,
   IPluginConstraint,
-  definedPluginBrand,
-  IDefinedPluginConstraint
+  IRawPluginConstraint,
+  definedPluginBrand
 } from './plugin-definition-types.ts'
 import type {
   IFeatureOutput,
@@ -18,25 +18,28 @@ import type {
 } from './feature-types.ts'
 
 /** Extracts one candidate's native Feature roots without widening a tuple element. */
-type IPluginConstraintFeatures<TPlugin> =
-  TPlugin extends IDefinedPluginConstraint<any, any, any, any, any, any, infer TFeatures, any, any>
-    ? TFeatures
-    : TPlugin extends { readonly features?: infer TFeatures extends IFeatureRecord }
-      ? TFeatures
-      : Record<never, never>
-
-/** Extracts a candidate's expose value while preserving its concrete method surface. */
-type IPluginConstraintExpose<TPlugin> = TPlugin extends {
-  readonly featureExpose: infer TExpose
+type IPluginConstraintFeatures<TPlugin> = TPlugin extends {
+  readonly [definedPluginBrand]: { readonly features: infer TFeatures extends IFeatureRecord }
 }
-  ? TExpose extends (...args: never[]) => infer TFactoryExpose
-    ? TFactoryExpose extends object
-      ? TFactoryExpose
-      : never
-    : TExpose extends object
-      ? TExpose
-      : never
-  : Record<never, never>
+  ? TFeatures
+  : TPlugin extends { readonly features?: infer TFeatures extends IFeatureRecord }
+    ? TFeatures
+    : Record<never, never>
+
+/** Thin native definitions retain expose inference in their type-only provenance. */
+type IPluginConstraintExpose<TPlugin> = TPlugin extends {
+  readonly [definedPluginBrand]: { readonly expose: infer TExpose extends object }
+}
+  ? TExpose
+  : TPlugin extends { readonly featureExpose: infer TExpose }
+    ? TExpose extends (...args: never[]) => infer TFactoryExpose
+      ? TFactoryExpose extends object
+        ? TFactoryExpose
+        : never
+      : TExpose extends object
+        ? TExpose
+        : never
+    : Record<never, never>
 
 /** Declared feature names for one concrete plugin definition. */
 export type IPluginFeatureName<TPlugin> = Extract<keyof IPluginConstraintFeatures<TPlugin>, string>
@@ -68,6 +71,25 @@ export type IPluginConstraintTuple<
         IPluginConstraintFeatures<TPlugins[K]>,
         IPluginConstraintExpose<TPlugins[K]>
       > &
+        Readonly<{
+          /** Raw callback inference remains available without exposing hooks on native outputs. */
+          install?: (
+            core: Parameters<
+              IRawPluginConstraint<
+                TCore,
+                IPluginConstraintFeatures<TPlugins[K]>,
+                IPluginConstraintExpose<TPlugins[K]>
+              >['install']
+            >[0],
+            setupOutput?: any
+          ) => ReturnType<
+            IRawPluginConstraint<
+              TCore,
+              IPluginConstraintFeatures<TPlugins[K]>,
+              IPluginConstraintExpose<TPlugins[K]>
+            >['install']
+          >
+        }> &
         IPluginRuntimeConstraint<readonly [...TInstalled, ...TPlugins], TPlugins[K]> &
         (TPlugins[K] extends { readonly [definedPluginBrand]: { readonly core: infer TRequired } }
           ? TRequired extends Record<string, never>
@@ -121,17 +143,22 @@ export type IPluginFeatureOptions<
 }>
 
 /** Extracts one plugin's declared extension surface; it does not instantiate or read a registration. */
-export type IExtractPluginExt<TPlugin> =
-  TPlugin extends IPlugin<
-    infer _TCore,
-    infer TExt,
-    infer _TConfig,
-    infer _TShared,
-    infer _TFeatures extends IFeatureRecord,
-    infer _TExpose extends object,
-    any
-  >
-    ? TExt
+export type IExtractPluginExt<TPlugin> = TPlugin extends {
+  readonly [definedPluginBrand]: {
+    readonly extensions: infer TExtension extends Record<string, unknown>
+  }
+}
+  ? TExtension
+  : TPlugin extends IPlugin<
+        infer _TCore,
+        infer TExtension,
+        infer _TConfig,
+        infer _TShared,
+        infer _TFeatures extends IFeatureRecord,
+        infer _TExpose extends object,
+        any
+      >
+    ? TExtension
     : Record<string, never>
 
 /** Extracts declared configuration, falling back to the general config record when unspecified. */

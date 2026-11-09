@@ -1,3 +1,4 @@
+import { syncPipelineModule } from '@migaia/plugin-host/pipeline-modes/sync'
 import { identifyMiddlewareFailure } from './error-boundary.ts'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import {
@@ -102,7 +103,7 @@ function assertHostOptions(options: unknown): asserts options is object {
  */
 function snapshotHostOptions<T>(
   options: IStoreMiddlewareHostOptions<T>
-): IStoreMiddlewareHostOptions<T> {
+): IStoreMiddlewareHostOptions<T> & Readonly<{ pipeline: Readonly<{ mode: 'sync' }> }> {
   assertHostOptions(options)
   try {
     /** Read pipeline once even when non-enumerable; rest excludes it from the option spread. */
@@ -172,6 +173,8 @@ type IStoreMiddlewareSurface<S> = Readonly<{
 export type IStoreMiddlewareHost<S> = IHostHandle<
   IStoreMiddlewareCore<S>,
   IMiddlewareEvent<S>,
+  readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule],
+  'sync',
   readonly [],
   IStoreMiddlewareSurface<S>
 >
@@ -360,9 +363,12 @@ function createStoreMiddlewareHostCore<S>(
   const host = defineHost<
     IStoreMiddlewareCore<S>,
     IMiddlewareEvent<S>,
+    readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule],
+    'sync',
     readonly [],
     typeof surface
   >({
+    modules: [syncPipelineModule],
     host: settled,
     surface,
     domainCore: () => ({
@@ -466,6 +472,8 @@ export type IStoreMiddlewareBindingOptions = {
 export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<
   IStoreMiddlewareCore<Record<string, unknown>>,
   IMiddlewareEvent<Record<string, unknown>>,
+  readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule],
+  'sync',
   readonly [],
   IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S> }
 >

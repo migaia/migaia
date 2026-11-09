@@ -1,3 +1,4 @@
+import { nativeModules } from '../native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { defineHost, definePlugin, type IPluginHostCore } from '../../src/index.ts'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
@@ -6,7 +7,9 @@ import { deferred } from '@migaia/utils/promise'
 
 /** Creates one async host whose owner can choose either execution entry. */
 const createHost = () =>
-  defineHost<Record<string, never>, number>({
+  defineHost<Record<string, never>, number, typeof nativeModules, 'async'>({
+    modules: nativeModules,
+
     host: {
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       pipeline: { mode: MiddlewarePipelineMode.async }

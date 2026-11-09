@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original middleware disposal assertions now exercise the public Host and its real native IO. */
 import { expect, it, vi } from 'vitest'
@@ -199,6 +200,7 @@ it('C117 preserves both owned flow cleanup failures on the native disposal bound
   )
   /** C0 endpoint.dispose delegated to this native boundary before its retired RPC translator. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
@@ -261,6 +263,7 @@ it('C003 retains a lifecycle diagnostic beside an independent native cleanup fai
   )
   /** No public RPC Root.close translates or substitutes this original native disposal boundary. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
@@ -293,6 +296,7 @@ it('C001 publishes native disposal settlement before synchronous cleanup reentry
   )
   /** Native disposal remains the tested boundary; no binding facade or RPC Root.close is used. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })

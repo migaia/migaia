@@ -1,5 +1,6 @@
+import { defineFeature } from '@migaia/plugin-host/features'
 /** Pool is a complete native resource feature installed by its concrete transport. */
-import { defineFeature } from '@migaia/plugin-host'
+
 import {
   RpcNativeFeatureKind,
   registerRpcNativeFeature,

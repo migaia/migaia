@@ -1,9 +1,10 @@
+import { defineFeature } from '@migaia/plugin-host/features'
 /**
  * Installs one native backlog/stderr observer and the caller-owned IPC sink. Subscription
  * retirement and reporter-failure isolation stay with this per-installation log owner.
  */
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { defineFeature, type IFeature } from '@migaia/plugin-host'
+import { type IFeature } from '@migaia/plugin-host'
 import { registerRpcNativeFeature } from '@migaia/rpc-host/sdk'
 import { IpcReporterContext, ProcessFeatureName } from './text.ts'
 import type { IProcessFeatureContext } from './metadata.ts'

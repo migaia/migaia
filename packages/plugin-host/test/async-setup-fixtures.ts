@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 /** Owns shared fixture construction; test assertions remain in their focused suites. */
 import { createManualScheduler } from '@migaia/utils/testing'
 import { PluginHost } from '../src/index.ts'
@@ -20,11 +21,28 @@ export const deferred = <T>() => {
 export const createHost = (
   timeout: number | false = false,
   diagnostic?: (...args: any[]) => void
-) => {
+): {
+  host: PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >
+  scheduler: ReturnType<typeof createManualScheduler>
+} => {
   /** Runtime-neutral clock whose deadlines advance only when the test requests it. */
   const scheduler = createManualScheduler()
   /** Host whose lifecycle and diagnostics are controlled by this fixture. */
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     scheduler,
     diagnostic,
     execution: { mutationTimeoutMs: timeout, pipelineDrainTimeoutMs: false }

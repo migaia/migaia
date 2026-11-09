@@ -1,3 +1,5 @@
+import type { IHostModule } from './module-runtime.ts'
+import type { IInstalledPipelineMode } from './host-selection-types.ts'
 import type { IPipelineDefinitions } from './pipeline-spec.ts'
 import { readDefinedPluginDefinition } from './define-plugin.ts'
 import { PluginHost as RuntimePluginHost } from './host-runtime.ts'
@@ -19,6 +21,17 @@ type IRuntimeHostConstructor = new <
 /** The value is the same runtime constructor; this type adds no wrapper or phantom instance state. */
 const RuntimeHost: IRuntimeHostConstructor = RuntimePluginHost
 
+/** Constructor mode selection follows its inferred literal module tuple; class members stay fixed. */
+type IClassHostOptions<
+  TPipelines extends IPipelineDefinitions,
+  TModules extends readonly IHostModule[]
+> = Omit<IPluginHostOptions<TPipelines>, 'modules' | 'pipeline'> &
+  Readonly<{
+    modules?: TModules
+    pipeline?: Omit<NonNullable<IPluginHostOptions<TPipelines>['pipeline']>, 'mode'> &
+      Readonly<{ mode?: IInstalledPipelineMode<TModules> }>
+  }>
+
 /**
  * Class entry for the canonical plugin runtime, with trusted definePlugin admission enabled.
  * Subclass it for domain capabilities or use defineHost() for a frozen owner handle. Mutations
@@ -29,14 +42,15 @@ export class PluginHost<
   TValue = never,
   TInstalled extends readonly import('./plugin-definition-types.ts').IPluginConstraint<any>[] =
     readonly [],
-  TPipelines extends IPipelineDefinitions = Record<never, never>
+  TPipelines extends IPipelineDefinitions = Record<never, never>,
+  const TModules extends readonly IHostModule[] = readonly IHostModule[]
 > extends RuntimeHost<TDomainCore, TValue, TInstalled, TPipelines> {
   /**
    * Creates an empty Host. options.execution budgets default to 5000 ms each and may be overridden.
    * Invalid budgets/options fail before plugin hooks run; no plugin is installed by construction.
    * Own the resulting Host until its shared dispose() completion has been observed.
    */
-  constructor(options: import('./host-options-types.ts').IPluginHostOptions<TPipelines> = {}) {
+  constructor(options: IClassHostOptions<TPipelines, TModules> = {}) {
     super(options, readDefinedPluginDefinition)
   }
 }
@@ -48,7 +62,6 @@ export {
   type IPluginHostDisposalProvenance
 } from './host-runtime.ts'
 export { definePlugin, isDefinedPlugin } from './define-plugin.ts'
-export { defineFeature } from './define-feature.ts'
 export { readPluginDependencies, type IPluginDependency } from './dependency-reader.ts'
 export { getPluginRuntimeIntegration } from './core.ts'
 export type {
@@ -74,7 +87,8 @@ export {
 } from './state-constants.ts'
 
 export { PluginHostErrorCode } from './error-code.ts'
-export { default as ERROR_TEXT, PluginHostError } from './error-text.ts'
+export { default as ERROR_TEXT } from './error-text.ts'
+export { PluginHostError } from './errors.ts'
 export type {
   IExtractPluginExt,
   IExtractPluginConfig,
@@ -179,3 +193,5 @@ export type {
   IPipelineOwner,
   IPipelineRunResult
 } from './pipeline-spec.ts'
+
+export type { IHostModule } from './module-runtime.ts'

@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../../../rpc-host/test/fixtures/native-modules.ts'
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { RpcWireKind, RpcWireControlOperation } from '@migaia/rpc-contract/protocol'
@@ -47,6 +48,7 @@ describe('platform capability admission', () => {
         (name, request) => host.pipeline(name, request)
       )
       const host = defineHost({
+        modules: rpcNativeTestModules,
         ...rpc,
         host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       })

@@ -1,3 +1,5 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns the stable config surface and queued update transaction; Host retains admission and
  * generation authority.
@@ -6,12 +8,8 @@ import type { PluginHostCoreRuntime } from './core-runtime.ts'
 import type { PluginHostOperationRuntime } from './operation-runtime.ts'
 import type { PluginHostState } from './host-state.ts'
 import { copyConfigWithPatch, parseConfigPath, readConfigPath } from './config.ts'
-import ERROR_TEXT, {
-  identifyPluginHostCallbackFailure,
-  PluginHostError,
-  createPluginHostTypeError,
-  PluginHostInternalText
-} from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
+import { identifyPluginHostCallbackFailure, PluginHostError } from './errors.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import { invokeCaptured } from './invocation.ts'
 import type { IRegistration } from './registry.ts'
@@ -72,7 +70,10 @@ export class PluginHostConfigRuntime<
   #read(path: string): unknown {
     this.#port.assertActive()
     if (typeof path !== 'string' || path.length === 0)
-      throw createPluginHostTypeError(PluginHostInternalText.CONFIG_PATH_REQUIRED)
+      throw attachErrorIdentity(new TypeError(PluginHostInternalText.CONFIG_PATH_REQUIRED), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     /** Plugin names cannot contain dots, so the first path segment is an exact map key. */
     const separator = path.indexOf('.')
     /** First segment names the exact registration before config-path traversal. */

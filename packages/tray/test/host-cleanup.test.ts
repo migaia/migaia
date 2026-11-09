@@ -1,3 +1,4 @@
+import { trayNativeTestModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { runInNewContext } from 'node:vm'
 import { type IPluginHostCore } from '@migaia/plugin-host'
@@ -22,6 +23,7 @@ describe('@migaia/tray/host', () => {
     const managed = await createHost({
       ...options([], () => {
         raw = new AsyncTestHost({
+          modules: trayNativeTestModules,
           scheduler,
           pipeline: { mode: 'async' },
           execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -107,6 +109,7 @@ describe('@migaia/tray/host', () => {
         [],
         () =>
           new ForeignResourceHost({
+            modules: trayNativeTestModules,
             execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
           })
       )
@@ -137,6 +140,7 @@ describe('@migaia/tray/host', () => {
           [],
           () =>
             new FailingHost({
+              modules: trayNativeTestModules,
               execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
             })
         ),

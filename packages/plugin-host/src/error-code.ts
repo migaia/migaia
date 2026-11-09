@@ -351,7 +351,21 @@ export const PluginHostErrorCode = {
    * caller that gets this has an object that is not a host of this package — a plain object, a host
    * from a different copy of the package, or a value that was never constructed at all.
    */
-  compositionTargetUnmanaged: 'COMPOSITION_TARGET_UNMANAGED'
+  compositionTargetUnmanaged: 'COMPOSITION_TARGET_UNMANAGED',
+  /** A host option contains an unregistered module identity; import its built-in module. */
+  invalidHostModule: 'INVALID_HOST_MODULE',
+  /** A module key is installed twice; remove its duplicate. */
+  duplicateHostModule: 'DUPLICATE_HOST_MODULE',
+  /** A definition or selected module requires an absent module; install the module named in detail. */
+  hostModuleMissing: 'HOST_MODULE_MISSING',
+  /** The requested mode is absent; install its mode module. */
+  pipelineModeNotInstalled: 'PIPELINE_MODE_NOT_INSTALLED',
+  /**
+   * A global/default contribution or transport-local call-policy record duplicates a singular role,
+   * including different aliases of one token, or a repeatable role reserves the same global alias
+   * twice. Remove the duplicate provider, policy or alias.
+   */
+  featureRoleConflict: 'FEATURE_ROLE_CONFLICT'
 } as const
 
 /** Semantic package-code union; diagnostics may report a code without throwing a new error. */

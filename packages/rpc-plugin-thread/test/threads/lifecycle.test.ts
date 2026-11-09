@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../../../rpc-host/test/fixtures/native-modules.ts'
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
@@ -40,6 +41,7 @@ describe('thread lifecycle ownership', () => {
       (name, request) => host.pipeline(name, request)
     )
     const host = defineHost({
+      modules: rpcNativeTestModules,
       ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })

@@ -20,9 +20,10 @@
 校验、格式化步骤在多个入口被复制，某个副本又改变了执行顺序。把选定的步骤交给 `run()`，每次 `next(value)` 把处理后的值交给下一步，终点回调收到最终结果。`sync` 模式中，当前步骤返回后下游才开始。
 
 ```ts doc-test=run
+import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
+const pipeline = createPipeline<number>({ mode: syncMode })
 pipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {
   console.log('结果:', value)
 })
@@ -41,9 +42,11 @@ pipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)
 请求中的异步工作还没完成，计时器就停止了，因为手写回调链没有等待下游 Promise。`async` 模式的 `next()` 启动下游并返回它的 Promise；在 `try/finally` 中等待它，外层收尾就在下游结束后执行。这种前后包裹的执行方式称为洋葱模型。
 
 ```ts doc-test=run
+import { asyncMode } from '@migaia/middleware-pipeline/async'
+import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.async })
+const pipeline = createPipeline<number>({ mode: asyncMode })
 const trace: string[] = []
 await pipeline.run(
   [
@@ -81,14 +84,16 @@ console.log(trace.join(' | '))
 为了接入另一条流水线，同步规范化步骤被改写成异步回调，`next()` 后的代码却意外跑到了下游之后。`lift(stage, from)` 复用同步步骤并保留线性顺序：它的 `next()` 只记录要传递的值，当前步骤返回后下游才开始。
 
 ```ts doc-test=run
+import { asyncMode } from '@migaia/middleware-pipeline/async'
+import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })
+const pipeline = createPipeline<string>({ mode: asyncMode })
 const trim = pipeline.lift((value, next) => {
   console.log('同步步骤调用 next 前')
   next(value.trim())
   console.log('同步步骤调用 next 后')
-}, MiddlewarePipelineMode.sync)
+}, syncMode)
 await pipeline.run(
   [
     trim,
@@ -120,13 +125,15 @@ await pipeline.run(
 可复用流水线配置了应用信号，某次请求却需要自己的取消边界。只检查默认信号，会让已经取消的请求继续进入下一步。把 `control.signal` 传给 `run()` 来覆盖默认值；步骤在 `context.signal` 中看到同一个信号，进入下游之前会检查取消状态。
 
 ```ts doc-test=run
+import { asyncMode } from '@migaia/middleware-pipeline/async'
+import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
 const application = new AbortController()
 application.abort(new Error('应用已停止'))
 const request = new AbortController()
 const pipeline = createPipeline<number>({
-  mode: MiddlewarePipelineMode.async,
+  mode: asyncMode,
   signal: application.signal
 })
 let completed = false
@@ -166,9 +173,10 @@ console.log('终点回调执行:', completed)
 生成器校验发现值不合法，却把这个值返回给下游，保存步骤仍然执行。返回 `GENERATOR_HALT` 可以明确停止整条生成器流水线，后续步骤和终点回调都不会执行。这个控制符属于生成器模式，不用于同步或异步的 `next()` 回调。
 
 ```ts doc-test=run
+import { generatorMode } from '@migaia/middleware-pipeline/generator'
 import { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })
+const pipeline = createPipeline<number>({ mode: generatorMode })
 let written = false
 let completed = false
 pipeline.run(
@@ -204,13 +212,14 @@ console.log('终点回调执行:', completed)
 清空缓存需要把真正的 `undefined` 作为数据交出去，生成器直接 `return undefined` 却表示停止，终点回调不会执行。`GENERATOR_UNDEFINED` 把有意交付的空值和终止分开；流水线的载荷类型必须包含 `undefined`。
 
 ```ts doc-test=run
+import { generatorMode } from '@migaia/middleware-pipeline/generator'
 import {
   createPipeline,
   MiddlewarePipelineMode,
   GENERATOR_UNDEFINED
 } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<string | undefined>({ mode: MiddlewarePipelineMode.generator })
+const pipeline = createPipeline<string | undefined>({ mode: generatorMode })
 let ordinaryCompleted = false
 pipeline.run(
   [
@@ -260,12 +269,13 @@ pipeline.run(
 async runner 始终等待已启动的全部遍历。stage 正常结束但没有观察某个失败的 next Promise 时，run 仍以该原错误拒绝；多个未观察失败按启动顺序聚合，code 为 `MULTIPLE_DOWNSTREAM_FAILED`。`then` 表示调用方接手后续 Promise 链的错误处理；它本身不等于已经报告错误。取消和宿主活性检查仍然有效。
 
 ```ts doc-test=run
+import { asyncMode } from '@migaia/middleware-pipeline/async'
 import { createPipeline } from '@migaia/middleware-pipeline'
 
 const failure = new Error('第二个值失败')
 const received: number[] = []
 const reported: unknown[] = []
-const pipeline = createPipeline<number>({ mode: 'async', next: 'multiple' })
+const pipeline = createPipeline<number>({ mode: asyncMode, next: 'multiple' })
 await pipeline.run(
   [
     async (_value, next) => {
@@ -292,12 +302,13 @@ console.log(received.join(','), reported[0] === failure)
 multiple 的生成器在 `yield` 处捕获错误，例如：
 
 ```ts doc-test=run
+import { generatorMode } from '@migaia/middleware-pipeline/generator'
 import { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'
 
 const failure = new Error('yield 下游失败')
 const reported: unknown[] = []
 const completed: number[] = []
-const pipeline = createPipeline<number>({ mode: 'generator', next: 'multiple' })
+const pipeline = createPipeline<number>({ mode: generatorMode, next: 'multiple' })
 pipeline.run(
   [
     function* () {
@@ -336,7 +347,7 @@ stage（处理步骤）接收当前值，决定继续、短路或失败；done �
 
 | 字段                                                | 默认值                               | 含义与所有取值                                                                                                                                                             |
 | --------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`                                              | 必填，无默认                         | `'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。                  |
+| `mode`                                              | 必填，无默认                         | 对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。                                                             |
 | `next`                                              | `'single'`                           | `'single'` 或 `'multiple'`，对应 `MiddlewarePipelineNext`。整条 pipeline 与 lift 共用；multiple 在四种模式下都允许独立的多次遍历。                                         |
 | `onViolation(kind)`                                 | 空操作函数                           | 同步接收 `'duplicate'` 或 `'late'`；分别对应 `MiddlewarePipelineViolation.duplicate`、`late`。用于记录非法 next 调用，不重新执行下游。                                     |
 | `assertActive()`                                    | `undefined`                          | 宿主提供的同步生命周期断言。入口和每个 stage 后执行；异步模式进入下游时也会检查。抛错会阻止继续执行，包不替宿主改变状态。                                                  |

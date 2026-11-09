@@ -1,12 +1,26 @@
+import { PluginHostErrorCode } from './error-code.ts'
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import type {
+  IHostPipelineCollection,
+  IHostPipelineEntryConstructor
+} from './pipeline-module-types.ts'
+import type {
+  IHostActivationOperations,
+  IHostFeatureOperations,
+  IHostEnablementOperations,
+  IHostReplaceOperations,
+  IHostResumeOperations
+} from './host-module-surfaces.ts'
 /**
  * Owns Host runtime assembly and explicit coordination context; exports no public Host methods or
  * lifecycle implementation.
  */
 
-import ERROR_TEXT, { createPluginHostTypeError, PluginHostInternalText } from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
 import { issueHostIdentity } from './host-identity.ts'
 import { type IPluginHostIdentity } from './host-identity-types.ts'
-import { type ITrustedDefinitionReader } from './admission-runtime.ts'
+import { type ITrustedDefinitionReader } from './definition-snapshots.ts'
 import { PluginHostInstallRuntime } from './install-runtime.ts'
 
 import { registerManagedHost } from './composition.ts'
@@ -28,12 +42,9 @@ import {
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import type { IPluginHostDisposalProvenance } from './cleanup-runtime.ts'
 import { PluginHostCleanupRuntime } from './cleanup-runtime.ts'
-import { PluginHostPipelines } from './named-pipelines.ts'
 
 import type { IPipelineDefinitions } from './pipeline-spec.ts'
 import { PluginHostRemovalRuntime } from './removal-runtime.ts'
-import { PluginHostReplaceRuntime } from './replace-runtime.ts'
-import { PluginHostResumeRuntime } from './resume-runtime.ts'
 import { bindTerminalSink } from './diagnostic-report.ts'
 import { PluginHostOperationRuntime } from './operation-runtime.ts'
 
@@ -41,10 +52,9 @@ import { PluginHostCoreRuntime } from './core-runtime.ts'
 import { PluginHostConfigRuntime } from './config-runtime.ts'
 import { PluginHostDisposalRuntime } from './host-disposal-runtime.ts'
 
-import {
-  PluginHostEnablementRuntime,
-  createPluginHostEnablementFacade
-} from './enablement-runtime.ts'
+import { HostModules } from './module-runtime.ts'
+import type { IPluginHostInstallRuntimePort } from './install-runtime.ts'
+import { DefaultPipelineCollection } from './default-pipeline.ts'
 
 import type { IRegistration } from './registry.ts'
 import type { IPluginConstraint } from './plugin-definition-types.ts'
@@ -96,9 +106,9 @@ export type IPluginHostRuntimeContext<
   /** Physical registration cleanup owner. */
   removalRuntime: PluginHostRemovalRuntime<TDomainCore, TValue>
   /** Candidate replacement owner. */
-  replaceRuntime: PluginHostReplaceRuntime<TDomainCore, TValue>
+  replaceRuntime?: IHostReplaceOperations<TDomainCore, TValue>
   /** Suspended-dependent recovery owner. */
-  resumeRuntime: PluginHostResumeRuntime<TDomainCore, TValue>
+  resumeRuntime?: IHostResumeOperations
   /** Install-scoped core construction owner. */
   coreRuntime: PluginHostCoreRuntime<TDomainCore, TValue>
   /** Stable config facade and update owner. */
@@ -106,11 +116,32 @@ export type IPluginHostRuntimeContext<
   /** Terminal cleanup orchestration owner. */
   hostDisposalRuntime: PluginHostDisposalRuntime<IRegistration<TDomainCore, TValue>>
   /** Reversible availability owner. */
-  enablementRuntime: PluginHostEnablementRuntime<TDomainCore, TValue>
+  enablementRuntime?: IHostEnablementOperations<TDomainCore, TValue>
   /** Frozen availability facade, typed for the original Host. */
   plugin: IPluginEnablement<object, TInstalled, TDomainCore, TValue>
   /** Default and named pipelines share one execution owner. */
-  pipelines: PluginHostPipelines<TDomainCore, TValue>
+  pipelines: IHostPipelineCollection<TDomainCore, TValue>
+  /** Validated module identities are the sole construction-time extension source. */
+  modules: HostModules
+  /** Actual optional owners are created only by installed built-ins. */
+  featureOperations?: IHostFeatureOperations
+  activationOperations?: IHostActivationOperations
+  featureRuntime?: IPluginHostInstallRuntimePort<TDomainCore, TValue>['featureRuntime']
+  validateInstallBatch?: (
+    entries: readonly import('./registry.ts').IInstallEntry<TDomainCore, TValue>[],
+    inactive?: import('./dependency-constants.ts').PluginInactiveProviderPolicy,
+    roots?: readonly string[]
+  ) => ReturnType<
+    NonNullable<IPluginHostInstallRuntimePort<TDomainCore, TValue>['validateInstallBatch']>
+  >
+  createPipelines?: (
+    port: PluginHostRuntimePorts<TDomainCore, TValue, TInstalled, _TPipelines>,
+    options: IPluginHostOptions
+  ) => IHostPipelineCollection<TDomainCore, TValue>
+  pipelineEntry?: IHostPipelineEntryConstructor
+  /** Feature planning supplies dependency-safe teardown; core uses reverse install order. */
+  teardownOrder?: () => IRegistration<TDomainCore, TValue>[]
+  pipelineModes: Map<string, import('@migaia/middleware-pipeline').IPipelineModeObject<any>>
   /** Exact synchronous hook owner, cleared on hook exit. */
   hookRegistration: IRegistration<TDomainCore, TValue> | undefined
   /** Synchronous hook stack depth; asynchronous continuations do not inherit it. */
@@ -168,12 +199,15 @@ export function createHostRuntimeContext<
     setupPending: undefined,
     releasePending: undefined,
     trustedDefinitionReader,
-    activationRequests: new Map()
+    pipelineModes: new Map()
   } as IPluginHostRuntimeContext<TDomainCore, TValue, TInstalled, TPipelines>
   /** Only omission selects defaults; null remains an invalid execution policy. */
   const execution = options.execution === undefined ? {} : options.execution
   if (execution === null || typeof execution !== 'object')
-    throw createPluginHostTypeError(PluginHostInternalText.EXECUTION_OBJECT)
+    throw attachErrorIdentity(new TypeError(PluginHostInternalText.EXECUTION_OBJECT), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   assertTimeoutOption(execution.mutationTimeoutMs, HostTimeoutOptionKey.mutation)
   assertTimeoutOption(execution.pipelineDrainTimeoutMs, HostTimeoutOptionKey.pipelineDrain)
   /** Admitted operation budget; operation authority remains in lifecycle. */
@@ -182,22 +216,27 @@ export function createHostRuntimeContext<
     execution.pipelineDrainTimeoutMs ?? DEFAULT_PIPELINE_DRAIN_TIMEOUT_MS
   context.identity = issueHostIdentity(owner.host, options.identity?.name)
   if (options.diagnostic !== undefined && typeof options.diagnostic !== 'function')
-    throw createPluginHostTypeError(ERROR_TEXT.DIAGNOSTIC_OPTION)
+    throw attachErrorIdentity(new TypeError(ERROR_TEXT.DIAGNOSTIC_OPTION), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   /** Read once, preserving option accessor behavior and failure timing. */
   const onDiagnosticFailure = options.onDiagnosticFailure
   if (onDiagnosticFailure !== undefined && typeof onDiagnosticFailure !== 'function')
-    throw createPluginHostTypeError(ERROR_TEXT.DIAGNOSTIC_FAILURE_OPTION)
+    throw attachErrorIdentity(new TypeError(ERROR_TEXT.DIAGNOSTIC_FAILURE_OPTION), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   context.rawDiagnostic = options.diagnostic ?? defaultDiagnostic
   /** One Host authority is narrowed to the existing port type by each receiving runtime. */
   const port = new PluginHostRuntimePorts(context)
   context.diagnostic = port.diagnostic
   if (onDiagnosticFailure) bindTerminalSink(port.diagnostic, onDiagnosticFailure)
-  context.enablementRuntime = new PluginHostEnablementRuntime(port)
-  context.plugin = createPluginHostEnablementFacade<object, TInstalled, TDomainCore, TValue>(
-    context.enablementRuntime,
-    port
-  )
-  context.pipelines = new PluginHostPipelines(port, options.pipeline, options.pipelines)
+  context.modules = new HostModules(options.modules)
+  context.modules.install(context, port, options)
+  context.pipelines =
+    context.createPipelines?.(port, options) ??
+    new DefaultPipelineCollection(context, port, options.pipeline)
   // This tuple has exactly three entries, fixed here by the supported option contract.
   for (const [label, value] of [
     [HostTimeoutOptionKey.queueAdmission, options.queueAdmissionTimeoutMs],
@@ -217,8 +256,6 @@ export function createHostRuntimeContext<
   context.cleanupRuntime = new PluginHostCleanupRuntime(port)
   context.removalRuntime = new PluginHostRemovalRuntime(port)
   context.installRuntime = new PluginHostInstallRuntime(port)
-  context.replaceRuntime = new PluginHostReplaceRuntime(port)
-  context.resumeRuntime = new PluginHostResumeRuntime(port)
   context.coreRuntime = new PluginHostCoreRuntime(port)
   /** Shared publication is distinct from batch publication; it grants no mutation orchestration. */
   const publication = new PluginHostPublicationRuntime(context, port)

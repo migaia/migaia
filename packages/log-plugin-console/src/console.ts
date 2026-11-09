@@ -3,7 +3,7 @@ import {
   defineOutputPlugin,
   LogEntryDataKey,
   type ILogFeature,
-  type ILogFeatureRecord,
+  type ILogOutputFeatureRecord,
   type ILogFormat,
   type ILogOutputRecord,
   type ILogPluginCore
@@ -100,9 +100,9 @@ class ConsoleRaw {
 }
 
 /** Create an optional console output with native pretty arguments and host-owned delivery policies. */
-export function consolePlugin<const F extends ILogFeatureRecord = Record<never, never>>(
+export function consolePlugin<const F extends ILogOutputFeatureRecord = Record<never, never>>(
   options: IConsoleOptions<F> = {}
-) {
+): ReturnType<typeof defineOutputPlugin<typeof CONSOLE_PLUGIN_NAME, F, IConsoleExtension>> {
   /** The named owner holds capability and rendering state; SDK callbacks only forward to methods. */
   const output = new ConsoleOutput(options)
   return defineOutputPlugin({

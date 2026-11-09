@@ -1,12 +1,11 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns canonical install-core construction and provenance; domain state remains with its
  * registration.
  */
-import ERROR_TEXT, {
-  PluginHostError,
-  createPluginHostTypeError,
-  PluginHostInternalText
-} from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import {
   MiddlewarePipelineMode,
@@ -172,14 +171,23 @@ export class PluginCoreSurface<TDomainCore extends object, TValue> {
     /** Only ordinary or null-prototype domain surfaces participate in core construction. */
     const prototype = Object.getPrototypeOf(domainCore)
     if (prototype !== Object.prototype && prototype !== null)
-      throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_OBJECT)
+      throw attachErrorIdentity(new TypeError(PluginHostInternalText.DOMAIN_CORE_OBJECT), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     for (const key of Reflect.ownKeys(domainCore)) {
       if (reservedCoreKeys.has(key))
-        throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_RESERVED(key))
+        throw attachErrorIdentity(new TypeError(PluginHostInternalText.DOMAIN_CORE_RESERVED(key)), {
+          source: PLUGIN_HOST_SOURCE,
+          code: PluginHostErrorCode.invalidOption
+        })
       /** Admission copies the descriptor unchanged after excluding accessors and hidden keys. */
       const descriptor = Object.getOwnPropertyDescriptor(domainCore, key)
       if (!descriptor || !('value' in descriptor) || !descriptor.enumerable)
-        throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_DATA)
+        throw attachErrorIdentity(new TypeError(PluginHostInternalText.DOMAIN_CORE_DATA), {
+          source: PLUGIN_HOST_SOURCE,
+          code: PluginHostErrorCode.invalidOption
+        })
       Object.defineProperty(this.#facade, key, descriptor)
     }
   }

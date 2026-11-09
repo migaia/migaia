@@ -1,3 +1,4 @@
+import { HostModuleKey } from './module-constants.ts'
 /**
  * Owns functional Host callables and descriptor materialization; keeps the public handle a plain
  * frozen surface behind its original proxy.
@@ -17,7 +18,7 @@ import type {
   IPluginDependencyPlan
 } from './plugin-handle-types.ts'
 
-import type { IDefineHostOptions, IHostCoreConstructionRequest } from './define-host.ts'
+import type { ICompleteDefineHostOptions, IHostCoreConstructionRequest } from './define-host.ts'
 import { HostSurfaceKey, HostReflection, hostAccessorName } from './host-constants.ts'
 import { DefinedHostRuntime, DefinedHostDisposal } from './defined-host-runtime.ts'
 
@@ -37,12 +38,18 @@ export class DefinedHostSurface<
   readonly #reference: IHandleReference
   /** Disposal middleware and canonical cleanup share the original singleflight owner. */
   readonly #disposal: DefinedHostDisposal
+  /** Admitted construction choices determine the frozen handle's actual member set. */
+  readonly #moduleKeys: ReadonlySet<string>
+  /** No selected mode means the handle has no default execution surface. */
+  readonly #selectedMode: string | undefined
   /** Captures explicit owners without constructing a closure-based component. */
   constructor(
     runtime: DefinedHostRuntime<TDomainCore, TValue, TInstalled, TPipelines>,
-    options: IDefineHostOptions<TDomainCore, any, TPipelines>,
+    options: ICompleteDefineHostOptions<TDomainCore, any, TPipelines>,
     reference: IHandleReference
   ) {
+    this.#moduleKeys = new Set((options.modules ?? []).map((module) => module.key))
+    this.#selectedMode = options.host?.pipeline?.mode
     this.#runtime = runtime
     this.#reference = reference
     this.#disposal = new DefinedHostDisposal(runtime, options.dispose)
@@ -149,6 +156,23 @@ export class DefinedHostSurface<
       runPipelineAsync: this.runPipelineAsync,
       dispose: this.#disposal.dispose
     })
+    if (!this.#moduleKeys.has(HostModuleKey.enablement)) delete surface.plugin
+    if (!this.#moduleKeys.has(HostModuleKey.activation)) delete surface.activate
+    if (!this.#moduleKeys.has(HostModuleKey.featureDependencies)) delete surface.replace
+    if (!this.#moduleKeys.has(HostModuleKey.namedPipelines)) delete surface.pipeline
+    if (!this.#selectedMode) {
+      delete surface.pipelineMode
+      delete surface.usePipeline
+      delete surface.runPipeline
+    }
+    if (this.#selectedMode !== 'async') delete surface.useAsyncPipeline
+    if (this.#selectedMode !== 'generator' && this.#selectedMode !== 'async-generator')
+      delete surface.useGeneratorPipeline
+    if (this.#selectedMode !== 'async-generator') delete surface.useAsyncGeneratorPipeline
+    if (!this.#selectedMode || !this.#moduleKeys.has(HostModuleKey.pipelineSync))
+      delete surface.runPipelineSync
+    if (!this.#selectedMode || !this.#moduleKeys.has(HostModuleKey.pipelineAsync))
+      delete surface.runPipelineAsync
     return surface
   }
 }

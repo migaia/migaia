@@ -1,9 +1,9 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns concrete Host publication and explicit handle/view read ports; registrations and cleanup
  * remain with canonical owners.
  */
-
-import { tagPluginHostError } from './error-text.ts'
 
 import { type IInstallBatchContext } from './install-runtime.ts'
 import { PluginHostErrorCode } from './error-code.ts'
@@ -156,7 +156,10 @@ export class PluginHostPublicationRuntime<
         get: () => this.#context.state.readSharedExtension(key)
       })
     } catch (error) {
-      throw tagPluginHostError(error as TypeError, PluginHostErrorCode.pluginInstallFailed)
+      throw attachErrorIdentity(error as TypeError, {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.pluginInstallFailed
+      })
     }
   }
 }

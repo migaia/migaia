@@ -1,9 +1,8 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /** Owns plain-data config validation and immutable DAG copies; Host owns transaction publication. */
-import ERROR_TEXT, {
-  PluginHostError,
-  createPluginHostTypeError,
-  PluginHostInternalText
-} from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import { parseConfigPath as parseUtilsConfigPath } from '@migaia/utils/config'
 import type { IPluginConfig } from './plugin-lifecycle-types.ts'
@@ -19,22 +18,37 @@ export const readPlainDataRecord = (
   rejectSymbolKeys = false
 ): Record<PropertyKey, unknown> => {
   if (value === null || typeof value !== 'object' || Array.isArray(value))
-    throw createPluginHostTypeError(PluginHostInternalText.RECORD_OBJECT(label))
+    throw attachErrorIdentity(new TypeError(PluginHostInternalText.RECORD_OBJECT(label)), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   /** Only the existing plain-object or array prototype is admitted at this boundary. */
   const prototype = Object.getPrototypeOf(value)
   if (prototype !== Object.prototype && prototype !== null)
-    throw createPluginHostTypeError(PluginHostInternalText.RECORD_OBJECT(label))
+    throw attachErrorIdentity(new TypeError(PluginHostInternalText.RECORD_OBJECT(label)), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   /** Null-prototype admission record isolates public config keys from inherited properties. */
   const result = Object.create(null) as Record<PropertyKey, unknown>
   for (const key of Reflect.ownKeys(value)) {
     if (rejectSymbolKeys && typeof key === 'symbol')
-      throw createPluginHostTypeError(PluginHostInternalText.RECORD_SYMBOL_KEYS(label))
+      throw attachErrorIdentity(new TypeError(PluginHostInternalText.RECORD_SYMBOL_KEYS(label)), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     if (rejectDangerousKeys && typeof key === 'string' && dangerousKeys.has(key))
-      throw createPluginHostTypeError(PluginHostInternalText.RECORD_KEY(label, key))
+      throw attachErrorIdentity(new TypeError(PluginHostInternalText.RECORD_KEY(label, key)), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     /** Own descriptors preserve the existing accessor-rejection order without executing getters. */
     const descriptor = Object.getOwnPropertyDescriptor(value, key)
     if (!descriptor || !('value' in descriptor))
-      throw createPluginHostTypeError(PluginHostInternalText.RECORD_DATA(label))
+      throw attachErrorIdentity(new TypeError(PluginHostInternalText.RECORD_DATA(label)), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     if (descriptor.enumerable) result[key] = descriptor.value
   }
   return result
@@ -215,7 +229,13 @@ export const parseConfigPath = (path: string): string[] => {
   try {
     return [...parseUtilsConfigPath(path)]
   } catch (cause) {
-    throw createPluginHostTypeError(PluginHostInternalText.CONFIG_PATH_INVALID, { cause })
+    throw attachErrorIdentity(
+      new TypeError(
+        PluginHostInternalText.CONFIG_PATH_INVALID,
+        cause !== undefined ? { cause: cause } : undefined
+      ),
+      { source: PLUGIN_HOST_SOURCE, code: PluginHostErrorCode.invalidOption }
+    )
   }
 }
 /** Resolves the existing plugin-relative config path without changing stored object identity. */

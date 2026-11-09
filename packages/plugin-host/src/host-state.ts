@@ -1,11 +1,15 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns canonical registration, publication and dependency state; adapters borrow explicit ports and
  * never duplicate these registries.
  */
-import { createTopologyIndex, type ITopologyIndex } from '@migaia/capability/graph/topology'
+import type { ITopologyIndex } from '@migaia/capability/graph/topology'
 import type { IDependencyNodeState } from '@migaia/capability/graph/dependency'
 import { StageLaneCollection } from './stage-lanes.ts'
-import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
+import { PluginHostError } from './errors.ts'
+import { HostModuleKey, HostModuleText } from './module-constants.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import { PluginHostRegistrationLifecycle } from './state-constants.ts'
 import type { IDataOrderSlotState } from './composition.ts'
@@ -20,24 +24,10 @@ import type {
 } from './registry.ts'
 import type { IPluginRuntimeSharedSlot } from './core.ts'
 import { assertPluginExtensionKey, isSharedExtensionSlot } from './extension.ts'
-import { createPluginHostTypeError } from './error-text.ts'
-import { toIndexNode } from './dependency-runtime.ts'
-import { reverseItems } from './cleanup-runtime.ts'
-import { SharedSlotView, type ISharedSlotViewPort } from './shared-slot-view.ts'
 
-/** Creates the host-owned dependency index and translates structural failures at its boundary. */
-const createDependencyIndex = (): ITopologyIndex =>
-  createTopologyIndex({
-    onCycle: () => {
-      throw new PluginHostError(PluginHostErrorCode.dependencyCycle, ERROR_TEXT.DEPENDENCY_CYCLE)
-    },
-    onInvalid: () => {
-      throw new PluginHostError(
-        PluginHostErrorCode.pluginDefinitionInvalid,
-        ERROR_TEXT.PLUGIN_DEFINITION_INVALID
-      )
-    }
-  })
+import type { ITopologyIndexNode } from '@migaia/capability/graph/topology'
+import { reverseItems } from './cleanup-runtime.ts'
+import type { ISharedSlotViewConstructor, ISharedSlotViewPort } from './feature-runtime-types.ts'
 
 /**
  * Every piece of mutable state a host shares with its runtimes, in one owner.
@@ -54,7 +44,28 @@ const createDependencyIndex = (): ITopologyIndex =>
  */
 export class PluginHostState<TDomainCore extends object, TValue> {
   /** Persistent dependency facts shared by every planner invocation for this host. */
-  readonly #index = createDependencyIndex()
+  #index: ITopologyIndex | undefined
+  /** Dependency projection is supplied by the graph module, never imported by the core. */
+  #toIndexNode:
+    | ((name: string, plugin: import('./registry.ts').IPluginDefinition<any>) => ITopologyIndexNode)
+    | undefined
+  /** Native feature slots use the constructor supplied by the features module. */
+  #sharedView: ISharedSlotViewConstructor | undefined
+  /** Install canonical graph collaboration without creating a second registry. */
+  configureDependencyIndex(
+    index: ITopologyIndex,
+    project: (
+      name: string,
+      plugin: import('./registry.ts').IPluginDefinition<any>
+    ) => ITopologyIndexNode
+  ): void {
+    this.#index = index
+    this.#toIndexNode = project
+  }
+  /** Supply the actual shared slot implementation only when features are installed. */
+  configureSharedView(constructor: ISharedSlotViewConstructor): void {
+    this.#sharedView = constructor
+  }
   /** Installed registrations by plugin name. */
   readonly registrations = new Map<string, IRegistration<TDomainCore, TValue>>()
   /** Registration owner for each immutable extension view slot. */
@@ -137,9 +148,16 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     assertContribution: () => void
   ): IPluginRuntimeSharedSlot<TFacade> {
     assertInstall()
+    if (!this.#sharedView)
+      throw new PluginHostError(PluginHostErrorCode.hostModuleMissing, HostModuleText.missing, {
+        detail: { module: HostModuleKey.features }
+      })
     assertPluginExtensionKey(registration.name, key)
     if (typeof family !== 'object' || family === null || typeof create !== 'function')
-      throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.INVALID_OPTION), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     /** Candidate overlay remains invisible to committed publication. */
     const candidate = batch.extensionOwners.get(key)
     /** A committed shared family survives retirement of its first member. */
@@ -175,7 +193,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     const reservation = existing ?? { slot, value: undefined as object | undefined }
     /** Writes are exact-registration scoped; facade reads require committed slot identity. */
     const view: IPluginRuntimeSharedSlot<TFacade> = Object.freeze(
-      new SharedSlotView<TDomainCore, TValue, TFacade>(
+      new this.#sharedView!<TDomainCore, TValue, TFacade>(
         this.#slotViewPort,
         slot,
         key,
@@ -188,7 +206,10 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     if (!owner || (isSharedExtensionSlot(owner) && owner.retired)) {
       slot.facade = create(view)
       if (typeof slot.facade !== 'object' || slot.facade === null)
-        throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
+        throw attachErrorIdentity(new TypeError(ERROR_TEXT.INVALID_OPTION), {
+          source: PLUGIN_HOST_SOURCE,
+          code: PluginHostErrorCode.invalidOption
+        })
     }
     batch.extensionOwners.set(key, slot)
     if (!existing) {
@@ -203,7 +224,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
 
   /** Returns the host's single mutable dependency index to planning and commit paths. */
   dependencyIndex(): ITopologyIndex {
-    return this.#index
+    return this.#index!
   }
 
   /** Projects one committed registration into capability's orthogonal dependency state. */
@@ -224,6 +245,19 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     this.lanes.refreshOwner(registration)
   }
 
+  /** Suspends an exact generation without disabling or disposing its retained instance. */
+  suspendRegistration(registration: IRegistration<TDomainCore, TValue>): boolean {
+    if (this.registrations.get(registration.name) !== registration)
+      throw new PluginHostError(
+        PluginHostErrorCode.pluginNotInstalled,
+        ERROR_TEXT.PLUGIN_NOT_INSTALLED(registration.name)
+      )
+    if (registration.suspended) return false
+    this.setSuspended(registration, true)
+    registration.featureExposeValid = false
+    this.commit()
+    return true
+  }
   /** Writes one registration's suspension through the host's visibility owner. */
   setSuspended(registration: IRegistration<TDomainCore, TValue>, suspended: boolean): void {
     registration.suspended = suspended
@@ -276,10 +310,12 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         for (const [key, segment] of previous.segments)
           if (!registration.segments.has(key)) registration.segments.set(key, segment)
       /** Canonical dependency node derived from the admitted plugin snapshot. */
-      const node = toIndexNode(registration.name, registration.plugin)
-      if (!previous) this.#index.add(node)
-      else if (previous !== registration)
-        this.#index.setDependencies(registration.name, node.dependencies)
+      if (this.#index && this.#toIndexNode) {
+        const node = this.#toIndexNode(registration.name, registration.plugin)
+        if (!previous) this.#index.add(node)
+        else if (previous !== registration)
+          this.#index.setDependencies(registration.name, node.dependencies)
+      }
       this.registrations.set(registration.name, registration)
       this.removedNames.delete(registration.name)
     }
@@ -325,7 +361,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     this.clearRegistrationPublication(registration)
     if (this.registrations.get(registration.name) === registration) {
       this.registrations.delete(registration.name)
-      this.#index.remove(registration.name)
+      this.#index?.remove(registration.name)
     }
   }
 

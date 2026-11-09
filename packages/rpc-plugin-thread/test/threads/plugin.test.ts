@@ -1,6 +1,8 @@
+import { rpcNativeTestModules } from '../../../rpc-host/test/fixtures/native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { Worker, threadId } from 'node:worker_threads'
-import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -103,6 +105,7 @@ describe('native thread transport plugin', () => {
       (name, request) => host.pipeline(name, request)
     )
     const host = defineHost({
+      modules: rpcNativeTestModules,
       ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })

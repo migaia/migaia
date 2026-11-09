@@ -1,5 +1,7 @@
+import { rpcActivationTestModules } from '../fixtures/native-modules.ts'
 /** Original middleware activation observations use one genuine native install transaction. */
-import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import type { IRpcCarrierReceiver } from '@migaia/rpc-contract/interfaces'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
@@ -66,6 +68,7 @@ it('C123 keeps native installation pending and business gated until final commit
   )
   /** Mutation deadlines are disabled only through the real native Host's public options. */
   const native = defineHost({
+    modules: rpcActivationTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
@@ -133,6 +136,7 @@ it('C124 installs one actual native carrier receiver and keeps its subscription 
   )
   /** This is the actual native owner, not a reconstructed RPC activation port. */
   const native = defineHost({
+    modules: rpcActivationTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
@@ -179,6 +183,7 @@ it.each(['commit', 'rollback'] as const)(
     )
     /** Native installation remains the only transaction and cleanup authority. */
     const native = defineHost({
+      modules: rpcActivationTestModules,
       ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })

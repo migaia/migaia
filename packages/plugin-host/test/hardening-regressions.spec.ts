@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin } from '../src/index.ts'
+import { definePlugin } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { Host } from './hardening-fixtures.ts'
 

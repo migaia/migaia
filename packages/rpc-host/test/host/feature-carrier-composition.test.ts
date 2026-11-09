@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { timeoutFeature } from '@migaia/rpc-host/features'
 import { defineFlowFeature, defineTransportPlugin, rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
-import { defineFeature, definePlugin, type IFeatureRecord } from '@migaia/plugin-host'
+import { definePlugin, type IFeatureRecord } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 
 /** Empty native transports acquire no resources while exercising genuine installation. */

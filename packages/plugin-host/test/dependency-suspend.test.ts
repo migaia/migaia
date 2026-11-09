@@ -1,5 +1,7 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import {
   type IRecoveryDiagnostic,
   SuspendHost,
@@ -95,7 +97,17 @@ describe('dependency suspension and recovery', () => {
   })
 
   it('restores same-generation dependents without reinstalling them', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const installs = { a: 0, b: 0 }
     const pValue = defineFeature(() => ({ value: 1 }))
     const p = definePlugin({ name: 'p', features: { value: pValue }, install: () => ({}) })
@@ -134,7 +146,17 @@ describe('dependency suspension and recovery', () => {
   })
 
   it('keeps a transitive dependent suspended while another provider is disabled', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const pValue = defineFeature(() => ({ value: 'p' }))
     const qValue = defineFeature(() => ({ value: 'q' }))
     const p = definePlugin({ name: 'p', features: { value: pValue }, install: () => ({}) })

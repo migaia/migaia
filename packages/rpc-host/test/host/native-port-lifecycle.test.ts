@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Original raw transport ownership and native rollback oracles use the genuine source owner. */
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import {
@@ -30,6 +31,7 @@ function receivingHost(name: string) {
   )
   /** The runtime owns rollback and its one stable native disposal Promise. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: {
       identity: { name },

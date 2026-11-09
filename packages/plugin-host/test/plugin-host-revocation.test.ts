@@ -1,10 +1,13 @@
+import { createTopologyIndex } from '@migaia/capability/graph/topology'
+import { toIndexNode } from '../src/modules/features/dependency-runtime.ts'
 import { PluginHostState } from '../src/host-state.ts'
 import { createDataOrderSlotState } from '../src/composition.ts'
 import { createQuiescenceTracker } from '@migaia/lifecycle'
 import { describe, expect, it } from 'vitest'
 
 import { PluginHostErrorCode } from '../src/error-code.ts'
-import { defineFeature, definePlugin } from '../src/index.ts'
+import { definePlugin } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { PluginHostRemovalRuntime } from '../src/removal-runtime.ts'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { type IExt, Host, FeatureHost, plugin } from './plugin-host-fixtures.ts'
@@ -109,6 +112,10 @@ describe('PluginHost', () => {
     }
     /** Actual state and a held lease separate synchronous revocation from physical completion. */
     const state = new PluginHostState<IExt, number>()
+    state.configureDependencyIndex(
+      createTopologyIndex({ onCycle: failTopology, onInvalid: failTopology }),
+      toIndexNode
+    )
     state.registrations.set(registration.name, registration)
     state.dependencyIndex().add({ id: registration.name, dependencies: [] })
     /** One physical user keeps its lease active through logical revocation. */
@@ -248,6 +255,10 @@ describe('PluginHost', () => {
     }
     /** Canonical state owns both the retained definition slot and exact extension retirement. */
     const state = new PluginHostState<IExt, number>()
+    state.configureDependencyIndex(
+      createTopologyIndex({ onCycle: failTopology, onInvalid: failTopology }),
+      toIndexNode
+    )
     const { state: stage } = createDataOrderSlotState(host, registration.name, 0n)
     const { stageSlots, registrations, extensionOwners } = state
     stageSlots.set(registration.name, stage)
@@ -276,3 +287,8 @@ describe('PluginHost', () => {
     expect(registration.featureOutputs).toBeUndefined()
   })
 })
+
+/** Any invalid topology in this valid single-node fixture is a test failure. */
+function failTopology(): never {
+  throw new Error('unexpected invalid topology fixture')
+}

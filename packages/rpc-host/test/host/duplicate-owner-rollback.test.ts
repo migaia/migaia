@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Original rollback side effects belong to the genuine native installation transaction. */
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { expect, it } from 'vitest'
@@ -5,6 +6,7 @@ import { expect, it } from 'vitest'
 it('rolls back native resources and public publication without replacing the install cause', async () => {
   /** The native Host is the original batch, config and resource owner, with no RPC facade. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Count only the resource actually acquired by the first native installation. */

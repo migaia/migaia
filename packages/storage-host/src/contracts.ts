@@ -1,8 +1,8 @@
+import { defineFeature as defineNativeFeature } from '@migaia/plugin-host/features'
 import type { IBackendStageBindings } from '@migaia/storage-contract'
 import type { IStorageHooks } from './hook-types.ts'
 import type { IStorageHookEmitter } from './hooks.ts'
 import {
-  defineFeature as defineNativeFeature,
   definePlugin as defineNativePlugin,
   type IPluginHostCore,
   type IFeatureRecord

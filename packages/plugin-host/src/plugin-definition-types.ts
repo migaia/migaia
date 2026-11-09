@@ -177,7 +177,7 @@ export type IPlugin<
   (TShared extends object ? unknown : never)
 
 /** Constrains a plugin tuple while preserving each plugin's precise generic arguments. */
-export type IPluginConstraint<
+export type IRawPluginConstraint<
   TCore,
   TFeatures extends IFeatureRecord = Record<never, never>,
   TExpose extends object = Record<never, never>
@@ -231,6 +231,19 @@ export type IPluginConstraint<
     }
 )
 
+/** Host admission accepts either a raw descriptor or an opaque native definition identity. */
+export type IPluginConstraint<
+  TCore,
+  TFeatures extends IFeatureRecord = Record<never, never>,
+  TExpose extends object = Record<never, never>
+> =
+  | IRawPluginConstraint<TCore, TFeatures, TExpose>
+  | (IDefinedPluginConstraint<any, any, any, any, any, any, any, any, any, any> &
+      Readonly<{
+        /** Input-only callback context does not add hooks to the native output type. */
+        install?: IRawPluginConstraint<TCore, TFeatures, TExpose>['install']
+      }>)
+
 /** Opaque compile-time provenance carried by definitions made through `definePlugin`. */
 export declare const definedPluginBrand: unique symbol
 
@@ -249,34 +262,41 @@ export type IDefinedPluginConstraint<
   TExpose extends object = Record<never, never>,
   TSetup = never,
   TPipelines extends IPipelineDefinitions = Record<never, never>
-> = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose, TSetup> &
-  Readonly<{
-    /** Definition's literal registration name, preserved for reference typing. */
-    readonly name: TName
-    /** Exact own declaration map remains tied to its trusted definition. */
-    readonly pipelines?: TPipelines
-    /** Creates a required cross-plugin reference without running the provider's Feature factory. */
-    getFeature<TKey extends Extract<keyof TFeatures, string>>(
-      name: TKey
-    ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, false, TName, TPipelines>
-    /**
-     * Optional:true tolerates an absent provider; unknown declared names still throw
-     * FEATURE_NOT_DECLARED.
-     */
-    getFeature<TKey extends Extract<keyof TFeatures, string>>(
-      name: TKey,
-      options: Readonly<{
-        /** Opts into an optional reference; the dependency value can be undefined when absent. */
-        readonly optional: true
-      }>
-    ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, true, TName, TPipelines>
-    /** Required only in declarations; runtime authority remains the private WeakMap. */
-    readonly [definedPluginBrand]: {
-      readonly core: TCore
-      readonly value: TValue
-      readonly pipelines: TPipelines
-    }
-  }>
+> = Readonly<{
+  /** Definition's literal registration name, preserved for reference typing. */
+  readonly name: TName
+  /** Definition config is always an owned immutable snapshot, including omission's empty record. */
+  readonly config: TConfig
+  /** The normalized activation policy is data; lifecycle hooks remain private. */
+  readonly activation: 'eager' | 'lazy'
+  /** Creates a required cross-plugin reference without running the provider's Feature factory. */
+  getFeature<TKey extends Extract<keyof TFeatures, string>>(
+    name: TKey
+  ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, false, TName, TPipelines>
+  /**
+   * Optional:true tolerates an absent provider; unknown declared names still throw
+   * FEATURE_NOT_DECLARED.
+   */
+  getFeature<TKey extends Extract<keyof TFeatures, string>>(
+    name: TKey,
+    options: Readonly<{
+      /** Opts into an optional reference; the dependency value can be undefined when absent. */
+      readonly optional: true
+    }>
+  ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, true, TName, TPipelines>
+  /** Required only in declarations; runtime authority remains the private WeakMap. */
+  readonly [definedPluginBrand]: {
+    readonly core: TCore
+    readonly value: TValue
+    readonly pipelines: TPipelines
+    /** Phantom axes preserve host inference without exposing any input hooks or custom fields. */
+    readonly extensions: TExtension
+    readonly shared: TShared
+    readonly features: TFeatures
+    readonly expose: TExpose
+    readonly setup: TSetup
+  }
+}>
 
 /** Extracts captured own pipeline declarations from trusted-definition provenance. */
 export type IPluginDeclaredPipelines<TPlugin> = TPlugin extends {

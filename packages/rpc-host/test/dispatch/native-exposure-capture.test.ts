@@ -1,5 +1,7 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Native Feature output reflection is captured once without changing the first selector failure. */
-import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.ts'
@@ -24,6 +26,7 @@ it('captures one native output descriptor inventory for repeated exposure select
     (name, request) => host.pipeline(name, request)
   )
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: {
       identity: { name: 'native-capture' },
@@ -89,6 +92,7 @@ it('keeps the first selector invalid descriptor ahead of later native output ref
     (name, request) => host.pipeline(name, request)
   )
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: {
       identity: { name: 'native-selector-order' },

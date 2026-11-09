@@ -6,7 +6,7 @@ Contract 提供纯事件/接口契约；Host 拥有业务会话和调用；trans
 
 ## 观察真实调用
 
-此示例另需安装 `@migaia/rpc-plugin-coroutines`。将同一 tools 安装到父子两个真实 Host，watch 首次 next 先订阅未来事件，再发业务。安装 flow plugin 时使用 Host.plugins，而非 transport.features。
+此示例另需安装 `@migaia/rpc-plugin-coroutines`。将同一 tools.plugin 安装到父子两个真实 Host，watch 首次 next 先订阅未来事件，再发业务。安装 flow plugin 时使用 Host.plugins，而非 transport.features。
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
@@ -30,7 +30,7 @@ async function untilStopped(signal: AbortSignal): Promise<void> {
 const tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })
 const task: ICoroutineUserTask = async ({ connect, signal }) => {
   const child = await createRpcHost({
-    plugins: [tools, coroutinePlugin({ connectToParent: connect })],
+    plugins: [tools.plugin, coroutinePlugin({ connectToParent: connect })],
     provide: { double: (value: number) => value * 2 }
   })
   try {
@@ -41,7 +41,7 @@ const task: ICoroutineUserTask = async ({ connect, signal }) => {
 }
 
 type IWorkerApi = { double(value: number): number }
-const plugins = [tools, coroutinePlugin({ spawn: task })] as const
+const plugins = [tools.plugin, coroutinePlugin({ spawn: task })] as const
 const parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })
 const watch = tools.watch({ stages: ['message'] })
 try {
@@ -52,7 +52,7 @@ try {
 } finally {
   await watch.return(undefined)
   await parent.close()
-  tools.close()
+  tools.collector.close()
 }
 ```
 
@@ -104,7 +104,7 @@ try {
   const text = tools.collector.exportRecord(record)
   console.log(tools.collector.importRecord(text).header.version)
 } finally {
-  tools.close()
+  tools.collector.close()
 }
 ```
 

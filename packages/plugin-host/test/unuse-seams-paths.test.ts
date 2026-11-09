@@ -1,11 +1,21 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 
 describe('release paths', () => {
   it('runs the old dependent and provider hooks before replacement cleanup, once per generation', async () => {
     const events: string[] = []
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const service = defineFeature(() => ({ value: 1 }))
@@ -53,7 +63,15 @@ describe('release paths', () => {
   it('runs hooks in reverse disposal order and retains cleanup errors with their causes', async () => {
     const events: string[] = []
     const failure = new Error('hook failure')
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     await host.use(
@@ -92,7 +110,15 @@ describe('release paths', () => {
   it('does not invoke a candidate hook when replacement installation fails', async () => {
     const oldHook = vi.fn()
     const candidateHook = vi.fn()
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     await host.use(definePlugin({ name: 'P', install: () => ({}), beforeRelease: oldHook }))
@@ -117,7 +143,15 @@ describe('release paths', () => {
 
   it('runs a suspended dependent hook when provider recovery restarts its generation', async () => {
     const events: string[] = []
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const provider = definePlugin({
@@ -166,7 +200,15 @@ describe('release paths', () => {
     const pending = new Promise<void>((resolve) => {
       finish = resolve
     })
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     await host.use(
@@ -198,7 +240,15 @@ describe('release paths', () => {
 
   it('does not run hooks for discarded admissions or composition removal', async () => {
     const hook = vi.fn()
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const composition = openComposition(host)

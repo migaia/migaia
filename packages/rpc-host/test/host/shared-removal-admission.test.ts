@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** A public native removal and a genuine arriving connection share the original Feature lifetime. */
 import { defineHost } from '@migaia/plugin-host'
 import { authFeature } from '@migaia/rpc-host/plugins/auth'
@@ -33,6 +34,7 @@ it('F3 refuses a new connection or shared Auth removal while its accepted cleanu
   )
   /** No Session exists when the wrapper's original removal admission runs. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })

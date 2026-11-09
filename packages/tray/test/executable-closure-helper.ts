@@ -1,10 +1,18 @@
+import { trayNativeTestModules } from './native-modules.ts'
 import { expect } from 'vitest'
 import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'
-import { PluginHost, defineFeature, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
+import { PluginHost, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { openComposition } from '@migaia/plugin-host/composition'
 import { createHost } from '../src/host/index.ts'
 
-export class RuntimeHost extends PluginHost<Record<string, never>, string> {}
+export class RuntimeHost extends PluginHost<
+  Record<string, never>,
+  string,
+  readonly [],
+  Record<never, never>,
+  typeof trayNativeTestModules
+> {}
 
 export class AsyncRuntimeHost extends RuntimeHost {
   runValue(value: string): Promise<void> {
@@ -26,7 +34,10 @@ export class CountingRuntimeHost extends RuntimeHost {
 export const hostOptions = (
   plugins: readonly unknown[] = [],
   create: () => RuntimeHost = () =>
-    new RuntimeHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
+    new RuntimeHost({
+      modules: trayNativeTestModules,
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
 ) => ({
   create,
   plugins: plugins as never,
@@ -127,6 +138,7 @@ export async function runHostMutationRace(
     ...hostOptions(initialNames.map((name) => tracked(name))),
     create: () => {
       raw = new CountingRuntimeHost({
+        modules: trayNativeTestModules,
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
       })
       return raw

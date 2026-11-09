@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Asynchronous native installation failure retains original causes and starts no physical IO. */
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
@@ -48,6 +49,7 @@ it.each(
   const written = vi.spyOn(carrier, 'write')
   /** One real native Host owns the failing hook and the later genuine SDK transport. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Original role names identify the failing fixture hook, not a reconstructed old role API. */

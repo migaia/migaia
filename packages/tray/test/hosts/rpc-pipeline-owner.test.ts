@@ -1,3 +1,4 @@
+import { trayNativeTestModules } from '../native-modules.ts'
 import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it, vi } from 'vitest'
 import { PluginHost, type IHostCoreConstructionRequest } from '@migaia/plugin-host'
@@ -27,6 +28,7 @@ class NativeTrayHost extends PluginHost<IRpcCore, unknown, readonly []> {
       (name, request) => this.pipeline(name, request)
     )
     super({
+      modules: trayNativeTestModules,
       identity: { name: 'tray-rpc-class' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })

@@ -30,6 +30,13 @@ export type ITrayRuntimeMembers = IRpcNativeMemberControls<RpcNativeMemberKind>
 export type ITrayRuntimeHost = IHostHandle<
   ReturnType<ReturnType<typeof rpcHostPipelines>['domainCore']>,
   never,
+  readonly [
+    typeof import('@migaia/plugin-host/features').featuresModule,
+    typeof import('@migaia/plugin-host/feature-dependencies').featureDependenciesModule,
+    typeof import('@migaia/plugin-host/named-pipelines').namedPipelinesModule,
+    typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule
+  ],
+  'async',
   readonly IPluginConstraint<any>[],
   Record<never, never>
 > &

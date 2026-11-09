@@ -11,6 +11,8 @@ import type { IRegistration } from './registry.ts'
 
 /** The Host lends existing lifecycle, pending and ordering owners to every pipeline. */
 export type IPipelinePorts<TValue> = Readonly<{
+  /** Installed mode identities are selected once at host construction. */
+  pipelineModes: ReadonlyMap<string, import('@migaia/middleware-pipeline').IPipelineModeObject<any>>
   host: object
   signal: INativeAbortSignal
   pending: IPendingTracker

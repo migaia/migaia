@@ -64,7 +64,7 @@ Unknown tags bypass only the standard level threshold. `atLevel()` keeps the bus
 
 Entry features execute once at host ingress. Each output then follows gate, format, batch, retry, timeout and transport phases, retaining effective record declaration order within the gate phase. `defineLogPlugin({ name, features })` installs host-wide policy through native `definePlugin`. `createLogHost` has no `features` option; policies arrive through caller-declared plugins. `defineOutputPlugin` policies apply only to their own output. Both use `{ alias: feature }` records in property declaration order. The record key is the feature name: output `features.<key>` overrides the same host-wide key. Different keys retain both features even when they use the same factory; `{ a: thresholdFeature(), b: thresholdFeature() }` applies both gates. Surviving host gates precede local gates in declaration order. Entry features belong only to host-wide carriers.
 
-Each output applies at most one format, batch, retry and timeout. When an output configures one of these itself, it replaces the host-wide one of the same kind, even under a different key. One plugin record holds at most one of each, checked when the plugin is defined. Host-wide carriers cannot share a key or each supply the same kind, including during dynamic `use()`. Violations use the existing `INVALID_OPTION`. The output's `defaultFormat` applies only when no explicit formatter survives.
+Each output applies at most one format, batch, retry and timeout. When an output configures one of these itself, it replaces the host-wide one of the same kind, even under a different key. One plugin record holds at most one of each, checked when the plugin is defined. Host-wide carriers cannot share a key or each supply the same kind, including during dynamic `use()`. Duplicate host aliases and invalid individual records retain `logging / INVALID_OPTION`; two global carriers contributing the same singular format, batch, retry or timeout role fail with `plugin.host / FEATURE_ROLE_CONFLICT`. The output's `defaultFormat` applies only when no explicit formatter survives.
 
 | Feature                               | Behavior                                                                                    |
 | ------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -272,3 +272,5 @@ try {
   await Promise.all([records.dispose(), intents.dispose(), images.dispose()])
 }
 ```
+
+Output feature selections accept `false` to disable an inherited role. A local singular format, batch, retry or timeout replaces that whole inherited role; entry and gate selections replace the matching alias. Host defaults are published through the shared overlay and propagated to installed outputs on committed policy installation or removal.

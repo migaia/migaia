@@ -1,3 +1,4 @@
+import type { IHostModule } from './module-runtime.ts'
 /**
  * Defines Host construction budgets and diagnostic/error detail contracts. It performs no admission
  * or error construction.
@@ -40,6 +41,9 @@ export type IPipelineConfig = {
 
 /** Host execution, scheduling and diagnostics admitted once by the canonical runtime constructor. */
 export type IPluginHostOptions<TPipelines extends IPipelineDefinitions = Record<never, never>> = {
+  /** Optional built-in capabilities installed once during construction. */
+  readonly modules?: readonly IHostModule[]
+
   /** Optional human-readable Host identity label; uniqueness is supplied by the runtime id. */
   readonly identity?: Readonly<{
     /** Defaults to DEFAULT; a supplied label must be a nonempty string and need not be unique. */

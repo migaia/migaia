@@ -1,7 +1,8 @@
 /** Owns name-addressed handles and generation-bound extensions; lifecycle authority stays in ports. */
 import { invokeCaptured } from './invocation.ts'
 import { PluginHostErrorCode } from './error-code.ts'
-import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import type { IRegistration } from './registry.ts'
 import type { IPluginConfig } from './plugin-lifecycle-types.ts'
 

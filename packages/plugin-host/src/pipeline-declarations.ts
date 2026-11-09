@@ -1,9 +1,11 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { admitPipelineNext } from '@migaia/middleware-pipeline/admission'
 /**
  * Owns immutable pipeline declaration admission and snapshots; it allocates no lanes or running
  * stages.
  */
 import {
-  createPipeline,
   MiddlewarePipelineMode,
   MiddlewarePipelineNext,
   type IMiddlewarePipelineMode
@@ -13,11 +15,8 @@ import {
   type IPipelineDefinitions,
   type IPipelineSpecOptions
 } from './pipeline-spec.ts'
-import ERROR_TEXT, {
-  PluginHostError,
-  attachPluginHostIdentity,
-  tagPluginHostError
-} from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
+import { PluginHostError, attachPluginHostIdentity } from './errors.ts'
 import { PluginHostErrorCode, type IPluginHostErrorCode } from './error-code.ts'
 import { PipelineOrder } from './pipeline-constants.ts'
 
@@ -35,10 +34,10 @@ export function pipelineOptionError(
   cause?: unknown
 ): TypeError {
   /** The original native or coded failure receives Host attribution without replacing its identity. */
-  const error = tagPluginHostError(
+  const error = attachErrorIdentity(
     new TypeError(message, cause === undefined ? undefined : { cause }),
-    code
-  )
+    { source: PLUGIN_HOST_SOURCE, code }
+  ) as TypeError & Pick<PluginHostError, 'source' | 'code'>
   return host ? attachPluginHostIdentity(error, host) : error
 }
 
@@ -108,7 +107,7 @@ export function pipelineDeclarations(
          * Canonical admission supplies the middleware INVALID_OPTION cause without creating a
          * runner.
          */
-        createPipeline({ mode: MiddlewarePipelineMode.sync, next: options.next })
+        admitPipelineNext(options.next)
       } catch (cause) {
         throw pipelineOptionError(
           host,

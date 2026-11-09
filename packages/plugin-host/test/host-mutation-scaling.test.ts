@@ -1,10 +1,19 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { definePlugin, PluginHost } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 
 describe('host mutation bench fixture', () => {
   it('preserves leaf mutation behavior after unrelated registrations', async () => {
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     try {

@@ -6,24 +6,24 @@ import * as entry from '@migaia/rpc-plugin-devtools'
 import * as sourceEntry from '../src/index.ts'
 import * as collectorOwner from '../src/collector/devtools.ts'
 import type { IRpcDevtoolsOptions } from '../src/collector-types.ts'
-import type { IDevtoolsPlugin } from '../src/index.ts'
+import type { IDevtoolsBundle } from '../src/index.ts'
 import type { IRpcDevtoolsWatchBatch } from '../src/contract/service.ts'
 import { collectorView } from './collector/fixture.ts'
 import { coreMemoryServer } from '../../rpc-host/test/host/core-fixture.ts'
 
 /** Read the actual public package factory and preserve its original export-presence assertion. */
-function plugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin {
+function plugin(options?: IRpcDevtoolsOptions): IDevtoolsBundle {
   /** A missing published factory must fail before a test can manufacture an alternate entry. */
   const factory = Reflect.get(entry, 'devtoolsPlugin') as
-    | ((input?: IRpcDevtoolsOptions) => IDevtoolsPlugin)
+    | ((input?: IRpcDevtoolsOptions) => IDevtoolsBundle)
     | undefined
   expect(typeof factory).toBe('function')
   return factory!(options)
 }
 
 /** Count the actual collector's settled message rows for one observed business method. */
-function calls(value: IDevtoolsPlugin, method = 'echo'): number {
-  return value
+function calls(value: IDevtoolsBundle, method = 'echo'): number {
+  return value.collector
     .stats()
     .methods.filter((row) => row.method === method)
     .reduce((total, row) => total + row.calls, 0)
@@ -77,22 +77,23 @@ describe('devtools feature plugin', () => {
         (1 << RpcProbeStage.message) | (1 << RpcProbeStage.encoded)
       )
       expect(Object.isFrozen(value)).toBe(true)
-      expect(value.describe().limits).toEqual({ maxEvents: 2, maxContentBytes: 5 })
+      expect(value.collector.describe().limits).toEqual({ maxEvents: 2, maxContentBytes: 5 })
     } finally {
-      value.close()
+      value.collector.close()
       vi.restoreAllMocks()
     }
   })
 
-  it('forwards query and statistics to its collector and exposes the original full control surface', () => {
+  it('exposes an explicit native plugin and independently controlled collector', () => {
     /** One genuine feature instance owns exactly one caller-controlled collector. */
     const value = plugin()
     try {
       value.collector.emit(collectorView())
-      expect(value.query()).toEqual(value.collector.query())
-      expect(value.stats()).toEqual(value.collector.stats())
-      /** Detached metadata arrows retain their original collector without receiver binding. */
-      const query = value.query
+      expect(Object.keys(value)).toEqual(['plugin', 'collector'])
+      expect(Object.isFrozen(value.plugin)).toBe(true)
+      expect(value.collector.query().events).toHaveLength(1)
+      /** Detached collector operations preserve the original control surface. */
+      const query = value.collector.query
       expect(query().events).toHaveLength(1)
       /** The original recording owner retains observations independently of the main ring. */
       const recording = value.collector.record()
@@ -102,9 +103,9 @@ describe('devtools feature plugin', () => {
       expect(value.collector.importRecord(value.collector.exportRecord(record))).toEqual(record)
       expect(value.collector.service).toHaveProperty('query')
       value.collector.clear()
-      expect(value.query().events).toHaveLength(0)
+      expect(value.collector.query().events).toHaveLength(0)
     } finally {
-      value.close()
+      value.collector.close()
     }
   })
 
@@ -114,20 +115,23 @@ describe('devtools feature plugin', () => {
     /** The real listener admits raw memory channels through the canonical handshake. */
     const server = coreMemoryServer('watched-host')
     /** The new host entry installs the feature through its actual native plugin hook. */
-    const host = await createRpcHost({ ...server.options, plugins: [server.transport, value] })
+    const host = await createRpcHost({
+      ...server.options,
+      plugins: [server.transport, value.plugin]
+    })
     /** An independently constructed provider host executes the observed business request. */
     const remote = await server.connect('provider', {
       provide: { echo: (payload: unknown) => payload }
     })
     /** The original iterator subscribes before the next actual business emission. */
-    const watch = value.watch({ methods: ['echo'] })
+    const watch = value.collector.watch({ methods: ['echo'] })
     try {
       value.collector.clear()
       /** The pending reader must wake from a real observed call rather than retained history. */
       const next = watch.next()
       expect(await host.memory.request('echo', 42)).toBe(42)
       expect(
-        value.query({ methods: ['echo'] }).events.some((event) => event.method === 'echo')
+        value.collector.query({ methods: ['echo'] }).events.some((event) => event.method === 'echo')
       ).toBe(true)
       expect(
         ((await next).value as IRpcDevtoolsWatchBatch).events.some(
@@ -135,14 +139,14 @@ describe('devtools feature plugin', () => {
         )
       ).toBe(true)
       expect(calls(value)).toBe(1)
-      expect(value.describe().descriptors.map((descriptor) => descriptor.endpointId)).toContain(
-        'watched-host'
-      )
+      expect(
+        value.collector.describe().descriptors.map((descriptor) => descriptor.endpointId)
+      ).toContain('watched-host')
     } finally {
       await watch.return(undefined)
       await remote.host.close()
       await host.close()
-      value.close()
+      value.collector.close()
     }
   })
 
@@ -152,7 +156,10 @@ describe('devtools feature plugin', () => {
     /** The real listener admits raw memory channels through the canonical handshake. */
     const server = coreMemoryServer('dynamic-host')
     /** The new host entry installs the feature through its actual native plugin hook. */
-    const host = await createRpcHost({ ...server.options, plugins: [server.transport, value] })
+    const host = await createRpcHost({
+      ...server.options,
+      plugins: [server.transport, value.plugin]
+    })
     /** An independently constructed provider host executes the observed business request. */
     const remote = await server.connect('provider', {
       provide: { echo: (payload: unknown) => payload }
@@ -160,16 +167,18 @@ describe('devtools feature plugin', () => {
     try {
       value.collector.clear()
       expect(await host.memory.request('echo', 1)).toBe(1)
-      expect(value.query({ stages: ['carrier', 'encoded'] }).events).toHaveLength(0)
+      expect(value.collector.query({ stages: ['carrier', 'encoded'] }).events).toHaveLength(0)
       value.collector.setStages(['message', 'carrier', 'encoded'])
       /** The original iterator subscribes before the next actual business emission. */
-      const watch = value.watch({ stages: ['carrier', 'encoded'] })
+      const watch = value.collector.watch({ stages: ['carrier', 'encoded'] })
       try {
         /** The pending reader must wake from a real observed call rather than retained history. */
         const next = watch.next()
         expect(await host.memory.request('echo', 2)).toBe(2)
-        expect(value.query({ stages: ['carrier', 'encoded'] }).events.length).toBeGreaterThan(0)
-        expect(value.query().events.map((event) => event.stage)).toEqual(
+        expect(
+          value.collector.query({ stages: ['carrier', 'encoded'] }).events.length
+        ).toBeGreaterThan(0)
+        expect(value.collector.query().events.map((event) => event.stage)).toEqual(
           expect.arrayContaining(['carrier', 'encoded'])
         )
         expect((await next).value?.events.length).toBeGreaterThan(0)
@@ -178,18 +187,18 @@ describe('devtools feature plugin', () => {
       }
       value.collector.pause()
       /** A paused collector preserves its sequence while the host continues business. */
-      const paused = value.query().nextSeq
+      const paused = value.collector.query().nextSeq
       expect(await host.memory.request('echo', 3)).toBe(3)
-      expect(value.query().nextSeq).toBe(paused)
-      expect(value.describe().paused).toBe(true)
+      expect(value.collector.query().nextSeq).toBe(paused)
+      expect(value.collector.describe().paused).toBe(true)
       value.collector.resume()
       expect(await host.memory.request('echo', 4)).toBe(4)
-      expect(value.query().nextSeq).toBeGreaterThan(paused)
+      expect(value.collector.query().nextSeq).toBeGreaterThan(paused)
       expect(calls(value)).toBe(3)
     } finally {
       await remote.host.close()
       await host.close()
-      value.close()
+      value.collector.close()
     }
   })
 
@@ -201,9 +210,15 @@ describe('devtools feature plugin', () => {
     /** The second endpoint has its own emitter and the same original collector. */
     const second = coreMemoryServer('second-host')
     /** The first real host owns only its transport and emitter lifetime. */
-    const hostA = await createRpcHost({ ...first.options, plugins: [first.transport, value] })
+    const hostA = await createRpcHost({
+      ...first.options,
+      plugins: [first.transport, value.plugin]
+    })
     /** The second real host must remain observable after the first host closes. */
-    const hostB = await createRpcHost({ ...second.options, plugins: [second.transport, value] })
+    const hostB = await createRpcHost({
+      ...second.options,
+      plugins: [second.transport, value.plugin]
+    })
     /** The first real provider gives the two host calls distinguishable results. */
     const remoteA = await first.connect('first-provider', { provide: { echo: () => 'a' } })
     /** The second real provider remains usable after collector and first-host close. */
@@ -215,7 +230,7 @@ describe('devtools feature plugin', () => {
       expect(calls(value)).toBe(2)
       await hostA.close()
       /** The original iterator subscribes before the next actual business emission. */
-      const watch = value.watch({ methods: ['echo'] })
+      const watch = value.collector.watch({ methods: ['echo'] })
       try {
         /** The pending reader must wake from a real observed call rather than retained history. */
         const next = watch.next()
@@ -229,14 +244,14 @@ describe('devtools feature plugin', () => {
         await watch.return(undefined)
       }
       expect(calls(value)).toBe(3)
-      value.close()
+      value.collector.close()
       expect(await hostB.memory.request('echo')).toBe('b')
     } finally {
       await remoteA.host.close()
       await remoteB.host.close()
       await hostA.close()
       await hostB.close()
-      value.close()
+      value.collector.close()
     }
   })
 
@@ -244,7 +259,7 @@ describe('devtools feature plugin', () => {
     /** One genuine feature instance owns exactly one caller-controlled collector. */
     const value = plugin()
     /** The original iterator subscribes before the next actual business emission. */
-    const watch = value.watch()
+    const watch = value.collector.watch()
     /** The original pending watch must be rejected by explicit collector close. */
     const pending = watch.next()
     /** Attach rejection observation before synchronously closing the collector. */
@@ -252,16 +267,16 @@ describe('devtools feature plugin', () => {
       source: entry.RPC_DEVTOOLS_SOURCE,
       code: entry.RpcDevtoolsErrorCode.closed
     })
-    value.close()
-    value.close()
+    value.collector.close()
+    value.collector.close()
     await rejected
-    expect(() => value.describe()).toThrowError(
+    expect(() => value.collector.describe()).toThrowError(
       expect.objectContaining({
         source: entry.RPC_DEVTOOLS_SOURCE,
         code: entry.RpcDevtoolsErrorCode.closed
       })
     )
-    expect(() => value.query()).toThrowError(
+    expect(() => value.collector.query()).toThrowError(
       expect.objectContaining({ code: entry.RpcDevtoolsErrorCode.closed })
     )
   })

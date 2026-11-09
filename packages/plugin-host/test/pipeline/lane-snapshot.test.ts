@@ -1,3 +1,14 @@
+import { syncMode } from '@migaia/middleware-pipeline/sync'
+import { asyncMode } from '@migaia/middleware-pipeline/async'
+import { generatorMode } from '@migaia/middleware-pipeline/generator'
+import { asyncGeneratorMode } from '@migaia/middleware-pipeline/async-generator'
+/** Fixed public mode objects preserve this fixture's parameterized execution cases. */
+const pipelineModes = {
+  sync: syncMode,
+  async: asyncMode,
+  generator: generatorMode,
+  'async-generator': asyncGeneratorMode
+} as const
 import { describe, expect, it } from 'vitest'
 import { createPendingTracker, createQuiescenceTracker } from '@migaia/lifecycle'
 import {
@@ -11,7 +22,7 @@ import { DEFAULT_PIPELINE_KEY, StageLanes } from '../../src/stage-lanes.ts'
 /** Runs one lifted sync stage while mutating the live lane it came from. */
 const verifySnapshot = async (mode: IMiddlewarePipelineMode): Promise<void> => {
   const seen: string[] = []
-  const runner = createPipeline<number, IMiddlewarePipelineMode>({ mode })
+  const runner = createPipeline<number, IMiddlewarePipelineMode>({ mode: pipelineModes[mode] })
   const lanes = new StageLanes<number>(DEFAULT_PIPELINE_KEY, createQuiescenceTracker<object>())
   lanes.appendHost(
     runner.lift((value, next) => {

@@ -1,3 +1,5 @@
+import { CAPABILITY_SOURCE } from './errors.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns capability-host admission, allowlist state, completion order and final disposal. Entries own
  * activation resources; lifecycle owns quiescence and generation cancellation. Graph topology and
@@ -21,7 +23,7 @@ import {
 } from './host-admission.ts'
 import { CapabilityErrorCode } from './error-code.ts'
 import { CapabilityErrorText } from './error-text.ts'
-import { createCapabilityError } from './errors.ts'
+
 import { invokeCapabilityReporter } from './reporter.ts'
 
 /** Isolated flag and resource coordinator with receiver-independent public operations. */
@@ -73,10 +75,10 @@ export class CapabilityHost<Context> implements ICapabilityHost<Context> {
     /** Registration getters run under reentry admission, before duplicate detection. */
     const snapshot = this.#transition(() => snapshotHostDefinition(definition))
     if (this.#entries.has(snapshot.name)) {
-      throw createCapabilityError(
-        CapabilityErrorCode.alreadyRegistered,
-        CapabilityErrorText.alreadyRegistered(snapshot.name)
-      )
+      throw attachErrorIdentity(new Error(CapabilityErrorText.alreadyRegistered(snapshot.name)), {
+        source: CAPABILITY_SOURCE,
+        code: CapabilityErrorCode.alreadyRegistered
+      })
     }
     this.#entries.set(snapshot.name, new CapabilityEntry(snapshot, this.#entryOwner))
   }
@@ -151,10 +153,10 @@ export class CapabilityHost<Context> implements ICapabilityHost<Context> {
       if (this.#transitionDepth > 0) this.#assertNotTransitioning()
       if (!this.#disposeCompleted) {
         return rejectedHostOperation<void>(
-          createCapabilityError(
-            CapabilityErrorCode.hostTransitioning,
-            CapabilityErrorText.hostTransitioning
-          )
+          attachErrorIdentity(new Error(CapabilityErrorText.hostTransitioning), {
+            source: CAPABILITY_SOURCE,
+            code: CapabilityErrorCode.hostTransitioning
+          })
         )
       }
       return this.#disposePromise
@@ -194,19 +196,19 @@ export class CapabilityHost<Context> implements ICapabilityHost<Context> {
   /** Reject mutation of a host whose terminal cleanup has begun. */
   #assertUsable(): void {
     if (this.#disposed)
-      throw createCapabilityError(
-        CapabilityErrorCode.hostDisposed,
-        CapabilityErrorText.hostDisposed
-      )
+      throw attachErrorIdentity(new Error(CapabilityErrorText.hostDisposed), {
+        source: CAPABILITY_SOURCE,
+        code: CapabilityErrorCode.hostDisposed
+      })
   }
 
   /** Reject synchronous mutation reentry while lifecycle work owns a transition. */
   #assertNotTransitioning(): void {
     if (this.#transitionDepth > 0)
-      throw createCapabilityError(
-        CapabilityErrorCode.hostTransitioning,
-        CapabilityErrorText.hostTransitioning
-      )
+      throw attachErrorIdentity(new Error(CapabilityErrorText.hostTransitioning), {
+        source: CAPABILITY_SOURCE,
+        code: CapabilityErrorCode.hostTransitioning
+      })
   }
 
   /** Keep callback admission guarded for the entire synchronous state transition. */
@@ -224,10 +226,10 @@ export class CapabilityHost<Context> implements ICapabilityHost<Context> {
     /** Registry owns stable name identity; unknown names never create entries. */
     const entry = this.#entries.get(name)
     if (!entry)
-      throw createCapabilityError(
-        CapabilityErrorCode.notRegistered,
-        CapabilityErrorText.notRegistered(name)
-      )
+      throw attachErrorIdentity(new Error(CapabilityErrorText.notRegistered(name)), {
+        source: CAPABILITY_SOURCE,
+        code: CapabilityErrorCode.notRegistered
+      })
     return entry
   }
 

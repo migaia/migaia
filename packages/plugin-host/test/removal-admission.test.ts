@@ -1,14 +1,18 @@
+import { nativeModules } from './native-modules.ts'
 /** Original registration admission rejects explicit removal before cleanup or publication changes. */
 import { expect, it, vi } from 'vitest'
 import {
-  defineFeature,
   definePlugin,
   getPluginRuntimeIntegration,
   PluginHost,
   PluginHostError,
   PluginHostErrorCode
 } from '../src/index.ts'
-import { createView, openComposition } from '../src/composition-entry.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
+import {
+  createView,
+  openComposition
+} from '../src/modules/feature-dependencies/composition-entry.ts'
 
 it('rejects ordinary removal atomically, permits cold retry, and never vetoes full Host disposal', async () => {
   /** Only domain state changes the original synchronous removal decision. */
@@ -20,7 +24,15 @@ it('rejects ordinary removal atomically, permits cold retry, and never vetoes fu
   /** The predicate is captured during actual native installation, never by a fabricated core. */
   const allowed = vi.fn(() => state.allowed)
   /** All mutations use the existing Host FIFO and canonical installation. */
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   /** This real registration exposes an ordinary callable whose continued identity proves liveness. */
@@ -83,7 +95,15 @@ it('preflights every cascade release before the first dependent or provider clea
     dispose: cleanup
   })
   /** Native FIFO owns the entire cascade as one mutation. */
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   /** Both exact original generations must stay readable after the rejected plan. */
@@ -105,7 +125,15 @@ it('keeps prepared removal uncommitted when a later receipt refuses and allows t
   /** Prepared rejection must run no physical cleanup for either original receipt. */
   const cleanup = vi.fn()
   /** Both admissions use the existing managed composition entry. */
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   /** The original composition facade owns all receipts and their single commit boundary. */
@@ -187,7 +215,15 @@ it('rejects a replacement before candidate install when an original dependent ca
   /** Candidate setup is a real native lifecycle hook that must remain untouched. */
   const install = vi.fn(() => ({ providerRead: () => 2 }))
   /** Exact old handles remain live after an inadmissible replacement. */
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   /** Both original registration identities remain published throughout preflight rejection. */
@@ -217,7 +253,15 @@ it('never invokes removal admission during failed candidate rollback', async () 
   /** Only original failed-candidate cleanup is counted. */
   const cleanup = vi.fn()
   /** The surviving provider is a genuine committed registration. */
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   /** Rejected replacement cannot replace this exact original callable. */

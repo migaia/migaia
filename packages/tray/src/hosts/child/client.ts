@@ -1,5 +1,6 @@
+import { defineFeature } from '@migaia/plugin-host/features'
 /** Child business calls use its one actual parent namespace and the original relay admission. */
-import { defineFeature, definePlugin } from '@migaia/plugin-host'
+import { definePlugin } from '@migaia/plugin-host'
 import { createRemote, createRoutedRemote, type ITrayInvocation } from '../remote.ts'
 import { readHost } from '../define-host.ts'
 import { TrayInternal, TrayCallKind } from '../constants.ts'

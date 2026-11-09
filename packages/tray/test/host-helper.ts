@@ -1,13 +1,14 @@
+import { trayNativeTestModules } from './native-modules.ts'
 import * as composition from '@migaia/plugin-host/composition'
 import { openComposition } from '@migaia/plugin-host/composition'
 import { afterEach, vi } from 'vitest'
 import {
   PluginHost,
-  defineFeature,
   definePlugin,
   type IPluginHostCore,
   type IPluginPreparedAdmissions
 } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 
 /** Real provenance remains owned by PluginHost; this test only observes the public protocol read. */
 const actualOpenComposition = composition.openComposition
@@ -29,9 +30,21 @@ afterEach(() => {
 
 type ITestCore = Record<string, never>
 
-export class TestHost extends PluginHost<ITestCore, string> {}
+export class TestHost extends PluginHost<
+  ITestCore,
+  string,
+  readonly [],
+  Record<never, never>,
+  typeof trayNativeTestModules
+> {}
 
-export class AsyncTestHost extends PluginHost<ITestCore, string> {
+export class AsyncTestHost extends PluginHost<
+  ITestCore,
+  string,
+  readonly [],
+  Record<never, never>,
+  typeof trayNativeTestModules
+> {
   runValue(value: string): Promise<void> {
     return Promise.resolve(this.runPipeline(value, () => undefined))
   }
@@ -74,7 +87,10 @@ export class PublicationBarrierHost extends TestHost {
 export const options = (
   plugins: readonly unknown[],
   create: () => TestHost = () =>
-    new TestHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
+    new TestHost({
+      modules: trayNativeTestModules,
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
 ) => ({
   create,
   plugins: plugins as never,

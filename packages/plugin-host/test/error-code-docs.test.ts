@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { PluginHostErrorCode } from '../src/error-code.ts'
-import { PluginHostError, createPluginHostTypeError } from '../src/error-text.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { PLUGIN_HOST_SOURCE } from '../src/error-code.ts'
+import { PluginHostError } from '../src/errors.ts'
 
 /** Links PLUGIN_SUSPENDED and every public error code to maintained documentation. */
 describe('PluginHost public error-code documentation', () => {
@@ -18,16 +20,19 @@ describe('PluginHost public error-code documentation', () => {
 
   it('每个 PluginHostError 都携带 (source, code) 二元组', () => {
     const error = new PluginHostError('HOST_DISPOSED', 'host is disposed')
-    expect(error.source).toBe('plugin.host')
+    expect(error).toMatchObject({ source: 'plugin.host' })
     expect(error.code).toBe('HOST_DISPOSED')
     expect(error.stack).toBeTruthy()
   })
 
   it('入参校验 TypeError 保持类型不变并携带 (source, INVALID_OPTION)（裸抛扫描门禁）', () => {
-    const error = createPluginHostTypeError('plugin name must be a non-empty string')
+    const error = attachErrorIdentity(new TypeError('plugin name must be a non-empty string'), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
     expect(error).toBeInstanceOf(TypeError)
-    expect(error.source).toBe('plugin.host')
-    expect(error.code).toBe(PluginHostErrorCode.invalidOption)
+    expect(error).toMatchObject({ source: 'plugin.host' })
+    expect(error).toMatchObject({ code: PluginHostErrorCode.invalidOption })
     expect(error.stack).toBeTruthy()
   })
 })

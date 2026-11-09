@@ -1,3 +1,4 @@
+import { FeatureOverlay, type IFeatureOverlayEntry } from '@migaia/plugin-host/feature-overlay'
 /**
  * Resolve complete call features once per namespace; concrete timeout/retry behavior stays outside
  * host.
@@ -8,11 +9,16 @@ import type {
   IRpcRetryExecution,
   IRpcTimeoutExecution
 } from '@migaia/rpc-contract/interfaces'
-import type { IFeatureRecord } from '@migaia/plugin-host'
+import type { IFeatureRecord, IPluginHostCore } from '@migaia/plugin-host'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { HostErrorText } from '../host/error-text.ts'
-import { readRpcFeature, RpcCallFeatureRole } from '../sdk/metadata.ts'
+import {
+  readRpcFeature,
+  RpcCallFeatureRole,
+  callFeatureRole,
+  RpcFeatureCategory
+} from '../sdk/metadata.ts'
 import { createRpcTimeoutExecution } from '../features/timeout.ts'
 import { createRpcRetryExecution } from '../features/retry.ts'
 
@@ -33,29 +39,42 @@ function validateCallParameters(value: unknown): void {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) invalidCallFeature()
 }
 
-/** Resolve role metadata once while consuming outputs from the original native registration. */
+/** Domain payload keeps execution ownership and fixed call-role meaning out of plugin-host. */
+type IInstalledCallFeature = Readonly<{
+  role: 'timeout' | 'retry'
+  execution: IRpcTimeoutExecution | IRpcRetryExecution
+}>
+/** Resolve role metadata once while consuming actual native-installed outputs. */
 function captureFeatures(
   features: IFeatureRecord,
   outputs: Readonly<Record<string, unknown>>
-): ISelectedCallFeatures {
-  /** Only the two fixed call roles survive cold compilation into the namespace cache. */
-  const selected: { timeout?: IRpcTimeoutExecution; retry?: IRpcRetryExecution } = {}
+): readonly IFeatureOverlayEntry<IInstalledCallFeature>[] {
+  /** Original aliases remain addressing data; role meaning stays in the domain payload. */
+  const selected: IFeatureOverlayEntry<IInstalledCallFeature>[] = []
   for (const [name, feature] of Object.entries(features)) {
-    /** Native admission has already authenticated every token; this metadata only selects its role. */
+    /** Native admission has authenticated tokens before role projection. */
     const metadata = readRpcFeature(feature)
-    if (metadata?.category !== 'call') continue
-    /** Role keys never derive from caller aliases, which remain free for addressing and inference. */
+    if (metadata?.category !== RpcFeatureCategory.call) continue
+    /** Only the established two call roles join this composition owner. */
     const role = metadata.role
     if (role !== RpcCallFeatureRole.timeout && role !== RpcCallFeatureRole.retry) continue
-    if (selected[role] !== undefined)
-      throw tagRpcError(
-        new TypeError(HostErrorText.featureCombinationConflict),
-        RpcCoreErrorCode.featureCombinationConflict
-      )
-    /** The executing object comes from the real registration, never from public token fields. */
-    const output = outputs[name] as IRpcTimeoutExecution | IRpcRetryExecution | undefined
-    if (!output || typeof output.run !== 'function') invalidCallFeature()
-    selected[role] = output
+    /** Executing objects come from native installation, never copied token fields. */
+    const execution = outputs[name] as IRpcTimeoutExecution | IRpcRetryExecution | undefined
+    if (!execution || typeof execution.run !== 'function') invalidCallFeature()
+    selected.push({ alias: name, value: { role, execution } })
+  }
+  return selected
+}
+/** Materialize the fixed domain cache once per cold notification. */
+function compileFeatures(
+  entries: readonly IFeatureOverlayEntry<IInstalledCallFeature>[]
+): ISelectedCallFeatures {
+  /** Runtime meanings remain separated by their original role discriminant. */
+  const selected: { timeout?: IRpcTimeoutExecution; retry?: IRpcRetryExecution } = {}
+  for (const { value } of entries) {
+    if (value.role === RpcCallFeatureRole.timeout)
+      selected.timeout = value.execution as IRpcTimeoutExecution
+    else selected.retry = value.execution as IRpcRetryExecution
   }
   return Object.freeze(selected)
 }
@@ -100,75 +119,73 @@ class ScopedAttempt<T> {
 
 /** Own installation caches and the sole call > transport > link-policy precedence rule. */
 export class FeatureScope {
-  /** Link policy contributes executing instances before transport startup. */
-  #defaults: ISelectedCallFeatures = Object.freeze({})
-  /** Native receipts withdraw failed or uninstalled policies without reviving a disposed default. */
-  readonly #policies = new Map<object, ISelectedCallFeatures>()
-  /** Each namespace stores its resolved installation overlay for O(1) call selection. */
-  readonly #namespaces = new Map<string, ISelectedCallFeatures>()
-  /** Raw transport selections allow defaults to be compiled once after cold registration. */
-  readonly #installed = new Map<string, ISelectedCallFeatures>()
+  /** Original namespace cache is the only object selected by calls without overrides. */
+  readonly #namespaces = new Map<
+    string,
+    Readonly<{
+      local: readonly IFeatureOverlayEntry<IInstalledCallFeature>[]
+      selected: ISelectedCallFeatures
+    }>
+  >()
+  /** Shared composition owns roles and native publication; RPC owns execution/cache meaning. */
+  readonly #overlay = new FeatureOverlay<IInstalledCallFeature>(callFeatureRole)
 
-  /** Capture one link-policy plugin's complete instances and refresh cold namespace caches. */
-  setDefaults(features: IFeatureRecord, outputs: Readonly<Record<string, unknown>>): () => void {
-    /** The receipt identifies only this native installation, including reuse of one definition. */
-    const token = {}
-    /** Policies from link-policy and feature carriers share one host-wide default layer. */
+  /** Startup-only policies enter the rule owner before any transport cache is published. */
+  setDefaults(
+    core: IPluginHostCore,
+    features: IFeatureRecord,
+    outputs: Readonly<Record<string, unknown>>
+  ): void {
+    /** Empty policies own no call role and require no composition receipt. */
     const captured = captureFeatures(features, outputs)
-    for (const policy of this.#policies.values())
-      if (
-        (captured.timeout !== undefined && policy.timeout !== undefined) ||
-        (captured.retry !== undefined && policy.retry !== undefined)
-      )
-        throw tagRpcError(
-          new TypeError(HostErrorText.featureCombinationConflict),
-          RpcCoreErrorCode.featureCombinationConflict
-        )
-    this.#policies.set(token, captured)
-    this.#refreshDefaults()
-    return () => {
-      this.#policies.delete(token)
-      this.#refreshDefaults()
-    }
+    if (captured.length === 0) return
+    /** Existing native lifetime remains the only contribution identity. */
+    const owner = core.lifecycle.signal
+    this.#overlay.prepare(owner, captured)
+    core.onDispose(() => this.#releaseDefaults(owner))
+    this.#overlay.commit(owner)
   }
 
-  /** Cold candidate admission captures policies without changing the still-published namespace. */
+  /**
+   * Original namespace publication commits one precompiled cache; no notification owner is
+   * imported.
+   */
   prepare(
     namespace: string,
     features: IFeatureRecord = {},
     outputs: Readonly<Record<string, unknown>> = {}
   ): () => void {
-    /** One explicit commit input holds captured instances, never another policy registry. */
-    const input = { namespace, installed: captureFeatures(features, outputs) }
-    return () => this.#commit(input)
+    /** Inputs are retained only for supported native policy withdrawal during cleanup. */
+    const local = captureFeatures(features, outputs)
+    /** Compilation precedes transport startup; the native namespace receipt publishes it once. */
+    const cache = { local, selected: compileFeatures(this.#overlay.compile(local)) }
+    return () => this.#namespaces.set(namespace, cache)
   }
 
-  /** Direct owner installation uses the same cold parse and publication operation. */
-  register(
-    namespace: string,
-    features: IFeatureRecord = {},
-    outputs: Readonly<Record<string, unknown>> = {}
-  ): void {
-    this.prepare(namespace, features, outputs)()
-  }
-
-  /** A retiring namespace relinquishes its installation cache without retaining plugin instances. */
+  /** Retiring namespace releases its domain cache; native cleanup removes the overlay receipt. */
   unregister(namespace: string): void {
-    this.#installed.delete(namespace)
     this.#namespaces.delete(namespace)
   }
 
   /** Merge only two fixed fields; false disables while undefined inherits the next owner. */
-  resolve(namespace: string, options: IRpcCallFeatures = {}): ISelectedCallFeatures {
-    if (!options || typeof options !== 'object' || Array.isArray(options)) invalidCallFeature()
+  resolve(namespace: string, options?: IRpcCallFeatures): ISelectedCallFeatures {
+    if (
+      options !== undefined &&
+      (!options || typeof options !== 'object' || Array.isArray(options))
+    )
+      invalidCallFeature()
     /** Admission captures each caller choice before reading any execution policy parameters. */
-    const timeout = options.timeout
+    const timeout = options?.timeout
     /** Retry uses the same data-container rule while retaining its existing option fields. */
-    const retry = options.retry
+    const retry = options?.retry
     validateCallParameters(timeout)
     validateCallParameters(retry)
-    /** Cached defaults are immutable; a call overlay never changes the next call's policy. */
-    const installed = this.#namespaces.get(namespace) ?? this.#defaults
+    /**
+     * Registered namespaces borrow their precompiled domain projection; cold fallback uses the sole
+     * rule owner.
+     */
+    const installed =
+      this.#namespaces.get(namespace)?.selected ?? compileFeatures(this.#overlay.compile())
     /** Without call overrides the frozen installed selection is reused, allocating nothing. */
     if (timeout === undefined && retry === undefined) return installed
     return {
@@ -217,31 +234,22 @@ export class FeatureScope {
     })
   }
 
-  /** Release installed policy references when the owning host reaches its terminal state. */
+  /** Native registration cleanup owns overlay withdrawal; the closing domain forgets its caches. */
   close(): void {
-    this.#policies.clear()
-    this.#installed.clear()
     this.#namespaces.clear()
-    this.#defaults = Object.freeze({})
   }
 
-  /** Merge every live policy's disjoint roles cold; no hot call scans policies. */
-  #refreshDefaults(): void {
-    /** SetDefaults keeps roles disjoint across policies, so merging never drops a role. */
-    const defaults: { timeout?: IRpcTimeoutExecution; retry?: IRpcRetryExecution } = {}
-    for (const features of this.#policies.values()) Object.assign(defaults, features)
-    this.#defaults = Object.freeze(defaults)
-    for (const [namespace, installed] of this.#installed) this.#cache(namespace, installed)
-  }
-
-  /** Compile installed precedence once; the hot path never scans plugins or feature arrays. */
-  #cache(namespace: string, installed: ISelectedCallFeatures): void {
-    this.#namespaces.set(namespace, Object.freeze({ ...this.#defaults, ...installed }))
-  }
-
-  /** Native commit publishes only its already captured candidate policies. */
-  #commit(input: Readonly<{ namespace: string; installed: ISelectedCallFeatures }>): void {
-    this.#installed.set(input.namespace, input.installed)
-    this.#cache(input.namespace, input.installed)
+  /**
+   * Native withdrawal preserves supported unUse semantics without a generic notifier or second
+   * registry.
+   */
+  #releaseDefaults(owner: object): void {
+    if (!this.#overlay.remove(owner)) return
+    // RpcCallFeatureRole fixes two singular global roles; each namespace compiles at most two values.
+    for (const [namespace, cache] of this.#namespaces)
+      this.#namespaces.set(namespace, {
+        local: cache.local,
+        selected: compileFeatures(this.#overlay.compile(cache.local))
+      })
   }
 }

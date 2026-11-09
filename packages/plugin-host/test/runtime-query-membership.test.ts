@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 import { expect, it } from 'vitest'
 import {
   defineHost,
@@ -12,7 +13,12 @@ type IQueryFixture = Readonly<{ values(): readonly object[]; registered(): reado
 it('registered cold metadata survives ready withdrawal and retires with its registration', async () => {
   /** The actual frozen Host controls publication, rollback and final slot retirement. */
   const host = defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    modules: nativeModules,
+
+    host: {
+      pipeline: { mode: 'sync' },
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    }
   })
   /** One exact family permits two legitimate registrations to share their original slot. */
   const family = Object.freeze({})

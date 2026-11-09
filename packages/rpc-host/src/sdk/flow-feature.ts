@@ -1,5 +1,6 @@
+import { defineFeature } from '@migaia/plugin-host/features'
 /** Cold native Feature definitions share one SDK adapter; no feature runs while being defined. */
-import { defineFeature } from '@migaia/plugin-host'
+
 import type { IRpcFlowDefinition, IRpcFlowFeature } from './types.ts'
 import { registerRpcDefinition, RpcDefinitionKind } from './metadata.ts'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'

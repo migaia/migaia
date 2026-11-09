@@ -1,6 +1,7 @@
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { resourceLimits, threadId } from 'node:worker_threads'
-import { defineFeature, definePlugin } from '@migaia/plugin-host'
+import { definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { defineTrayHost, defineRoutingPolicy } from '@migaia/tray'
 import { defineProbe } from '@migaia/rpc-host/plugins/probe'
 import { FixtureText, fixtureError } from './fixture-text.mjs'

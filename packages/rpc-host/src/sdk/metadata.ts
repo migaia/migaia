@@ -11,6 +11,7 @@ import type {
   IRpcTransportSetupContext
 } from './types.ts'
 import { RpcBuiltinFeature, type IRpcBuiltinFeature } from './flow-feature.ts'
+import type { IFeatureOverlayRole } from '@migaia/plugin-host/feature-overlay'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { HostErrorText } from '../host/error-text.ts'
@@ -86,14 +87,30 @@ export type IRpcDefinitionMetadata = Readonly<
   | { kind: 'native-feature'; role: string }
 >
 
+/** Canonical categories separate call policy, information-flow placement and transport resources. */
+export const RpcFeatureCategory = {
+  /** Timeout/retry strategies compose through the shared call-policy rule owner. */
+  call: 'call',
+  /** Flow helpers retain RPC's existing placement and dependency-order semantics. */
+  flow: 'flow',
+  /** Transport resource features retain their independent native-role admission. */
+  native: 'native'
+} as const
+export type RpcFeatureCategory = keyof typeof RpcFeatureCategory
+
 /** Cold role projection is consumed only during definition/configuration and installation. */
 export type IRpcFeatureMetadata = Readonly<{
-  category: 'call' | 'flow' | 'native'
+  category: RpcFeatureCategory
   role: PropertyKey
 }>
 
 /** The two fixed call-role keys select installed execution outputs at cold configuration. */
 export const RpcCallFeatureRole = { timeout: 'timeout', retry: 'retry' } as const
+
+/** Both call-policy roles are singular in cold token admission and installed-output composition. */
+export function callFeatureRole(feature: Readonly<{ role: PropertyKey }>): IFeatureOverlayRole {
+  return { role: feature.role, repeatable: false }
+}
 
 /** Definitions are configuration-only and disappear when their native identity is unreachable. */
 const definitions = new WeakMap<object, IRpcDefinitionMetadata>()
@@ -131,12 +148,12 @@ export function readRpcFeature(feature: unknown): IRpcFeatureMetadata | undefine
   /** One identity authority owns definitions and feature roles across the RPC SDK. */
   const metadata = readRpcDefinition(feature)
   if (metadata?.kind === RpcDefinitionKind.callFeature)
-    return { category: 'call', role: metadata.role }
+    return { category: RpcFeatureCategory.call, role: metadata.role }
   if (metadata?.kind === RpcDefinitionKind.nativeFeature)
-    return { category: 'native', role: metadata.role }
+    return { category: RpcFeatureCategory.native, role: metadata.role }
   if (metadata?.kind === RpcDefinitionKind.feature)
     return {
-      category: 'flow',
+      category: RpcFeatureCategory.flow,
       role: metadata.builtin ? RpcBuiltinFeature[metadata.builtin] : metadata.definition.name
     }
   return undefined
@@ -153,7 +170,7 @@ export function findRpcNativeFeatureOutput<TOutput extends object>(
   for (const [alias, feature] of Object.entries(features ?? {})) {
     /** Metadata authenticates role identity; outputs come from the genuine installing core. */
     const metadata = readRpcFeature(feature)
-    if (metadata?.category !== 'native' || metadata.role !== role) continue
+    if (metadata?.category !== RpcFeatureCategory.native || metadata.role !== role) continue
     if (selected !== undefined)
       throw tagRpcError(
         new TypeError(HostErrorText.featureCombinationConflict),

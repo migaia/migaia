@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 import { expect, it } from 'vitest'
 import {
   defineHost,
@@ -13,7 +14,10 @@ for (const mode of ['class', 'frozen'] as const) {
     const options = {
       execution: { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
     }
-    const host = mode === 'class' ? new PluginHost(options) : defineHost({ host: options })
+    const host =
+      mode === 'class'
+        ? new PluginHost({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+        : defineHost({ modules: nativeModules, host: options })
     let core!: IPluginHostCore
     let prepared!: IPluginRuntimeIntegration
     try {
@@ -56,7 +60,10 @@ for (const mode of ['class', 'frozen'] as const) {
     const options = {
       execution: { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
     }
-    const host = mode === 'class' ? new PluginHost(options) : defineHost({ host: options })
+    const host =
+      mode === 'class'
+        ? new PluginHost({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+        : defineHost({ modules: nativeModules, host: options })
     let prepared!: IPluginRuntimeIntegration
     const releases: string[] = []
     const original = new RangeError('bootstrap failed')

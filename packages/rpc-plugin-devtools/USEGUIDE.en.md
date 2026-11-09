@@ -6,7 +6,7 @@ Contract provides pure event/interface contracts. Host owns business sessions an
 
 ## Observe real calls
 
-This example additionally needs `@migaia/rpc-plugin-coroutines`. Install the same tools on two real parent/child Hosts. The watch's first next subscribes to future events before business begins. Flow plugins go in Host.plugins rather than transport.features.
+This example additionally needs `@migaia/rpc-plugin-coroutines`. Install tools.plugin on two real parent/child Hosts. The watch's first next subscribes to future events before business begins. Flow plugins go in Host.plugins rather than transport.features.
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
@@ -30,7 +30,7 @@ async function untilStopped(signal: AbortSignal): Promise<void> {
 const tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })
 const task: ICoroutineUserTask = async ({ connect, signal }) => {
   const child = await createRpcHost({
-    plugins: [tools, coroutinePlugin({ connectToParent: connect })],
+    plugins: [tools.plugin, coroutinePlugin({ connectToParent: connect })],
     provide: { double: (value: number) => value * 2 }
   })
   try {
@@ -41,7 +41,7 @@ const task: ICoroutineUserTask = async ({ connect, signal }) => {
 }
 
 type IWorkerApi = { double(value: number): number }
-const plugins = [tools, coroutinePlugin({ spawn: task })] as const
+const plugins = [tools.plugin, coroutinePlugin({ spawn: task })] as const
 const parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })
 const watch = tools.watch({ stages: ['message'] })
 try {
@@ -52,7 +52,7 @@ try {
 } finally {
   await watch.return(undefined)
   await parent.close()
-  tools.close()
+  tools.collector.close()
 }
 ```
 
@@ -104,7 +104,7 @@ try {
   const text = tools.collector.exportRecord(record)
   console.log(tools.collector.importRecord(text).header.version)
 } finally {
-  tools.close()
+  tools.collector.close()
 }
 ```
 

@@ -1,0 +1,153 @@
+import { PluginHostErrorCode } from './error-code.ts'
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
+import ERROR_TEXT from './error-text.ts'
+import type {
+  IFeature,
+  IFeatureDependencyRecord,
+  IFeatureFactory,
+  IFeatureReference
+} from './feature-types.ts'
+
+/** Module-private immutable definition data; runtime consumers never trust public object shape. */
+type IFeatureDefinition = Readonly<{
+  readonly factory: Function
+  readonly dependencies: Readonly<Record<string, object>>
+}>
+
+/** Object shorthand shares the function form's trusted definition snapshot. */
+export type IFeatureDescriptor<
+  TExpose extends object,
+  TDependencies extends IFeatureDependencyRecord,
+  TOutput extends object,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
+> = Readonly<{
+  /** Synchronous Feature factory; returned methods may be async, the factory result may not be. */
+  readonly install: IFeatureFactory<TExpose, TDependencies, TOutput, TPipelines>
+  /**
+   * Direct aliases to trusted local Features or cross-plugin references; defaults to no
+   * dependencies.
+   */
+  readonly dependencies?: TDependencies
+}>
+
+/** Trusted identity store for Feature definitions. */
+const definitions = new WeakMap<object, IFeatureDefinition>()
+
+/** Trusted identities for references created by declared plugins. */
+const references = new WeakSet<object>()
+
+/** Tests whether a dependency is a package-authored cross-plugin reference. */
+export const isFeatureReference = (value: unknown): value is IFeatureReference<object, boolean> =>
+  references.has(value as object)
+
+/** Creates one trusted immutable cross-plugin feature reference. */
+export const createFeatureReference = <TOutput extends object, TOptional extends boolean>(
+  plugin: string,
+  feature: string,
+  optional: TOptional
+): IFeatureReference<TOutput, TOptional> => {
+  const reference = Object.freeze({ plugin, feature, optional })
+  references.add(reference)
+  return reference
+}
+
+/** Captures one direct dependency record before any Feature factory can run. */
+export const snapshotFeatureRecord = (value: unknown): Readonly<Record<string, object>> => {
+  if (value === undefined) return Object.freeze({})
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
+  )
+    throw attachErrorIdentity(new TypeError(ERROR_TEXT.FEATURE_DEPENDENCIES_RECORD), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
+  const snapshot: Record<string, object> = Object.create(null)
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string')
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.FEATURE_DEPENDENCIES_DATA), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (!descriptor || !('value' in descriptor) || !descriptor.enumerable)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.FEATURE_DEPENDENCIES_DATA), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
+    if (!readDefinedFeature(descriptor.value) && !isFeatureReference(descriptor.value))
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.FEATURE_DEPENDENCIES_DEFINED), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
+    snapshot[key] = descriptor.value as object
+  }
+  return Object.freeze(snapshot)
+}
+
+/**
+ * Captures a synchronous factory and its direct dependency aliases as one frozen opaque Feature.
+ * Omitted dependencies mean none. Defining runs no factory; each registration later constructs its
+ * dependency-first closure once. Invalid definitions throw INVALID_OPTION. Async factory results
+ * are rejected during installation, while methods on a valid object output may return Promises.
+ */
+export function defineFeature<
+  TExpose extends object = Record<never, never>,
+  const TDependencies extends IFeatureDependencyRecord = Record<never, never>,
+  TOutput extends object = Record<never, never>,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
+>(
+  factory: IFeatureFactory<TExpose, TDependencies, TOutput, TPipelines>,
+  dependencies?: TDependencies
+): IFeature<TExpose, TOutput, TDependencies>
+/** Object form of the same captured factory/dependency contract; install must be an own data method. */
+export function defineFeature<
+  TExpose extends object = Record<never, never>,
+  const TDependencies extends IFeatureDependencyRecord = Record<never, never>,
+  TOutput extends object = Record<never, never>,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
+>(
+  descriptor: IFeatureDescriptor<TExpose, TDependencies, TOutput, TPipelines>
+): IFeature<TExpose, TOutput, TDependencies>
+export function defineFeature(
+  input: Function | Readonly<{ readonly install: Function; readonly dependencies?: object }>,
+  dependencies?: object
+): IFeature<any, any, any> {
+  const descriptor = typeof input === 'function' ? undefined : input
+  const installDescriptor = descriptor && Object.getOwnPropertyDescriptor(descriptor, 'install')
+  const dependenciesDescriptor =
+    descriptor && Object.getOwnPropertyDescriptor(descriptor, 'dependencies')
+  if (
+    descriptor &&
+    (!installDescriptor ||
+      !('value' in installDescriptor) ||
+      (dependenciesDescriptor && !('value' in dependenciesDescriptor)))
+  )
+    throw attachErrorIdentity(new TypeError(ERROR_TEXT.FEATURE_FACTORY_REQUIRED), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
+  const factory = typeof input === 'function' ? input : installDescriptor?.value
+  if (typeof factory !== 'function')
+    throw attachErrorIdentity(new TypeError(ERROR_TEXT.FEATURE_FACTORY_REQUIRED), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
+  const feature = Object.freeze({}) as IFeature<any, any, any>
+  definitions.set(
+    feature,
+    Object.freeze({
+      factory,
+      dependencies: snapshotFeatureRecord(dependenciesDescriptor?.value ?? dependencies)
+    })
+  )
+  return feature
+}
+
+/** Returns only package-authored Feature definition data for a trusted opaque identity. */
+export const readDefinedFeature = (value: unknown): IFeatureDefinition | undefined =>
+  definitions.get(value as object)

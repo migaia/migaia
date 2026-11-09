@@ -1,9 +1,12 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns opaque composition provenance and managed Host records; transaction execution stays in
  * composition-runtime.
  */
 import { assimilateCapturedThen } from '@migaia/utils/function'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import type {
   IPluginDataOrderSlot,
   IPluginHostCompositionIntegration,
@@ -16,7 +19,7 @@ import type { IPluginHostPhysicalCleanupResult } from './plugin-lifecycle-types.
 import { createPluginHostExtensionPublication } from './publication.ts'
 import { PluginHostRegistrationLifecycle } from './state-constants.ts'
 import { PluginHostErrorCode } from './error-code.ts'
-import type { IPluginHostCompositionRuntimePort } from './composition-runtime.ts'
+import type { IPluginHostCompositionRuntimePort } from './composition-runtime-types.ts'
 import { buildManagedPort, type IManagedHostRuntime } from './composition-port.ts'
 
 /** Validates a publication-ordered request list and resolves its Host-owned definition snapshots. */
@@ -24,7 +27,11 @@ export const resolveAdmissionDefinitions = <TDefinition>(
   requests: readonly IPluginAdmissionRequest[],
   host: object
 ): readonly TDefinition[] => {
-  if (!Array.isArray(requests)) throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_REQUESTS_ARRAY)
+  if (!Array.isArray(requests))
+    throw attachErrorIdentity(new TypeError(ERROR_TEXT.ADMISSION_REQUESTS_ARRAY), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   /** A request may consume each exact Host-owned ordering slot only once. */
   const seenSlots = new Set<object>()
   return requests.map((request) => {
@@ -36,22 +43,45 @@ export const resolveAdmissionDefinitions = <TDefinition>(
       admission = request?.admission
       slot = request?.slot
     } catch (cause) {
-      throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION, { cause })
+      throw attachErrorIdentity(
+        new TypeError(
+          ERROR_TEXT.INVALID_OPTION,
+          cause !== undefined ? { cause: cause } : undefined
+        ),
+        { source: PLUGIN_HOST_SOURCE, code: PluginHostErrorCode.invalidOption }
+      )
     }
     if (!admission || typeof admission !== 'object')
-      throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_REQUIRED)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.ADMISSION_REQUIRED), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     /** Only this package instance can resolve an opaque admission to its immutable definition. */
     const definition = readAdmissionDefinition<TDefinition>(admission)
-    if (!definition) throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_FOREIGN)
+    if (!definition)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.ADMISSION_FOREIGN), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     /** Slot matching uses captured definition data rather than a live user property. */
     const definitionName = (definition as { readonly name?: unknown }).name
     /** Private slot provenance checks Host ownership, exact name and permanent retirement. */
     const slotState = slot && typeof slot === 'object' ? readDataOrderSlotState(slot) : undefined
     if (!slotState || slotState.host !== host || slotState.name !== definitionName)
-      throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_SLOT_FOREIGN)
-    if (slotState.retired) throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_SLOT_RETIRED)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.ADMISSION_SLOT_FOREIGN), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
+    if (slotState.retired)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.ADMISSION_SLOT_RETIRED), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     if (seenSlots.has(slot as object))
-      throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_SLOT_DUPLICATE)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.ADMISSION_SLOT_DUPLICATE), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     seenSlots.add(slot as object)
     return definition
   })
@@ -250,16 +280,28 @@ export const createRegistrationView = (
 export const captureCleanupFence = (value: PromiseLike<void> | undefined): Promise<void> => {
   if (value === undefined) return Promise.resolve()
   if ((typeof value !== 'object' && typeof value !== 'function') || value === null)
-    throw createPluginHostTypeError(ERROR_TEXT.BEFORE_CLEANUP_THENABLE)
+    throw attachErrorIdentity(new TypeError(ERROR_TEXT.BEFORE_CLEANUP_THENABLE), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   /** One-time captured then method; hostile access becomes a stable invalid-option boundary. */
   let then: unknown
   try {
     then = value.then
   } catch (cause) {
-    throw createPluginHostTypeError(ERROR_TEXT.BEFORE_CLEANUP_THENABLE, { cause })
+    throw attachErrorIdentity(
+      new TypeError(
+        ERROR_TEXT.BEFORE_CLEANUP_THENABLE,
+        cause !== undefined ? { cause: cause } : undefined
+      ),
+      { source: PLUGIN_HOST_SOURCE, code: PluginHostErrorCode.invalidOption }
+    )
   }
   if (typeof then !== 'function')
-    throw createPluginHostTypeError(ERROR_TEXT.BEFORE_CLEANUP_THENABLE)
+    throw attachErrorIdentity(new TypeError(ERROR_TEXT.BEFORE_CLEANUP_THENABLE), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   return assimilateCapturedThen(then as (...args: unknown[]) => void, value)
 }
 

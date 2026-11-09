@@ -1,8 +1,8 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import {
-  defineFeature,
   definePlugin,
   PluginHost,
   PluginHostError,
@@ -10,6 +10,7 @@ import {
   type IPluginHostCore,
   type IPluginSetupContext
 } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { deferred, createHost } from './async-setup-fixtures.ts'
 
 describe('async setup definition admission', () => {
@@ -18,23 +19,30 @@ describe('async setup definition admission', () => {
       expect.objectContaining({ code: PluginHostErrorCode.invalidOption })
     )
 
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     expect(() => host.use({ name: 'raw', setup: 'x', install: () => ({}) } as never)).toThrow(
       expect.objectContaining({ code: PluginHostErrorCode.invalidOption })
     )
 
-    /** Counts calls to the source hook after the definition has frozen its wrapper. */
+    /** Counts calls to the source hook after the definition has captured its original hook. */
     let calls = 0
     const original = (_context: unknown) => {
       calls += 1
       return { ready: true }
     }
     const plugin = definePlugin({ name: 'valid', setup: original, install: () => ({}) })
-    expect(typeof plugin.setup).toBe('function')
-    expect(plugin.setup).not.toBe(original)
-    expect(plugin.setup?.({} as never)).toEqual({ ready: true })
+    expect(Object.hasOwn(plugin, 'setup')).toBe(false)
+    await host.use(plugin)
     expect(calls).toBe(1)
     await host.use(definePlugin({ name: 'raw', install: () => ({}) }))
     await host.dispose()
@@ -44,9 +52,19 @@ describe('async setup definition admission', () => {
 describe('async setup installation', () => {
   it('rejects eager setup before synchronous hooks and permits lazy registration', async () => {
     /** Exposes the constructor and later synchronous installation paths. */
-    class SyncHost extends PluginHost<Record<string, never>> {
+    class SyncHost extends PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    > {
       constructor(plugins: readonly unknown[] = []) {
-        super({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
+        super({
+          modules: nativeModules,
+          pipeline: { mode: 'sync' },
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+        })
         if (plugins.length > 0) this.useSync(plugins as never)
       }
 
@@ -84,7 +102,22 @@ describe('async setup installation', () => {
 
   it('queues behind a lease drain, then times out a mutation waiting behind setup', async () => {
     /** Exposes a long-running async pipeline that retains a plugin-owned lease. */
-    class LeaseHost extends PluginHost<Record<string, never>, number> {
+    class LeaseHost extends PluginHost<
+      Record<string, never>,
+      number,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    > {
+      /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+      constructor(
+        options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+          modules?: typeof nativeModules
+        } = {}
+      ) {
+        super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+      }
+
       run(): Promise<void> {
         return Promise.resolve(this.runPipeline(1, () => undefined))
       }

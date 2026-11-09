@@ -99,7 +99,7 @@ function recordText(record: ILogOutputRecord): string {
 export function createFilePlugin<const F extends ILogFeatureRecord = Record<never, never>>(
   options: IFilePluginConfig<F>,
   defaultWriter?: IFileWriter
-) {
+): ReturnType<typeof defineOutputPlugin<typeof FILE_PLUGIN_NAME, F>> {
   /** Named state owns the writer; the SDK callback only forwards the batch. */
   const output = new FileOutput(options, defaultWriter)
   return defineOutputPlugin({

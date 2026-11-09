@@ -1,5 +1,6 @@
+import { asyncMode } from '@migaia/middleware-pipeline/async'
 import { describe, expect, it } from 'vitest'
-import { PluginHostError } from '../src/error-text.ts'
+import { PluginHostError } from '../src/errors.ts'
 import { PluginHostDisposalNodeKind, readPluginHostDisposalProvenance } from '../src/index.ts'
 import * as pluginHostPublic from '../src/index.ts'
 import type { IPluginHostCore } from '../src/plugin-core-types.ts'
@@ -7,8 +8,7 @@ import {
   createPipeline,
   GENERATOR_CONTINUE as middlewareContinue,
   GENERATOR_HALT as middlewareHalt,
-  GENERATOR_UNDEFINED as middlewareUndefined,
-  MiddlewarePipelineMode
+  GENERATOR_UNDEFINED as middlewareUndefined
 } from '@migaia/middleware-pipeline'
 import {
   GENERATOR_CONTINUE as hostContinue,
@@ -167,7 +167,7 @@ describe('PluginHost', () => {
       removeEventListener() {}
     }
     await expect(
-      createPipeline<number>({ mode: MiddlewarePipelineMode.async, signal }).run(
+      createPipeline<number>({ mode: asyncMode, signal }).run(
         [
           async (_value, _next, context) => {
             aborted = true

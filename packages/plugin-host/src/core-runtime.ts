@@ -1,3 +1,5 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns cached registration cores and explicit install-bound contexts; lifecycle scopes retain
  * resource ownership.
@@ -16,11 +18,8 @@ import {
   type IPluginCoreContext
 } from './core.ts'
 import { resolveDisposer } from './disposal.ts'
-import ERROR_TEXT, {
-  PluginHostError,
-  createPluginHostTypeError,
-  PluginHostInternalText
-} from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import type { IInstallBatchContext } from './install-runtime.ts'
 import type { IRegistration } from './registry.ts'
@@ -177,9 +176,19 @@ class PluginRegistrationCoreContext<
     try {
       disposer = resolveDisposer(resource)
     } catch (cause) {
-      throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION, { cause })
+      throw attachErrorIdentity(
+        new TypeError(
+          ERROR_TEXT.INVALID_OPTION,
+          cause !== undefined ? { cause: cause } : undefined
+        ),
+        { source: PLUGIN_HOST_SOURCE, code: PluginHostErrorCode.invalidOption }
+      )
     }
-    if (!disposer) throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_RESOURCE_DISPOSER)
+    if (!disposer)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.PLUGIN_RESOURCE_DISPOSER), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     /** Installation owns provisionally until the existing lifecycle scope commits. */
     const owner: IProvisionalScope | ILifecycleScope =
       registration.provisional ?? registration.scope!

@@ -1,9 +1,10 @@
+import { defineFeature } from '@migaia/plugin-host/features'
 /**
  * Serializes original physical writes with the Utils concurrency limiter and one shared
  * flow-admission owner. Queued cancellation and close do not create a second RPC execution queue.
  */
 import { createConcurrencyLimiter } from '@migaia/utils/promise'
-import { defineFeature, type IFeature } from '@migaia/plugin-host'
+import { type IFeature } from '@migaia/plugin-host'
 import { registerRpcNativeFeature } from '@migaia/rpc-host/sdk'
 import type { IRpcWriteAdmission } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorText, RpcLifecycleError, tagRpcError } from '@migaia/rpc-contract/errors'

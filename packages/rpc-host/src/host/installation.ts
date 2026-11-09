@@ -1,3 +1,7 @@
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+import { featuresModule } from '@migaia/plugin-host/features'
+import { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'
+import { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'
 /** Join SDK definitions to their genuine native receiving host without creating another plugin-host. */
 import {
   defineHost,
@@ -78,7 +82,18 @@ type IRpcInstallationPorts = Readonly<{
 
 /** Only the genuine native Host supplies these transactional operations. */
 type IRpcNativeInstallation = Pick<
-  IHostHandle<Record<never, never>, never, readonly []>,
+  IHostHandle<
+    Record<never, never>,
+    never,
+    readonly [
+      typeof import('@migaia/plugin-host/features').featuresModule,
+      typeof import('@migaia/plugin-host/feature-dependencies').featureDependenciesModule,
+      typeof import('@migaia/plugin-host/named-pipelines').namedPipelinesModule,
+      typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule
+    ],
+    'async',
+    readonly []
+  >,
   'use' | 'unUse'
 >
 
@@ -107,6 +122,12 @@ export class RpcHostInstallation {
     const ports = this.#ports
     /** Native plugin definitions, including transports, alone declare their pipeline groups. */
     const native = defineHost({
+      modules: [
+        featuresModule,
+        featureDependenciesModule,
+        namedPipelinesModule,
+        asyncPipelineModule
+      ],
       host: {
         identity: { name: ports.self().name },
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -149,9 +170,12 @@ export class RpcHostInstallation {
   /** Failure rolls back this one native batch and keeps earlier namespaces and shared setup alive. */
   readonly use = async (...plugins: readonly IRpcHostPlugin[]): Promise<IRpcHost> => {
     this.#ports.assertOpen()
-    for (const plugin of plugins)
-      if (readRpcDefinition(plugin)?.kind === RpcDefinitionKind.features)
+    for (const plugin of plugins) {
+      /** Reject cold-only defaults before native duplicate-name checks or resource acquisition. */
+      const kind = readRpcDefinition(plugin)?.kind
+      if (kind === RpcDefinitionKind.features || kind === RpcDefinitionKind.policy)
         throw tagRpcError(new TypeError(HostErrorText.flowStarted), RpcCoreErrorCode.invalidConfig)
+    }
     /** The same compiler fixes placement order before any new transport opens IO. */
     const program = new RpcFlowProgram(plugins)
     try {

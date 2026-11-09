@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Original native cleanup and rollback errors retain their exact observable owner boundaries. */
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -16,6 +17,7 @@ function receivingHost() {
   )
   /** The same native runtime owns authentic pipeline handles, rollback and final disposal. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })

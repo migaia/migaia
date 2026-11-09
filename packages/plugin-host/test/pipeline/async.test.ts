@@ -1,11 +1,19 @@
+import { nativeModules } from '../native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { PluginHost } from '../../src/host-runtime.ts'
+import { PluginHost } from '../../src/index.ts'
 
 /** Test host exposing the protected pipeline entry. */
-class AsyncHost extends PluginHost<Record<string, never>, number> {
+class AsyncHost extends PluginHost<
+  Record<string, never>,
+  number,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   constructor() {
     super({
+      modules: nativeModules,
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       pipeline: { mode: MiddlewarePipelineMode.async }
     })
@@ -57,9 +65,16 @@ describe('async host pipeline', () => {
 })
 
 /** Async host variant that records pipeline diagnostics. */
-class AsyncHostWithDiagnostic extends PluginHost<Record<string, never>, number> {
+class AsyncHostWithDiagnostic extends PluginHost<
+  Record<string, never>,
+  number,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   constructor(diagnostic: (message: string, code?: string) => void) {
     super({
+      modules: nativeModules,
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       pipeline: { mode: MiddlewarePipelineMode.async },
       diagnostic

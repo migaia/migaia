@@ -1,11 +1,7 @@
+import { nativeModules } from './native-modules.ts'
 /** Keeps own and dependency-qualified names tied to genuine declarations. */
-import {
-  defineFeature,
-  defineHost,
-  definePlugin,
-  pipelineSpec,
-  type IFeatureCore
-} from '../src/index.ts'
+import { defineHost, definePlugin, pipelineSpec, type IFeatureCore } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 /** Genuine declarations provide the same runtime and compile-time payload. */
 const pipelines = { outgoing: pipelineSpec<{ text: string }>()({ mode: 'async' }) }
 /** The Feature core derives its names from that actual definition map. */
@@ -52,8 +48,13 @@ definePlugin({
   }
 })
 /** Known installed definitions retain each qualified payload at the Host owner. */
-const host = defineHost<{}, never, readonly [typeof plugin]>({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+const host = defineHost<{}, never, typeof nativeModules, 'sync', readonly [typeof plugin]>({
+  modules: nativeModules,
+
+  host: {
+    pipeline: { mode: 'sync' },
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  }
 })
 host.pipeline('producer.outgoing').run({ text: 'x' }, (value) => value.text)
 // @ts-expect-error Qualified payload inference still rejects another data domain.

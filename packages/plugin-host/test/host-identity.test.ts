@@ -1,3 +1,4 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import {
   defineHost,
@@ -7,18 +8,36 @@ import {
   PluginHostErrorCode
 } from '../src/index.ts'
 import { getPluginRuntimeIntegration } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 
 /** Explicit unbounded lifecycle policy keeps identity tests independent of wall-clock timing. */
 const execution = { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
 
 /** Concrete class entry used to observe the identity exposed by a Host instance. */
-class Host extends PluginHost<Record<string, never>> {}
+class Host extends PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+}
 
 describe('host identity', () => {
   it('runtime node identity is shared per Host and separate from public labels', async () => {
     /** Both Host entry points reuse the canonical identity owner through their actual Plugin core. */
-    const hosts = [new Host({ execution }), defineHost({ host: { execution } })] as const
+    const hosts = [
+      new Host({ execution }),
+      defineHost({ modules: nativeModules, host: { pipeline: { mode: 'sync' }, execution } })
+    ] as const
     /** Separate connection families must see one node for their shared Host instance. */
     const nodes: string[][] = [[], []]
     try {
@@ -68,7 +87,11 @@ describe('host identity', () => {
   })
 
   it('host identity is unique per instance and never a lookup key: config and removal retain the bare plugin name', async () => {
-    const host = defineHost({ host: { execution, identity: { name: 'tray' } } })
+    const host = defineHost({
+      modules: nativeModules,
+
+      host: { pipeline: { mode: 'sync' }, execution, identity: { name: 'tray' } }
+    })
     const plugin = definePlugin({
       name: 'plain',
       config: { enabled: true },
@@ -104,7 +127,10 @@ describe('host identity', () => {
 
 it('public Host identity and genuine integration port share the canonical issuing identity', async () => {
   /** Both public entries represent exactly one canonical Host and perform actual installation. */
-  const hosts = [new Host({ execution }), defineHost({ host: { execution } })]
+  const hosts = [
+    new Host({ execution }),
+    defineHost({ modules: nativeModules, host: { pipeline: { mode: 'sync' }, execution } })
+  ]
   try {
     for (const host of hosts) {
       /**

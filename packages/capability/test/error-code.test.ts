@@ -4,7 +4,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { CapabilityErrorCode, createCapabilityHost, type ICapabilityHandle } from '../src/index.ts'
-import { CAPABILITY_SOURCE, createCapabilityError } from '../src/errors.ts'
+import { CAPABILITY_SOURCE } from '../src/errors.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
 
@@ -220,10 +221,13 @@ async function verifyTaggedErrorsCarrySourceCapabilityAndNonEmptyStack(): Promis
 /** Executes the existing case: shared attachment preserves native error identity, cause, and stack. */
 function verifySharedAttachmentPreservesNativeErrorIdentityCauseAndStack(): void {
   const cause = new Error('cause')
-  const error = createCapabilityError('TEST_CODE', 'message', { cause })
+  const error = attachErrorIdentity(new Error('message', { cause }), {
+    source: CAPABILITY_SOURCE,
+    code: 'TEST_CODE'
+  })
   expect(error).toBeInstanceOf(Error)
-  expect(error.source).toBe(CAPABILITY_SOURCE)
-  expect(error.code).toBe('TEST_CODE')
+  expect((error as Error & { source: string }).source).toBe(CAPABILITY_SOURCE)
+  expect((error as Error & { code: string }).code).toBe('TEST_CODE')
   expect(error.cause).toBe(cause)
   expect(error.stack).toBeTruthy()
 }

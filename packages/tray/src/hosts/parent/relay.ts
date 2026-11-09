@@ -1,5 +1,6 @@
+import { defineFeature } from '@migaia/plugin-host/features'
 /** Own authenticated relay Features; registry, routing and topics retain their canonical state. */
-import { defineFeature, definePlugin, type IPluginConstraint } from '@migaia/plugin-host'
+import { definePlugin, type IPluginConstraint } from '@migaia/plugin-host'
 import type { IRpcContext } from '@migaia/rpc-host'
 import { TrayInternal, TrayCallKind } from '../constants.ts'
 import { createTrayError } from '../../errors.ts'

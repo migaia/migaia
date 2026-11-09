@@ -1,7 +1,7 @@
 import { defineLogPlugin } from '@migaia/log-host/plugin'
 import { setImmediate } from 'node:timers'
 import { expect, it } from 'vitest'
-import { createLogHost, levelPlugin, LogHostStatus } from '@migaia/log-host'
+import { createLogHost, levelPlugin, LogHostStatus, type ILogFailure } from '@migaia/log-host'
 import { batchFeature, formatFeature, thresholdFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 import { httpPlugin } from '@migaia/log-plugin-http'
@@ -121,7 +121,7 @@ async function composedOutputs(): Promise<void> {
       processPlugin({ process: outputs, shutdownTimeoutMs: 1000 })
     ]
   })
-  log.onFailure(({ error }) => failures.push(error))
+  log.onFailure(({ error }: ILogFailure) => failures.push(error))
   log.onShutdown(() => log.info('final-entry'))
   try {
     log.debug('filtered-entry')
@@ -172,7 +172,7 @@ async function failureBoundaries(): Promise<void> {
       binlogPlugin({ store: records })
     ]
   })
-  log.onFailure(({ error }) => failures.push(error))
+  log.onFailure(({ error }: ILogFailure) => failures.push(error))
   try {
     await log.binlog.ready()
     expect(() => log.log('info', 'business continues')).not.toThrow()

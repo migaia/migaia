@@ -1,10 +1,20 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 
 /** Creates one unbounded host so path tests control setup settlement directly. */
 const createHost = (diagnostic?: (...args: any[]) => void) =>
-  new PluginHost<Record<string, never>>({
+  new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
     diagnostic
   })

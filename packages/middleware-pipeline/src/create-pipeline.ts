@@ -1,28 +1,26 @@
+import { MiddlewarePipelineErrorCode } from './error-code.ts'
+import { MIDDLEWARE_PIPELINE_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { admitPipelineNext } from './option-admission.ts'
 /** Admits immutable pipeline options and exposes the public runner and canonical lift matrix. */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { tryReadProperty } from '@migaia/utils/error'
 import { MiddlewarePipelineErrorText } from './error-text.ts'
+import { identifyMiddlewarePipelineFailure } from './errors.ts'
+import type {
+  IAsyncGeneratorMiddlewareStage,
+  IAsyncMiddlewareStage,
+  IGeneratorMiddlewareStage,
+  IMiddlewarePipelineContext,
+  IMiddlewarePipelineOptions,
+  IMiddlewarePipelineControlOptions,
+  ISyncMiddlewareStage
+} from './runtime-types.ts'
 import {
-  createMiddlewarePipelineInvalidOptionError,
-  identifyMiddlewarePipelineFailure
-} from './errors.ts'
-import {
-  adaptGeneratorStageToAsyncGenerator,
-  adaptSyncStageToAsync,
-  adaptSyncStageToAsyncGenerator,
-  adaptSyncStageToGenerator,
-  runAsyncGeneratorMiddleware,
-  runAsyncMiddleware,
-  runGeneratorMiddleware,
-  runSyncMiddleware,
-  type IAsyncGeneratorMiddlewareStage,
-  type IAsyncMiddlewareStage,
-  type IGeneratorMiddlewareStage,
-  type IMiddlewarePipelineContext,
-  type IMiddlewarePipelineOptions,
-  type IMiddlewarePipelineControlOptions,
-  type ISyncMiddlewareStage
-} from './runtime.ts'
+  readPipelineMode,
+  type IPipelineModeObject,
+  type IPipelineModeImplementation
+} from './mode-registry.ts'
 import {
   MiddlewarePipelineGeneratorSignals,
   MiddlewarePipelineMode,
@@ -95,7 +93,7 @@ export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Read
    * Required execution mode: sync, async, generator, or async-generator. Determines stage shape,
    * downstream timing, and whether run throws synchronously or returns a promise.
    */
-  readonly mode: TMode
+  readonly mode: IPipelineModeObject<TMode>
   /** Number of values one active stage may submit; omitted preserves single semantics. */
   readonly next?: MiddlewarePipelineNext
   /**
@@ -166,10 +164,11 @@ export type IMiddlewarePipeline<
 }>
 
 /** Frozen internal options consumed by mode dispatch. */
-type INormalizedPipelineOptions = Readonly<
+export type INormalizedPipelineOptions = Readonly<
   IMiddlewarePipelineOptions & {
     readonly mode: IMiddlewarePipelineMode
     readonly signals: IGeneratorMiddlewareSignals
+    readonly implementation: IPipelineModeImplementation
   }
 >
 
@@ -191,7 +190,10 @@ const isPipelineMode = (value: unknown): value is IMiddlewarePipelineMode =>
 const readCallback = <TCallback extends Function>(value: unknown): TCallback | undefined => {
   if (value === undefined) return undefined
   if (typeof value !== 'function')
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
+    throw attachErrorIdentity(new TypeError(MiddlewarePipelineErrorText.invalidOption), {
+      source: MIDDLEWARE_PIPELINE_SOURCE,
+      code: MiddlewarePipelineErrorCode.invalidOption
+    })
   return value as TCallback
 }
 
@@ -199,16 +201,22 @@ const readCallback = <TCallback extends Function>(value: unknown): TCallback | u
 const readSignals = (value: unknown): IGeneratorMiddlewareSignals => {
   if (value === undefined) return MiddlewarePipelineGeneratorSignals
   if (value === null || typeof value !== 'object')
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
+    throw attachErrorIdentity(new TypeError(MiddlewarePipelineErrorText.invalidOption), {
+      source: MIDDLEWARE_PIPELINE_SOURCE,
+      code: MiddlewarePipelineErrorCode.invalidOption
+    })
   /** Only the three named properties are admitted from the caller's structural record. */
   const candidate = value as Record<string, unknown>
   /** Read each caller-owned getter exactly once before committing the immutable sentinel set. */
   const reads = ['undefined', 'halt', 'continue'].map((key) => tryReadProperty(candidate, key))
   for (const read of reads) {
     if (read.threw)
-      throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption, {
-        cause: read.error
-      })
+      throw attachErrorIdentity(
+        new TypeError(MiddlewarePipelineErrorText.invalidOption, {
+          cause: read.error
+        }),
+        { source: MIDDLEWARE_PIPELINE_SOURCE, code: MiddlewarePipelineErrorCode.invalidOption }
+      )
   }
   /** Local values cannot change after construction even if the caller mutates its options. */
   const [undefinedSignal, halt, continueSignal] = reads.map((read) =>
@@ -222,7 +230,10 @@ const readSignals = (value: unknown): IGeneratorMiddlewareSignals => {
     undefinedSignal === continueSignal ||
     halt === continueSignal
   )
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
+    throw attachErrorIdentity(new TypeError(MiddlewarePipelineErrorText.invalidOption), {
+      source: MIDDLEWARE_PIPELINE_SOURCE,
+      code: MiddlewarePipelineErrorCode.invalidOption
+    })
   return Object.freeze({ undefined: undefinedSignal, halt, continue: continueSignal })
 }
 
@@ -231,34 +242,40 @@ const readOption = (candidate: object, key: string): unknown => {
   /** Structural option reads belong to admission, never to a later runner transition. */
   const read = tryReadProperty(candidate as Record<string, unknown>, key)
   if (read.threw)
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption, {
-      cause: read.error
-    })
+    throw attachErrorIdentity(
+      new TypeError(MiddlewarePipelineErrorText.invalidOption, {
+        cause: read.error
+      }),
+      { source: MIDDLEWARE_PIPELINE_SOURCE, code: MiddlewarePipelineErrorCode.invalidOption }
+    )
   return read.value
 }
 
 /** Validates and freezes construction options before any mode-specific work begins. */
 const readPipelineOptions = (options: unknown): INormalizedPipelineOptions => {
   if (!isOptionRecord(options))
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOptions)
+    throw attachErrorIdentity(new TypeError(MiddlewarePipelineErrorText.invalidOptions), {
+      source: MIDDLEWARE_PIPELINE_SOURCE,
+      code: MiddlewarePipelineErrorCode.invalidOption
+    })
   /** Unknown input narrowed only after object admission. */
   const candidate = options as Record<string, unknown>
   /** Mode is both validated and published from this one captured value. */
-  const mode = readOption(candidate, 'mode')
-  if (!isPipelineMode(mode))
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidMode)
+  const implementation = readPipelineMode(readOption(candidate, 'mode'))
+  if (!implementation)
+    throw attachErrorIdentity(new TypeError(MiddlewarePipelineErrorText.invalidMode), {
+      source: MIDDLEWARE_PIPELINE_SOURCE,
+      code: MiddlewarePipelineErrorCode.invalidOption
+    })
   /** Captured next callbacks can report after run returns, so this callback owns its boundary. */
   const onViolation = readCallback<IMiddlewarePipelineViolationHandler>(
     readOption(candidate, 'onViolation')
   )
   /** Capture and validate the policy once before creating any runner state. */
-  const nextOption = readOption(candidate, 'next')
-  /** Only omission selects the default; null is an invalid explicitly supplied policy. */
-  const next = nextOption === undefined ? MiddlewarePipelineNext.single : nextOption
-  if (next !== MiddlewarePipelineNext.single && next !== MiddlewarePipelineNext.multiple)
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
+  const next = admitPipelineNext(readOption(candidate, 'next'))
   return Object.freeze({
-    mode,
+    mode: implementation.key,
+    implementation,
     next,
     onViolation:
       onViolation === undefined
@@ -280,121 +297,18 @@ const readPipelineOptions = (options: unknown): INormalizedPipelineOptions => {
 }
 
 /** Selects a call-time signal before the construction-time default. */
-const selectSignal = (
+export const selectSignal = (
   options: INormalizedPipelineOptions,
   control: unknown
 ): IAbortSignal | undefined => {
   if (control === undefined) return options.signal
   if (!isOptionRecord(control))
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
+    throw attachErrorIdentity(new TypeError(MiddlewarePipelineErrorText.invalidOption), {
+      source: MIDDLEWARE_PIPELINE_SOURCE,
+      code: MiddlewarePipelineErrorCode.invalidOption
+    })
   /** Call-time signal wins when supplied; creation signal remains the fallback. */
   return (readOption(control, 'signal') as IAbortSignal | undefined) ?? options.signal
-}
-
-/** Promotes one stage through the canonical existing adapter matrix. */
-const liftStage = (
-  target: IMiddlewarePipelineMode,
-  from: IMiddlewarePipelineMode,
-  stage: unknown,
-  onViolation: IMiddlewarePipelineViolationHandler,
-  signals: IGeneratorMiddlewareSignals,
-  nextPolicy: MiddlewarePipelineNext
-): unknown => {
-  if (target === from) return stage
-  if (target === MiddlewarePipelineMode.async && from === MiddlewarePipelineMode.sync)
-    return adaptSyncStageToAsync(stage as ISyncMiddlewareStage<unknown>, onViolation, nextPolicy)
-  if (target === MiddlewarePipelineMode.generator && from === MiddlewarePipelineMode.sync)
-    return adaptSyncStageToGenerator(
-      stage as ISyncMiddlewareStage<unknown>,
-      onViolation,
-      signals,
-      nextPolicy
-    )
-  if (target === MiddlewarePipelineMode.asyncGenerator) {
-    if (from === MiddlewarePipelineMode.sync)
-      return adaptSyncStageToAsyncGenerator(
-        stage as ISyncMiddlewareStage<unknown>,
-        onViolation,
-        signals,
-        nextPolicy
-      )
-    if (from === MiddlewarePipelineMode.generator)
-      return adaptGeneratorStageToAsyncGenerator(stage as IGeneratorMiddlewareStage<unknown>)
-  }
-  throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.unsupportedLift)
-}
-
-/** Dispatches one run while preserving each existing runner's return semantics. */
-const runForMode = (
-  mode: IMiddlewarePipelineMode,
-  options: INormalizedPipelineOptions,
-  stages: readonly unknown[],
-  value: unknown,
-  done: unknown,
-  control: IMiddlewarePipelineControlOptions | undefined
-): void | Promise<void> => {
-  if (mode === MiddlewarePipelineMode.sync) {
-    /** Sync mode keeps malformed control failures synchronous. */
-    const signal = selectSignal(options, control)
-    return runSyncMiddleware(
-      stages as readonly ISyncMiddlewareStage<unknown>[],
-      value,
-      done as (value: unknown, context?: IMiddlewarePipelineContext) => void,
-      options.onViolation,
-      signal,
-      options.assertActive,
-      options.next
-    )
-  }
-  if (mode === MiddlewarePipelineMode.async) {
-    /** Async mode converts malformed control admission into a rejected Promise. */
-    let signal: IAbortSignal | undefined
-    try {
-      signal = selectSignal(options, control)
-    } catch (error) {
-      return Promise.reject(error)
-    }
-    return runAsyncMiddleware(
-      stages as readonly IAsyncMiddlewareStage<unknown>[],
-      value,
-      done as (value: unknown, context?: IMiddlewarePipelineContext) => void | Promise<void>,
-      {
-        onViolation: options.onViolation,
-        next: options.next,
-        assertActive: options.assertActive,
-        combineStageAndDownstreamError: options.combineStageAndDownstreamError,
-        signal
-      }
-    )
-  }
-  if (mode === MiddlewarePipelineMode.generator) {
-    /** Generator mode keeps malformed control failures synchronous. */
-    const signal = selectSignal(options, control)
-    return runGeneratorMiddleware(
-      stages as readonly IGeneratorMiddlewareStage<unknown>[],
-      value,
-      done as (value: unknown, context?: IMiddlewarePipelineContext) => void,
-      options.signals,
-      signal,
-      options.assertActive,
-      options.next
-    )
-  }
-  try {
-    /** Async-generator mode converts malformed control admission into a rejected Promise. */
-    const signal = selectSignal(options, control)
-    return runAsyncGeneratorMiddleware(
-      stages as readonly IAsyncGeneratorMiddlewareStage<unknown>[],
-      value,
-      done as (value: unknown, context?: IMiddlewarePipelineContext) => void | Promise<void>,
-      options.signals,
-      signal,
-      options.assertActive,
-      options.next
-    )
-  } catch (error) {
-    return Promise.reject(error)
-  }
 }
 
 /**
@@ -493,15 +407,12 @@ class MiddlewarePipelineRuntime {
   /** Uses the one canonical lift matrix with this pipeline's next policy. */
   readonly lift = (stage: unknown, from: IMiddlewarePipelineMode): unknown => {
     if (!isPipelineMode(from))
-      throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.unsupportedLift)
-    return liftStage(
-      this.mode,
-      from,
-      stage,
-      this.#options.onViolation,
-      this.#options.signals,
-      this.#options.next ?? MiddlewarePipelineNext.single
-    )
+      throw attachErrorIdentity(new TypeError(MiddlewarePipelineErrorText.unsupportedLift), {
+        source: MIDDLEWARE_PIPELINE_SOURCE,
+        code: MiddlewarePipelineErrorCode.invalidOption
+      })
+    if (this.mode === from) return stage
+    return this.#options.implementation.lift(from, stage, this.#options)
   }
 
   /** Preserves synchronous/async failure timing while adding package identity only at the boundary. */
@@ -513,7 +424,7 @@ class MiddlewarePipelineRuntime {
   ): void | Promise<void> => {
     try {
       /** Dispatch selects the canonical mode runner without retaining per-run state here. */
-      const pending = runForMode(this.mode, this.#options, stages, value, done, control)
+      const pending = this.#options.implementation.run(this.#options, stages, value, done, control)
       if (pending)
         return pending.catch((error: unknown) => {
           throw identifyMiddlewarePipelineFailure(error)

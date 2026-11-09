@@ -1,3 +1,4 @@
+import { nativeModules } from '../native-modules.ts'
 /** Proves named construction admission and primary-first failure identity at public boundaries. */
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
@@ -21,7 +22,12 @@ function constructionFailure(pipelines: unknown): Error {
   let failure: unknown
   try {
     defineHost({
-      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
+      modules: nativeModules,
+
+      host: {
+        pipeline: { mode: 'sync' },
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      },
       pipelines: pipelines as IPipelineDefinitions
     })
     returned = true
@@ -36,7 +42,12 @@ function constructionFailure(pipelines: unknown): Error {
 /** The two failure scenarios use the public owner path with one async numeric payload. */
 function createFailureHost(multiple = false) {
   return defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
+    modules: nativeModules,
+
+    host: {
+      pipeline: { mode: 'sync' },
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    },
     pipelines: {
       work: pipelineSpec<number>()({ mode: 'async', next: multiple ? 'multiple' : 'single' })
     }

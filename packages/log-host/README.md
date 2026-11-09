@@ -72,3 +72,5 @@ feature 工厂返回 `@migaia/plugin-host` 的原生 opaque 定义，不暴露 d
 host 不内置输出端，不依赖第三方运行时包。底层能力来自 `@migaia/plugin-host`、`@migaia/middleware-pipeline`、`@migaia/lifecycle`、`@migaia/event-subscriber` 与 `@migaia/utils`。
 
 完整用法见 [USEGUIDE.md](./USEGUIDE.md)。
+
+输出 Feature 可使用 `false` 禁用继承角色。本地 format、batch、retry、timeout 替换对应全局角色，entry 与 gate 按别名替换。两个全局载体重复提供同一单例角色时，以 `plugin.host / FEATURE_ROLE_CONFLICT` 拒绝；重复宿主别名与单个记录格式错误仍使用 `logging / INVALID_OPTION`。全局默认值通过共享 overlay 在策略安装提交或移除后通知已安装输出。

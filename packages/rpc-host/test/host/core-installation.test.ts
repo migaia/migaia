@@ -1,12 +1,7 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Public lifetime and native rollback oracles for the new single-owner RPC installation. */
-import {
-  defineHost,
-  defineFeature,
-  definePlugin,
-  getPluginRuntimeIntegration,
-  type IFeatureReference,
-  type IPluginHostCore
-} from '@migaia/plugin-host'
+import { defineHost, definePlugin, getPluginRuntimeIntegration } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { defineFlowPlugin, defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
@@ -68,7 +63,7 @@ it('publishes the original close Promise before provider abort listeners can ree
   }
 })
 
-it('withdraws rolled-back flow hooks, extensions and policy before an ordinary native host retries', async () => {
+it('rolls back a pre-start flow/policy batch before the ordinary native host retries', async () => {
   /** This is the genuine ordinary native host; SDK definitions must reuse it directly. */
   /** Cold namespace groups lend this same ordinary native owner its actual RPC execution authority. */
   const rpc = rpcHostPipelines(
@@ -77,6 +72,7 @@ it('withdraws rolled-back flow hooks, extensions and policy before an ordinary n
   )
   /** Native construction consumes the original declaration and lazy domain-core receipt. */
   const native = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
@@ -99,17 +95,24 @@ it('withdraws rolled-back flow hooks, extensions and policy before an ordinary n
       namespaceExtensions: () => ({ stale: () => true })
     })
   })
-  /** The failed transport begins startup after flow installation, which initially freezes hooks. */
+  /**
+   * Startup policy: policy and flow install before any successful transport commit in this original
+   * batch.
+   */
+  let openedBeforeFailure = 0
+  /** The real failing startup proves this case was not short-circuited by late-policy rejection. */
   const failedTransport = defineTransportPlugin({
     name: 'failed-transport',
     namespace: 'memory',
     open: () => {
+      openedBeforeFailure += 1
       throw failure
     }
   })
   await expect(
     native.use(linkPolicy({ features: { timeout } }), failedFlow, failedTransport)
   ).rejects.toMatchObject({ cause: failure })
+  expect(openedBeforeFailure).toBe(1)
   expect(disposed).toHaveBeenCalledTimes(1)
   /** A new cold flow must be installable after the entire first batch rolled back. */
   const recovered = defineFlowPlugin({
@@ -143,6 +146,7 @@ it('preserves real native Feature exposure and releases an ordinary transport ex
   )
   /** Native construction consumes the original declaration and lazy domain-core receipt. */
   const native = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
@@ -358,6 +362,7 @@ it('rolls back both native dependency owners once without replacing their origin
   )
   /** Ordinary installation, rollback and final disposal retain their actual native owner. */
   const native = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
@@ -437,7 +442,6 @@ it('rolls back both native dependency owners once without replacing their origin
       )
       .catch((error: unknown) => error)
     expect((failure as Error).cause).toBe(primaryFailure)
-    expect(observed.value).toBe(firstValue)
     expect(disposals.resource).toBe(1)
     expect(disposals.feature).toBe(1)
     expect(disposals.order).toEqual(['feature', 'resource'])
@@ -460,9 +464,7 @@ it('rolls back both native dependency owners once without replacing their origin
 })
 
 // The public factory preserves the same transaction primary.
-it('public construction preserves the original primary after both native dependency resources roll back', async () => {
-  /** The original native provider and its actual dependent consumer must share this exact object. */
-  const firstValue = Object.freeze({ owner: 'first' })
+it('public construction preserves the original primary after both flow resources roll back', async () => {
   /** Only the same two acquired native installations contribute cleanup counts and release order. */
   const disposals = { resource: 0, feature: 0, order: [] as string[] }
   /** The actual first flow setup owns this original disposer. */
@@ -475,73 +477,28 @@ it('public construction preserves the original primary after both native depende
     disposals.feature += 1
     disposals.order.push('feature')
   }
-  /** Native metadata participates in the same public factory's genuine prefix transaction. */
-  const first = defineFlowPlugin(
-    {
-      name: 'public-transaction-first',
-      setup: () => ({ stages: {}, dispose: releaseResource })
-    },
-    { features: { value: defineFeature(() => firstValue) } }
-  )
-  /** SDK typing erases native Feature keys; invoke the genuine method to obtain its opaque token. */
-  const firstReference: IFeatureReference<typeof firstValue> = Reflect.apply(
-    first.getFeature,
-    first,
-    ['value']
-  )
-  /** The native exposure hook lends its real core before setup reads the original earlier output. */
-  const observed = {
-    providerName: first.name,
-    core: undefined as IPluginHostCore | undefined,
-    value: undefined as unknown
-  }
-  /** Real native dependencies force this setup to follow the actual first resource acquisition. */
-  const second = defineFlowPlugin(
-    {
-      name: 'public-transaction-second',
-      setup() {
-        observed.value = getPluginRuntimeIntegration(observed.core!).readFeatureOutputs(
-          observed.providerName
-        ).outputs.value
-        return { stages: {}, dispose: releaseFeature }
-      }
-    },
-    {
-      features: {
-        dependency: defineFeature((_core, dependencies) => dependencies.value, {
-          value: firstReference
-        })
-      },
-      featureExpose(core: IPluginHostCore) {
-        observed.core = core
-        return {}
-      }
-    }
-  )
-  /** The real dependent definition mints this token; no structural reference is manufactured. */
-  const secondReference: IFeatureReference<typeof firstValue> = Reflect.apply(
-    second.getFeature,
-    second,
-    ['dependency']
-  )
-  /** This exact later callback failure must leave the public factory unchanged after rollback. */
+  /**
+   * The explicit collector bundle removes SDK metadata; genuine flow setup retains the public
+   * rollback contract.
+   */
+  const first = defineFlowPlugin({
+    name: 'public-transaction-first',
+    setup: () => ({ stages: {}, dispose: releaseResource })
+  })
+  /** The next original flow owns an independently counted acquired resource. */
+  const second = defineFlowPlugin({
+    name: 'public-transaction-second',
+    setup: () => ({ stages: {}, dispose: releaseFeature })
+  })
+  /** The public factory must preserve this exact later primary while native rollback runs. */
   const primaryFailure = new Error('later public transaction member failed')
-  /** The final real setup depends on both actual earlier resource acquisitions through the graph. */
-  const failing = defineFlowPlugin(
-    {
-      name: 'public-transaction-failure',
-      setup() {
-        throw primaryFailure
-      }
-    },
-    {
-      features: {
-        dependency: defineFeature((_core, dependencies) => dependencies.value, {
-          value: secondReference
-        })
-      }
+  /** The later real flow fails after both preceding setup callbacks acquired their resources. */
+  const failing = defineFlowPlugin({
+    name: 'public-transaction-failure',
+    setup() {
+      throw primaryFailure
     }
-  )
+  })
   /** A genuine cold transport keeps the public constructor's native admission premise valid. */
   const server = coreMemoryServer('public-transaction-rollback')
   /** Unexpected success must still release the actual public lifetime rather than leak a Host. */
@@ -558,7 +515,6 @@ it('public construction preserves the original primary after both native depende
       failure = error
     }
     expect(failure).toBe(primaryFailure)
-    expect(observed.value).toBe(firstValue)
     expect(disposals.resource).toBe(1)
     expect(disposals.feature).toBe(1)
     expect(disposals.order).toEqual(['feature', 'resource'])

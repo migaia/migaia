@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { PluginHostError } from '../src/error-text.ts'
+import { PluginHostError } from '../src/errors.ts'
 import { GENERATOR_CONTINUE as hostContinue } from '@migaia/middleware-pipeline'
 import { type IStageCore, Host, plugin } from './plugin-host-fixtures.ts'
 

@@ -1,7 +1,8 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { defineHost, definePlugin, PluginHost } from '../src/index.ts'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
-import * as composition from '../src/composition-entry.ts'
+import * as composition from '../src/modules/feature-dependencies/composition-entry.ts'
 
 /** Memory fixtures disable unrelated operation/drain deadlines. */
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
@@ -11,7 +12,11 @@ describe('audited plugin host contracts', () => {
     expect('registerManagedHost' in composition).toBe(false)
     expect('buildManagedPort' in composition).toBe(false)
     /** Public factories are the legitimate writers of managed-host provenance. */
-    const host = defineHost({ host: { execution } })
+    const host = defineHost({
+      modules: nativeModules,
+
+      host: { pipeline: { mode: 'sync' }, execution }
+    })
     /** A plain object has no public registration path or managed port. */
     const ordinary = {}
     expect(composition.isManagedHost(host)).toBe(true)
@@ -27,7 +32,11 @@ describe('audited plugin host contracts', () => {
     let oldDisposals = 0
     let newDisposals = 0
     /** One factory host owns both registration generations and their composition tokens. */
-    const host = defineHost({ host: { execution } })
+    const host = defineHost({
+      modules: nativeModules,
+
+      host: { pipeline: { mode: 'sync' }, execution }
+    })
     /** Only canonical public composition operations prepare and commit these receipts. */
     const port = composition.openComposition(host)
     /** Stable ordering lane is independent of a particular installed generation. */
@@ -74,7 +83,9 @@ describe('audited plugin host contracts', () => {
     let middlewareCalls = 0
     let host!: ReturnType<typeof defineHost>
     host = defineHost({
-      host: { execution },
+      modules: nativeModules,
+
+      host: { pipeline: { mode: 'sync' }, execution },
       dispose: (next) => {
         middlewareCalls++
         if (middlewareCalls === 1) nested = host.dispose()
@@ -91,7 +102,22 @@ describe('audited plugin host contracts', () => {
 
   it('publishes the runtime disposal promise before synchronous abort notification', async () => {
     /** Subclassing uses the existing protected pipeline entry, without exposing a new runtime seam. */
-    class DispatchHost extends PluginHost<object, string> {
+    class DispatchHost extends PluginHost<
+      object,
+      string,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    > {
+      /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+      constructor(
+        options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+          modules?: typeof nativeModules
+        } = {}
+      ) {
+        super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+      }
+
       /** Runs a supported sync pipeline to capture its host-owned signal. */
       dispatch(): void {
         this.runPipeline('value', () => undefined)
@@ -133,7 +159,12 @@ describe('audited plugin host contracts', () => {
     }
     /** A positive finite operation budget exercises boundedWait and the final result read. */
     const host = defineHost({
-      host: { execution: { mutationTimeoutMs: 500, pipelineDrainTimeoutMs: false } }
+      modules: nativeModules,
+
+      host: {
+        pipeline: { mode: 'sync' },
+        execution: { mutationTimeoutMs: 500, pipelineDrainTimeoutMs: false }
+      }
     })
     await host.use(
       definePlugin({
@@ -157,7 +188,9 @@ describe('audited plugin host contracts', () => {
        * next.
        */
       const host = defineHost({
-        host: { execution },
+        modules: nativeModules,
+
+        host: { pipeline: { mode: 'sync' }, execution },
         dispose: async (next) => {
           const result = await next()
           if (kind === 'dispose') throw original
@@ -202,7 +235,11 @@ describe('audited plugin host contracts', () => {
       const original =
         kind === 'primitive' ? undefined : Object.freeze(new Error('immutable callback failed'))
       /** Recipe execution is the public boundary under audit. */
-      const host = defineHost({ host: { execution } })
+      const host = defineHost({
+        modules: nativeModules,
+
+        host: { pipeline: { mode: 'sync' }, execution }
+      })
       await host.use(definePlugin({ name: 'config', config: { value: 1 }, install: () => ({}) }))
       /** The coded shell must preserve even an explicit undefined cause. */
       const failure = await host.config
@@ -222,7 +259,10 @@ describe('audited plugin host contracts', () => {
     const errors: unknown[] = []
     /** Existing diagnostics provide the observation path without admitting the async installation. */
     const host = defineHost({
+      modules: nativeModules,
+
       host: {
+        pipeline: { mode: 'sync' },
         execution,
         diagnostic: (_message, _code, error) => {
           if (error !== undefined) errors.push(error)
@@ -259,7 +299,9 @@ describe('audited plugin host contracts', () => {
     let completed = false
     const diagnostics: string[] = []
     /** Zero budget explicitly stops waiting; it must not claim the pending work drained. */
-    const host = defineHost<object, string>({
+    const host = defineHost<object, string, typeof nativeModules, 'async'>({
+      modules: nativeModules,
+
       host: {
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 0 },
         pipeline: { mode: 'async' },
@@ -309,8 +351,13 @@ describe('audited plugin host contracts', () => {
   it('does not grant a caller object managed provenance through a retired receiver option', async () => {
     /** A caller-owned object is an extension context, not a package-constructed Host. */
     const ordinary = {}
-    // @ts-expect-error Receiver aliasing is not a public provenance registration path.
-    const host = defineHost({ host: { execution }, receiver: ordinary })
+    const host = defineHost({
+      modules: nativeModules,
+
+      host: { pipeline: { mode: 'sync' }, execution },
+      // @ts-expect-error Receiver aliasing is not a public provenance registration path.
+      receiver: ordinary
+    })
     expect(composition.isManagedHost(host)).toBe(true)
     expect(composition.isManagedHost(ordinary)).toBe(false)
     await host.dispose()

@@ -19,6 +19,26 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./sync": {
+      "types": "./dist/modes/sync.d.ts",
+      "default": "./dist/modes/sync.js"
+    },
+    "./async": {
+      "types": "./dist/modes/async.d.ts",
+      "default": "./dist/modes/async.js"
+    },
+    "./generator": {
+      "types": "./dist/modes/generator.d.ts",
+      "default": "./dist/modes/generator.js"
+    },
+    "./async-generator": {
+      "types": "./dist/modes/async-generator.d.ts",
+      "default": "./dist/modes/async-generator.js"
+    },
+    "./admission": {
+      "types": "./dist/option-admission.d.ts",
+      "default": "./dist/option-admission.js"
     }
   },
   "scripts": {

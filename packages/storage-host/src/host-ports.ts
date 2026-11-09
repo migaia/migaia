@@ -1,3 +1,7 @@
+import { syncPipelineModule } from '@migaia/plugin-host/pipeline-modes/sync'
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+import { featuresModule } from '@migaia/plugin-host/features'
+import { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'
 // Registration cores, the PluginHost assembly and the native authoring and execution ports of one storage host (see ./storage-host.ts).
 import type { IStorageHookEmitter } from './hooks.ts'
 import type { IStorageHooks } from './hook-types.ts'
@@ -66,15 +70,44 @@ function createStorageRegistrationCore(registration: IStorageRegistrationAssembl
     ...createStorageExecutionPorts(registration)
   }
 }
+/**
+ * The original storage constructor fixes async as its default, while native sync execution uses its
+ * separately installed runner.
+ */
+type IStoragePluginHostOptions = IPluginHostOptions &
+  Readonly<{ pipeline: NonNullable<IPluginHostOptions['pipeline']> & Readonly<{ mode: 'async' }> }>
+
 /** Own the native batch bridge while delegating lifecycle and pipelines to PluginHost. */
 class StoragePluginHostAssembly {
   /** Storage registration context of each plugin in the active batch, keyed by native plugin name. */
   #nativeContexts: ReadonlyMap<string, IStorageNativeRegistrationContext> = new Map()
   /** The canonical managed host owns installation, resources and pipeline execution. */
-  #host: IHostHandle<IStorageHostCore, IStoragePipelineInput, readonly []>
+  #host: IHostHandle<
+    IStorageHostCore,
+    IStoragePipelineInput,
+    readonly [
+      typeof import('@migaia/plugin-host/features').featuresModule,
+      typeof import('@migaia/plugin-host/feature-dependencies').featureDependenciesModule,
+      typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule,
+      typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule
+    ],
+    'async',
+    readonly []
+  >
   /** Allocate only the batch bridge; PluginHost retains the full managed lifecycle. */
-  constructor(options: IPluginHostOptions) {
-    this.#host = defineHost<IStorageHostCore, IStoragePipelineInput>({
+  constructor(options: IStoragePluginHostOptions) {
+    this.#host = defineHost<
+      IStorageHostCore,
+      IStoragePipelineInput,
+      readonly [
+        typeof import('@migaia/plugin-host/features').featuresModule,
+        typeof import('@migaia/plugin-host/feature-dependencies').featureDependenciesModule,
+        typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule,
+        typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule
+      ],
+      'async'
+    >({
+      modules: [featuresModule, featureDependenciesModule, asyncPipelineModule, syncPipelineModule],
       host: options,
       domainCore: (request) => this.#createDomainCore(request.pluginName)
     })
@@ -96,7 +129,7 @@ class StoragePluginHostAssembly {
   }
 }
 /** Create the storage bridge around one canonical managed PluginHost. */
-export function createStoragePluginHost(options: IPluginHostOptions): IStoragePluginHost {
+export function createStoragePluginHost(options: IStoragePluginHostOptions): IStoragePluginHost {
   return new StoragePluginHostAssembly(options).construct()
 }
 

@@ -37,7 +37,7 @@ describe('architecture boundaries', () => {
       sources
         .filter(({ content }) => content.includes('buildCapabilityTopology'))
         .map(({ file }) => file)
-    ).toEqual([join(sourceRoot, 'feature-runtime.ts')])
+    ).toEqual([join(sourceRoot, 'modules/features/feature-runtime.ts')])
     for (const retired of [
       'planPluginDependencyMutation',
       'readPluginBlockers',

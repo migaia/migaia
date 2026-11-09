@@ -12,7 +12,8 @@ import {
   type ITerminalController
 } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import type { IPluginHostDiagnostic } from './host-options-types.ts'
 import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.ts'
@@ -29,6 +30,8 @@ type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly enqueueTerminal: <T>(task: () => Promise<T>) => Promise<T>
   readonly registrationsInReverse: () => readonly TRegistration[]
   readonly clearPipelineState: () => void
+  /** Optional module resources close after the native plugin cleanup sequence. */
+  readonly disposeModules: () => Promise<void>
   readonly diagnostic: IPluginHostDiagnostic
   /** Terminal coordination advances the same revision owner as all other mutations. */
   readonly state: Pick<PluginHostState<object, unknown>, 'commit'>
@@ -117,6 +120,11 @@ export class PluginHostDisposalRuntime<TRegistration> {
       const result = await this.#port.removal.disposeRegistration(registration)
       errors.push(...result.cleanupErrors)
       if (result.physicalCompletion) physical.push(result.physicalCompletion)
+    }
+    try {
+      await this.#port.disposeModules()
+    } catch (error) {
+      errors.push(error)
     }
     this.#port.clearPipelineState()
     this.#port.terminal.forceTerminal()

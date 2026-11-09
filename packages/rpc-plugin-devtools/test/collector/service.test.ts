@@ -56,7 +56,7 @@ describe('collector query, watch and service', () => {
     /** The actual serving host installs the same collector through its genuine flow plugin. */
     const connected = await server.connect('service-provider', {
       provide: { devtools: service },
-      plugins: [plugin]
+      plugins: [plugin.plugin]
     })
     /** Cleanup retains only the two genuine public host owners. */
     const pair = { a, b: connected.host }
@@ -146,7 +146,7 @@ describe('collector query, watch and service', () => {
     /** The original service and plugin share the one caller-owned collector on the real provider. */
     const connected = await server.connect('excluded-service-provider', {
       provide: { devtools: service },
-      plugins: [plugin]
+      plugins: [plugin.plugin]
     })
     /** Cleanup retains only the two genuine public host owners. */
     const pair = { a, b: connected.host }

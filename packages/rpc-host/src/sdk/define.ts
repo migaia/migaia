@@ -24,9 +24,6 @@ import type {
   IRpcTransportSetupContext
 } from './types.ts'
 import { closeRpcTransport, installRpcDefinition } from '../host/installation.ts'
-import { tagRpcError } from '@migaia/rpc-contract/errors'
-import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { HostErrorText } from '../host/error-text.ts'
 export { defineFlowFeature } from './flow-feature.ts'
 
 /** One cold definition owns its install callback; installation state belongs to the receiving host. */
@@ -90,30 +87,24 @@ export function defineTransportPlugin<
 }
 
 /** Each native flow install invokes setup anew, preventing cross-host sharing of optional state. */
-export function defineFlowPlugin<
-  E extends object = Record<never, never>,
-  M extends object = Record<never, never>
->(definition: IRpcFlowDefinition<E>, metadata?: M): IRpcFlowPlugin<E> & Readonly<M> {
-  /** Observer configuration is cold; each host setup constructs its own actual installation. */
+export function defineFlowPlugin<E extends object = Record<never, never>>(
+  definition: IRpcFlowDefinition<E>
+): IRpcFlowPlugin<E> {
+  /** Observer configuration is cold; native installation owns every per-host setup output. */
   const captured = Object.freeze({ ...definition })
-  /** Only the actual admitted definition object is recognized by createRpcHost. */
+  /** Only this native definition identity receives RPC's private kind metadata. */
   const registration: IRpcDefinitionMetadata = {
     kind: RpcDefinitionKind.flow,
     definition: captured,
     prepare: new RpcFlowSetup(captured).prepare
   }
-  /** Caller-owned collector metadata cannot replace the actual native registration authority. */
-  if (metadata && (Object.hasOwn(metadata, 'name') || Object.hasOwn(metadata, 'install')))
-    throw tagRpcError(new TypeError(HostErrorText.pluginInvalid), RpcCoreErrorCode.invalidConfig)
-  /** Preserve descriptors so native own-data admission rejects accessors without executing them. */
-  const native = Object.defineProperties(
-    { name: captured.name, install: new RpcDefinition(registration).install },
-    Object.getOwnPropertyDescriptors(metadata ?? {})
-  )
-  /** The shared native transaction calls this install in its real dependency order. */
-  const plugin = definePlugin(native)
+  /** Thin definitions omit arbitrary metadata fields; callers keep domain owners explicitly. */
+  const plugin = definePlugin<Record<never, never>, Record<never, never>>({
+    name: captured.name,
+    install: new RpcDefinition(registration).install
+  })
   registerRpcDefinition(plugin, registration)
-  return plugin as unknown as IRpcFlowPlugin<E> & Readonly<M>
+  return plugin as IRpcFlowPlugin<E>
 }
 
 /** Link policy composes complete feature behavior without introducing another intervention stage. */

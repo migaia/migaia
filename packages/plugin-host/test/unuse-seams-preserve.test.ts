@@ -1,18 +1,27 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import {
-  defineFeature,
   definePlugin,
   PluginHost,
   PluginHostErrorCode,
   type IPluginConstraint
 } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 
 /** Builds the same three-level dependency chain for every unchanged-behavior check. */
 const createChain = async () => {
   /** Records the exact physical disposer order after dependency planning. */
   const events: string[] = []
-  const host = new PluginHost<Record<string, never>>({
+  const host = new PluginHost<
+    Record<string, never>,
+    never,
+    readonly [],
+    Record<never, never>,
+    typeof nativeModules
+  >({
+    modules: nativeModules,
+    pipeline: { mode: 'sync' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
   const providerFeature = defineFeature(() => ({ value: 1 }))
@@ -64,7 +73,22 @@ const createChain = async () => {
 }
 
 /** Exposes the existing protected synchronous admission only for its preservation oracle. */
-class SyncHost extends PluginHost<Record<string, never>> {
+class SyncHost extends PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   installSync(plugins: readonly IPluginConstraint<Record<string, never>>[]) {
     return this.useSync(plugins)
   }
@@ -115,7 +139,15 @@ describe('unUse seams unchanged behavior', () => {
   })
 
   it('keeps prepared composition removal result shape', async () => {
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const composition = openComposition(host)

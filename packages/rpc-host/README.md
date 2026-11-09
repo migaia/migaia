@@ -164,3 +164,11 @@ verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证�
 原六个 `/features/{auth,batch,chunk,idempotency,limits,schema}` 入口已删除，改从 `/plugins/*` 或 `/plugins` 导入。`rpcHostPipelines` 删除第三参数与 `pipelines` 输出，改为转交真实构造请求；管道由传输声明。以下无抛出点错误码已删除，不提供替代码：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。
 
 被父端拉起的子节点优先使用真实父端指定的名字与 instanceId。父端未命名时，保留显式的子节点 `self.name`；子节点也未命名时，默认名随父端的 instanceId 更新。可按子节点握手报回的名字寻址。显式子节点名字或 instanceId 被父端覆盖时，只发出一次 `RpcWarningCode.selfIgnored`（`SELF_IGNORED`）警告。警告为 `{ code, message, data }`，`data` 只含实际被忽略的项：`parentName`/`ignoredName`、`parentInstanceId`/`ignoredInstanceId`。先交给 `onWarning` 选项，再交给宿主级 SDK 订阅插件；无人接收才用 `console.warn`。警告本身不进 report，接收者失败则报告原错并继续。冲突的父端启动事实仍为 `INVALID_CONFIG`。见[警告订阅](./USEGUIDE.md#警告与子节点名称)。
+
+## 默认策略的安装边界
+
+在首次 transport 启动前安装 `linkPolicy` 与 feature carrier。启动后 `host.use(linkPolicy(...))` 和新增 carrier 均以现有 `INVALID_CONFIG` 拒绝，消息为 `RPC flow hooks cannot be installed after transport startup`；失败调用不会改变已编译的调用策略。每次调用仍可通过 timeout/retry 选项或 `false` 覆盖。合法的安装失败回滚用例必须在启动前安装策略，不能依赖 late link-policy。原生移除/释放仍由既有生命周期回执处理。
+
+## 重复调用策略角色
+
+timeout/retry 角色为单例，与调用方别名无关。transport 本地声明或全局默认策略准入中的重复角色，由共享规则 owner 以 `source: plugin.host`、`code: FEATURE_ROLE_CONFLICT` 拒绝。flow 与 transport-native 角色冲突保留 `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`；别名/配置冲突保留原 RPC 错误身份。不提供旧错误别名兼容。

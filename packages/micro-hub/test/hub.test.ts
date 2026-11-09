@@ -47,22 +47,24 @@ function capability(options: {
     kind: MicroCapability.state,
     requires: [],
     bind: () =>
-      definePlugin(
+      definePlugin<
+        Record<string, never>,
+        Record<string, unknown>,
+        never,
         'fixture-state',
-        (core) => ({
-          install: () => {
-            if (options.dispose) core.onDispose(options.dispose)
-            return {
-              stateDriver: {
-                kind: MicroCapability.state,
-                view: () => options.view?.() ?? {},
-                own: (_entry: unknown, owner: IAppRuntime) => options.own?.(owner) ?? {}
-              }
+        Record<never, never>
+      >('fixture-state', (core) => ({
+        install: () => {
+          if (options.dispose) core.onDispose(options.dispose)
+          return {
+            stateDriver: {
+              kind: MicroCapability.state,
+              view: () => options.view?.() ?? {},
+              own: (_entry: unknown, owner: IAppRuntime) => options.own?.(owner) ?? {}
             }
           }
-        }),
-        {}
-      )
+        }
+      }))
   }
 }
 
@@ -118,15 +120,17 @@ describe('hub singleton and capability installation', () => {
             kind: MicroCapability.state,
             requires: [],
             bind: () =>
-              definePlugin(
+              definePlugin<
+                Record<string, never>,
+                Record<string, unknown>,
+                never,
                 'failed-state',
-                () => ({
-                  install: () => {
-                    throw failure
-                  }
-                }),
-                {}
-              )
+                Record<never, never>
+              >('failed-state', () => ({
+                install: () => {
+                  throw failure
+                }
+              }))
           }
         ]
       })

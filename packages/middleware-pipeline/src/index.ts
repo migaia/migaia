@@ -27,6 +27,8 @@ export {
   type IMiddlewarePipelineContext,
   type IMiddlewarePipelineControlOptions,
   type ISyncMiddlewareStage
-} from './runtime.ts'
+} from './runtime-types.ts'
 export { MIDDLEWARE_PIPELINE_SOURCE, MiddlewarePipelineErrorCode } from './error-code.ts'
 export type { IMiddlewarePipelineErrorCode } from './error-code.ts'
+
+export type { IPipelineModeObject } from './mode-registry.ts'

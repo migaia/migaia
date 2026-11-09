@@ -6,7 +6,8 @@ import type {
   IRpcNativePoolEvents
 } from '@migaia/rpc-host/sdk'
 import { registerRpcNativeFeature, RpcNativeFeatureKind } from '@migaia/rpc-host/sdk'
-import { defineFeature, type IFeatureOutput } from '@migaia/plugin-host'
+import { type IFeatureOutput } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 
 /** Cases observe acquisition/cleanup through existing concrete native member methods. */
 export type INativeObservation = Readonly<{

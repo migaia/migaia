@@ -118,7 +118,18 @@ export type IStorageNativeRegistrationContext = {
  * Built with `defineHost` rather than by extending `PluginHost`: the shell needed one domain-core
  * hook and one extra setter, and inheritance handed it the host's entire surface as well.
  */
-export type IStoragePluginHost = IHostHandle<IStorageHostCore, IStoragePipelineInput, readonly []> &
+export type IStoragePluginHost = IHostHandle<
+  IStorageHostCore,
+  IStoragePipelineInput,
+  readonly [
+    typeof import('@migaia/plugin-host/features').featuresModule,
+    typeof import('@migaia/plugin-host/feature-dependencies').featureDependenciesModule,
+    typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule,
+    typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule
+  ],
+  'async',
+  readonly []
+> &
   Readonly<{
     setNativeContexts(contexts: ReadonlyMap<string, IStorageNativeRegistrationContext>): void
   }>
@@ -128,7 +139,18 @@ export type IStorageRegistrationAssembly = {
   /** The native batch entry owns store, org and stage authority. */
   readonly context: IStorageNativeRegistrationContext
   /** The canonical PluginHost owns the existing pipeline and resource scope. */
-  readonly host: IHostHandle<IStorageHostCore, IStoragePipelineInput, readonly []>
+  readonly host: IHostHandle<
+    IStorageHostCore,
+    IStoragePipelineInput,
+    readonly [
+      typeof import('@migaia/plugin-host/features').featuresModule,
+      typeof import('@migaia/plugin-host/feature-dependencies').featureDependenciesModule,
+      typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule,
+      typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule
+    ],
+    'async',
+    readonly []
+  >
   /** Installation supplies this core before invoking registration callbacks. */
   registrationCore: IStorageInstallCore | undefined
 }

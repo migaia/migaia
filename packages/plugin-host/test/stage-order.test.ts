@@ -1,10 +1,27 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { defineFeature, definePlugin, PluginHost, type IPluginHostCore } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { definePlugin, PluginHost, type IPluginHostCore } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 
 /** Sync host exposes the current pipeline result for allocation-order assertions. */
-class StageOrderHost extends PluginHost<Record<string, never>, string> {
+class StageOrderHost extends PluginHost<
+  Record<string, never>,
+  string,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   run(value = ''): string {
     let result = value
     this.runPipeline(value, (next) => {
@@ -15,7 +32,22 @@ class StageOrderHost extends PluginHost<Record<string, never>, string> {
 }
 
 /** Async host exposes stage results while an install hook awaits publication. */
-class AsyncStageOrderHost extends PluginHost<Record<string, never>, string> {
+class AsyncStageOrderHost extends PluginHost<
+  Record<string, never>,
+  string,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
+  /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+  constructor(
+    options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+      modules?: typeof nativeModules
+    } = {}
+  ) {
+    super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+  }
+
   async run(value = ''): Promise<string> {
     let result = value
     await this.runPipeline(value, (next) => {

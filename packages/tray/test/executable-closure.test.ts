@@ -1,3 +1,4 @@
+import { trayNativeTestModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import {
   type IPluginDependencyMutationOptions,
@@ -181,6 +182,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
             ] as never,
             () => {
               concrete = new FailingCleanupHost({
+                modules: trayNativeTestModules,
                 execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
               })
               return concrete

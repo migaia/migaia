@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../../fixtures/native-modules.ts'
 /** Actual native Auth stages retain transform, replay and cancellation semantics through one codec. */
 import { expect, it, vi } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
@@ -84,6 +85,7 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
   )
   /** Native plugin-host alone owns actual stage execution and immutable snapshots. */
   const flow = defineHost({
+    modules: rpcNativeTestModules,
     domainCore(request) {
       /** The genuine native request fixes this registration's execution authority. */
       const domain = rpc.domainCore(request)

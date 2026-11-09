@@ -1,6 +1,13 @@
+import { nativeModules } from './native-modules.ts'
 import { definePlugin, PluginHost } from '../src/index.ts'
 
-declare const host: PluginHost<Record<string, never>>
+declare const host: PluginHost<
+  Record<string, never>,
+  never,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+>
 const a = definePlugin({ name: 'a', install: () => ({ a: () => 1 }) })
 const b = definePlugin({ name: 'b', install: () => ({ b: () => 2 }) })
 

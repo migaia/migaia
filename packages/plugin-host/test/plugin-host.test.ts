@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { defineFeature, definePlugin } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { definePlugin } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 import { FeatureHost } from './plugin-host-fixtures.ts'
 
 describe('PluginHost', () => {

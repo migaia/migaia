@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
@@ -36,6 +37,7 @@ class OwnerPair {
   #pipelines!: IRpcPipelineOwner
   /** Genuine native stages execute the same provider pipeline as the public Host. */
   readonly #native = defineHost({
+    modules: rpcNativeTestModules,
     domainCore: (request) => {
       /** The native core's original request identifies this genuine candidate group. */
       const domain = this.#rpc.domainCore(request)

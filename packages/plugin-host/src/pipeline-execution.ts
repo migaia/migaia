@@ -1,5 +1,7 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /** Owns fixed pipeline execution ports and terminal-result capture, not runner or lease algorithms. */
-import ERROR_TEXT, { tagPluginHostError } from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 
 /** Keeps stage/downstream failure identity and ordering under the existing pipeline code. */
@@ -7,12 +9,12 @@ export function combinePipelineFailures(
   stageError: unknown,
   downstreamError: unknown
 ): AggregateError {
-  return tagPluginHostError(
+  return attachErrorIdentity(
     new AggregateError(
       [stageError, downstreamError],
       ERROR_TEXT.PIPELINE_STAGE_AND_DOWNSTREAM_FAILED
     ),
-    PluginHostErrorCode.pipelineFailed
+    { source: PLUGIN_HOST_SOURCE, code: PluginHostErrorCode.pipelineFailed }
   )
 }
 

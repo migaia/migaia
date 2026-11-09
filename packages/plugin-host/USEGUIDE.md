@@ -17,7 +17,7 @@
 pnpm add @migaia/plugin-host
 ```
 
-共同参数：defineHost 的 host 可选；嵌套 execution.mutationTimeoutMs 与 execution.pipelineDrainTimeoutMs 分别限制变更执行与 pipeline 排空，默认各 5000 毫秒，示例显式写出相同值，false 表示无限等待。pipeline.mode 未传时为 sync。省略 domainCore 时为空对象；省略自定义 dispose 时使用内核结构化清理。
+共同参数：defineHost 的 host 可选；嵌套 execution.mutationTimeoutMs 与 execution.pipelineDrainTimeoutMs 分别限制变更执行与 pipeline 排空，默认各 5000 毫秒，示例显式写出相同值，false 表示无限等待。省略 pipeline.mode 时不创建默认管线；显式选择模式并安装对应模块后才启用。省略 domainCore 时为空对象；省略自定义 dispose 时使用内核结构化清理。
 
 ## 安装插件并读取扩展
 
@@ -219,9 +219,15 @@ true
 `defineFeature(factory, dependencies?)` 的同步工厂必填，依赖表可选、默认空表；`summary` 的 `cache` 别名指向 `provider.getFeature("cache")`，默认必需。`features` 是插件可选的命名 Feature 表；`use(consumer, provider)` 故意逆序输入。
 
 ```ts doc-test=run
-import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { featuresModule } from '@migaia/plugin-host/features'
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+/** Explicit capabilities used by this example. */
+const selectedModules = [featuresModule, featureDependenciesModule] as const
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 
 const host = defineHost({
+  modules: selectedModules,
   host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }
 })
 const order: string[] = []
@@ -271,9 +277,15 @@ consumer provider
 `getFeature("cache")` 的名称必填且必须已声明；未提供 `{ optional: true }`，因此引用必需。`use(consumer)` 不含 provider，预检直接拒绝；`installs` 只在消费方的 install 中增加。
 
 ```ts doc-test=run
-import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { featuresModule } from '@migaia/plugin-host/features'
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+/** Explicit capabilities used by this example. */
+const selectedModules = [featuresModule, featureDependenciesModule] as const
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 
 const host = defineHost({
+  modules: selectedModules,
   host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }
 })
 let installs = 0
@@ -318,6 +330,11 @@ PREREQUISITE_MISSING
 把数字校验和文本拆分放进不同管道，stage 参数和 next 的值会按名字推断。命名说明在 defineHost 顶层传入；插件只登记步骤，由持有 host handle 的 owner 发起执行。
 
 ```ts doc-test=run
+import { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'
+import { syncPipelineModule } from '@migaia/plugin-host/pipeline-modes/sync'
+import { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'
+/** Explicit capabilities used by this example. */
+const selectedModules = [namedPipelinesModule, syncPipelineModule, asyncPipelineModule] as const
 import {
   defineHost,
   definePlugin,
@@ -330,6 +347,7 @@ const pipelines = {
   text: pipelineSpec<{ text: string }>()({ mode: 'async', next: 'multiple', order: 'reverse' })
 }
 const host = defineHost({
+  modules: selectedModules,
   host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } },
   pipelines
 })
@@ -363,16 +381,22 @@ await host.dispose()
 已有代码显式给 defineHost 泛型时，命名轴要放在原四个轴之后。复用说明对象的类型即可：
 
 ```ts doc-test=check
+import { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'
+/** Explicit capabilities used by this example. */
+const selectedModules = [namedPipelinesModule] as const
 import { defineHost, pipelineSpec } from '@migaia/plugin-host'
 
 const pipelines = { count: pipelineSpec<number>()({}) }
 const host = defineHost<
   Record<never, never>,
   number,
+  typeof selectedModules,
+  never,
   readonly [],
   Record<never, never>,
   typeof pipelines
 >({
+  modules: selectedModules,
   host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
   pipelines
 })
@@ -380,14 +404,26 @@ host.pipeline('count').use((value, next) => next(value + 1))
 await host.dispose()
 ```
 
-省略 pipelines 的旧泛型用法不需要新增轴。类入口则是 `PluginHost<TDomainCore, TValue, TInstalled, TPipelines>`，通过类构造选项传同一个映射，并从子类的领域方法调用 protected pipeline。
+省略 pipelines 的旧泛型用法不需要新增轴。类入口则是 `PluginHost<TDomainCore, TValue, TInstalled, TPipelines, TModules>`，通过类构造选项传同一个映射，并从子类的领域方法调用 protected pipeline。
 
 ## 高阶：插件声明自己的管道
 
 插件可以在 `definePlugin({ pipelines })` 里声明载荷、mode、next 和 order，不要求应用预先复制它的约定。Host 声明用原名访问，本插件的管道用短名，依赖插件的管道用 `插件名.管道名`。下面复用真实 Feature 依赖，既决定安装顺序，也推导提供方的限定名；不新增权限列表。
 
 ```ts doc-test=check
-import { defineFeature, defineHost, definePlugin, pipelineSpec } from '@migaia/plugin-host'
+import { featuresModule } from '@migaia/plugin-host/features'
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+import { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'
+import { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'
+/** Explicit capabilities used by this example. */
+const selectedModules = [
+  featuresModule,
+  featureDependenciesModule,
+  namedPipelinesModule,
+  asyncPipelineModule
+] as const
+import { defineHost, definePlugin, pipelineSpec } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 
 /** Own declarations infer this plugin's short names and payloads. */
 const transport = definePlugin({
@@ -411,7 +447,14 @@ const consumer = definePlugin({
   }
 })
 /** The installed-definition type supplies owner names; use still performs actual installation. */
-const host = defineHost<Record<never, never>, never, readonly [typeof transport]>({
+const host = defineHost<
+  Record<never, never>,
+  never,
+  typeof selectedModules,
+  never,
+  readonly [typeof transport]
+>({
+  modules: selectedModules,
   host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
 })
 await host.use(transport, consumer)
@@ -431,6 +474,10 @@ await host.dispose()
 把 target 嵌入 source 后，target 的终点就是 source 的剩余步骤和原终点。它可以修改值或短路，也可以在 `await next(...)` 之后处理余下链路的结果。
 
 ```ts doc-test=check
+import { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'
+import { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'
+/** Explicit capabilities used by this example. */
+const selectedModules = [namedPipelinesModule, asyncPipelineModule] as const
 import { defineHost, definePlugin, pipelineSpec } from '@migaia/plugin-host'
 
 /** Matching declarations infer both registration handles from this original definition. */
@@ -453,7 +500,14 @@ const bridge = definePlugin({
   }
 })
 /** Execution remains with the owner of this actual Host. */
-const host = defineHost<Record<never, never>, never, readonly [typeof bridge]>({
+const host = defineHost<
+  Record<never, never>,
+  never,
+  typeof selectedModules,
+  never,
+  readonly [typeof bridge]
+>({
+  modules: selectedModules,
   host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
 })
 /** Only this original registration owns the removable link. */
@@ -479,7 +533,7 @@ await host.dispose()
 
 只有根入口 `@migaia/plugin-host` 与稳定子入口 `@migaia/plugin-host/composition`。不要依赖内部文件。普通应用使用根入口的 Host、插件、Feature、句柄和错误工具；composition 是单一组合 owner 的窄协议，不是另一套应用 Host。
 
-类 `PluginHost<TDomainCore, TValue, TInstalled, TPipelines>` 的首个类型参数 TDomainCore 必须提供；运行时 createPluginDomainCore 的默认实现返回空对象。末尾 TPipelines 轴默认 `Record<never, never>`；pipeline 值类型默认 `never`，安装类型清单默认 `readonly []`；defineHost 的领域类型参数另有默认值。`TInstalled` 参与安装约束和配置推导，运行期 `use()` 不改变 Host 变量的静态类型，而是按输入顺序返回精确句柄 tuple。插件合并、提取等仅类型 helper 以发布声明为准；`IPluginHostCoreFor<THost>` 从 Host 类型提取领域 core 与 pipeline 轴，类型元数据不会安装运行时能力。
+类 `PluginHost<TDomainCore, TValue, TInstalled, TPipelines, TModules>` 的首个类型参数 TDomainCore 必须提供；运行时 createPluginDomainCore 的默认实现返回空对象。末尾 TPipelines 轴默认 `Record<never, never>`；pipeline 值类型默认 `never`，安装类型清单默认 `readonly []`；defineHost 的领域类型参数另有默认值。`TInstalled` 参与安装约束和配置推导，运行期 `use()` 不改变 Host 变量的静态类型，而是按输入顺序返回精确句柄 tuple。插件合并、提取等仅类型 helper 以发布声明为准；`IPluginHostCoreFor<THost>` 从 Host 类型提取领域 core 与 pipeline 轴，类型元数据不会安装运行时能力。
 
 扩展点少且不需要动态装卸时，普通选项或组合函数可能足够。只需执行 middleware 时可直接使用 middleware-pipeline；本包适合需要统一插件资源、依赖、配置和可达性的类库或应用。logger 是仓库内采用此宿主的实际消费者。
 
@@ -497,28 +551,28 @@ await host.dispose()
 | `surface`                       | 可选；默认无领域公开成员，第四类型参数默认空表面                                                     |
 | `pipelines`                     | 可选；真实 `pipelineSpec<TPayload>()(config)` 组成的固定命名映射；defineHost 在顶层传入。            |
 
-`surface` 支持对象或工厂。对象形式的自有描述符在获取 Runtime 之前读取一次，访问器保持动态，所有 canonical Host 键（包括 identity、use、unUse）仍为保留键。工厂形式 `surface: (native) => ({ ... })` 在创建最终 handle 时执行一次，收到冻结的原生 `use`、`unUse`，可组合并替换这两个方法；其他 canonical Host 键仍不能替换。领域方法、Host 身份、共享出口和 fluent 管线方法属于同一个冻结 handle，组合方应通过 surface 提供方法，不能复制返回的 handle。surface 读取或工厂失败保持原错，经 `CALLBACK_FAILED` 边界分类。旧对象写法和三类型参数调用仍有效。
+`surface` 支持对象或工厂。对象形式的自有描述符在获取 Runtime 之前读取一次，访问器保持动态，所有 canonical Host 键（包括 identity、use、unUse）仍为保留键。工厂形式 `surface: (native) => ({ ... })` 在创建最终 handle 时执行一次，收到冻结的原生 `use`、`unUse`，可组合并替换这两个方法；其他 canonical Host 键仍不能替换。领域方法、Host 身份、共享出口和 fluent 管线方法属于同一个冻结 handle，组合方应通过 surface 提供方法，不能复制返回的 handle。surface 读取或工厂失败保持原错，经 `CALLBACK_FAILED` 边界分类。对象形式仍受支持；显式泛型第三轴改为已选模块元组。
 
 类构造 `options` 可选，defineHost 的 `host` 同样可选；全部省略时使用下表默认值：
 
-| 字段                                                 | 默认                                  | 行为                                                                |
-| ---------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------- |
-| `identity?: { name?: string }`                       | name 为 `'DEFAULT'`                   | 可读名称可选，宿主另分配唯一 id                                     |
-| `execution.mutationTimeoutMs?: number \| false`      | `5000`                                | 本次变更 hook 的执行预算；`false` 无期限                            |
-| `execution.pipelineDrainTimeoutMs?: number \| false` | `5000`                                | pipeline 租约排空预算；`false` 等真实排空                           |
-| `pipeline?.mode`                                     | `'sync'`                              | `'sync' \| 'async' \| 'generator' \| 'async-generator'`，构造后固定 |
-| `diagnostic(message, code?, error?)`                 | 空操作                                | 接收诊断及被包含的原始失败对象                                      |
-| `onDiagnosticFailure(error)`                         | 宿主的 globalThis.reportError（若有） | 诊断器自身 throw/reject 的终端出口                                  |
-| `scheduler?: IScheduler`                             | 内部 systemScheduler                  | 统一 `now()`、`schedule()` 的时间源                                 |
-| `queueAdmissionTimeoutMs?: number \| false`          | `undefined`                           | 默认只诊断；数值表示排队拒绝阈值；false 关闭相关计时与诊断          |
-| `queueAdmissionDiagnosticMs?: number \| false`       | `1000`                                | 仅未配置排队拒绝阈值时生效；false 关闭诊断计时器                    |
-| `disposeStepTimeoutMs?: number \| false`             | `5000`                                | 单个普通释放步骤的等待预算；false 无期限                            |
+| 字段                                                 | 默认                                  | 行为                                                                                |
+| ---------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| `identity?: { name?: string }`                       | name 为 `'DEFAULT'`                   | 可读名称可选，宿主另分配唯一 id                                                     |
+| `execution.mutationTimeoutMs?: number \| false`      | `5000`                                | 本次变更 hook 的执行预算；`false` 无期限                                            |
+| `execution.pipelineDrainTimeoutMs?: number \| false` | `5000`                                | pipeline 租约排空预算；`false` 等真实排空                                           |
+| `pipeline?.mode`                                     | 不创建默认管线                        | `'sync' \| 'async' \| 'generator' \|'async-generator'`，构造后固定 须安装对应模块。 |
+| `diagnostic(message, code?, error?)`                 | 空操作                                | 接收诊断及被包含的原始失败对象                                                      |
+| `onDiagnosticFailure(error)`                         | 宿主的 globalThis.reportError（若有） | 诊断器自身 throw/reject 的终端出口                                                  |
+| `scheduler?: IScheduler`                             | 内部 systemScheduler                  | 统一 `now()`、`schedule()` 的时间源                                                 |
+| `queueAdmissionTimeoutMs?: number \| false`          | `undefined`                           | 默认只诊断；数值表示排队拒绝阈值；false 关闭相关计时与诊断                          |
+| `queueAdmissionDiagnosticMs?: number \| false`       | `1000`                                | 仅未配置排队拒绝阈值时生效；false 关闭诊断计时器                                    |
+| `disposeStepTimeoutMs?: number \| false`             | `5000`                                | 单个普通释放步骤的等待预算；false 无期限                                            |
 
 所有时间数值须有限、非负；非法选项、非函数回调或不满足 scheduler 协议的对象以 TypeError / `INVALID_OPTION` 拒绝。直接导入 `@migaia/utils/scheduler` 的消费项目需直接安装 utils。
 
 ### 定义插件与发布句柄
 
-`definePlugin(name, descriptorFactory, features?)` 只捕获定义。真正安装时同步创建一次 descriptor，再调用其 `install()`、`expose()`、`featureExpose()` hooks；后两者同步返回各自表面。需要配置、setup、更新和释放钩子时使用对象形 `definePlugin(definition)`。两种定义和有效原始描述符走相同准入路径，不在定义时执行安装或 Feature 工厂。名称必填、非空、不能包含 `.`，在 Host 内唯一。对象形定义捕获 own data 字段并冻结；退役的 `shared` 字段不会回退为旧共享行为，应迁移到 Feature，适配器共享出口仍由规范 owner 协议管理。
+`definePlugin(name, descriptorFactory, features?)` 只捕获定义。真正安装时同步创建一次 descriptor，再调用其 `install()`、`expose()`、`featureExpose()` hooks；后两者同步返回各自表面。需要配置、setup、更新和释放钩子时使用对象形 `definePlugin(definition)`。两种定义和有效原始描述符走相同准入路径，不在定义时执行安装或 Feature 工厂。名称必填、非空、不能包含 `.`，在 Host 内唯一。对象定义与 raw 按同一字段顺序捕获，选定 getter 各读取一次；getter 抛错以 TypeError / INVALID_OPTION 保留原 cause。空名使用 PLUGIN_NAME_REQUIRED，带点名称使用 PLUGIN_NAME_DOT；省略 config 得到冻结空记录。返回的原生身份被冻结；退役的 `shared` 字段不会回退为旧共享行为，应迁移到 Feature，适配器共享出口仍由规范 owner 协议管理。
 
 | 对象定义字段                                                      | 必填 / 默认与作用                                        |
 | ----------------------------------------------------------------- | -------------------------------------------------------- |
@@ -611,7 +665,7 @@ sync、generator 的命名 run 返回 `TResult | undefined`；async、async-gene
 
 所有管道在同一 Host 事务中提交；每条管道在同一可见 stage 修订内复用编译快照，reverse 也只在编译时处理。没有可见 stage 时直接调用终点，不取快照或 lease。有 stage 时，所有管道复用同一套登记、排序和 quiescence/lease owner。安装失败回滚、unUse、replace、禁用和挂起在一次提交中作用于该插件的全部管道；已有运行持有原快照和分管道的代际 lease，drain 等待这些实际运行，清理和排空预算仍由既有生命周期配置控制。任何管道执行期间，owner 向任一管道注册 stage 都会抛 `PIPELINE_EXECUTING`。
 
-Host 未声明 pipelines 时，其命名轴默认为 `Record<never, never>`；已知插件定义仍能推出其限定名。Host 和插件都没有命名组时，不分配额外的命名 runner、lane 或 lease key。原 `TValue`、`pipeline.mode`、四个 use*Pipeline、runPipeline/runPipelineSync/runPipelineAsync、pipelineMode 都只操作默认管道，原有显式泛型调用不变。默认管道使用内部 symbol，不占用任何字符串名字。显式填写 defineHost 泛型并同时声明命名管道时，要在第五个泛型参数传 `typeof pipelines`；省略它会保留空轴，pipeline(name) 只接受 never。
+Host 未声明 pipelines 时，其命名轴默认为 `Record<never, never>`；已知插件定义仍能推出其限定名。Host 和插件都没有命名组时，不分配额外的命名 runner、lane 或 lease key。原 `TValue`、`pipeline.mode`、四个 use*Pipeline、runPipeline/runPipelineSync/runPipelineAsync、pipelineMode 都只操作默认管道，显式泛型需要填写已选模块元组与模式轴。默认管道使用内部 symbol，不占用任何字符串名字。显式填写 defineHost 泛型并同时声明命名管道时，要在第七个泛型参数传 `typeof pipelines`，第三、第四轴分别为已选模块元组与默认模式；省略它会保留空轴，pipeline(name) 只接受 never。
 
 非法 map、名字、spec、order 以原生 TypeError / `INVALID_PIPELINE_OPTION` 在构造时拒绝，不返回 handle；mode 非法仍是 `INVALID_PIPELINE_MODE`。next 非法的外层码为 `INVALID_PIPELINE_OPTION`，cause 保留 middleware-pipeline 的 TypeError / `INVALID_OPTION`。spec 配置 getter 抛错时也以 `INVALID_PIPELINE_OPTION` 保留原 cause。
 
@@ -751,3 +805,33 @@ pnpm --filter @migaia/plugin-host run test
 同步入口返回 `TResult | undefined`；异步入口接受返回 `Promise<TResult>` 的终点，返回 `Promise<TResult | undefined>`。stage 不调用 next 时以 undefined 停止。零 stage 直接调用终点，保留原值或 Promise 身份；非空异步管线等待真实终点结束再清理。生成器宿主继续使用 `runPipeline`，显式同步/异步入口以 `PIPELINE_MODE_MISMATCH` 拒绝该模式。
 
 `getPluginRuntimeIntegration(core).assertPreparedRegistration()` 仅检查原注册：当前安装沿原 operation 准入；同一尚未发布批次已完成的候选沿原 batch 精确身份与当前安装检查；发布后沿原 handle 准入。回滚、移除或宿主关闭后拒绝，不返回注册对象，也不授予晚注册资源或安装权限。`assertCurrent()` 与 `core.config.get()` 的原有语义不变。
+
+## 显式选择 Host 模块
+
+默认 Host 提供安装、配置、移除与释放。可选方法需要显式安装对应模块；使用默认管线时，还需同时选择模式模块和 `pipeline.mode`。`defineFeature` 改从 `@migaia/plugin-host/features` 导入。
+
+```ts
+import { defineHost } from '@migaia/plugin-host'
+import { featuresModule } from '@migaia/plugin-host/features'
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+import { syncPipelineModule } from '@migaia/plugin-host/pipeline-modes/sync'
+const host = defineHost({
+  modules: [featuresModule, featureDependenciesModule, syncPipelineModule],
+  host: { pipeline: { mode: 'sync' } }
+})
+await host.dispose()
+```
+
+启停、延迟激活和命名管线分别从对应子路径导入 `enablementModule`、`activationModule`、`namedPipelinesModule`。依赖规划需要同时安装两个 feature 模块。未安装的模块不会在返回 handle 上产生对应成员。类 Host 的构造选项直接接收 `modules` 与 `pipeline`。
+
+`definePlugin` 返回冻结的原生定义，自有键精确为 `name`、`config`、`activation`、`getFeature`。安装 hook、setup、依赖声明保存在内部捕获的定义中；任意元数据由调用方单独持有。安装时保留原定义对象：展开原生结果不能复制其身份或隐藏的 install。普通原始定义仍经同一准入路径处理。描述符工厂在每次安装时运行一次，定义捕获时不运行。配置在定义时捕获，对象定义的 hook 保留原始接收者。
+
+`/feature-overlay` 提供轻量 `FeatureOverlay`，`/feature-overlay/notifications` 提供通知子类。全局结果先按角色、再按角色内安装顺序组合；可重复角色内全局别名必须唯一。本地选择替换同别名项，`false` 禁用继承角色。需要运行时传播的消费方使用通知入口，静态消费方使用轻量入口。
+
+| 错误码（`source: plugin.host`） | 场景与处理                                           |
+| ------------------------------- | ---------------------------------------------------- |
+| `INVALID_HOST_MODULE`           | 模块身份未经登记；导入真实模块对象。                 |
+| `DUPLICATE_HOST_MODULE`         | 重复选择模块 key；移除重复项。                       |
+| `HOST_MODULE_MISSING`           | 定义或模块依赖未安装模块；按 detail 补齐后重试。     |
+| `PIPELINE_MODE_NOT_INSTALLED`   | 请求的模式未安装；添加对应模式模块。                 |
+| `FEATURE_ROLE_CONFLICT`         | 全局单例角色冲突或可重复角色别名重复；移除冲突贡献。 |

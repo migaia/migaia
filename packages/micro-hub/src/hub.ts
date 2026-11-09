@@ -102,7 +102,7 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
     }
   }
   /** Plugin-host instance owning capability plugins and one plugin per connected app. */
-  const host = defineHost({ host: { execution: HOST_EXECUTION } })
+  const host = defineHost({ modules: [], host: { execution: HOST_EXECUTION } })
   /** Installed drivers by capability kind. */
   const drivers = new Map<MicroCapability, IMicroDriver>()
   /** Registered contracts by name. */

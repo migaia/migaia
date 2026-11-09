@@ -6,7 +6,7 @@ import type { IFilePluginConfig } from './typing.ts'
 /** Create a server file output with an injected writer or the recognized runtime's native append. */
 export function filePlugin<const F extends ILogFeatureRecord = Record<never, never>>(
   options: IFilePluginConfig<F>
-) {
+): ReturnType<typeof createFilePlugin<F>> {
   return createFilePlugin(options, options.writer ? undefined : nativeFileWriter())
 }
 

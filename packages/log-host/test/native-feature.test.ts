@@ -1,4 +1,5 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
+import { FeatureOverlay } from '@migaia/plugin-host/feature-overlay'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import { prettyFeature } from '@migaia/log-plugin-console'
 import { PluginHostErrorCode, type IFeatureOutput } from '@migaia/plugin-host'
@@ -22,6 +23,53 @@ import type {
   ILogPluginCore
 } from '../src/typing.ts'
 import { CaptureOutput, messageOf, nextTurn } from './fixtures/output.ts'
+
+/** Real hot writes reuse the installed formatter without invoking shared composition rules. */
+async function compiledOutputCache(): Promise<void> {
+  /** The transport records the actual selected native formatter at delivery. */
+  const output = new CaptureOutput()
+  /** A separate consumer exercises its real local override under the same global default. */
+  const localOutput = new CaptureOutput({
+    name: 'local-cache',
+    features: { format: formatFeature({ format: 'plain' }) }
+  })
+  /** Install a real inherited formatter before observing the hot path. */
+  const host = createLogHost({
+    plugins: [
+      defineLogPlugin({
+        name: 'cached-format',
+        features: { format: formatFeature({ format: 'json' }) }
+      }),
+      output.plugin(),
+      localOutput.plugin()
+    ]
+  })
+  /** Spy on the canonical compiler shared by the native notification owner. */
+  const compile = vi.spyOn(FeatureOverlay.prototype, 'compile')
+  try {
+    host.log('info', 'first-cache-read')
+    await host.flush()
+    /** This value came from the real output context, not a compiled value compared with itself. */
+    const formatter = output.formats[0]
+    /** The local cache must retain its own installed formatter rather than the inherited value. */
+    const localFormatter = localOutput.formats[0]
+    host.log('info', 'second-cache-read')
+    await host.flush()
+    expect(output.formats).toHaveLength(2)
+    expect(formatter).toBeDefined()
+    expect(output.formats[1]).toBe(formatter)
+    expect(localOutput.formats).toHaveLength(2)
+    expect(localFormatter).toBeDefined()
+    expect(localFormatter).not.toBe(formatter)
+    expect(localOutput.formats[1]).toBe(localFormatter)
+    expect(compile).toHaveBeenCalledTimes(0)
+  } finally {
+    compile.mockRestore()
+    await host.shutdown('manual')
+  }
+}
+
+it('reuses the real output cache with zero hot overlay compilation calls', compiledOutputCache)
 
 /** This predicate gives filter additions a visible, independently removable effect. */
 function rejectAdded(entry: ILogEntry): boolean {
@@ -267,8 +315,8 @@ async function singularPoliciesAtInstallation(): Promise<void> {
       features: { second: features.second }
     })
     await expect(host.use(incoming)).rejects.toMatchObject({
-      source: 'logging',
-      code: 'INVALID_OPTION'
+      source: 'plugin.host',
+      code: 'FEATURE_ROLE_CONFLICT'
     })
     host.log('info', 'survives-rejected-install')
     await host.flush()
@@ -308,7 +356,10 @@ async function queuedSingularPoliciesAtInstallation(): Promise<void> {
     expect(results[1].status).toBe('fulfilled')
     expect(results[2].status).toBe('rejected')
     if (results[2].status === 'rejected')
-      expect(results[2].reason).toMatchObject({ source: 'logging', code: 'INVALID_OPTION' })
+      expect(results[2].reason).toMatchObject({
+        source: 'plugin.host',
+        code: 'FEATURE_ROLE_CONFLICT'
+      })
     host.log('info', 'first-policy-still-live')
     await host.flush()
     expect(output.records.map(messageOf)).toEqual(['first-policy-still-live'])
@@ -342,7 +393,10 @@ async function queuedHostKeyConflict(): Promise<void> {
   expect(results[1].status).toBe('fulfilled')
   expect(results[2].status).toBe('rejected')
   if (results[2].status === 'rejected')
-    expect(results[2].reason).toMatchObject({ source: 'logging', code: 'INVALID_OPTION' })
+    expect(results[2].reason).toMatchObject({
+      source: 'logging',
+      code: 'INVALID_OPTION'
+    })
   await host.shutdown('manual')
 }
 
@@ -378,7 +432,10 @@ async function queuedCompoundOutputCollision(): Promise<void> {
   expect(results[1].status).toBe('fulfilled')
   expect(results[2].status).toBe('rejected')
   if (results[2].status === 'rejected')
-    expect(results[2].reason).toMatchObject({ source: 'logging', code: 'INVALID_OPTION' })
+    expect(results[2].reason).toMatchObject({
+      source: 'plugin.host',
+      code: 'FEATURE_ROLE_CONFLICT'
+    })
   /** Reusing both rejected names proves native registration rollback alongside scope retraction. */
   const recovered = new CaptureOutput({ name: 'compound-output' })
   await host.use(defineLogPlugin({ name: 'second-policy' }), recovered.plugin())

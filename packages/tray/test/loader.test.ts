@@ -1,6 +1,8 @@
+import { trayNativeTestModules } from './native-modules.ts'
 /* oxlint-disable unicorn/no-thenable -- this suite intentionally models foreign thenables. */
 import { describe, expect, it } from 'vitest'
-import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
+import { PluginHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { createAbortController } from '@migaia/lifecycle'
 import { createHost } from '../src/host/index.ts'
 import { defineAdapter } from '../src/adapter/index.ts'
@@ -11,7 +13,10 @@ class TestHost extends PluginHost<Record<string, never>, string> {}
 const createManagedHost = async (plugins: readonly unknown[] = []) =>
   createHost({
     create: () =>
-      new TestHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }),
+      new TestHost({
+        modules: trayNativeTestModules,
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      }),
     plugins: plugins as never,
     mutationAdmissionMs: 100,
     quiescenceMs: 100,

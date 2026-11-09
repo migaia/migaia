@@ -1,7 +1,7 @@
 // @ts-expect-error Managed provenance writers belong to private constructor wiring.
-import type { buildManagedPort } from '../src/composition-entry.ts'
+import type { buildManagedPort } from '../src/modules/feature-dependencies/composition-entry.ts'
 // @ts-expect-error Public readers cannot grant managed-host provenance to arbitrary objects.
-import type { registerManagedHost } from '../src/composition-entry.ts'
+import type { registerManagedHost } from '../src/modules/feature-dependencies/composition-entry.ts'
 
 /** Negative imports remain live without exposing replacement writer aliases. */
 type IPrivateWriters = [typeof buildManagedPort, typeof registerManagedHost]

@@ -1,3 +1,4 @@
+import { trayNativeTestModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { PluginHost } from '@migaia/plugin-host'
 import { createHost } from '../src/host/index.ts'
@@ -9,7 +10,10 @@ class TestHost extends PluginHost<Record<string, never>, string> {}
 const createManagedHost = async () =>
   createHost({
     create: () =>
-      new TestHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }),
+      new TestHost({
+        modules: trayNativeTestModules,
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      }),
     plugins: [],
     mutationAdmissionMs: 100,
     quiescenceMs: 100,

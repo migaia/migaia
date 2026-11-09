@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, type IFeatureReference } from '@migaia/plugin-host'
+import { type IFeatureReference } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import {
   createStorageHost,
   definePlugin,

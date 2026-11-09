@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { defineFeature } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { createLogHost } from '../src/index.ts'
 import { defineLogFeature, defineLogPlugin, defineOutputPlugin } from '../src/plugin.ts'
 import { thresholdFeature } from '../src/features/index.ts'

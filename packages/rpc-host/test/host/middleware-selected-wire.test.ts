@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Selected wire business uses the canonical codec, installed plugins and original native IO. */
 import { defineHost } from '@migaia/plugin-host'
@@ -23,6 +24,7 @@ function receivingHost() {
   )
   /** One original native runtime owns its actual registration and terminal cleanup. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })

@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Genuine native Hosts own actual subscriptions and release pre-attachment resources on rollback. */
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
@@ -17,6 +18,7 @@ function receivingHost() {
   )
   /** The sole native owner retains acquisition, rollback and its stable disposal completion. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })

@@ -116,7 +116,7 @@ class HttpOutput {
 /** Create one HTTP output with host-owned policy and the unchanged JSON entries envelope. */
 export function httpPlugin<const F extends ILogFeatureRecord = Record<never, never>>(
   options: IHttpPluginConfig<F>
-) {
+): ReturnType<typeof defineOutputPlugin<typeof HTTP_PLUGIN_NAME, F>> {
   /** A named owner retains request state; SDK callbacks only forward to its methods. */
   const output = new HttpOutput(options)
   return defineOutputPlugin({

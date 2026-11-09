@@ -25,9 +25,10 @@
 用 Node 24 直接运行。输入 2 先加 1，再乘 2；终点回调收到 6。next 是当前步骤把新值交给后续步骤的函数。
 
 ```ts doc-test=run
+import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
-const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })
+const pipeline = createPipeline<number>({ mode: syncMode })
 pipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {
   console.log('结果:', value)
 })

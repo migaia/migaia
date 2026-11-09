@@ -1,3 +1,5 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /** Owns atomic installation and activation; delegates setup, feature construction and cleanup. */
 import { reverseItems } from './cleanup-runtime.ts'
 import type { PluginHostRemovalRuntime } from './removal-runtime.ts'
@@ -9,19 +11,15 @@ import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { copyConfig } from './config.ts'
-import ERROR_TEXT, {
-  identifyPluginHostCallbackFailure,
-  PluginHostError,
-  tagPluginHostError,
-  PluginHostInternalText
-} from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
+import { identifyPluginHostCallbackFailure, PluginHostError } from './errors.ts'
 import { PluginHostInstallText } from './install-constants.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import { reportDiagnostic } from './diagnostic-report.ts'
-import { validateInstallBatch } from './dependency-runtime.ts'
+import { planCoreInstallBatch } from './core-install-plan.ts'
 import { PluginHostSetupAttempt, closeSetupAttempt } from './setup-runtime.ts'
 import { PluginHostSyncRollbackRuntime } from './install-rollback-runtime.ts'
-import { PluginHostInstallFeatureRuntime } from './install-feature-runtime.ts'
+import { PluginHostInstallFeatureRuntime } from './install-descriptor-runtime.ts'
 import type { PluginHostState } from './host-state.ts'
 import { PluginHostRegistrationLifecycle } from './state-constants.ts'
 import type {
@@ -45,6 +43,11 @@ export type IInstallBatchContext<TDomainCore extends object, TValue> = {
 }
 
 export type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+  /** Feature construction and graph planning are present only through installed extensions. */
+  readonly featureRuntime?: import('./feature-runtime-types.ts').IHostFeatureRuntime
+  readonly validateInstallBatch?: (
+    entries: readonly IInstallEntry<TDomainCore, TValue>[]
+  ) => ReturnType<typeof planCoreInstallBatch<TDomainCore, TValue>>
   /** Host-owned synchronous invocation boundary; preserves the hook's exact returned value. */
   readonly invokeHook: <T>(invoke: () => T) => T
   readonly scheduler: IScheduler
@@ -368,7 +371,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     readonly activationOrder: readonly string[]
   }> {
     try {
-      return validateInstallBatch(entries, this.#port.state)
+      return this.#port.validateInstallBatch?.(entries) ?? planCoreInstallBatch(entries)
     } catch (error) {
       throw error instanceof PluginHostError ? this.#port.decorateError(error) : error
     }
@@ -457,9 +460,9 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       const reason = cause instanceof Error ? cause.message : String(cause)
       error.message = PluginHostInternalText.PLUGIN_INSTALL_FAILURE_DETAIL(failedName, reason)
     } catch (conversionFailure) {
-      error.cause = tagPluginHostError(
+      error.cause = attachErrorIdentity(
         new AggregateError([cause, conversionFailure], error.message),
-        PluginHostErrorCode.pluginInstallFailed
+        { source: PLUGIN_HOST_SOURCE, code: PluginHostErrorCode.pluginInstallFailed }
       )
     }
     this.#port.decorateError(error)

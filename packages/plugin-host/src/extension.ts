@@ -1,9 +1,8 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { reportDiagnostic } from './diagnostic-report.ts'
-import ERROR_TEXT, {
-  PluginHostError,
-  createPluginHostTypeError,
-  PluginHostInternalText
-} from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import { asyncDisposeKey, disposeKeys } from './symbols.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import type { IPluginHostErrorCode } from './error-code.ts'
@@ -65,10 +64,16 @@ type IExtensionOwnerStore<TRegistration> = Readonly<{
 /** Validate extension container before Host-specific descriptor mounting. */
 const assertExtensionResult = (extension: unknown, pluginName: string): object => {
   if (extension === null || typeof extension !== 'object' || Array.isArray(extension))
-    throw createPluginHostTypeError(PluginHostInternalText.EXTENSION_OBJECT)
+    throw attachErrorIdentity(new TypeError(PluginHostInternalText.EXTENSION_OBJECT), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   const prototype = Object.getPrototypeOf(extension)
   if (prototype !== Object.prototype && prototype !== null)
-    throw createPluginHostTypeError(PluginHostInternalText.EXTENSION_PLAIN_OBJECT)
+    throw attachErrorIdentity(new TypeError(PluginHostInternalText.EXTENSION_PLAIN_OBJECT), {
+      source: PLUGIN_HOST_SOURCE,
+      code: PluginHostErrorCode.invalidOption
+    })
   for (const key of Reflect.ownKeys(extension)) {
     if (
       (asyncDisposeKey !== undefined && key === asyncDisposeKey) ||
@@ -107,7 +112,10 @@ export const mountPluginExtensions = <TRegistration extends IExtensionRegistrati
         ERROR_TEXT.EXTENSION_DUPLICATE(registration.name, key)
       )
     if ('get' in descriptor || 'set' in descriptor || descriptor.configurable === false)
-      throw createPluginHostTypeError(PluginHostInternalText.EXTENSION_DATA)
+      throw attachErrorIdentity(new TypeError(PluginHostInternalText.EXTENSION_DATA), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     registration.extensions.push({ key, descriptor })
     extensionOwners.set(key, registration)
   }

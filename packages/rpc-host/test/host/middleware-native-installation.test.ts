@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Original native installation and rollback receipts use one real receiving PluginHost. */
 import { defineHost, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
@@ -32,6 +33,7 @@ function receivingHost() {
   )
   /** The original native Host owns both these authentic pipelines and the existing transaction. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })

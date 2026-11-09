@@ -428,3 +428,11 @@ verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证�
 原六个 `/features/{auth,batch,chunk,idempotency,limits,schema}` 入口已删除，改从 `/plugins/*` 或 `/plugins` 导入。`rpcHostPipelines` 删除第三参数和 `pipelines` 输出，构造请求必须传给 `domainCore(request)`；传输自己声明管道。以下无抛出点错误码已删除，不提供替代码：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。
 
 `onWarning` 的被忽略身份项放在 `data`，只包含实际发生冲突的名字或 instanceId。签名的小 buffer 只有未显式 `transfer` 时才可能内联；显式转移仍移交并 detach 原 buffer。载体实现须同步采用[当前清单格式](../rpc-contract/USEGUIDE.md#载体二进制与收发顺序)。
+
+## 默认策略的安装边界
+
+在首次 transport 启动前安装 `linkPolicy` 与 feature carrier。启动后 `host.use(linkPolicy(...))` 和新增 carrier 均以现有 `INVALID_CONFIG` 拒绝，消息为 `RPC flow hooks cannot be installed after transport startup`；失败调用不会改变已编译的调用策略。每次调用仍可通过 timeout/retry 选项或 `false` 覆盖。合法的安装失败回滚用例必须在启动前安装策略，不能依赖 late link-policy。原生移除/释放仍由既有生命周期回执处理。
+
+## 重复调用策略角色
+
+timeout/retry 角色为单例，与调用方别名无关。transport 本地声明或全局默认策略准入中的重复角色，由共享规则 owner 以 `source: plugin.host`、`code: FEATURE_ROLE_CONFLICT` 拒绝。flow 与 transport-native 角色冲突保留 `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`；别名/配置冲突保留原 RPC 错误身份。不提供旧错误别名兼容。

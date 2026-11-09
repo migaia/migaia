@@ -1,9 +1,13 @@
+import { featuresModule } from '@migaia/plugin-host/features'
+import { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'
+import { asyncMode } from '@migaia/middleware-pipeline/async'
 import {
   defineHost,
   type IHostHandle,
   type IPluginHandleTuple,
   type IPluginHostDisposalResult,
-  PluginHostErrorCode
+  PluginHostErrorCode,
+  PluginHostError
 } from '@migaia/plugin-host'
 import { createEventChannel, withSnapshotEntries } from '@migaia/event-subscriber'
 import { boundedWait, snapshotScheduler } from '@migaia/lifecycle'
@@ -20,6 +24,7 @@ import type {
   ILogContext,
   ILogEntry,
   ILogFailure,
+  ILogPluginCore,
   IRawEntryInput,
   IShutdownReason,
   ILogHost
@@ -36,7 +41,7 @@ import { ERROR_SOURCE, LogHostErrorCode } from './error-code.ts'
 import { LogHostErrorText } from './error-text.ts'
 import { createLogError, createLogTypeError, invalidOption } from './errors.ts'
 import { type IFeatureImplementation } from './feature-metadata.ts'
-import { LogFeatureScope } from './feature-policy.ts'
+import { createLogFeatureOverlay } from './feature-policy.ts'
 import { defaultLogFailureReporter, reportContained } from './reporter.ts'
 import { validateForwardPlugin } from './forward.ts'
 import { deferred } from '@migaia/utils/promise'
@@ -113,6 +118,8 @@ function installationError(error: unknown): unknown {
     return error
   /** Cleanup aggregates retain their full native wrapper instead of losing secondary failures. */
   const cause = error.cause
+  if (cause instanceof PluginHostError && cause.code === PluginHostErrorCode.featureRoleConflict)
+    return cause
   if (
     cause instanceof TypeError &&
     Reflect.get(cause, 'source') === ERROR_SOURCE &&
@@ -156,12 +163,23 @@ export class LogHost {
   /** Captured scheduler identity also identifies a process-plugin clock domain. */
   readonly scheduler: IScheduler
   /** Canonical plugin owner admits, rolls back and releases every installation. */
-  readonly #handle: IHostHandle<ILogDomainCore, ILogEntry, readonly []>
+  readonly #handle: IHostHandle<
+    ILogDomainCore,
+    ILogEntry,
+    readonly [
+      typeof import('@migaia/plugin-host/features').featuresModule,
+      typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule
+    ],
+    'async',
+    readonly []
+  >
   /**
    * Log-owned scope mirrors rpc-host preparation; native plugin-host still owns installation and
    * rollback.
    */
-  readonly featureScope = new LogFeatureScope(this)
+  /** Log's host-wide alias namespace remains distinct from generic singular-role composition. */
+  readonly #featureAliases = new Set<string>()
+  readonly featureScope = createLogFeatureOverlay(this)
   /** Installed entry adapters precede user pipeline stages without hot metadata lookup. */
   #entryStages: readonly IAsyncMiddlewareStage<ILogEntry>[] = []
   /**
@@ -171,7 +189,7 @@ export class LogHost {
   #runStages: readonly IAsyncMiddlewareStage<ILogEntry>[] = []
   /** One asynchronous middleware runner is reused without retaining per-run state. */
   readonly #pipeline: IMiddlewarePipeline<'async', ILogEntry> = createPipeline<ILogEntry>({
-    mode: 'async'
+    mode: asyncMode
   })
   /** Registration tokens give usePipeline independently revocable, insertion-ordered stages. */
   readonly #stages = new Map<object, IAsyncMiddlewareStage<ILogEntry>>()
@@ -234,7 +252,16 @@ export class LogHost {
         isCI: Boolean(process?.env?.CI)
       })
     })
-    this.#handle = defineHost<ILogDomainCore, ILogEntry>({
+    this.#handle = defineHost<
+      ILogDomainCore,
+      ILogEntry,
+      readonly [
+        typeof import('@migaia/plugin-host/features').featuresModule,
+        typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule
+      ],
+      'async'
+    >({
+      modules: [featuresModule, asyncPipelineModule],
       host: {
         scheduler: this.scheduler,
         execution: snapshot.execution,
@@ -301,6 +328,24 @@ export class LogHost {
   #rebuildRunStages(): void {
     this.#runStages = [...this.#entryStages, ...this.#stages.values()]
   }
+  /** Reserve log aliases before publication and release them through the original native receipt. */
+  reserveFeatureAliases(core: Pick<ILogPluginCore, 'onDispose'>, aliases: Iterable<string>): void {
+    /** Capture once because the original Map iterator is consumed by both admission and cleanup. */
+    const captured = [...aliases]
+    for (const alias of captured) if (this.#featureAliases.has(alias)) throw invalidOption()
+    for (const alias of captured) this.#featureAliases.add(alias)
+    try {
+      core.onDispose(() => this.#releaseFeatureAliases(captured))
+    } catch (error) {
+      this.#releaseFeatureAliases(captured)
+      throw error
+    }
+  }
+  /** Canonical native cleanup invokes this release once; no alternate policy lifetime exists. */
+  #releaseFeatureAliases(aliases: readonly string[]): void {
+    for (const alias of aliases) this.#featureAliases.delete(alias)
+  }
+
   /** Current lifecycle phase remains observable from the frozen facade. */
   get status(): LogHostStatus {
     return this.#status

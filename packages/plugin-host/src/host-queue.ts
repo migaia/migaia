@@ -1,7 +1,8 @@
 /** Owns Host queue diagnostics and error translation; lifecycle remains the sole queue authority. */
 import { reportDiagnostic } from './diagnostic-report.ts'
 import { LifecycleErrorCode } from '@migaia/lifecycle'
-import ERROR_TEXT, { PluginHostError, PluginHostInternalText } from './error-text.ts'
+import ERROR_TEXT, { PluginHostInternalText } from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 
 /**

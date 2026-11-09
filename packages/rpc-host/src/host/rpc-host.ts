@@ -42,7 +42,7 @@ import {
 } from '../sdk/flow-pipelines.ts'
 import type { RpcFlowProgram, RpcTransportFlowProgram } from '../sdk/flow-program.ts'
 import type { IRpcDefinitionMetadata, IRpcSharedFlows } from '../sdk/metadata.ts'
-import { readRpcFeature, RpcDefinitionKind } from '../sdk/metadata.ts'
+import { readRpcFeature, RpcDefinitionKind, RpcFeatureCategory } from '../sdk/metadata.ts'
 import { HostIdentity, defaultRpcId } from './identity.ts'
 import { createRpcAbortError, createRpcError, createRpcLifecycleError } from './error-owner.ts'
 import { HostErrorText } from './error-text.ts'
@@ -257,17 +257,21 @@ export class RpcHost {
   /** Actual SDK native hooks join this receiving owner; no second plugin-host is created here. */
   async install(core: IPluginHostCore, metadata: IRpcDefinitionMetadata): Promise<void> {
     this.#assertOpen()
+    if (
+      this.#everCommittedTransport &&
+      (metadata.kind === RpcDefinitionKind.policy || metadata.kind === RpcDefinitionKind.features)
+    )
+      throw tagRpcError(new TypeError(HostErrorText.flowStarted), RpcCoreErrorCode.invalidConfig)
     if (metadata.kind === RpcDefinitionKind.transport)
       return this.#installTransport(core, metadata.definition, metadata.flows)
     if (metadata.kind === RpcDefinitionKind.source)
       return this.#namespace(metadata.namespace).installSource(core, metadata.definition)
     if (metadata.kind === RpcDefinitionKind.policy) {
       this.#flow.registerControls(core, (core as IRpcTransportSetupContext['owner']).features)
-      core.onDispose(
-        this.#features.setDefaults(
-          metadata.definition.features,
-          (core as IRpcTransportSetupContext['owner']).features
-        )
+      this.#features.setDefaults(
+        core,
+        metadata.definition.features,
+        (core as IRpcTransportSetupContext['owner']).features
       )
       return
     }
@@ -281,14 +285,13 @@ export class RpcHost {
     if (metadata.kind === RpcDefinitionKind.features) {
       if (
         Object.values(metadata.features).some(
-          (feature) => readRpcFeature(feature)?.category === 'call'
+          (feature) => readRpcFeature(feature)?.category === RpcFeatureCategory.call
         )
       )
-        core.onDispose(
-          this.#features.setDefaults(
-            metadata.features,
-            (core as IRpcTransportSetupContext['owner']).features
-          )
+        this.#features.setDefaults(
+          core,
+          metadata.features,
+          (core as IRpcTransportSetupContext['owner']).features
         )
       /** The original shared setup lends only its selected group relationship to native removal. */
       const shared = await metadata.prepare(core, this.#controller.signal, context)

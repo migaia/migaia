@@ -1,11 +1,23 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostError } from '../src/index.ts'
+import { definePlugin, PluginHost, PluginHostError } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { execution } from './dependency-suspend-fixtures.ts'
 
 describe('dependency suspension and recovery', () => {
   it('keeps a disabled rebindable middle node disabled while its provider returns', async () => {
     for (const newDefinition of [false, true]) {
-      const host = new PluginHost<Record<string, never>>({ execution })
+      const host = new PluginHost<
+        Record<string, never>,
+        never,
+        readonly [],
+        Record<never, never>,
+        typeof nativeModules
+      >({
+        modules: nativeModules,
+        pipeline: { mode: 'sync' },
+        execution
+      })
       const p = definePlugin({
         name: 'p',
         features: { value: defineFeature(() => ({ value: 1 })) },
@@ -75,7 +87,17 @@ describe('dependency suspension and recovery', () => {
 
   it('restarts a disabled dependent without a hook and rebinds one with a hook', async () => {
     for (const withHook of [false, true]) {
-      const host = new PluginHost<Record<string, never>>({ execution })
+      const host = new PluginHost<
+        Record<string, never>,
+        never,
+        readonly [],
+        Record<never, never>,
+        typeof nativeModules
+      >({
+        modules: nativeModules,
+        pipeline: { mode: 'sync' },
+        execution
+      })
       const p = definePlugin({
         name: 'p',
         features: { value: defineFeature(() => ({ value: 1 })) },

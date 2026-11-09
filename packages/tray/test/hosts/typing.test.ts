@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { defineFeature, definePlugin, type IFeatureReference } from '@migaia/plugin-host'
+import { definePlugin, type IFeatureReference } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { defineTrayHost } from '../../src/hosts/define-host.ts'
 import { defineRoutingPolicy } from '../../src/hosts/routing-policy.ts'
 import type { ITray, ITrayClient, ITrayClientPlugin, ITrayRemote } from '../../src/hosts/typing.ts'

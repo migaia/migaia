@@ -1,10 +1,13 @@
+import { PLUGIN_HOST_SOURCE } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 /**
  * Owns the install-scoped integration port a Host lends to one registration's core: Host identity,
  * shared-slot acquisition, shared-extension reads and Feature output snapshots. It decides whether
  * each request is admitted for this exact registration and batch; slot ownership, registrations and
  * Feature activation stay with Host state and the existing plugin handles.
  */
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.ts'
+import ERROR_TEXT from './error-text.ts'
+import { PluginHostError } from './errors.ts'
 import { PluginHostErrorCode } from './error-code.ts'
 import { PluginHostRegistrationLifecycle } from './state-constants.ts'
 import type { IPluginHostIdentity } from './host-identity-types.ts'
@@ -171,9 +174,15 @@ export class PluginHostRuntimeIntegration<
   readonly allowRemovalWhen = (allowed: () => boolean): void => {
     this.#assertInstall()
     if (typeof allowed !== 'function')
-      throw createPluginHostTypeError(ERROR_TEXT.REMOVAL_ADMISSION_FUNCTION)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.REMOVAL_ADMISSION_FUNCTION), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     if (this.#registration.removalAdmission !== undefined)
-      throw createPluginHostTypeError(ERROR_TEXT.REMOVAL_ADMISSION_ALREADY_SET)
+      throw attachErrorIdentity(new TypeError(ERROR_TEXT.REMOVAL_ADMISSION_ALREADY_SET), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      })
     this.#registration.removalAdmission = Object.freeze({ allowed })
   }
 

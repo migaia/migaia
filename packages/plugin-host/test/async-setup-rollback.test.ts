@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHostErrorCode } from '../src/index.ts'
+import { definePlugin, PluginHostErrorCode } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { deferred, createHost } from './async-setup-fixtures.ts'
 
 describe('async setup installation', () => {

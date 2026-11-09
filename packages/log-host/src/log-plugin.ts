@@ -3,14 +3,14 @@ import type {
   ILogControlExtensions,
   ILogEntry,
   ILogFeatureRecord,
-  ILogPlugin,
+  IDefinedLogPlugin,
   ILogPluginCore
 } from './typing.ts'
 import { featureScope, installedFeatureScope } from './feature-metadata.ts'
 import {
   featureControlExtensions,
   composeFeatureExtensions,
-  LogPolicyInstallation
+  registerLogPolicy
 } from './feature-policy.ts'
 
 /** Ordinary carrier input declares native features and optional application extensions. */
@@ -50,11 +50,7 @@ class LogPluginDefinition<
     core: ILogPluginCore & { readonly features: IFeatureOutputs<F> }
   ): O & ILogControlExtensions<N, F> {
     /** One installation prepares host-wide policy in the log-owned scope. */
-    const installation = new LogPolicyInstallation(core, {
-      name: this.#definition.name,
-      output: false,
-      features: installedFeatureScope(this.features, core.features)
-    })
+    registerLogPolicy(core, installedFeatureScope(this.features, core.features))
     /** Application extensions install before the prepared log scope becomes visible. */
     const extensions = this.#definition.install?.(core) ?? ({} as O)
     /** Native admission still receives invalid results unchanged; valid data keeps its descriptors. */
@@ -63,18 +59,22 @@ class LogPluginDefinition<
       extensions,
       featureControlExtensions(this.#definition.name, this.features, core.features)
     )
-    installation.commit()
     return combined
   }
 }
 
-/** Assemble host-wide log policy with the same native plugin/feature primitives as output plugins. */
+/**
+ * Assemble host-wide policy from declared inputs. The receiving host must not infer phantom
+ * extension axes from its broad plugin constraint when the definition omits an installer.
+ */
 export function defineLogPlugin<
   const N extends string,
   const F extends ILogFeatureRecord = Record<never, never>,
   O extends Record<string, unknown> = Record<never, never>,
   C extends IPluginConfig = IPluginConfig
->(definition: ILogPluginDefinition<N, F, O, C>): ILogPlugin<O & ILogControlExtensions<N, F>, C, F> {
+>(
+  definition: ILogPluginDefinition<N, F, O, C>
+): NoInfer<IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, C, F>> {
   /** This owner holds only definition data and lifecycle callback dispatch. */
   const owner = new LogPluginDefinition(definition)
   return definePlugin<
@@ -91,5 +91,5 @@ export function defineLogPlugin<
     config: definition.config,
     install: (core) =>
       owner.install(core as ILogPluginCore & { readonly features: IFeatureOutputs<F> })
-  }) as ILogPlugin<O & ILogControlExtensions<N, F>, C, F>
+  }) as IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, C, F>
 }

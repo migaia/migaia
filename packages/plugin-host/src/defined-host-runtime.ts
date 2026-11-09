@@ -3,17 +3,17 @@
  * descriptors belong to host-handle-surface.
  */
 import type { IPipelineDefinitions } from './pipeline-spec.ts'
-import { identifyPluginHostCallbackFailure } from './error-text.ts'
+import { identifyPluginHostCallbackFailure } from './errors.ts'
 import { deferred } from '@migaia/utils/promise'
 import { PluginHost } from './host-runtime.ts'
 
 import { readDefinedPluginDefinition } from './define-plugin.ts'
-import type { PluginHostError } from './error-text.ts'
+import type { PluginHostError } from './errors.ts'
 
 import type { IPluginConstraint } from './plugin-definition-types.ts'
 import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.ts'
 
-import type { IDefineHostOptions, IHostCoreConstructionRequest } from './define-host.ts'
+import type { ICompleteDefineHostOptions, IHostCoreConstructionRequest } from './define-host.ts'
 /**
  * Runtime behind one functional Host. It replaces the four protected class hooks with the options'
  * callbacks and exposes the protected owner entries only to the handle created alongside it.
@@ -25,15 +25,18 @@ export class DefinedHostRuntime<
   TPipelines extends IPipelineDefinitions
 > extends PluginHost<TDomainCore, TValue, TInstalled, TPipelines> {
   /** Functional entry options; read on each hook call, as the original per-call class did. */
-  readonly #options: IDefineHostOptions<TDomainCore, any, TPipelines>
+  readonly #options: ICompleteDefineHostOptions<TDomainCore, any, TPipelines>
   /** Per-batch admission counters, keyed by the batch token the core runtime supplies. */
   readonly #batchCounters = new WeakMap<object, number>()
   /** Batch identity used when a construction request carries none; stable for this Host. */
   readonly #defaultBatch: object = Object.freeze({})
 
   /** Creates the runtime with the trusted functional-definition reader. */
-  constructor(options: IDefineHostOptions<TDomainCore, any, TPipelines>) {
-    super({ ...options.host, pipelines: options.pipelines }, readDefinedPluginDefinition)
+  constructor(options: ICompleteDefineHostOptions<TDomainCore, any, TPipelines>) {
+    super(
+      { ...options.host, modules: options.modules, pipelines: options.pipelines },
+      readDefinedPluginDefinition
+    )
     this.#options = options
   }
 
@@ -96,14 +99,14 @@ export class DefinedHostDisposal {
   /** Runtime that performs canonical cleanup. */
   readonly #runtime: { dispose(): Promise<IPluginHostDisposalResult> }
   /** Optional disposal middleware from the options. */
-  readonly #middleware: IDefineHostOptions<object>['dispose']
+  readonly #middleware: ICompleteDefineHostOptions<object>['dispose']
   /** Shared completion, published before middleware can call dispose again. */
   #disposal: Promise<IPluginHostDisposalResult> | undefined
 
   /** Captures the runtime and the optional middleware. */
   constructor(
     runtime: { dispose(): Promise<IPluginHostDisposalResult> },
-    middleware: IDefineHostOptions<object>['dispose']
+    middleware: ICompleteDefineHostOptions<object>['dispose']
   ) {
     this.#runtime = runtime
     this.#middleware = middleware

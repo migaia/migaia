@@ -11,7 +11,7 @@ import type {
   IRpcPreparedMessage
 } from '@migaia/rpc-contract/interfaces'
 import { normalizeRpcFrame, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
-import { RpcCarrierCodecId } from '../../dist/sdk/carrier/constants.js'
+import { RpcCarrierCodecId } from '../../src/sdk/carrier/constants.ts'
 import { RpcCarrierObservation } from '@migaia/rpc-host/sdk'
 import { defaultRpcReporter } from '@migaia/rpc-host'
 import {

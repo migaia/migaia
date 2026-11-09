@@ -1,5 +1,7 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 
 /** Keeps a microtask clock running while one installation path executes. */
 const startClock = () => {
@@ -89,7 +91,17 @@ describe('no-setup installation preservation', () => {
     const useEvents: string[] = []
     const useClock = startClock()
     const usePair = createPair(useEvents, useClock.read)
-    const useHost = new PluginHost<Record<string, never>>(options)
+    const useHost = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      ...options
+    })
     useClock.start()
     await useHost.use(usePair.provider, usePair.dependent)
     useClock.stop()
@@ -100,7 +112,17 @@ describe('no-setup installation preservation', () => {
     const lazyEvents: string[] = []
     const lazyClock = startClock()
     const lazyPair = createPair(lazyEvents, lazyClock.read, 'lazy')
-    const lazyHost = new PluginHost<Record<string, never>>(options)
+    const lazyHost = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      ...options
+    })
     await lazyHost.use(lazyPair.provider, lazyPair.dependent)
     lazyClock.start()
     const activationRound = lazyClock.read()
@@ -117,7 +139,17 @@ describe('no-setup installation preservation', () => {
     const replaceEvents: string[] = []
     const replaceClock = startClock()
     const replacePair = createPair(replaceEvents, replaceClock.read)
-    const replaceHost = new PluginHost<Record<string, never>>(options)
+    const replaceHost = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      ...options
+    })
     await replaceHost.use(replacePair.provider, replacePair.dependent)
     replaceEvents.length = 0
     const replacementPair = createPair(replaceEvents, replaceClock.read, undefined, 2)
@@ -135,9 +167,15 @@ describe('no-setup installation preservation', () => {
     const syncEvents: string[] = []
     const syncClock = startClock()
     const syncPair = createPair(syncEvents, syncClock.read)
-    class SyncHost extends PluginHost<Record<string, never>> {
+    class SyncHost extends PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    > {
       constructor() {
-        super(options)
+        super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
         this.useSync([syncPair.provider, syncPair.dependent])
       }
 

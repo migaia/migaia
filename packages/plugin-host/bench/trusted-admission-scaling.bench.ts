@@ -1,6 +1,7 @@
+import { nativeModules } from '../test/native-modules.ts'
 import { describe, expect, it } from 'vitest'
 import { definePlugin, PluginHost } from '../src/index.ts'
-import { openComposition } from '../src/composition-entry.ts'
+import { openComposition } from '../src/modules/feature-dependencies/composition-entry.ts'
 
 /** Disables unrelated host deadlines while measuring only trusted admission. */
 const HOST_OPTIONS = {
@@ -8,7 +9,13 @@ const HOST_OPTIONS = {
 } as const
 
 /** Supplies the same empty domain core used by the acceptance fixture. */
-class AdmissionHost extends PluginHost<Record<string, never>, unknown> {
+class AdmissionHost extends PluginHost<
+  Record<string, never>,
+  unknown,
+  readonly [],
+  Record<never, never>,
+  typeof nativeModules
+> {
   /** The measured route does not need a domain-specific core. */
   protected createPluginDomainCore(): Record<string, never> {
     return {}

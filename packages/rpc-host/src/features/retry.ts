@@ -1,3 +1,4 @@
+import { defineFeature } from '@migaia/plugin-host/features'
 /** The original generation retry transaction now belongs to the executing origin feature. */
 import { createAbortController } from '@migaia/lifecycle'
 import { sleep, type IAbortSignal } from '@migaia/utils/promise'
@@ -19,7 +20,7 @@ import { defaultRpcReporter, reportDiagnostic } from '../host/report.ts'
 import { resolveAbortReason } from '../host/abort-reason.ts'
 import { HostErrorText } from '../host/error-text.ts'
 import { localErrorWireSummary } from '../host/error-wire-metadata.ts'
-import { defineFeature } from '@migaia/plugin-host'
+
 import { registerRpcFeature, RpcCallFeatureRole } from '../sdk/metadata.ts'
 export type { IRetryFeatureOptions } from '@migaia/rpc-contract/interfaces'
 

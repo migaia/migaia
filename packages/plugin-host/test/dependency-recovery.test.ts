@@ -1,11 +1,21 @@
+import { nativeModules } from './native-modules.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { defineFeature } from '../src/modules/features/index.ts'
 import { type IRecoveryDiagnostic, execution } from './dependency-suspend-fixtures.ts'
 
 describe('dependency suspension and recovery', () => {
   it('reports restart failure without rejecting the restored provider', async () => {
     const diagnostics: Array<{ code?: string; error?: unknown }> = []
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution,
       diagnostic: (_message, code, error) => diagnostics.push({ code, error })
     })
@@ -52,7 +62,15 @@ describe('dependency suspension and recovery', () => {
   it('falls back to restarting a failed rebind closure', async () => {
     const hookFailure = new Error('rebind failed')
     const diagnostics: unknown[] = []
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution,
       diagnostic: (_message, _code, error) => diagnostics.push(error)
     })
@@ -96,7 +114,17 @@ describe('dependency suspension and recovery', () => {
 
   it('disposes suspended registrations in dependent-first order', async () => {
     const order: string[] = []
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const pValue = defineFeature(() => ({ value: 1 }))
     const p = definePlugin({ name: 'p', features: { value: pValue }, install: () => ({}) })
     const a = definePlugin({
@@ -131,7 +159,15 @@ describe('dependency suspension and recovery', () => {
 
   it('defers suspended members of a replace restart closure until their providers return', async () => {
     const diagnostics: IRecoveryDiagnostic[] = []
-    const host = new PluginHost<Record<string, never>>({
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
       execution,
       diagnostic: (_message, code, error) => diagnostics.push({ code, error })
     })
@@ -166,12 +202,15 @@ describe('dependency suspension and recovery', () => {
           { x: x.getFeature('value'), q: q.getFeature('value') }
         )
       },
-      install: () => {
+      install: (core) => {
         installs.y += 1
-        return {}
+        return new RecoveryReadable(core.features.value.value).extensions()
       }
     })
     const [, , handleX, handleY] = await host.use(p, q, x, y)
+    /** The saved callable belongs to the retained dependent's original physical generation. */
+    const previousRead = handleY.extensions.read
+    expect(previousRead()).toBe(101)
     await host.unUse('q', { policy: 'suspend' })
     const p2 = definePlugin({
       name: 'p',
@@ -196,11 +235,23 @@ describe('dependency suspension and recovery', () => {
     )
     expect(installs).toEqual({ x: 2, y: 2 })
     expect(handleY.getFeature('value')).toEqual({ value: 210 })
+    expect(() => previousRead()).toThrow(expect.objectContaining({ code: 'REGISTRATION_REVOKED' }))
+    expect(handleY.extensions.read()).toBe(210)
     await host.dispose()
   })
 
   it('reinstalls a suspended direct dependent whose provider was replaced while suspended', async () => {
-    const host = new PluginHost<Record<string, never>>({ execution })
+    const host = new PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    >({
+      modules: nativeModules,
+      pipeline: { mode: 'sync' },
+      execution
+    })
     const p = definePlugin({
       name: 'p',
       features: { value: defineFeature(() => ({ value: 1 })) },
@@ -248,7 +299,22 @@ describe('dependency suspension and recovery', () => {
 
   it('recovers suspended dependents of a synchronously installed provider inside the queue', async () => {
     /** Host exposing the protected synchronous install entry. */
-    class SyncInstallHost extends PluginHost<Record<string, never>> {
+    class SyncInstallHost extends PluginHost<
+      Record<string, never>,
+      never,
+      readonly [],
+      Record<never, never>,
+      typeof nativeModules
+    > {
+      /** Explicit full-module fixture preserves the behavior exercised by the original suite. */
+      constructor(
+        options: Omit<import('../src/host-options-types.ts').IPluginHostOptions, 'modules'> & {
+          modules?: typeof nativeModules
+        } = {}
+      ) {
+        super({ modules: nativeModules, pipeline: { mode: 'sync' }, ...options })
+      }
+
       installNow(plugins: readonly any[]) {
         return this.useSync(plugins)
       }
@@ -288,3 +354,21 @@ describe('dependency suspension and recovery', () => {
     await host.dispose()
   })
 })
+
+/** A detached extension must retain its original physical generation's value. */
+class RecoveryReadable {
+  /** Immutable installation-time value, independent of the name-addressed Host receiver. */
+  readonly #value: number
+  /** Capture one generation's resolved dependency output before publishing a callable. */
+  constructor(value: number) {
+    this.#value = value
+  }
+  /** Return only the value belonging to this original installation. */
+  read(): number {
+    return this.#value
+  }
+  /** Native publication supplies the Host receiver, so forwarding retains this explicit owner. */
+  extensions() {
+    return { read: () => this.read() }
+  }
+}

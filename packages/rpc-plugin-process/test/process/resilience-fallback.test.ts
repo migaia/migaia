@@ -1,3 +1,4 @@
+import { rpcNativeTestModules } from '../../../rpc-host/test/fixtures/native-modules.ts'
 import { definePlugin, PluginHost } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -103,6 +104,7 @@ describe('process instance fallback', () => {
 
   it('replaces a real Host target without changing the process owner', async () => {
     const host = new PluginHost<Record<string, never>>({
+      modules: rpcNativeTestModules,
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     const first = definePlugin({ name: 'p', install: () => ({ version: () => 1 }) })

@@ -1,5 +1,7 @@
+import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** Ordinary native Features retain original exposed values, exact identity and owned cleanup. */
-import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature } from '@migaia/plugin-host/features'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from './core-fixture.ts'
@@ -13,6 +15,7 @@ function receivingHost() {
   )
   /** Actual native Feature and pipeline ownership stay on the same original runtime. */
   const host = defineHost({
+    modules: rpcNativeTestModules,
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
