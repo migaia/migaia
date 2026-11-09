@@ -1,9 +1,5 @@
 /** Stable build-tool prerequisite diagnostic consumed by the source bundle CLI. */
-export const missingBuildTool = 'Installed esbuild is required'
-/** An absent public export is a source-resolution failure, never an externalized dependency. */
-export function missingExport(specifier: string): string {
-  return `No package export for ${specifier}`
-}
+export const missingBuildTool = 'Installed rolldown is required'
 /** Budget diagnostics retain both measured bytes and the maintained ceiling. */
 export function exceededBudget(actual: number, ceiling: number): string {
   return `gzip ${actual} exceeds ${ceiling}`

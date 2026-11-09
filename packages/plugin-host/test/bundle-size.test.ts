@@ -18,7 +18,7 @@ describe('dependency-inclusive production bundles', () => {
   // The table has eight permanent entry rows; this loop does not grow with application input.
   for (const row of budgets)
     it(`${row.owner}: ${row.entry}`, async () => {
-      /** All assertions consume the same minified artifact and metafile. */
+      /** All assertions consume the same minified artifact and build graph. */
       const result = await measureBundle(resolve(root, row.entry))
       expect(bundleViolations(result, row)).toEqual([])
       expect(result.external.filter((name) => name.startsWith('@migaia/'))).toEqual([])

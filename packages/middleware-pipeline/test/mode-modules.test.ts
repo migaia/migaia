@@ -19,7 +19,7 @@ const cases = [
     adapters: ['async-generator', 'generator']
   }
 ] as const
-/** Match actual source owners from the exact build metafile, never compressed contributions. */
+/** Match actual source owners from the exact build graph, never compressed contributions. */
 function graphOwner(input: string, directory: string): string | undefined {
   /** Only source files under the requested execution owner participate in this assertion. */
   const prefix = 'packages/middleware-pipeline/src/' + directory + '/'
