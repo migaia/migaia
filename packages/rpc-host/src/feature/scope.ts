@@ -129,6 +129,8 @@ export class FeatureScope {
   >()
   /** Shared composition owns roles and native publication; RPC owns execution/cache meaning. */
   readonly #overlay = new FeatureOverlay<IInstalledCallFeature>(callFeatureRole)
+  /** Inherited-only selection for unregistered namespaces; reset whenever defaults change. */
+  #defaults: ISelectedCallFeatures | undefined
 
   /** Startup-only policies enter the rule owner before any transport cache is published. */
   setDefaults(
@@ -142,8 +144,15 @@ export class FeatureScope {
     /** Existing native lifetime remains the only contribution identity. */
     const owner = core.lifecycle.signal
     this.#overlay.prepare(owner, captured)
-    core.onDispose(() => this.#releaseDefaults(owner))
+    try {
+      core.onDispose(() => this.#releaseDefaults(owner))
+    } catch (error) {
+      // Without a cleanup receipt nothing would release the reservation, so drop it now.
+      this.#overlay.remove(owner)
+      throw error
+    }
     this.#overlay.commit(owner)
+    this.#defaults = undefined
   }
 
   /**
@@ -185,7 +194,8 @@ export class FeatureScope {
      * rule owner.
      */
     const installed =
-      this.#namespaces.get(namespace)?.selected ?? compileFeatures(this.#overlay.compile())
+      this.#namespaces.get(namespace)?.selected ??
+      (this.#defaults ??= compileFeatures(this.#overlay.compile()))
     /** Without call overrides the frozen installed selection is reused, allocating nothing. */
     if (timeout === undefined && retry === undefined) return installed
     return {
@@ -245,6 +255,7 @@ export class FeatureScope {
    */
   #releaseDefaults(owner: object): void {
     if (!this.#overlay.remove(owner)) return
+    this.#defaults = undefined
     // RpcCallFeatureRole fixes two singular global roles; each namespace compiles at most two values.
     for (const [namespace, cache] of this.#namespaces)
       this.#namespaces.set(namespace, {
