@@ -352,7 +352,10 @@ export const PluginHostErrorCode = {
    * from a different copy of the package, or a value that was never constructed at all.
    */
   compositionTargetUnmanaged: 'COMPOSITION_TARGET_UNMANAGED',
-  /** A host option contains an unregistered module identity; import its built-in module. */
+  /**
+   * A host option contains an unregistered module identity, or the module requirements form a
+   * cycle. Import the built-in module, or fix the requirement set so it is acyclic.
+   */
   invalidHostModule: 'INVALID_HOST_MODULE',
   /** A module key is installed twice; remove its duplicate. */
   duplicateHostModule: 'DUPLICATE_HOST_MODULE',
@@ -363,7 +366,8 @@ export const PluginHostErrorCode = {
   /**
    * A global/default contribution or transport-local call-policy record duplicates a singular role,
    * including different aliases of one token, or a repeatable role reserves the same global alias
-   * twice. Remove the duplicate provider, policy or alias.
+   * twice, or one owner contributes or consumes twice on the same overlay. Remove the duplicate
+   * provider, policy, alias or second registration.
    */
   featureRoleConflict: 'FEATURE_ROLE_CONFLICT'
 } as const

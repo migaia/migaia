@@ -17,7 +17,7 @@ type IContribution<T> = { entries: readonly ICaptured<T>[]; published: boolean }
 /** Normalized immutable consumer input is independent of later global changes. */
 type ILocal<T> = {
   replacedRoles: ReadonlySet<PropertyKey>
-  replacedAliases: ReadonlySet<PropertyKey>
+  replacedAliases: ReadonlyMap<PropertyKey, ReadonlySet<PropertyKey>>
   roles: ReadonlyMap<PropertyKey, readonly ICaptured<T>[]>
 }
 /** Shared empty declaration avoids allocating a new cache key for each default compilation. */
@@ -45,6 +45,11 @@ export class FeatureOverlay<T> {
 
   /** Validate one complete contribution before mutating any reservation. */
   prepare(owner: object, values: readonly IFeatureOverlayEntry<T>[]): void {
+    if (this.#contributions.has(owner))
+      throw new PluginHostError(
+        PluginHostErrorCode.featureRoleConflict,
+        FeatureOverlayText.duplicateOwner
+      )
     /** Batch-local reservations make a failed prepare atomic. */
     const singular = new Set<PropertyKey>()
     /** Aliases are unique within each repeatable role, including unpublished reservations. */
@@ -143,7 +148,7 @@ export class FeatureOverlay<T> {
     for (const [role, bucket] of this.#buckets) {
       if (!selected.replacedRoles.has(role))
         for (const entry of bucket.values())
-          if (!entry.repeatable || !selected.replacedAliases.has(entry.alias))
+          if (!entry.repeatable || !selected.replacedAliases.get(role)?.has(entry.alias))
             result.push(Object.freeze({ alias: entry.alias, value: entry.value }))
       for (const entry of selected.roles.get(role) ?? emptySelection)
         result.push(Object.freeze({ alias: entry.alias, value: entry.value }))
@@ -160,14 +165,14 @@ export class FeatureOverlay<T> {
   #normalize(local: readonly IFeatureOverlaySelection<T>[]): ILocal<T> {
     /** Disabled and replaced singular roles need no global entry visits. */
     const replacedRoles = new Set<PropertyKey>()
-    /** Unique global aliases bound filtered repeatable visits by local input size. */
-    const replacedAliases = new Set<PropertyKey>()
+    /** Replaced aliases are scoped to their repeatable role; the same alias may exist elsewhere. */
+    const replacedAliases = new Map<PropertyKey, Set<PropertyKey>>()
     /** Captured declarations preserve the original local order. */
     const selected: ICaptured<T>[] = []
     /** Singular last-wins indices include explicit role disables. */
     const localRoles = new Map<PropertyKey, number>()
-    /** Repeatable last-wins indices use the declared alias. */
-    const localAliases = new Map<PropertyKey, number>()
+    /** Repeatable last-wins indices use the declared alias within its role. */
+    const localAliases = new Map<PropertyKey, Map<PropertyKey, number>>()
     for (const entry of local) {
       if ('role' in entry) {
         replacedRoles.add(entry.role)
@@ -176,8 +181,14 @@ export class FeatureOverlay<T> {
         /** Projection runs only at declaration, not on subsequent notifications. */
         const role = this.#roleOf(entry.value)
         if (role.repeatable) {
-          replacedAliases.add(entry.alias)
-          localAliases.set(entry.alias, selected.length)
+          /** Role-scoped alias sets keep last-local-wins inside one role only. */
+          let aliases = replacedAliases.get(role.role)
+          if (!aliases) replacedAliases.set(role.role, (aliases = new Set()))
+          aliases.add(entry.alias)
+          /** Role-scoped index of the last local declaration for each alias. */
+          let indices = localAliases.get(role.role)
+          if (!indices) localAliases.set(role.role, (indices = new Map()))
+          indices.set(entry.alias, selected.length)
         } else {
           replacedRoles.add(role.role)
           localRoles.set(role.role, selected.length)
@@ -190,7 +201,11 @@ export class FeatureOverlay<T> {
     for (let index = 0; index < selected.length; index += 1) {
       /** A replaced declaration is never materialized. */
       const entry = selected[index]!
-      if ((entry.repeatable ? localAliases.get(entry.alias) : localRoles.get(entry.role)) !== index)
+      if (
+        (entry.repeatable
+          ? localAliases.get(entry.role)!.get(entry.alias)
+          : localRoles.get(entry.role)) !== index
+      )
         continue
       /** Each local role has one installation-ordered output bucket. */
       let bucket = roles.get(entry.role)

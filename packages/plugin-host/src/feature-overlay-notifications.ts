@@ -2,6 +2,8 @@ import { getPluginRuntimeIntegration, type IPluginRuntimeSharedSlot } from './co
 import { reportTerminalFailure } from './diagnostic-report.ts'
 import type { IPluginHostCore } from './plugin-core-types.ts'
 import { FeatureOverlayText } from './feature-overlay-text.ts'
+import { PluginHostError } from './errors.ts'
+import { PluginHostErrorCode } from './error-code.ts'
 
 import {
   FeatureOverlay as CompiledFeatureOverlay,
@@ -63,6 +65,11 @@ export class FeatureOverlay<T> extends CompiledFeatureOverlay<T> {
   ): void {
     /** Borrow the actual native lifetime; local containers are copied only at this cold boundary. */
     const signal = core.lifecycle.signal
+    if (this.#consumers.has(signal))
+      throw new PluginHostError(
+        PluginHostErrorCode.featureRoleConflict,
+        FeatureOverlayText.duplicateOwner
+      )
     this.#consumers.set(signal, { local: Object.freeze([...local]), accept, published: false })
     this.#pending += 1
     this.#enlist(core, signal)
@@ -120,7 +127,13 @@ export class FeatureOverlay<T> extends CompiledFeatureOverlay<T> {
     if (super.remove(signal)) this.#notify(true)
   }
 
-  /** Cold propagation charges each consumer's inherited/local input plus its callback work. */
+  /**
+   * Cold propagation charges each consumer's inherited/local input plus its callback work. A global
+   * change recompiles every published consumer, so one install or removal costs O(consumers x
+   * global entries). Every consumer receives its complete compiled list, so the push model has no
+   * linear form. This accepted bound applies only to install and removal, never to the log write or
+   * rpc call paths.
+   */
   #notify(changed: boolean, fresh?: ReadonlySet<object>): void {
     if (changed && this.#onChange) this.#accept(this.#onChange, this.compile())
     for (const [signal, consumer] of this.#consumers)

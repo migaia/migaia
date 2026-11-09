@@ -93,7 +93,7 @@ export class HostModules {
       }
     }
     if (this.#order.length !== this.#definitions.size)
-      throw new PluginHostError(PluginHostErrorCode.hostModuleMissing, HostModuleText.missing)
+      throw new PluginHostError(PluginHostErrorCode.invalidHostModule, HostModuleText.cycle)
   }
   /** Class dispatch and frozen handle construction query the same admitted set. */
   has(key: string): boolean {
@@ -140,27 +140,47 @@ export class HostModules {
         if (runtime) this.#runtimes.push(runtime)
       }
     } catch (error) {
-      /** Construction is synchronous; synchronous rollback errors retain the primary failure first. */
-      const errors: unknown[] = [identifyPluginHostCallbackFailure(error)]
-      for (let index = this.#runtimes.length - 1; index >= 0; index -= 1) {
-        try {
-          this.#runtimes[index]!.dispose?.()
-        } catch (cleanup) {
-          errors.push(cleanup)
-        }
-      }
-      this.#runtimes.length = 0
-      if (errors.length > 1)
-        throw attachErrorIdentity(new AggregateError(errors, ERROR_TEXT.CALLBACK_FAILED), {
-          source: PLUGIN_HOST_SOURCE,
-          code: PluginHostErrorCode.callbackFailed
-        })
-      throw errors[0]
+      this.rollback(identifyPluginHostCallbackFailure(error))
     }
   }
-  /** Module state closes after plugin resources, in reverse successful installation order. */
-  async dispose(): Promise<void> {
-    for (let index = this.#runtimes.length - 1; index >= 0; index -= 1)
-      await this.#runtimes[index]!.dispose?.()
+  /**
+   * Undo every successful installation after a synchronous construction failure, then rethrow. Host
+   * construction calls this when a step after module installation fails. Cleanup errors follow the
+   * primary failure in one AggregateError, so the original error stays first and reachable.
+   */
+  rollback(primary: unknown): never {
+    /** The primary failure leads; synchronous cleanup failures are appended in reverse order. */
+    const errors: unknown[] = [primary]
+    for (let index = this.#runtimes.length - 1; index >= 0; index -= 1) {
+      try {
+        this.#runtimes[index]!.dispose?.()
+      } catch (cleanup) {
+        errors.push(cleanup)
+      }
+    }
+    this.#runtimes.length = 0
+    if (errors.length > 1)
+      throw attachErrorIdentity(new AggregateError(errors, ERROR_TEXT.CALLBACK_FAILED), {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.callbackFailed
+      })
+    throw primary
+  }
+  /**
+   * Module state closes after plugin resources, in reverse successful installation order. One
+   * failing module does not stop the others; every failure is returned for the host to report.
+   */
+  async dispose(): Promise<unknown[]> {
+    /** Cleanup failures in disposal order; empty when every module closed. */
+    const errors: unknown[] = []
+    for (let index = this.#runtimes.length - 1; index >= 0; index -= 1) {
+      try {
+        await this.#runtimes[index]!.dispose?.()
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+    this.#runtimes.length = 0
+    return errors
   }
 }

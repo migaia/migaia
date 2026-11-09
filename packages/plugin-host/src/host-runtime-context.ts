@@ -232,11 +232,6 @@ export function createHostRuntimeContext<
   const port = new PluginHostRuntimePorts(context)
   context.diagnostic = port.diagnostic
   if (onDiagnosticFailure) bindTerminalSink(port.diagnostic, onDiagnosticFailure)
-  context.modules = new HostModules(options.modules)
-  context.modules.install(context, port, options)
-  context.pipelines =
-    context.createPipelines?.(port, options) ??
-    new DefaultPipelineCollection(context, port, options.pipeline)
   // This tuple has exactly three entries, fixed here by the supported option contract.
   for (const [label, value] of [
     [HostTimeoutOptionKey.queueAdmission, options.queueAdmissionTimeoutMs],
@@ -245,6 +240,16 @@ export function createHostRuntimeContext<
   ] as const)
     assertTimeoutOption(value, label)
   context.scheduler = admitHostScheduler(options.scheduler) ?? systemScheduler
+  context.modules = new HostModules(options.modules)
+  context.modules.install(context, port, options)
+  try {
+    context.pipelines =
+      context.createPipelines?.(port, options) ??
+      new DefaultPipelineCollection(context, port, options.pipeline)
+  } catch (error) {
+    // Pipeline admission is the last construction step that can reject options after modules run.
+    context.modules.rollback(error)
+  }
   context.operationRuntime = new PluginHostOperationRuntime({
     parentSignal: context.executionController.signal,
     scheduler: context.scheduler,

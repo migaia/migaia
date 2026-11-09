@@ -31,7 +31,7 @@ type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly registrationsInReverse: () => readonly TRegistration[]
   readonly clearPipelineState: () => void
   /** Optional module resources close after the native plugin cleanup sequence. */
-  readonly disposeModules: () => Promise<void>
+  readonly disposeModules: () => Promise<unknown[]>
   readonly diagnostic: IPluginHostDiagnostic
   /** Terminal coordination advances the same revision owner as all other mutations. */
   readonly state: Pick<PluginHostState<object, unknown>, 'commit'>
@@ -121,11 +121,7 @@ export class PluginHostDisposalRuntime<TRegistration> {
       errors.push(...result.cleanupErrors)
       if (result.physicalCompletion) physical.push(result.physicalCompletion)
     }
-    try {
-      await this.#port.disposeModules()
-    } catch (error) {
-      errors.push(error)
-    }
+    errors.push(...(await this.#port.disposeModules()))
     this.#port.clearPipelineState()
     this.#port.terminal.forceTerminal()
     this.#port.state.commit()
