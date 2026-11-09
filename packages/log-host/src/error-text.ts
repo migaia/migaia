@@ -32,9 +32,10 @@ export const LogHostErrorText = {
   deliveryFailed: 'log output delivery failed',
   /** Retry feature attempts are total attempts, including the initial delivery. */
   invalidRetryCount: 'retry attempts must be a positive safe integer',
-  /** Self-forwarding preserves the old diagnostic message while the public code changes. */
-  forwardSelf: (id: string): string => `[logger] extends() 不能传入自己 (id=${id})`,
-  /** Cycle rejection preserves the old message and names its source identity. */
+  /** Self-forwarding is rejected; the message names the logger that tried to extend itself. */
+  forwardSelf: (id: string): string =>
+    `[logger] extends() cannot target the logger itself (id=${id})`,
+  /** Cycle rejection names the source identity whose extends chain already reaches back to it. */
   forwardCycle: (id: string): string =>
-    `[logger] extends() 会形成循环引用：目标 logger 已经能沿着它自己的 extends 链路 转发回当前 logger (id=${id})，已阻止这次调用`
+    `[logger] extends() would create a cycle: the target logger already forwards back to this logger through its own extends chain (id=${id}); the call was rejected`
 } as const
