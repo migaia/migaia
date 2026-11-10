@@ -398,3 +398,33 @@ function isAggregateErrorLike(value: unknown): value is AggregateError {
 
 export { UtilsErrorCode }
 export type { IUtilsErrorCode }
+
+/**
+ * Give a failure crossing a package boundary that package's identity, the way the error contract
+ * asks: an error that already has a complete identity (own string `source` and `code`) keeps it; an
+ * uncoded, extensible native error gets `identity` attached in place, so its type, stack and object
+ * identity stay the caller's; anything else (a non-error value, a frozen error, or one whose
+ * descriptors cannot be read) becomes `wrap(failure)`, with a descriptor-read failure attached as a
+ * secondary error. Only own data descriptors are read, so no getter runs.
+ */
+export function identifyBoundaryFailure(
+  failure: unknown,
+  identity: Pick<IErrorIdentity, 'source' | 'code'>,
+  wrap: (cause: unknown) => Error
+): unknown {
+  if (!isNativeErrorValue(failure)) return wrap(failure)
+  /** Own source descriptor, or the error thrown while reading it. */
+  let source: PropertyDescriptor | undefined
+  /** Own code descriptor. */
+  let code: PropertyDescriptor | undefined
+  try {
+    source = Object.getOwnPropertyDescriptor(failure, 'source')
+    code = Object.getOwnPropertyDescriptor(failure, 'code')
+  } catch (metadataError) {
+    return attachSecondaryErrors(wrap(failure), [metadataError])
+  }
+  if (typeof source?.value === 'string' && typeof code?.value === 'string') return failure
+  if (!source && !code && Object.isExtensible(failure))
+    return attachErrorIdentity(failure, { source: identity.source, code: identity.code })
+  return wrap(failure)
+}

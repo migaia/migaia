@@ -294,3 +294,33 @@ function pathKeys(path: ISnapshotPath | undefined): PropertyKey[] {
 export function identitySnapshot<T>(value: T): T {
   return value
 }
+
+/**
+ * Read an options object once into a plain copy, the way direct property reads would see it: own
+ * properties and properties inherited from a class prototype (getters and methods) are included;
+ * `Object.prototype` members and `constructor` are not. Each key is read once through the original
+ * object, so getters run with it as receiver. A nearer key shadows the same key further up. Proxy
+ * traps and getters may throw; the caller classifies that failure.
+ */
+export function snapshotOptionProperties<T extends object>(value: T): T {
+  /** Plain copy returned to the caller; later reads never touch the original object. */
+  const copy: Record<PropertyKey, unknown> = {}
+  /** Keys already read, so a shadowed prototype key is not read again. */
+  const seen = new Set<PropertyKey>()
+  for (let owner: object | null = value; owner !== null; owner = Object.getPrototypeOf(owner)) {
+    // Any realm's root prototype (its own prototype is null) holds only built-in members.
+    if (owner !== value && Object.getPrototypeOf(owner) === null) break
+    for (const key of Reflect.ownKeys(owner)) {
+      if (seen.has(key) || key === 'constructor') continue
+      seen.add(key)
+      // Defined as own data, so a key named __proto__ stays a property instead of a prototype.
+      Object.defineProperty(copy, key, {
+        value: (value as Record<PropertyKey, unknown>)[key],
+        enumerable: true,
+        writable: true,
+        configurable: true
+      })
+    }
+  }
+  return copy as T
+}
