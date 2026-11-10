@@ -64,7 +64,7 @@ export class AbortRaceOperation<T> {
   #run(): void {
     /** Observe external cancellation before admitting timers, listeners or user work. */
     const initial = observeAbort(this.#signals)
-    if (initial.kind === 'failed') return this.#finish(false, initial.error, initial.error)
+    if (initial.kind === 'failed') return this.#finish(false, initial.error)
     if (initial.kind === 'aborted') return this.#onAbort()
     try {
       for (const candidate of this.#signals) {
@@ -81,19 +81,19 @@ export class AbortRaceOperation<T> {
         }),
         { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
       )
-      this.#finish(false, admissionError, admissionError)
+      this.#finish(false, admissionError)
       return
     }
     /** Close the original post-registration cancellation race with the same observation order. */
     const after = observeAbort(this.#signals)
-    if (after.kind === 'failed') return this.#finish(false, after.error, after.error)
+    if (after.kind === 'failed') return this.#finish(false, after.error)
     if (after.kind === 'aborted') return this.#onAbort()
     try {
       Promise.resolve(
         Reflect.apply(this.#operation, undefined, [{ signal: this.#operationSignal }])
       ).then(this.#onFulfilled, this.#onRejected)
     } catch (error) {
-      this.#finish(false, error, error)
+      this.#finish(false, error)
     }
   }
   /** Publish the original value after listener cleanup, retaining the configured cleanup policy. */
@@ -110,10 +110,10 @@ export class AbortRaceOperation<T> {
         })
       return
     }
-    this.#finish(false, error, error)
+    this.#finish(false, error)
   }
   /** Release the originally admitted resources before publishing settlement. */
-  #finish(fulfilled: boolean, value: unknown, primaryError?: unknown): void {
+  #finish(fulfilled: boolean, value: unknown): void {
     if (this.#settled) return
     this.#settled = true
     /** Release resources in their original order before publishing the public outcome. */
@@ -129,7 +129,7 @@ export class AbortRaceOperation<T> {
         else this.#reject(value)
         return
       }
-      this.#reject(operationCleanupFailure(primaryError, cleanupErrors))
+      this.#reject(operationCleanupFailure(!fulfilled, value, cleanupErrors))
       return
     }
     if (fulfilled) this.#resolve(value as T)
@@ -140,7 +140,7 @@ export class AbortRaceOperation<T> {
     /** Observe cancellation in the original signal order before releasing owned resources. */
     const observation = observeAbort(this.#signals)
     if (observation.kind === 'failed') {
-      this.#finish(false, observation.error, observation.error)
+      this.#finish(false, observation.error)
       return
     }
     /** Forward the first observed cancellation reason without rebuilding or replacing it. */
@@ -148,6 +148,6 @@ export class AbortRaceOperation<T> {
     this.#controller.abort(reason)
     /** This exact boundary failure becomes the public outcome after required cleanup. */
     const error = new UtilsAbortError(reason)
-    this.#finish(false, error, error)
+    this.#finish(false, error)
   }
 }

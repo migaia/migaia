@@ -38,7 +38,14 @@ export class ScheduledCallback<S extends AsyncTaskStrategy, R> {
       this.#resolve = resolve
       this.#reject = reject
       this.#cancel = dispatch(concrete, this.#run, delay, idleTimeout)
-      signal?.addEventListener('abort', this.#onAbort, { once: true })
+      try {
+        signal?.addEventListener('abort', this.#onAbort, { once: true })
+      } catch (error) {
+        // The callback is already queued; retire it so a rejected task never runs.
+        this.#settled = true
+        this.#cancel()
+        throw error
+      }
     })
   }
   /** Abort before callback start cancels the same host registration and retains its reason. */

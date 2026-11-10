@@ -6,6 +6,8 @@ import { UtilsErrorText } from '../error-text.ts'
 import type { IScheduledTask } from '../scheduler.ts'
 import type { IAbortSignal, IUtilsReporter } from './promise-contract.ts'
 import { tryReadProperty } from '../error.ts'
+import { attachErrorIdentity } from './error-primitives.ts'
+import { ERROR_SOURCE, UtilsErrorCode } from '../error-code.ts'
 
 /**
  * The abort-controller members this module consumes, named locally so the published declarations
@@ -139,9 +141,20 @@ export function collectOperationCleanup(
   return errors
 }
 
-/** Keep a primary failure first; a lone cleanup error retains its exact original identity. */
-export function operationCleanupFailure(primaryError: unknown, cleanupErrors: unknown[]): unknown {
-  /** Undefined denotes the existing absence-of-primary convention used by all settlement owners. */
-  const errors = primaryError === undefined ? cleanupErrors : [primaryError, ...cleanupErrors]
-  return errors.length === 1 ? errors[0] : new AggregateError(errors, UtilsErrorText.cleanupFailed)
+/**
+ * Build the coded cleanup failure. `hasPrimary` says whether the operation itself rejected, so a
+ * primary rejection value of `undefined` is still kept. The primary comes first in `errors`, then
+ * every cleanup failure in release order.
+ */
+export function operationCleanupFailure(
+  hasPrimary: boolean,
+  primaryError: unknown,
+  cleanupErrors: readonly unknown[]
+): AggregateError {
+  /** Primary first so callers find the operation outcome before secondary cleanup failures. */
+  const errors = hasPrimary ? [primaryError, ...cleanupErrors] : [...cleanupErrors]
+  return attachErrorIdentity(new AggregateError(errors, UtilsErrorText.cleanupFailed), {
+    source: ERROR_SOURCE,
+    code: UtilsErrorCode.cleanupFailed
+  })
 }

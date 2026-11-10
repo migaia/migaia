@@ -217,7 +217,7 @@ describe('promise primitives', () => {
     })
   })
 
-  it('rejects with the cleanup error when the primary outcome is a value and only one cleanup fails', async () => {
+  it('rejects with a coded CLEANUP_FAILED aggregate when the primary outcome is a value and only one cleanup fails', async () => {
     const cleanup = new Error('cleanup')
     const pending = withTimeout(() => 'value', {
       timeoutMs: 10,
@@ -230,7 +230,14 @@ describe('promise primitives', () => {
         })
       }
     })
-    await expect(pending).rejects.toBe(cleanup)
+    await expect(pending).rejects.toSatisfy(
+      (error: unknown) =>
+        error instanceof AggregateError &&
+        error.errors.length === 1 &&
+        error.errors[0] === cleanup &&
+        (error as { source?: unknown }).source === 'foundation.utils' &&
+        (error as { code?: unknown }).code === 'CLEANUP_FAILED'
+    )
   })
 })
 

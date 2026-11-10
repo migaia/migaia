@@ -55,7 +55,7 @@ export class SleepOperation {
       const initial = observeAbort(this.#signals)
       if (initial.kind === 'failed') {
         this.#settled = true
-        this.#cleanup(initial.error)
+        this.#cleanup(true, initial.error)
         return
       }
       if (initial.kind === 'aborted') return this.#onAbort()
@@ -74,17 +74,20 @@ export class SleepOperation {
       const after = observeAbort(this.#signals)
       if (after.kind === 'failed') {
         this.#settled = true
-        this.#cleanup(after.error)
+        this.#cleanup(true, after.error)
       } else if (after.kind === 'aborted') this.#onAbort()
     } catch (error) {
       if (!this.#settled) {
         this.#settled = true
-        this.#cleanup(error)
+        this.#cleanup(true, error)
       }
     }
   }
-  /** Release the originally admitted resources before publishing settlement. */
-  #cleanup(primaryError?: unknown): boolean {
+  /**
+   * Release the originally admitted resources before publishing settlement. `hasPrimary` marks a
+   * rejection, so a primary rejection value of `undefined` still rejects.
+   */
+  #cleanup(hasPrimary = false, primaryError?: unknown): boolean {
     /** Release resources in their original order before publishing the public outcome. */
     const cleanupErrors = collectOperationCleanup(this.#admitted, this.#onAbort, this.#timer)
     if (cleanupErrors.length > 0) {
@@ -94,8 +97,8 @@ export class SleepOperation {
           phase: PromiseDiagnosticPhase['cleanup']
         })
     }
-    if (primaryError !== undefined) this.#reject(primaryError)
-    return primaryError === undefined
+    if (hasPrimary) this.#reject(primaryError)
+    return !hasPrimary
   }
   /** Observe the original outside signal and settle its cancellation. */
   #onAbort = (): void => {
@@ -104,6 +107,7 @@ export class SleepOperation {
     const observation = observeAbort(this.#signals)
     this.#settled = true
     this.#cleanup(
+      true,
       observation.kind === 'failed'
         ? observation.error
         : new UtilsAbortError(observation.kind === 'aborted' ? observation.reason : undefined)

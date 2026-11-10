@@ -93,20 +93,23 @@ export function rebuild(
   segments: readonly string[],
   value: unknown,
   at: string,
-  construction?: IEnvConstructionContext
+  construction?: IEnvConstructionContext,
+  cursor = 0
 ): unknown {
-  if (segments.length === 0) return value
-  // All callers use toSegments and parseConfigPath's fixed default maxPathLength of 4096
-  // (config.ts). Suffix and diagnostic-prefix copies have that fixed bound, independent of env width.
-  /** Current segment and its remaining path. */
-  const [segment, ...rest] = segments
+  if (cursor === segments.length) return value
+  // The diagnostic prefix `at` grows per level; parseConfigPath's fixed maxPathLength of 4096
+  // (config.ts) bounds it. The segment array itself is shared and read through `cursor`.
+  /** Current segment; deeper levels read the same array at the next cursor. */
+  const segment = segments[cursor]!
+  /** True when this segment is the last one in the path. */
+  const last = cursor + 1 === segments.length
   /** Owned child at this segment, if any. */
   const child = ownValue(node, segment)
   if (node === undefined) {
     if (value === CONFIG_DELETE) return UNCHANGED
     /** Missing records belong only to this construction, never to a supplied coerce value. */
     const record = {
-      [segment]: rebuild(undefined, rest, value, `${at}.${segment}`, construction)
+      [segment]: rebuild(undefined, segments, value, `${at}.${segment}`, construction, cursor + 1)
     }
     construction?.owned.add(record)
     return record
@@ -120,17 +123,18 @@ export function rebuild(
       )
     /** Numeric index into the copied array. */
     const index = Number(segment)
-    if (value === CONFIG_DELETE && rest.length === 0) {
+    if (value === CONFIG_DELETE && last) {
       if (index >= node.length) return UNCHANGED
       return [...node.slice(0, index), ...node.slice(index + 1)]
     }
     /** Rebuilt child; unchanged children keep the original array. */
     const next = rebuild(
       child.found ? child.value : undefined,
-      rest,
+      segments,
       value,
       `${at}.${segment}`,
-      construction
+      construction,
+      cursor + 1
     )
     if (next === UNCHANGED) return UNCHANGED
     /** Copy-on-write array; the original stays untouched. */
@@ -144,7 +148,7 @@ export function rebuild(
       UtilsErrorCode.configPathInvalid,
       UtilsErrorText.configPathInvalid(at, ConfigReason.recordOrArrayRequired)
     )
-  if (value === CONFIG_DELETE && rest.length === 0) {
+  if (value === CONFIG_DELETE && last) {
     if (!child.found) return UNCHANGED
     /** Copy without the deleted key. */
     const copy = copyRecord(node)
@@ -154,10 +158,11 @@ export function rebuild(
   /** Rebuilt child. */
   const next = rebuild(
     child.found ? child.value : undefined,
-    rest,
+    segments,
     value,
     `${at}.${segment}`,
-    construction
+    construction,
+    cursor + 1
   )
   if (next === UNCHANGED) return UNCHANGED
   /** Only an unexposed private draft avoids copying its growing record; borrowed records detach. */

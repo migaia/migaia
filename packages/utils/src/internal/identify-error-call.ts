@@ -117,19 +117,31 @@ export class IdentifyErrorWrapper<F extends (...args: never[]) => unknown> {
     } catch (error) {
       throw this.#errorConstructor.from(error, this.#identity)
     }
-    if (
-      result !== null &&
-      (typeof result === 'object' || typeof result === 'function') &&
-      typeof (result as { then?: unknown }).then === 'function'
-    )
-      return Promise.resolve(result as PromiseLike<unknown>).then(undefined, (error: unknown) =>
-        this.#onRejected(error)
-      )
-    return result
+    if (result === null || (typeof result !== 'object' && typeof result !== 'function'))
+      return result
+    /** One `then` read classifies the result and is the method later used to assimilate it. */
+    const then = (result as { then?: unknown }).then as
+      | ((...args: unknown[]) => unknown)
+      | undefined
+    if (typeof then !== 'function') return result
+    return Promise.resolve()
+      .then(() => assimilateThen(then, result))
+      .then(undefined, (error: unknown) => this.#onRejected(error))
   }
 
   /** Reject with the identified wrapper while retaining the exact original failure as cause. */
   #onRejected(error: unknown): never {
     throw this.#errorConstructor.from(error, this.#identity)
   }
+}
+
+/**
+ * Settle a new Promise through an already-read `then` method on its original receiver. Reusing the
+ * captured method keeps assimilation to the single `then` read used for classification.
+ */
+function assimilateThen(
+  then: (...args: unknown[]) => unknown,
+  receiver: unknown
+): Promise<unknown> {
+  return new Promise((resolve, reject) => Reflect.apply(then, receiver, [resolve, reject]))
 }

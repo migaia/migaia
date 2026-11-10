@@ -74,7 +74,12 @@ type IEqualsStage = {
 type IOneOfStage = {
   readonly kind: typeof CollectorStageKind.oneOf
   readonly fields: readonly IObjectPathTuple[]
-  readonly values: readonly unknown[]
+  /** Candidate membership built once per stage; Set equality already matches NaN to NaN. */
+  readonly index: ReadonlySet<unknown>
+  /** Set treats +0 and -0 as equal, so each zero sign is tracked to keep Object.is semantics. */
+  readonly positiveZero: boolean
+  /** True when `-0` is one of the candidates. */
+  readonly negativeZero: boolean
 }
 
 type IWhereStage<T> = {
@@ -108,6 +113,34 @@ type ICollectStage<T> =
   | IDistinctByStage
   | ISkipStage
   | ITakeStage
+
+/** Index candidate values once so each row checks membership in constant time. */
+function createOneOfStage(
+  fields: readonly IObjectPathTuple[],
+  values: readonly unknown[]
+): IOneOfStage {
+  /** True when a zero candidate with the given sign is present. */
+  let positiveZero = false
+  let negativeZero = false
+  for (const candidate of values)
+    if (candidate === 0) {
+      if (Object.is(candidate, -0)) negativeZero = true
+      else positiveZero = true
+    }
+  return {
+    kind: CollectorStageKind.oneOf,
+    fields,
+    index: new Set(values),
+    positiveZero,
+    negativeZero
+  }
+}
+
+/** Object.is membership against an indexed oneOf stage. */
+function matchesOneOf(stage: IOneOfStage, value: unknown): boolean {
+  if (value === 0) return Object.is(value, -0) ? stage.negativeZero : stage.positiveZero
+  return stage.index.has(value)
+}
 
 /** Creates a package-coded TypeError for invalid collector arguments. */
 function invalidType(field: string, expectation: string): TypeError {
@@ -158,7 +191,7 @@ function matchesFieldPredicate(source: unknown, stage: IFieldPredicateStage): bo
       if (Object.is(value, stage.value)) return true
       continue
     }
-    for (const candidate of stage.values) if (Object.is(value, candidate)) return true
+    if (matchesOneOf(stage, value)) return true
   }
   return false
 }
@@ -178,11 +211,7 @@ function matchesFusedFieldPredicate(source: unknown, stage: IFieldPredicateStage
     } else if (stage.kind === CollectorStageKind.equals) {
       if (Object.is(value, stage.value)) matched = true
     } else {
-      for (const candidate of stage.values)
-        if (Object.is(value, candidate)) {
-          matched = true
-          break
-        }
+      if (matchesOneOf(stage, value)) matched = true
     }
     if (hasDefined && matched) return true
   }
@@ -420,15 +449,11 @@ class Collector<T> {
     return this
   }
 
-  /** Adds a fixed linear candidate scan over the active field scope. */
+  /** Adds a candidate membership test over the active field scope, indexed once per stage. */
   oneOf(value: unknown, ...values: unknown[]): this {
     this.#assertMutable()
     if (arguments.length === 0) throw invalidType('values', 'at least one comparison value')
-    this.#append({
-      kind: CollectorStageKind.oneOf,
-      fields: this.#requireActiveFields(),
-      values: [value, ...values]
-    })
+    this.#append(createOneOfStage(this.#requireActiveFields(), [value, ...values]))
     return this
   }
 

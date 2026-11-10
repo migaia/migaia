@@ -17,6 +17,8 @@ export {
   isUtilsAbortError,
   isUtilsTimeoutError
 } from './internal/error-primitives.ts'
+/** Last-resort delivery of an error that has no reporter left, through the host exception queue. */
+export { reportUnhandledError } from './host-report.ts'
 export type {
   IPropertyRead,
   IErrorIdentity,

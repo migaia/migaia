@@ -78,12 +78,16 @@ function openSource<T>(source: Iterable<T> | AsyncIterable<T>): {
   throw argumentError(TypeError, 'source', UtilsErrorText.iterableExpectation)
 }
 
-/** Detects a thenable through one guarded `then` read. */
+/**
+ * Detects a thenable through one guarded `then` read. A throwing `then` getter is an assimilation
+ * failure, so its error is rethrown and the caller's rejection path handles it.
+ */
 function isThenable(value: unknown): value is PromiseLike<unknown> {
   if (value === null || (typeof value !== 'object' && typeof value !== 'function')) return false
-  /** Guarded read; a throwing getter means "not a thenable". */
+  /** Guarded read; the getter error stays the original thrown value. */
   const then = tryReadProperty(value as { then?: unknown }, 'then')
-  return !then.threw && typeof then.value === 'function'
+  if (then.threw) throw then.error
+  return typeof then.value === 'function'
 }
 
 /**

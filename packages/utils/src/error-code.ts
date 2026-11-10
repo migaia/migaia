@@ -128,7 +128,14 @@ export const UtilsErrorCode = {
   /** Strict template formatting could not resolve one requested placeholder path. */
   formatValueMissing: 'FORMAT_VALUE_MISSING',
   /** Intl rejected a locale, number-format option, currency, or numeric value. */
-  numberFormatInvalid: 'NUMBER_FORMAT_INVALID'
+  numberFormatInvalid: 'NUMBER_FORMAT_INVALID',
+  /**
+   * Releasing an operation's timer or abort listeners failed while `sleep`, `withTimeout` or
+   * `raceWithAbort` settled. The rejection is an `AggregateError`: the operation's own rejection,
+   * when there was one, comes first in `errors`, followed by each cleanup failure in release order.
+   * The caller should treat the operation as settled and inspect `errors` for the causes.
+   */
+  cleanupFailed: 'CLEANUP_FAILED'
 } as const
 
 /** Value union of `UtilsErrorCode`; compare an error's `code` against these values. */

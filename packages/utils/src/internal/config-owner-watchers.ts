@@ -5,6 +5,7 @@ import { rawAt } from './config-owner-path.ts'
 import { readConfigPath } from './config-path.ts'
 import { readonlyConfig } from './config-readonly.ts'
 import { collectDiff } from './config-owner-diff.ts'
+import { reportUnhandledError } from '../host-report.ts'
 
 /** One registered watch listener; `path` is absent for root listeners. */
 type IConfigWatcher = {
@@ -94,11 +95,24 @@ export class ConfigWatchers {
             readWatchedValue(previous, watcher.path)
           )
         } catch (error) {
-          Reflect.apply(this.#report, this.#reportReceiver, [error])
+          this.#reportListenerFailure(error)
         }
       }
     } finally {
       this.#notifying = false
+    }
+  }
+
+  /**
+   * Report one listener failure without stopping notification. The snapshot is already committed,
+   * so a throwing custom reporter must not abort the remaining watchers; its failure goes to the
+   * host exception queue instead.
+   */
+  #reportListenerFailure(error: unknown): void {
+    try {
+      Reflect.apply(this.#report, this.#reportReceiver, [error])
+    } catch (failure) {
+      reportUnhandledError(failure)
     }
   }
 }

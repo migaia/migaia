@@ -91,11 +91,19 @@ function cloneCallable(
       'prototype',
       ConfigReason.callablePrototypeRequired
     )
+  // A callable is a graph node like any object, so it is charged to the same node budget.
+  state.nodes++
+  if (state.nodes > limits.maxNodes)
+    throw configError(UtilsErrorCode.configLimitExceeded, 'maxNodes', ConfigReason.graphNodes)
   /** Register the callable clone before copying its graph so recursive aliases resolve to it. */
   const wrapper = createConfigCallable(source, constructable)
   seen.set(value, wrapper)
   for (const key of Reflect.ownKeys(source)) {
     if (key === 'length' || key === 'name' || key === 'prototype') continue
+    // Each copied callable own key is charged to the shared key budget before its value is cloned.
+    state.keys++
+    if (state.keys > limits.maxKeys)
+      throw configError(UtilsErrorCode.configLimitExceeded, 'maxKeys', ConfigReason.graphKeys)
     /** Inspect the current data descriptor without invoking an accessor or losing its flags. */
     const descriptor = Object.getOwnPropertyDescriptor(source, key)
     if (!descriptor || !('value' in descriptor) || descriptor.configurable === false)

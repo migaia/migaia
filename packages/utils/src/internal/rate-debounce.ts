@@ -189,12 +189,18 @@ export class FrameThrottledFunction<F extends (...args: never[]) => unknown> {
     /** Cancellation belongs to this exact frame registration. */
     const controller = new AbortController()
     this.#frame = controller
-    asyncTask('animationFrame', this.#onFrame, { signal: controller.signal }).then(
-      undefined,
-      (error: unknown) => {
-        if (!controller.signal.aborted) reportUnhandledError(error)
-      }
-    )
+    try {
+      asyncTask('animationFrame', this.#onFrame, { signal: controller.signal }).then(
+        undefined,
+        (error: unknown) => {
+          if (!controller.signal.aborted) reportUnhandledError(error)
+        }
+      )
+    } catch (error) {
+      // Admission failed synchronously; clear the marker so a later call schedules again.
+      this.#frame = undefined
+      throw error
+    }
   }
   /** A delivered frame retires its cancellation token before reentrant user code runs. */
   readonly #onFrame = (): void => {

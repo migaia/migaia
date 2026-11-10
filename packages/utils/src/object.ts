@@ -131,7 +131,7 @@ export function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T
 function fallbackSnapshot<T>(value: T): IDiagnosticSnapshot<T> {
   const traversal: ISnapshotTraversal = { diagnostics: [], seen: new WeakMap<object, unknown>() }
   return {
-    value: projectSnapshotValue(value, [], traversal) as T,
+    value: projectSnapshotValue(value, undefined, traversal) as T,
     diagnostics: traversal.diagnostics
   }
 }
@@ -139,7 +139,7 @@ function fallbackSnapshot<T>(value: T): IDiagnosticSnapshot<T> {
 /** Projects one value and aliases only the subtree that cannot be inspected safely. */
 function projectSnapshotValue(
   current: unknown,
-  path: readonly PropertyKey[],
+  path: ISnapshotPath | undefined,
   traversal: ISnapshotTraversal
 ): unknown {
   if (current === null || (typeof current !== 'object' && typeof current !== 'function'))
@@ -168,7 +168,7 @@ function projectSnapshotValue(
       traversal.seen.set(current as object, cloned)
       return cloned
     } catch (error) {
-      traversal.diagnostics.push({ path, reason: 'unsupported', cause: error })
+      traversal.diagnostics.push({ path: pathKeys(path), reason: 'unsupported', cause: error })
       return current
     }
   }
@@ -183,11 +183,11 @@ function projectSnapshotValue(
       typeof current === 'function' ||
       (!isArray && prototype !== null && parentPrototype !== null)
     ) {
-      traversal.diagnostics.push({ path, reason: 'unsupported', cause: current })
+      traversal.diagnostics.push({ path: pathKeys(path), reason: 'unsupported', cause: current })
       return current
     }
   } catch (error) {
-    traversal.diagnostics.push({ path, reason: 'read-failed', cause: error })
+    traversal.diagnostics.push({ path: pathKeys(path), reason: 'read-failed', cause: error })
     return current
   }
 
@@ -196,7 +196,7 @@ function projectSnapshotValue(
     target = isArray ? [] : Object.create(prototype)
     traversal.seen.set(current as object, target)
   } catch (error) {
-    traversal.diagnostics.push({ path, reason: 'read-failed', cause: error })
+    traversal.diagnostics.push({ path: pathKeys(path), reason: 'read-failed', cause: error })
     return current
   }
 
@@ -204,17 +204,22 @@ function projectSnapshotValue(
   try {
     keys = Reflect.ownKeys(current as object)
   } catch (error) {
-    traversal.diagnostics.push({ path, reason: 'read-failed', cause: error })
+    traversal.diagnostics.push({ path: pathKeys(path), reason: 'read-failed', cause: error })
     return current
   }
   for (const key of keys) {
     if (isArray && key === 'length') continue
-    const propertyPath = [...path, key]
+    /** Shared-prefix path; keys are copied out only when a diagnostic is recorded. */
+    const propertyPath: ISnapshotPath = { parent: path, key }
     let descriptor: PropertyDescriptor | undefined
     try {
       descriptor = Object.getOwnPropertyDescriptor(current as object, key)
     } catch (error) {
-      traversal.diagnostics.push({ path: propertyPath, reason: 'read-failed', cause: error })
+      traversal.diagnostics.push({
+        path: pathKeys(propertyPath),
+        reason: 'read-failed',
+        cause: error
+      })
       continue
     }
     if (!descriptor) continue
@@ -230,10 +235,18 @@ function projectSnapshotValue(
       try {
         accessed = Reflect.get(current as object, key, current)
       } catch (error) {
-        traversal.diagnostics.push({ path: propertyPath, reason: 'read-failed', cause: error })
+        traversal.diagnostics.push({
+          path: pathKeys(propertyPath),
+          reason: 'read-failed',
+          cause: error
+        })
         continue
       }
-      traversal.diagnostics.push({ path: propertyPath, reason: 'accessor', cause: accessed })
+      traversal.diagnostics.push({
+        path: pathKeys(propertyPath),
+        reason: 'accessor',
+        cause: accessed
+      })
       projectedDescriptor = {
         value: projectSnapshotValue(accessed, propertyPath, traversal),
         enumerable: descriptor.enumerable,
@@ -244,7 +257,11 @@ function projectSnapshotValue(
     try {
       Object.defineProperty(target, key, projectedDescriptor)
     } catch (error) {
-      traversal.diagnostics.push({ path: propertyPath, reason: 'read-failed', cause: error })
+      traversal.diagnostics.push({
+        path: pathKeys(propertyPath),
+        reason: 'read-failed',
+        cause: error
+      })
       try {
         Object.defineProperty(target, key, {
           ...projectedDescriptor,
@@ -252,7 +269,7 @@ function projectSnapshotValue(
         })
       } catch (fallbackError) {
         traversal.diagnostics.push({
-          path: propertyPath,
+          path: pathKeys(propertyPath),
           reason: 'read-failed',
           cause: fallbackError
         })
@@ -260,6 +277,17 @@ function projectSnapshotValue(
     }
   }
   return target
+}
+
+/** One traversal step; each node shares its parent so descending does not copy the path. */
+type ISnapshotPath = Readonly<{ parent: ISnapshotPath | undefined; key: PropertyKey }>
+
+/** Copy a shared-prefix path into the root-to-leaf key array recorded on a diagnostic. */
+function pathKeys(path: ISnapshotPath | undefined): PropertyKey[] {
+  /** Keys collected leaf-first, then reversed once into root-to-leaf order. */
+  const keys: PropertyKey[] = []
+  for (let node = path; node; node = node.parent) keys.push(node.key)
+  return keys.reverse()
 }
 
 /** Returns the original value while making identity preservation explicit. */

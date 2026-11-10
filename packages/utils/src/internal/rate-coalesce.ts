@@ -53,12 +53,18 @@ export class CoalescedFunction<A extends unknown[]> {
     /** The error observer distinguishes this owner's expected cancellation. */
     const controller = new AbortController()
     this.#scheduled = controller
-    asyncTask(this.#strategy, this.#deliver, { signal: controller.signal }).then(
-      undefined,
-      (error: unknown) => {
-        if (!controller.signal.aborted) reportUnhandledError(error)
-      }
-    )
+    try {
+      asyncTask(this.#strategy, this.#deliver, { signal: controller.signal }).then(
+        undefined,
+        (error: unknown) => {
+          if (!controller.signal.aborted) reportUnhandledError(error)
+        }
+      )
+    } catch (error) {
+      // Admission failed synchronously; clear the marker so a later call schedules again.
+      this.#scheduled = undefined
+      throw error
+    }
   }
   /** Flush still delivers calls queued after a prior scheduled delivery was cancelled. */
   #flush = (): void => {

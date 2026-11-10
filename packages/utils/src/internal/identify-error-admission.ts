@@ -5,8 +5,8 @@ import { attachErrorIdentity, tryReadProperty, type IErrorIdentity } from './err
 import type { IIdentifyErrorIdentity, IErrorIdentityMatch } from '../identify-error.ts'
 
 /** Creates the coded native `TypeError` used for every rejected identity or argument. */
-export function identityError(field: string): TypeError {
-  return attachErrorIdentity(new TypeError(UtilsErrorText.identityInvalid(field)), {
+export function identityError(field: string, options?: ErrorOptions): TypeError {
+  return attachErrorIdentity(new TypeError(UtilsErrorText.identityInvalid(field), options), {
     source: ERROR_SOURCE,
     code: UtilsErrorCode.invalidArgument
   })
@@ -33,7 +33,14 @@ export function admitIdentity<S extends string, C extends string>(
   if (typeof source !== 'string' || source.length === 0) throw identityError('source')
   if (typeof code !== 'string' || code.length === 0) throw identityError('code')
   if (phase !== undefined && typeof phase !== 'string') throw identityError('phase')
-  if (detail !== undefined && !isPlainRecord(detail)) throw identityError('detail')
+  /** Reflective reads of a Proxy detail can throw; that failure becomes the coded error's cause. */
+  let plainDetail: boolean
+  try {
+    plainDetail = detail === undefined || isPlainRecord(detail)
+  } catch (cause) {
+    throw identityError('detail', { cause })
+  }
+  if (!plainDetail) throw identityError('detail')
   return Object.freeze({
     source,
     code,
