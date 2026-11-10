@@ -545,15 +545,17 @@ export class StorageHostInstaller {
 }
 
 /**
- * Give a failed detect check the storage identity. Errors that storage already coded keep their
- * identity; anything else from the plugin's check becomes EXTENSION_FAILED with the original on
- * cause.
+ * Give a failed detect check the storage identity. An error that already carries a complete
+ * identity (own string `source` and `code`) keeps it; anything else from the plugin's check becomes
+ * EXTENSION_FAILED with the original on cause.
  */
 function toDetectFailure(error: unknown): unknown {
   if (error instanceof Error) {
     /** Own `source` data property, read without invoking a getter. */
     const source = Object.getOwnPropertyDescriptor(error, 'source')?.value
-    if (typeof source === 'string' && source.startsWith('storage.')) return error
+    /** Own `code` data property, read the same way. */
+    const code = Object.getOwnPropertyDescriptor(error, 'code')?.value
+    if (typeof source === 'string' && typeof code === 'string') return error
   }
   // A detect check is a plugin-supplied extension callback; EXTENSION_FAILED is its registered code.
   return createStorageError(

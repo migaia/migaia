@@ -520,22 +520,28 @@ export type IEntityQueryMutationContext<T> = {
 /** Own one entity repository, its backend access and versioned materialization route. */
 
 /**
- * Cancellation is never an invalid record: rethrow an ABORTED failure (directly or as the cause of
- * a stage wrapper) before the invalid-record skip policy can turn it into a partial result.
+ * Cancellation is never an invalid record: rethrow when the failure, or any error on its cause
+ * chain, is the contract ABORTED error or a native AbortError, before the invalid-record skip
+ * policy can turn it into a partial result.
  */
 export function rethrowIfAborted(cause: unknown): void {
-  if (readsAborted(cause)) throw cause
-  if (cause !== null && typeof cause === 'object') {
-    /** Stage wrappers keep the original failure as an own `cause` data property. */
-    const inner = Object.getOwnPropertyDescriptor(cause, 'cause')?.value
-    if (readsAborted(inner)) throw cause
+  /** Errors already visited, so a cyclic cause chain ends. */
+  const seen = new Set<unknown>()
+  for (let current = cause; current instanceof Error && !seen.has(current);) {
+    if (readsAborted(current)) throw cause
+    seen.add(current)
+    /** Next link, read as an own data property so no getter runs. */
+    current = Object.getOwnPropertyDescriptor(current, 'cause')?.value
   }
 }
 
-/** True for an Error whose own `code` data property is the contract ABORTED code. */
-function readsAborted(value: unknown): boolean {
+/** Name of the native DOMException raised by `AbortSignal` cancellation; set by the platform. */
+const ABORT_ERROR_NAME = 'AbortError'
+
+/** True for the contract ABORTED code (own data property) or a native AbortError DOMException. */
+function readsAborted(value: Error): boolean {
   return (
-    value instanceof Error &&
-    Object.getOwnPropertyDescriptor(value, 'code')?.value === StorageContractErrorCode.aborted
+    Object.getOwnPropertyDescriptor(value, 'code')?.value === StorageContractErrorCode.aborted ||
+    (value instanceof DOMException && value.name === ABORT_ERROR_NAME)
   )
 }
