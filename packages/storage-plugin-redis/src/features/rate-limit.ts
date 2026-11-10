@@ -30,7 +30,7 @@ export type IRedisRateLimitOutput = IStorageFeatureOutput<
 >
 /** One Lua invocation checks and updates the window without client-side read/write races. */
 const rateScript =
-  "local current=tonumber(redis.call('GET',KEYS[1]) or '0'); local limit=tonumber(ARGV[1]); local cost=tonumber(ARGV[2]); local ttl=redis.call('PTTL',KEYS[1]); if cost>limit-current then return {0,limit-current,math.max(0,ttl)} end; local next=current+cost; if current==0 then redis.call('SET',KEYS[1],next,'PX',ARGV[3]) else redis.call('SET',KEYS[1],next,'KEEPTTL') end; return {1,limit-next,redis.call('PTTL',KEYS[1])}"
+  "local current=tonumber(redis.call('GET',KEYS[1]) or '0'); local limit=tonumber(ARGV[1]); local cost=tonumber(ARGV[2]); local ttl=redis.call('PTTL',KEYS[1]); if cost>limit-current then return {0,math.max(0,limit-current),math.max(0,ttl)} end; local next=current+cost; if current==0 then redis.call('SET',KEYS[1],next,'PX',ARGV[3]) else redis.call('SET',KEYS[1],next,'KEEPTTL') end; return {1,limit-next,redis.call('PTTL',KEYS[1])}"
 /** Capture finite policy once; each invocation uses the exact original pipeline and native lease. */
 export function redisRateLimitFeature(options: IRedisRateLimitOptions) {
   const limit = featureInteger(options.limit),

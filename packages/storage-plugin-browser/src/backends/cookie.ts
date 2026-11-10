@@ -1,3 +1,4 @@
+import { snapshotBrowserConfig } from '../utils/config-snapshot.ts'
 import {
   createBackendChangeController,
   resolveStorageNamespace,
@@ -247,7 +248,11 @@ export function cookiesHost(
   ICookieDocument
 > {
   /** Initialize native facts in original construction order before publishing any port. */
-  const cookieContext = { options, runtime, bindOrganizations } as ICookieContext
+  const cookieContext = {
+    options: snapshotBrowserConfig(options),
+    runtime,
+    bindOrganizations
+  } as ICookieContext
 
   configureCookieNamespace(cookieContext)
 

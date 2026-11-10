@@ -16,7 +16,6 @@ import type { IStorageKey } from '../types/context.ts'
 import type { IRecordIndexHandle } from '@migaia/storage-contract'
 import {
   INTERNAL_META_NAMESPACE,
-  LEGACY_RECORDS_MIGRATION_MIRROR_KEY,
   RECORD_EPOCH_KEY,
   createIndexGeneration,
   toIdbKey
@@ -121,10 +120,8 @@ export async function deleteOwnedMetaKeys<TValue>(
       metaStore.delete(key)
       continue
     }
-    if (Array.isArray(key)) continue
-    if (typeof key !== 'string') continue
-    if (key === LEGACY_RECORDS_MIGRATION_MIRROR_KEY) continue
-    if (key.startsWith('index:') || /^repository:.+:migration$/.test(key)) metaStore.delete(key)
+    // String keys are the public metadata channel; clearRecords never deletes them, even when a
+    // caller key looks like index or migration state. Private authority uses array keys only.
   }
 }
 

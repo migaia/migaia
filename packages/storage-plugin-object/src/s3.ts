@@ -116,6 +116,10 @@ class S3ObjectNative implements IObjectNative {
   readonly #report: (error: unknown) => void
   /** Native probing alone grants conditional-write support. */
   #conditional = false
+  /** Whether the conditional-write probe succeeded; presigning conditional uploads checks it. */
+  conditionalWrites(): boolean {
+    return this.#conditional
+  }
   /** Repeated disposal shares the original cleanup promise. */
   #primary: Promise<void> | undefined
   /** Symbol cleanup reports once without replacing ordinary disposal's promise. */

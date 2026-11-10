@@ -1,3 +1,4 @@
+import { normalizePostgresError } from './errors.ts'
 import { PgNames } from './constants.ts'
 import { createQuiescenceTracker } from '@migaia/lifecycle'
 import {
@@ -32,7 +33,13 @@ class PgBorrowedResource {
   readonly dispose = (): Promise<void> => {
     if (this.#main !== undefined) return this.#main
     this.#tracker.seal(this.#owner)
-    return (this.#main = this.#tracker.whenZero(this.#owner).then(this.#close))
+    // An explicit dispose surfaces a failed release as the registered SQL_FAILED, cause kept.
+    return (this.#main = this.#tracker
+      .whenZero(this.#owner)
+      .then(this.#close)
+      .then(undefined, (error: unknown) => {
+        throw normalizePostgresError(error)
+      }))
   }
   /** Extracted namespace methods consult the same original resource seal. */
   readonly assertLive = (): void => {

@@ -1,3 +1,4 @@
+import { ObjectErrorText } from '../error-text.ts'
 import { GetObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import {
@@ -122,6 +123,16 @@ async function signObjectUpload(
   const captured = snapshotStorageBlobPut(key, new Uint8Array(0), options, ObjectNames.backend)
   const seconds = expiry(options?.expiresInSeconds)
   assertS3ObjectHeaders(captured.options)
+  // A conditional upload is signed only after the driver's probe confirmed conditional writes.
+  if (
+    (captured.options.ifMatch !== undefined || captured.options.ifNoneMatch === true) &&
+    !native.supportsConditionalWrites()
+  )
+    throw new StorageContractError(
+      StorageContractErrorCode.unsupported,
+      { backend: ObjectNames.backend },
+      ObjectErrorText.conditional
+    )
   return observeObjectFeature(
     call.store,
     ObjectNames.presignUpload,

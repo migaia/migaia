@@ -5,7 +5,7 @@ import type { ICodecValue } from '@migaia/serialize/codec'
 import { jitter } from '@migaia/utils/number'
 import { CacheText, CacheWriteMode } from './constants.ts'
 import { CacheErrorCode } from '@migaia/storage-contract/error-code'
-import { cacheError, invalidArgument } from './errors.ts'
+import { cacheError, invalidArgument, isCodedCacheFailure } from './errors.ts'
 import type { ICacheOptions, ICacheCallOptions } from './types.ts'
 
 /** Installation snapshots retain only caller-selected policy and the original codec owner. */
@@ -21,6 +21,17 @@ export function duration(value: unknown, tier?: number): number | undefined {
 }
 /** Capture options before any backend is borrowed or modified. */
 export function snapshotCacheOptions(options: ICacheOptions & { readonly id?: string }) {
+  try {
+    return readSnapshotCacheOptions(options)
+  } catch (cause) {
+    // Validation failures are already coded; anything else is a throwing getter or Proxy trap.
+    if (isCodedCacheFailure(cause)) throw cause
+    throw cacheError(CacheErrorCode.tierInvalid, cause)
+  }
+}
+
+/** Validate options; reads happen inside the caller's getter-failure boundary. */
+function readSnapshotCacheOptions(options: ICacheOptions & { readonly id?: string }) {
   if (typeof options !== 'object' || options === null || Array.isArray(options))
     throw cacheError(CacheErrorCode.tierInvalid)
   const {

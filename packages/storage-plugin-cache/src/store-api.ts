@@ -335,7 +335,14 @@ class CacheStoreBase implements ICacheStoreBaseShape {
           try {
             for await (const [, value] of iterator) {
               if (typeof value.key !== 'string') throw invalidArgument()
-              await erase(this.#organizationContext, value.key, false)
+              // Strict erase: a failed tier deletion throws, so the tag index below is kept for retry.
+              await erase(
+                this.#organizationContext,
+                value.key,
+                false,
+                this.#organizationContext.cacheContext.tiers.length,
+                true
+              )
             }
           } finally {
             await iterator[asyncDisposeKey]()

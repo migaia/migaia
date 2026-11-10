@@ -1,3 +1,4 @@
+import { StorageContractError } from '@migaia/storage-contract'
 import { asCodecValue, toPortableValue } from '@migaia/serialize/codec'
 import { snapshotStorageVector, snapshotStorageVectorCollection } from '@migaia/storage-host/sdk'
 import {
@@ -21,6 +22,17 @@ import type {
 export function snapshotRescoreOptions(
   options: IQdrantRescoreOptions
 ): IQdrantRescoreConfiguration {
+  try {
+    return readRescoreOptions(options)
+  } catch (cause) {
+    // Validation failures are already coded; anything else is a throwing getter or Proxy trap.
+    if (cause instanceof StorageContractError) throw cause
+    throw invalidArgument(cause)
+  }
+}
+
+/** Validate rescore options; reads happen inside the caller's getter-failure boundary. */
+function readRescoreOptions(options: IQdrantRescoreOptions): IQdrantRescoreConfiguration {
   const { collections } = options
   if (collections === null || typeof collections !== 'object' || Array.isArray(collections))
     throw invalidArgument()

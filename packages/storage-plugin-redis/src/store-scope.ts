@@ -1,3 +1,4 @@
+import { snapshotStorageKey } from '@migaia/storage-host/sdk'
 // Transaction scope class for the Redis store (see ./store.ts).
 import {
   assertTransactionOwner,
@@ -182,7 +183,8 @@ class RedisScope implements IRedisInternalScope {
           prepared.wire,
           readTransactionConflictPolicy({ conflictPolicy: actual.policy }, RedisText.backend)
         )
-        return prepared.key
+        // The draft keeps its own key object; the caller gets an independent snapshot.
+        return snapshotStorageKey(prepared.key, RedisText.backend)
       }
     )
 

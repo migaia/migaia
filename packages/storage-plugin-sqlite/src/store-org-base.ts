@@ -33,7 +33,9 @@ import {
   sqliteRootWrite,
   sqlitePrepareWrite,
   sqliteBytesInput,
-  sqliteSynchronous
+  sqliteSynchronous,
+  preparedTextKey,
+  preparedRecordKey
 } from './store-operation.ts'
 import { sqliteRevisionKey, sqliteDecodeLockIdentity } from './store-revision.ts'
 import { sqliteExecuteSql } from './store-scope.ts'
@@ -79,10 +81,16 @@ export class SqliteOrgBase<TValue> implements ISqliteNativeStore<TValue> {
       SqliteOperation.get,
       { key },
       ctx,
-      (orgId, _input, observeKey, state) =>
-        sqliteRead(this.#organization, 'text', key, orgId, state, undefined, observeKey) as
-          | string
-          | null
+      (orgId, input, observeKey, state) =>
+        sqliteRead(
+          this.#organization,
+          'text',
+          preparedTextKey(this.#organization, input),
+          orgId,
+          state,
+          undefined,
+          observeKey
+        ) as string | null
     )
   }
 
@@ -120,8 +128,16 @@ export class SqliteOrgBase<TValue> implements ISqliteNativeStore<TValue> {
       SqliteOperation.has,
       { key },
       ctx,
-      (orgId, _input, observeKey, state) =>
-        sqliteRead(this.#organization, 'text', key, orgId, state, undefined, observeKey) !== null
+      (orgId, input, observeKey, state) =>
+        sqliteRead(
+          this.#organization,
+          'text',
+          preparedTextKey(this.#organization, input),
+          orgId,
+          state,
+          undefined,
+          observeKey
+        ) !== null
     )
   }
 
@@ -156,11 +172,11 @@ export class SqliteOrgBase<TValue> implements ISqliteNativeStore<TValue> {
       SqliteOperation.getBytes,
       { key },
       ctx,
-      (orgId, _input, observeKey, state) =>
+      (orgId, input, observeKey, state) =>
         sqliteRead(
           this.#organization,
           'bytes',
-          key,
+          preparedTextKey(this.#organization, input),
           orgId,
           state,
           undefined,
@@ -220,10 +236,16 @@ export class SqliteOrgBase<TValue> implements ISqliteNativeStore<TValue> {
       SqliteOperation.getRecord,
       { key: captured },
       ctx,
-      (orgId, _input, observeKey, state) =>
-        sqliteRead(this.#organization, 'record', captured, orgId, state, undefined, observeKey) as
-          | TValue
-          | undefined
+      (orgId, input, observeKey, state) =>
+        sqliteRead(
+          this.#organization,
+          'record',
+          preparedRecordKey(input),
+          orgId,
+          state,
+          undefined,
+          observeKey
+        ) as TValue | undefined
     )
   }
 

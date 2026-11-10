@@ -1,3 +1,4 @@
+import { snapshotBrowserConfig } from '../utils/config-snapshot.ts'
 import { indexedDbFeatureMissing } from '../backends/indexed-db-base-access.ts'
 import { IndexedDbFeature } from '../constants.ts'
 import {
@@ -237,8 +238,10 @@ function stopReactiveFeature(context: IReactiveFeatureContext): void {
 function createReactiveLiveQuery<TQuery extends IQueryShape>(
   context: IReactiveFeatureContext,
   query: TQuery,
-  options: IChainLiveQueryOptions<IQueryResultOf<TQuery>>
+  requested: IChainLiveQueryOptions<IQueryResultOf<TQuery>>
 ): ILiveQuery<IQueryResultOf<TQuery>> & IStorageResource {
+  /** Options are read once; validation and the created query use this same copy. */
+  const options = snapshotBrowserConfig(requested, StorageBrowserErrorCode.reactiveFeatureInvalid)
   /** The expose window is checked even after this installation selected its adapter. */
   const store = context.featureExpose.getStore()
   const backendId = context.featureExpose.getBackendId()

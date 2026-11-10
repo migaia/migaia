@@ -1,4 +1,5 @@
 // Root operations: admission, synchronous and scoped runs, reads, writes and batches for the SQLite store (see ./store.ts).
+import { snapshotStorageKey as snapshotPreparedKey } from '@migaia/storage-host/sdk'
 import {
   createStorageBatchKeyCapture,
   createStorageBatchKeyProjection,
@@ -759,4 +760,23 @@ export function sqliteGetMany<TValue>(
   }
   for (const { key } of captured) sqliteRevision(organization, state, 'text', key)
   return keys.map(({ identity }) => result.get(identity))
+}
+
+/**
+ * Read the key from the input that the execution pipeline actually prepared, and validate it there,
+ * so a stage that rewrites the input changes the key that is read.
+ */
+export function preparedTextKey<TValue>(
+  organization: ISqliteOrganizationContext<TValue>,
+  input: unknown
+): string {
+  /** The pipeline's prepared key; validated as a string storage key before use. */
+  const key = (input as { key?: unknown }).key as string
+  sqliteTextInput(organization, key)
+  return key
+}
+
+/** Record variant of `preparedTextKey`: the prepared key is snapshotted as a storage key. */
+export function preparedRecordKey(input: unknown): IStorageKey {
+  return snapshotPreparedKey((input as { key?: unknown }).key as IStorageKey, SqliteNames.backend)
 }

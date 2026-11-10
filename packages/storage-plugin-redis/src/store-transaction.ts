@@ -126,7 +126,11 @@ async function redisRunTransactionDraft<R>(
   if (attempt.failed) throw attempt.failure
   await attempt.registration.runFinalizers()
   throwIfAborted(attempt.context.signal)
-  attempt.changed = [...draft.entries.values()].filter((entry) => entry.changed).length
+  /** Changed key/value entries plus changed vector HASH entries; both are committed keys. */
+  let changed = 0
+  for (const entry of draft.entries.values()) if (entry.changed) changed += 1
+  for (const entry of draft.hashes.values()) if (entry.changed) changed += 1
+  attempt.changed = changed
   return value as Awaited<R>
 }
 /** Classify native settlement, close original iterators and preserve primary rollback errors. */

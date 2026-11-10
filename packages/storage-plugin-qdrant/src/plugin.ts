@@ -27,19 +27,7 @@ export function qdrantBackendPlugin<
   features?: F &
     IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>
 ): IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore> {
-  const captured = (function readAcceptedInput() {
-    const {
-      url,
-      apiKey,
-      collectionPrefix = QdrantText.prefix,
-      http,
-      id = QdrantText.backend
-    } = options
-    if (typeof url !== 'string' || typeof collectionPrefix !== 'string' || typeof id !== 'string')
-      throw invalidArgument()
-    const fallback = fetchHttp(url, apiKey)
-    return { url, apiKey, collectionPrefix, http: http ?? fallback, id: id as TId }
-  })()
+  const captured = readQdrantOptions<TId>(options)
   /** Each installation gets its own named state while borrowing the validated configuration. */
   const descriptor = (core: IStoragePluginCore<F>) => new QdrantInstallation(captured, core)
   return definePlugin<TId, typeof descriptor, F>(captured.id, descriptor, features)
@@ -85,4 +73,31 @@ class QdrantInstallation<F extends IStorageFeatureRecord> {
       this.#rescore = configuration
     }
   })
+}
+
+/**
+ * Read and validate plugin options once. A throwing option getter is INVALID_ARGUMENT with the
+ * getter error on cause; invalid values are INVALID_ARGUMENT without a cause.
+ */
+function readQdrantOptions<TId extends string>(
+  options: IQdrantOptions & { readonly id?: TId }
+): IQdrantInstallationOptions & { readonly id: TId } {
+  /** One read of every option. */
+  let snapshot: IQdrantOptions & { readonly id?: TId }
+  try {
+    snapshot = { ...options }
+  } catch (cause) {
+    throw invalidArgument(cause)
+  }
+  const {
+    url,
+    apiKey,
+    collectionPrefix = QdrantText.prefix,
+    http,
+    id = QdrantText.backend
+  } = snapshot
+  if (typeof url !== 'string' || typeof collectionPrefix !== 'string' || typeof id !== 'string')
+    throw invalidArgument()
+  const fallback = fetchHttp(url, apiKey)
+  return { url, apiKey, collectionPrefix, http: http ?? fallback, id: id as TId }
 }

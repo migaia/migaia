@@ -36,7 +36,7 @@ import type { ICodecValue } from '@migaia/serialize/codec'
 import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
 import { cacheBackendKind } from '../kind.ts'
 import { cacheKey } from '../key.ts'
-import { cacheError, invalidArgument, missingCapability } from '../errors.ts'
+import { cacheError, invalidArgument, missingCapability, isCodedCacheFailure } from '../errors.ts'
 import { CacheErrorCode } from '@migaia/storage-contract/error-code'
 import { CacheText, CacheOperation, CacheHook } from '../constants.ts'
 import type {} from '../hooks.ts'
@@ -167,6 +167,17 @@ function encodeValue(value: ICodecValue): string {
 
 /** Scalar installation options stay detached for all later Feature and embedding awaits. */
 function snapshotSemanticConfiguration(options: ISemanticCacheOptions) {
+  try {
+    return readSnapshotSemanticConfiguration(options)
+  } catch (cause) {
+    // Validation failures are already coded; anything else is a throwing getter or Proxy trap.
+    if (isCodedCacheFailure(cause)) throw cause
+    throw invalidArgument(cause)
+  }
+}
+
+/** Validate options; reads happen inside the caller's getter-failure boundary. */
+function readSnapshotSemanticConfiguration(options: ISemanticCacheOptions) {
   if (typeof options !== 'object' || options === null) throw invalidArgument()
   const { backend, collection, dimensions, metric, minScore, ttlMs, embed } = options
   /** The canonical vector owner alone validates names, dimensions and metric. */

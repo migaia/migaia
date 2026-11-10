@@ -1,7 +1,7 @@
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
 import { Archive } from './constants.ts'
 import { ArchiveErrorCode } from '@migaia/storage-contract/error-code'
-import { archiveError } from './errors.ts'
+import { archiveError, isArchiveError } from './errors.ts'
 import type { IArchivePluginOptions, IArchiveRule } from './types.ts'
 
 /** An installation snapshot never rereads mutable rule fields during a later run. */
@@ -15,6 +15,17 @@ export type IArchiveConfiguration = Readonly<{
 export function snapshotArchiveOptions<T>(
   options: IArchivePluginOptions<T>
 ): IArchiveConfiguration {
+  try {
+    return readArchiveOptions(options)
+  } catch (cause) {
+    // Validation failures are already coded; anything else is a throwing getter or Proxy trap.
+    if (isArchiveError(cause)) throw cause
+    throw archiveError(ArchiveErrorCode.invalidOption, cause)
+  }
+}
+
+/** Validate plugin options; reads happen inside the caller's getter-failure boundary. */
+function readArchiveOptions<T>(options: IArchivePluginOptions<T>): IArchiveConfiguration {
   if (!options || typeof options !== 'object') throw archiveError(ArchiveErrorCode.invalidOption)
   const { id, hot, cold, rules } = options
   if (

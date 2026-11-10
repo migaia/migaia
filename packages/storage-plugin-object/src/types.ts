@@ -40,6 +40,8 @@ export type IObjectNative = IStorageResource & {
   readonly kind: ObjectDriverKind
   readonly client?: S3Client
   detect(signal: AbortSignal): Promise<void>
+  /** True once native probing confirmed conditional writes; absent or false means unsupported. */
+  conditionalWrites?(): boolean
   address(key: string): IObjectAddress
   put(
     key: string,

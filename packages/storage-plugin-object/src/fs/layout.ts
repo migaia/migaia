@@ -358,12 +358,15 @@ class FileObjectNative implements IObjectNative {
   }
 
   /** Execute the original head operation with this owner's native state. */
-  head: IObjectNative['head'] = (key, _logicalKey, ctx) =>
-    this.#locked(
-      key,
-      ctx,
-      async () => (await readCurrent(this.#io, this.#directoryOf(key), key))?.info
-    )
+  head: IObjectNative['head'] = (key, logicalKey, ctx) =>
+    this.#locked(key, ctx, async () => {
+      /** Sidecar metadata of the current object, if any. */
+      const info = (await readCurrent(this.#io, this.#directoryOf(key), key))?.info
+      // A sidecar naming a different key is corrupt; never return another object's metadata.
+      if (info !== undefined && info.key !== logicalKey)
+        throw objectError(ObjectErrorCode.dataInvalid)
+      return info
+    })
 
   /** Execute the original remove operation with this owner's native state. */
   remove: IObjectNative['remove'] = (key, ctx) =>

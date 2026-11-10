@@ -1,3 +1,4 @@
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
   createBackendChangeController,
   runTransactionOperation,
@@ -291,16 +292,26 @@ class PgOrganizationRegistry<T> implements IStorageOrgBinding {
       await this.#organization(orgId).dropVectorOrg(client, orgId)
       await client.query('COMMIT', [])
     } catch (cause) {
+      /** The operation's failure stays primary; rollback and release failures are attached to it. */
+      let primary: unknown = cause
       try {
         await client.query('ROLLBACK', [])
       } catch (secondary) {
-        throw normalizePostgresError(
+        primary = normalizePostgresError(
           new AggregateError([cause, secondary], PostgresErrorText.sqlFailed)
         )
       }
-      throw cause
-    } finally {
+      try {
+        await client.dispose()
+      } catch (release) {
+        primary = attachSecondaryErrors(primary, [release])
+      }
+      throw primary
+    }
+    try {
       await client.dispose()
+    } catch (release) {
+      throw normalizePostgresError(release)
     }
   }
   /** Every journal route resolves the same original org and never caches another index. */
@@ -340,6 +351,11 @@ export async function createPostgresStore<T>(
     throw new StorageContractError(StorageContractErrorCode.unsupported, {
       backend: PgNames.backend
     })
+  // The change feed needs listen; reject before probing or running any DDL.
+  if (configuration.server === 'postgres' && configuration.driver.listen === undefined)
+    throw new StorageContractError(StorageContractErrorCode.unsupported, {
+      backend: PgNames.backend
+    })
   const probe = await probePostgres(configuration)
   const tables = postgresTables(configuration, probe.maxIdentifierBytes)
   await ensurePostgresTables(configuration, tables)
@@ -375,10 +391,6 @@ export async function createPostgresStore<T>(
     createBackendChangeController
   )
   try {
-    if (configuration.server === 'postgres' && configuration.driver.listen === undefined)
-      throw new StorageContractError(StorageContractErrorCode.unsupported, {
-        backend: PgNames.backend
-      })
     changes = await createPgChanges(configuration, controller)
     /** The registry owns root and child organization instances under this physical controller. */
     const environment: IPgStoreEnvironment = {

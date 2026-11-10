@@ -119,7 +119,7 @@ Text, bytes and records use separate channels, but another channel holding the s
 
 Driver is required; table defaults to migaia. concurrency selects conflict behavior and maxLockMs bounds the lease. A store uses the driver exclusively but never closes it. Separate connections may share a file; one driver cannot serve two stores concurrently. Feature clients expose exec/prepare without disposal. Repeated dispose returns the same main Promise; symbolic cleanup has a separate report-only Promise, sharing one real cleanup. The store stays terminal after cleanup failure.
 
-Package failures use source @migaia/storage-plugin-sqlite and SQLITE_FAILED, TRANSACTION_FAILED, DUPLICATE_KEY or DECODE_FAILED. Shared validation, cancellation, timeout and conflict codes retain their source. Original failures remain on cause; aggregate errors keep the primary failure first if rollback also fails. Decode errors never repair data automatically. Vectors and RDF are unsupported, including their lock targets before native I/O. No live change feed or server-side record-field index is provided.
+Package failures use source storage.backend.sqlite and SQLITE_FAILED, TRANSACTION_FAILED, DUPLICATE_KEY or DECODE_FAILED. Shared validation, cancellation, timeout and conflict codes retain their source. Original failures remain on cause; aggregate errors keep the primary failure first if rollback also fails. Decode errors never repair data automatically. Vectors and RDF are unsupported, including their lock targets before native I/O. No live change feed or server-side record-field index is provided.
 
 ## Optional journals
 

@@ -51,3 +51,11 @@ export function missingCapability(tier: number, capability: string): never {
     CacheText.missingCapability(tier, capability)
   )
 }
+
+/** True for a failure that already carries a storage error identity (own `source` data property). */
+export function isCodedCacheFailure(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  /** Own source, read without invoking a getter. */
+  const source = Object.getOwnPropertyDescriptor(error, 'source')?.value
+  return typeof source === 'string' && source.startsWith('storage.')
+}

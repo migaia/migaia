@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { probeWebStorage } from '../../src/utils/availability.ts'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
 import type { IWebStorageLike } from '../../src/types/storage.ts'
@@ -38,6 +38,42 @@ describe('probeWebStorage', () => {
     expect(probeWebStorage(storage)).toBe(true)
     expect(storage.getItem('__storage_web_probe__')).toBe('caller-value')
     expect(storage.length).toBe(1)
+  })
+
+  it('生成的临时键与调用方数据冲突时换用下一个键，不覆盖也不删除调用方数据', () => {
+    const storage = fakeWebStorage()
+    vi.spyOn(Date, 'now').mockReturnValue(0)
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.5)
+    try {
+      /** First generated fallback key, prefilled so it collides with caller data. */
+      const collidingKey = `__storage_web_probe__:0:${(0.25).toString(36).slice(2)}`
+      storage.setItem('__storage_web_probe__', 'caller-base')
+      storage.setItem(collidingKey, 'caller-fallback')
+      expect(probeWebStorage(storage)).toBe(true)
+      expect(storage.getItem('__storage_web_probe__')).toBe('caller-base')
+      expect(storage.getItem(collidingKey)).toBe('caller-fallback')
+      expect(storage.length).toBe(2)
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('所有候选键都被调用方占用时返回 false，且调用方数据不变', () => {
+    const storage = fakeWebStorage()
+    vi.spyOn(Date, 'now').mockReturnValue(0)
+    vi.spyOn(Math, 'random').mockReturnValue(0.25)
+    try {
+      /** The only fallback key the stubbed generator can produce, prefilled by the caller. */
+      const collidingKey = `__storage_web_probe__:0:${(0.25).toString(36).slice(2)}`
+      storage.setItem('__storage_web_probe__', 'caller-base')
+      storage.setItem(collidingKey, 'caller-fallback')
+      expect(probeWebStorage(storage)).toBe(false)
+      expect(storage.getItem('__storage_web_probe__')).toBe('caller-base')
+      expect(storage.getItem(collidingKey)).toBe('caller-fallback')
+      expect(storage.length).toBe(2)
+    } finally {
+      vi.restoreAllMocks()
+    }
   })
 
   it('setItem 抛错（隐私模式）时返回 false', () => {

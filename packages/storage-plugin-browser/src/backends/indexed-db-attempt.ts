@@ -92,6 +92,8 @@ export type IIndexedDbNativeCallback<TValue, T> = {
   access: ReturnType<typeof createNativeDataAccess<TValue>>
   /** Original native access exposes changed within this callback only. */
   changed: ReturnType<typeof createNativeDataAccess<TValue>>['changed']
+  /** Keys removed by whole-channel clears; a clear resets `changed`, so they are counted here. */
+  clearedCount: number
   /** Original native access exposes indexedScopes within this callback only. */
   indexedScopes: ReturnType<typeof createNativeDataAccess<TValue>>['indexedScopes']
   /** Original native access exposes markChanged within this callback only. */
@@ -117,7 +119,7 @@ export async function attemptNative<TValue, T>(
   run: (scope: IIndexedDbTransactionScope<TValue>) => T
 ): Promise<Awaited<T>> {
   /** Physical state is initialized before its corresponding native callbacks can execute. */
-  const nativeState = { attemptState, run } as IIndexedDbNativeCallback<TValue, T>
+  const nativeState = { attemptState, run, clearedCount: 0 } as IIndexedDbNativeCallback<TValue, T>
 
   assertTransactionCallback(nativeState.run, StorageBackend.indexedDb)
 
@@ -226,7 +228,10 @@ export async function attemptNative<TValue, T>(
     beforeCommit: (...args) => indexedDbNativeBeforeCommit(nativeState, ...args),
     validateCommit: () => indexedDbNativeValidateCommit(nativeState),
     changedKeys: () =>
-      [...nativeState.changed.values()].reduce((count, keys) => count + keys.size, 0),
+      [...nativeState.changed.values()].reduce(
+        (count, keys) => count + keys.size,
+        nativeState.clearedCount
+      ),
     afterCommit: () =>
       nativeState.attemptState.logicalTransaction.indexedDbContext.assemblies.notifications?.afterCommit(
         nativeState
@@ -370,7 +375,10 @@ export async function clearRoot<TValue, T>(
       request(nativeState, () => physical.clear())
     )
     await nativeState.ttlAccess.clear(target)
-    if (count > 0) nativeState.changed.set(target, new Map())
+    if (count > 0) {
+      nativeState.changed.set(target, new Map())
+      nativeState.clearedCount += count
+    }
   }
   if (channels.includes('record')) {
     if (nativeState.native.objectStoreNames.contains(INDEX_RECORDS_STORE_NAME))

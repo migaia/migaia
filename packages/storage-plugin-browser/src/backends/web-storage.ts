@@ -1,3 +1,4 @@
+import { snapshotBrowserConfig } from '../utils/config-snapshot.ts'
 import {
   createBackendChangeIterator,
   createBackendChangeController,
@@ -217,7 +218,7 @@ export function createWebStorageBackend(
   const webStorageContext = {
     backend,
     storage,
-    options,
+    options: snapshotBrowserConfig(options),
     runtime,
     bindOrganizations
   } as IWebStorageContext

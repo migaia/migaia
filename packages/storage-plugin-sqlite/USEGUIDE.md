@@ -119,7 +119,7 @@ backup 使用 VACUUM INTO，要求目标不存在且路径可写，不预删、�
 
 driver 必填；table 默认 migaia；concurrency 选择冲突策略，maxLockMs 是锁期限。一个 store 独占使用 driver，但不负责关闭它。多连接可共用文件，不能同时把同一 driver 交给两个 store。Feature 借用的 exec/prepare 客户端不含关闭权。dispose 重复返回相同主 Promise，符号释放有独立的报告型 Promise，两者共享一次清理；失败后仍终止。
 
-本包错误 source 为 @migaia/storage-plugin-sqlite，码为 SQLITE_FAILED、TRANSACTION_FAILED、DUPLICATE_KEY、DECODE_FAILED。校验、取消、超时和并发使用共享错误码。原生或编码错误保留在 cause；回滚也失败时，aggregate errors 首项保留主错误。解码失败不自动修补数据。向量和 RDF 不支持，对应锁在原生调用前报 UNSUPPORTED_CAPABILITY；不提供变更流或服务端记录字段索引。
+本包错误 source 为 storage.backend.sqlite，码为 SQLITE_FAILED、TRANSACTION_FAILED、DUPLICATE_KEY、DECODE_FAILED。校验、取消、超时和并发使用共享错误码。原生或编码错误保留在 cause；回滚也失败时，aggregate errors 首项保留主错误。解码失败不自动修补数据。向量和 RDF 不支持，对应锁在原生调用前报 UNSUPPORTED_CAPABILITY；不提供变更流或服务端记录字段索引。
 
 ## 可选日志
 

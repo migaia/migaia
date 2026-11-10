@@ -335,9 +335,10 @@ class ArchiveOperations {
     try {
       captured = captureRunInput(this.#configuration, options)
     } catch (cause) {
-      // Finite argument failures reject; unsupported accessors are not normalized here.
-      if (isArchiveError(cause)) return Promise.reject(cause)
-      throw cause
+      // Every run failure rejects; a throwing getter is INVALID_ARGUMENT with the getter error as cause.
+      return Promise.reject(
+        isArchiveError(cause) ? cause : archiveError(ArchiveErrorCode.invalidArgument, cause)
+      )
     }
     // The host already owns this immutable org identity and genuine backend projection.
     const call = callContext
@@ -503,8 +504,9 @@ class ArchiveOperations {
     try {
       captured = captureGetInput({ key, restore: options?.restore })
     } catch (cause) {
-      if (isArchiveError(cause)) return Promise.reject(cause)
-      throw cause
+      return Promise.reject(
+        isArchiveError(cause) ? cause : archiveError(ArchiveErrorCode.invalidArgument, cause)
+      )
     }
     // The host already owns this immutable org identity and genuine backend projection.
     const call = callContext

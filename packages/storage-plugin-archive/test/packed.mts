@@ -28,7 +28,8 @@ const packageNames = [
   'capability',
   'middleware-pipeline',
   'plugin-host',
-  'logger',
+  'log-host',
+  'log-plugin-durable',
   'storage-contract',
   'storage-host',
   'storage-plugin-archive'

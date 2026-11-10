@@ -67,7 +67,14 @@ type ISparqlHttpContext = {
 
   endpoint: ISparqlEndpoint
 }
-export function httpEndpoint(options: ISparqlHttpOptions): ISparqlEndpoint {
+export function httpEndpoint(requested: ISparqlHttpOptions): ISparqlEndpoint {
+  /** Every option is read once; a throwing getter is INVALID_ARGUMENT with its cause. */
+  let options: ISparqlHttpOptions
+  try {
+    options = { ...requested }
+  } catch (cause) {
+    throw invalidArgument(cause)
+  }
   /** Initialize physical owners in original order before a store escapes. */
   const httpContext = {} as ISparqlHttpContext
   httpContext.query = endpointUrl(options.queryUrl)
@@ -280,7 +287,10 @@ function readHttpAuth(auth: ISparqlHttpOptions['auth']): string | undefined {
     bearer = auth.bearer
   if ((basic === undefined) === (bearer === undefined)) throw invalidArgument()
   if (bearer !== undefined) {
-    if (typeof bearer !== 'string' || /[\r\n]/.test(bearer)) throw invalidArgument()
+    // Fetch rejects any header value with a control character (including NUL) locally; reject the
+    // same values here, so an unsendable request is never mistaken for an unknown commit later.
+    // oxlint-disable-next-line no-control-regex -- matching control characters is the intent.
+    if (typeof bearer !== 'string' || /[\u0000-\u001f\u007f]/.test(bearer)) throw invalidArgument()
     return 'Bearer ' + bearer
   }
   /** Basic credentials are encoded into the request header only and never failure metadata. */

@@ -26,6 +26,8 @@ export const objectBackendKind = defineStorageBackendKind<
     getDriverKind(): ObjectDriverKind
     getS3Client(): S3Client
     getObjectAddress(key: string, ctx?: IOperationContext): IObjectAddress
+    /** True once the driver confirmed conditional writes; presign checks it before signing. */
+    supportsConditionalWrites(): boolean
   }
 >()(ObjectNames.backend)
 /** Capture an authentic lazy driver; installation alone opens native resources. */
@@ -83,6 +85,8 @@ class ObjectBackendInstallation<F extends IStorageFeatureRecord> {
         })
       return this.#construction.native.client
     },
-    getObjectAddress: (key: string, ctx?: IOperationContext) => this.#construction.address(key, ctx)
+    getObjectAddress: (key: string, ctx?: IOperationContext) =>
+      this.#construction.address(key, ctx),
+    supportsConditionalWrites: () => this.#construction.native.conditionalWrites?.() === true
   })
 }

@@ -24,7 +24,8 @@ const packageNames = [
   'capability',
   'middleware-pipeline',
   'plugin-host',
-  'logger',
+  'log-host',
+  'log-plugin-durable',
   'storage-contract',
   'storage-host',
   'storage-plugin-object'
@@ -40,7 +41,7 @@ try {
   const extracted = new Map<string, string>()
   for (const name of packageNames) {
     const source = resolve(packageDirectory, '..', name)
-    execFileSync('rtk', ['proxy', 'pnpm', 'pack', '--pack-destination', pack], {
+    execFileSync('pnpm', ['pack', '--pack-destination', pack], {
       cwd: source,
       stdio: 'pipe'
     })
@@ -50,9 +51,7 @@ try {
     }
     const target = join(directory, 'extract', name)
     mkdirSync(target, { recursive: true })
-    execFileSync('rtk', [
-      'proxy',
-      'tar',
+    execFileSync('tar', [
       '-xzf',
       join(
         pack,
@@ -115,7 +114,7 @@ try {
 console.log('object packed consumer PASS')
 `
   )
-  execFileSync('rtk', ['proxy', 'node', 'native.mjs'], { cwd: consumer, stdio: 'inherit' })
+  execFileSync(process.execPath, ['native.mjs'], { cwd: consumer, stdio: 'inherit' })
   console.log(
     JSON.stringify({
       tarballs: readdirSync(pack).filter((name) => name.endsWith('.tgz')).length,
