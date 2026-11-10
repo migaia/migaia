@@ -314,18 +314,80 @@ export async function startDynamicEntries<TBinding>(
       nodes: startable.map((entry) => entry.definition.id)
     })
   }
+  /** Every instance is read and validated before any entry is published, so failure is atomic. */
+  const values = await readStartedInstances(context, startable, instances)
   for (let index = 0; index < startable.length; index += 1) {
     /** Canonical result position pairs each instance with its requested definition. */
     const entry = startable[index]
-    /** Instance identity, release receiver and value getter remain composition-owned. */
-    const instance = instances[index]
-    if (!instance || typeof instance !== 'object' || typeof instance.release !== 'function')
-      throw dynamicFailure(CapabilityGraphErrorCode.invalidNode)
-    entry.instance = instance
-    entry.value = instance.value
+    entry.instance = instances[index]
+    entry.value = values[index]
     entry.error = undefined
     entry.blockedReason = undefined
     entry.state = CapabilityGraphNodeState.ready
     entry.generation = context.graphGeneration
+  }
+}
+
+/**
+ * Validate every returned instance and read its value once. If any instance is invalid or its value
+ * getter throws, nothing is published: the returned instances go back to `releaseBatch`, the batch
+ * entries are marked failed (or blocked when the failure cannot be attributed), and START_FAILED is
+ * thrown with the original failure as cause.
+ */
+async function readStartedInstances<TBinding>(
+  context: IDynamicGraphContext<TBinding>,
+  startable: readonly IDynamicStoredNode<TBinding>[],
+  instances: readonly IGraphNodeInstance<unknown>[]
+): Promise<unknown[]> {
+  /** Values read once, in batch order. */
+  const values: unknown[] = []
+  try {
+    for (const instance of instances) {
+      if (!instance || typeof instance !== 'object' || typeof instance.release !== 'function')
+        throw dynamicFailure(CapabilityGraphErrorCode.invalidNode)
+      values.push(instance.value)
+    }
+    return values
+  } catch (error) {
+    await releaseUnpublishedInstances(context, startable, instances)
+    /** Only a single-node batch permits attributing the retained original failure. */
+    const attributable = startable.length === 1
+    for (const entry of startable) {
+      entry.state = attributable
+        ? CapabilityGraphNodeState.failed
+        : CapabilityGraphNodeState.blocked
+      entry.error = error
+      entry.blockedReason = attributable ? undefined : GraphBlockedReason.failed
+    }
+    throw graphFailure(CapabilityGraphErrorCode.startFailed, error, {
+      nodes: startable.map((entry) => entry.definition.id)
+    })
+  }
+}
+
+/** Hand started but never-published instances back to the physical cleanup owner. */
+async function releaseUnpublishedInstances<TBinding>(
+  context: IDynamicGraphContext<TBinding>,
+  startable: readonly IDynamicStoredNode<TBinding>[],
+  instances: readonly IGraphNodeInstance<unknown>[]
+): Promise<void> {
+  /** Only structurally valid instances can be released. */
+  const releasable: IGraphReleaseEntry<TBinding>[] = []
+  for (let index = 0; index < startable.length; index += 1) {
+    /** Returned instance at the same batch position as its definition. */
+    const instance = instances[index]
+    if (instance && typeof instance === 'object' && typeof instance.release === 'function')
+      releasable.push({
+        id: startable[index].definition.id,
+        binding: startable[index].binding,
+        instance
+      })
+  }
+  if (releasable.length === 0) return
+  try {
+    // No lease was issued for these instances, so the fence is already settled.
+    await context.options.releaseBatch(releasable, Promise.resolve())
+  } catch (error) {
+    reportDynamicError(context, error)
   }
 }

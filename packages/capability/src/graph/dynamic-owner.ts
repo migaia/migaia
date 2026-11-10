@@ -52,19 +52,17 @@ export class DynamicCapabilityGraph<TBinding> implements IDynamicCapabilityGraph
   #disposePromise: Promise<void> | undefined
 
   /** Admits the original live options before constructing the lifecycle mutation queue. */
-  constructor(options: IDynamicCapabilityGraphOptions<TBinding>) {
-    this.#context = createDynamicContext(options)
-    if (
-      !options ||
-      typeof options.startBatch !== 'function' ||
-      typeof options.releaseBatch !== 'function'
-    )
+  constructor(requested: IDynamicCapabilityGraphOptions<TBinding>) {
+    /** Options are read once and validated before any graph state exists. */
+    const options = snapshotDynamicOptions(requested)
+    if (typeof options.startBatch !== 'function' || typeof options.releaseBatch !== 'function')
       throw dynamicFailure(CapabilityGraphErrorCode.invalidOption)
     if (
       options.mutationAdmissionMs !== undefined &&
       (!Number.isFinite(options.mutationAdmissionMs) || options.mutationAdmissionMs < 0)
     )
       throw dynamicFailure(CapabilityGraphErrorCode.invalidOption)
+    this.#context = createDynamicContext(options)
     this.#mutationQueue = createMutationQueue({
       queueAdmissionTimeoutMs: options.mutationAdmissionMs ?? false
     })
@@ -336,21 +334,16 @@ export class DynamicCapabilityGraph<TBinding> implements IDynamicCapabilityGraph
           edge.provider === node.dependencies[index]?.provider &&
           edge.required === node.dependencies[index]?.required
       )
+    // Replacement is atomic: the new definition and topology are committed only after the old
+    // instances are released, so a failed release leaves the graph exactly as it was. Changed
+    // edges are still validated first: a trial write rejects malformed or cyclic edges before any
+    // release, and the old (acyclic) edges are restored at once.
     if (!sameTopology) {
       this.#context.topologyIndex.setDependencies(node.id, node.dependencies)
-      this.#context.diagnosticCache = undefined
+      this.#context.topologyIndex.setDependencies(node.id, oldDependencies)
     }
-    previous.definition = node
-    /** Same-edge replacement reuses the frontier instead of rebuilding a redundant set. */
-    let affectedIds: Iterable<string> = oldAffected
-    if (!sameTopology) {
-      /** Changed edges require one old/new union, ordered once by the canonical owner. */
-      const combined = new Set(oldAffected)
-      for (const id of this.#context.topologyIndex.closure([node.id])) combined.add(id)
-      affectedIds = combined
-    }
-    /** Lifecycle entries remain provider-first independently of closure insertion order. */
-    const affected = orderedDynamicEntries(this.#context, affectedIds)
+    /** Old frontier, provider-first; this is what release tears down. */
+    const released = orderedDynamicEntries(this.#context, oldAffected)
     if (options?.restartDependents === false) {
       /** Notification mode restarts only the provider before handing off new binding identity. */
       const targetOnly = [previous]
@@ -360,6 +353,7 @@ export class DynamicCapabilityGraph<TBinding> implements IDynamicCapabilityGraph
         new Set([node.id]),
         GraphBindingReleaseReason.replace
       )
+      this.#commitReplacement(previous, node, sameTopology)
       previous.binding = binding
       previous.state = CapabilityGraphNodeState.registered
       previous.error = undefined
@@ -399,20 +393,56 @@ export class DynamicCapabilityGraph<TBinding> implements IDynamicCapabilityGraph
           await startDynamicEntries(this.#context, restartEntries)
         }
       }
-      return dynamicMutationResult(this.#context, affected, !sameTopology)
+      return dynamicMutationResult(
+        this.#context,
+        this.#replacementFrontier(oldAffected, node.id, sameTopology),
+        !sameTopology
+      )
     }
     await releaseDynamicEntries(
       this.#context,
-      affected,
+      released,
       new Set([node.id]),
       GraphBindingReleaseReason.replace
     )
+    this.#commitReplacement(previous, node, sameTopology)
+    /** Restart frontier after the commit: the old closure plus any node the new edges reach. */
+    const affected = this.#replacementFrontier(oldAffected, node.id, sameTopology)
     previous.binding = binding
     previous.state = CapabilityGraphNodeState.registered
     previous.error = undefined
     this.#context.graphGeneration += 1
     await startDynamicEntries(this.#context, affected)
     return dynamicMutationResult(this.#context, affected, !sameTopology)
+  }
+
+  /** Publish a replacement definition and, when its edges changed, its new topology. */
+  #commitReplacement(
+    previous: IDynamicStoredNode<TBinding>,
+    node: IDynamicStoredNode<TBinding>['definition'],
+    sameTopology: boolean
+  ): void {
+    if (!sameTopology) {
+      this.#context.topologyIndex.setDependencies(node.id, node.dependencies)
+      this.#context.diagnosticCache = undefined
+    }
+    previous.definition = node
+  }
+
+  /**
+   * Provider-first entries affected by a committed replacement. Same edges reuse the old closure;
+   * changed edges add the new closure once.
+   */
+  #replacementFrontier(
+    oldAffected: readonly string[],
+    id: string,
+    sameTopology: boolean
+  ): IDynamicStoredNode<TBinding>[] {
+    if (sameTopology) return orderedDynamicEntries(this.#context, oldAffected)
+    /** Old and new closures, each id once. */
+    const combined = new Set(oldAffected)
+    for (const nodeId of this.#context.topologyIndex.closure([id])) combined.add(nodeId)
+    return orderedDynamicEntries(this.#context, combined)
   }
 
   /** Marks the container ready only after its current satisfiable frontier has settled. */
@@ -441,5 +471,27 @@ export class DynamicCapabilityGraph<TBinding> implements IDynamicCapabilityGraph
       this.#context.graphState = CapabilityGraphState.terminal
       this.#context.graphGeneration += 1
     }
+  }
+}
+
+/**
+ * Copy the dynamic graph options with one read of each field. A throwing getter becomes
+ * GRAPH_INVALID_OPTION with the getter error kept as the coded primary.
+ */
+function snapshotDynamicOptions<TBinding>(
+  options: IDynamicCapabilityGraphOptions<TBinding>
+): IDynamicCapabilityGraphOptions<TBinding> {
+  if (!options || typeof options !== 'object')
+    throw dynamicFailure(CapabilityGraphErrorCode.invalidOption)
+  try {
+    return Object.freeze({
+      startBatch: options.startBatch,
+      releaseBatch: options.releaseBatch,
+      releaseBinding: options.releaseBinding,
+      report: options.report,
+      mutationAdmissionMs: options.mutationAdmissionMs
+    })
+  } catch (error) {
+    throw graphFailure(CapabilityGraphErrorCode.invalidOption, error)
   }
 }

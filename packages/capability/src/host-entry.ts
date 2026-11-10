@@ -3,11 +3,7 @@
  * transitions reuse lifecycle generations and host-owned quiescence; this module does not own flags
  * or choose batch release order.
  */
-import {
-  containAsyncRejection,
-  createGenerationController,
-  type IGenerationToken
-} from '@migaia/lifecycle'
+import { createGenerationController, type IGenerationToken } from '@migaia/lifecycle'
 import type {
   ICapabilityDefinition,
   ICapabilityEnableResult,
@@ -227,8 +223,7 @@ export class CapabilityEntry<Context> {
         )
         this.#owner.trackPending(this, pending)
       }
-      if (!thenable)
-        containAsyncRejection(result, (error) => this.#recordCleanupFailure(error, generation))
+      // A non-thenable result was classified by the single `then` read above; it is not read again.
     } catch (error) {
       this.#recordCleanupFailure(error, generation)
     }

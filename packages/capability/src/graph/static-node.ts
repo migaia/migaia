@@ -1,3 +1,4 @@
+import { isArrayAdmitted } from './errors.ts'
 /** Captures static node definitions and direct-edge membership; owns no resources or scheduling. */
 import type { IGenerationToken } from '@migaia/lifecycle'
 import type { IGraphNodeId, IGraphDependency, IGraphNodeDefinition } from './index.ts'
@@ -57,7 +58,7 @@ export function readStaticNode<T>(input: IGraphNodeDefinition<T>, ordinal: numbe
     typeof kind !== 'string' ||
     kind.length === 0 ||
     typeof start !== 'function' ||
-    !Array.isArray(dependencies)
+    !isArrayAdmitted(dependencies, CapabilityGraphErrorCode.invalidNode)
   )
     throw staticGraphFailure(CapabilityGraphErrorCode.invalidNode)
   /** Immutable edge records preserve caller declaration order. */

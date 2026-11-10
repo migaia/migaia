@@ -111,3 +111,18 @@ export function graphMessageFor(code: ICapabilityGraphErrorCode): string {
   }
   return messages[code]
 }
+
+/**
+ * `Array.isArray` at an admission boundary. A revoked Proxy makes it throw a native TypeError; that
+ * error receives the given graph code instead of leaving the package uncoded.
+ */
+export function isArrayAdmitted(
+  value: unknown,
+  code: ICapabilityGraphErrorCode
+): value is unknown[] {
+  try {
+    return Array.isArray(value)
+  } catch (error) {
+    throw graphFailure(code, error)
+  }
+}

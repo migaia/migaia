@@ -46,11 +46,18 @@ export function snapshotTopologyDependencies(
   nodeId: string,
   onInvalid: ITopologySnapshotFailure
 ): readonly ITopologyDependency[] {
-  if (!Array.isArray(value)) onInvalid(TopologyInvalidReason.invalidNode, nodeId)
+  /** A revoked Proxy throws from Array.isArray; that failure is reported as an invalid node. */
+  let isArray: boolean
+  try {
+    isArray = Array.isArray(value)
+  } catch (cause) {
+    return onInvalid(TopologyInvalidReason.invalidNode, nodeId, { cause })
+  }
+  if (!isArray) onInvalid(TopologyInvalidReason.invalidNode, nodeId)
   /** A stable membership snapshot prevents edge accessors from rewriting later input entries. */
   let candidates: unknown[]
   try {
-    candidates = value.slice()
+    candidates = (value as unknown[]).slice()
   } catch (cause) {
     onInvalid(TopologyInvalidReason.invalidNode, nodeId, { cause })
   }
