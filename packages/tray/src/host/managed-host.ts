@@ -3,6 +3,7 @@
  * existing Graph and PluginHost composition remain the only topology and resource owners.
  */
 import { mergeCleanupResults } from '@migaia/lifecycle'
+import { reportUnhandledError } from '@migaia/utils/error'
 import { CapabilityGraphNodeState } from '@migaia/capability/graph'
 import { createEventHub, type IEventContext } from '@migaia/event-subscriber'
 import {
@@ -78,6 +79,16 @@ export class ManagedTrayHost {
         }
       }
     })
+  }
+
+  /** Reports a secondary cleanup failure without letting a throwing reporter escape. */
+  #reportSecondary(error: unknown): void {
+    try {
+      if (this.#context.options.report) this.#context.options.report(error)
+      else reportUnhandledError(error)
+    } catch (failure) {
+      reportUnhandledError(failure)
+    }
   }
 
   /** Read the currently owned graph names only after publication converges. */
@@ -187,7 +198,12 @@ export class ManagedTrayHost {
         this.#context.graph.getBinding(name as IGraphId) === candidate
       if (candidate && !committed) {
         this.#composition!.retireDataOrderSlot(candidate.slot)
-        await candidate.artifactCustody?.rollback()
+        try {
+          await candidate.artifactCustody?.rollback()
+        } catch (rollbackError) {
+          /** Rollback failure is secondary; the mutation failure stays the published result. */
+          this.#reportSecondary(rollbackError)
+        }
       }
       /** Publish the original failure observation without changing its error identity. */
       const failure = mutationFailure(ManagedHostOperation.use, name, error, this, committed)

@@ -52,6 +52,40 @@ export type ICreateTrayOptions<
   report?(error: unknown): void
 }>
 /**
+ * Snapshots the caller's options once. Missing hosts, or a getter, Proxy or iterator that throws,
+ * becomes `TRAY_HOST_INVALID`; the thrown error stays on `cause`.
+ */
+function readTrayOptions<
+  THosts extends readonly IAnyTrayHost[],
+  TRouting extends readonly ITrayRoutingPolicy[]
+>(options: ICreateTrayOptions<THosts, TRouting>): ICreateTrayOptions<THosts, TRouting> {
+  if (!options || typeof options !== 'object') throw createTrayError(TrayErrorCode.hostInvalid)
+  /** Plain copy read once; arrays are copied so later reads never touch caller objects. */
+  let input: ICreateTrayOptions<THosts, TRouting> | undefined
+  try {
+    /** Hosts read once, so a getter runs a single time. */
+    const hosts = options.hosts
+    /** Routing read once; absent routing stays absent. */
+    const routing = options.routing
+    input = Array.isArray(hosts)
+      ? Object.freeze({
+          hosts: Object.freeze([...hosts]) as unknown as THosts,
+          routing:
+            routing === undefined
+              ? undefined
+              : (Object.freeze([...routing]) as unknown as TRouting),
+          probe: options.probe,
+          report: options.report
+        })
+      : undefined
+  } catch (error) {
+    throw createTrayError(TrayErrorCode.hostInvalid, error)
+  }
+  if (!input) throw createTrayError(TrayErrorCode.hostInvalid)
+  return input
+}
+
+/**
  * Creates a frozen parent registry for trusted host definitions, without spawning instances. The
  * registry owns admission metadata and its parent PluginHost; native connections and generations
  * remain RPC/supervision-owned. Invalid definitions/policies reject synchronously. spawn() awaits
@@ -117,10 +151,7 @@ class TrayRuntime<
 
   /** Capture cold definitions and install only the original parent relay. */
   constructor(options: ICreateTrayOptions<THosts, TRouting>) {
-    this.#options = options
-
-    if (!this.#options || !Array.isArray(this.#options.hosts))
-      throw createTrayError(TrayErrorCode.hostInvalid)
+    this.#options = readTrayOptions(options)
 
     /** Branded definitions are captured once; business plugin factories stay entirely child-side. */
     this.#definitions = new Map<string, IAnyTrayHost>()

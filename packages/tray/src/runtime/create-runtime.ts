@@ -41,6 +41,29 @@ export function createRuntime<
     ITrayHostSourceOf<THost>
   >
 }
+/** Runtime options as read once from the caller. */
+type IRuntimeOptions = Readonly<{
+  shutdown?: IRuntimeShutdownOptions
+  report?: (error: unknown) => void
+}>
+
+/**
+ * Reads runtime options and the shutdown mode once. A getter or Proxy that throws becomes
+ * `RUNTIME_CONTRACT_INVALID` with the thrown error on `cause`.
+ */
+function readRuntimeOptions(options: IRuntimeOptions): IRuntimeOptions {
+  try {
+    /** Shutdown policy read once; its mode is copied so later reads see plain data. */
+    const shutdown = options.shutdown
+    return Object.freeze({
+      shutdown: shutdown == null ? undefined : Object.freeze({ mode: shutdown.mode }),
+      report: options.report
+    })
+  } catch (error) {
+    throw createTrayError(TrayErrorCode.runtimeContractInvalid, error)
+  }
+}
+
 /** Exact-generation run owner borrows Host leases and never duplicates Host lifecycle. */
 class RuntimeOwner {
   /** Original managed Host is borrowed, never disposed by Runtime. */
@@ -71,17 +94,19 @@ class RuntimeOwner {
   /** Public object keeps its original own getters and bound methods. */
   #runtime: IRuntime
   /** Validate original Host provenance before registering any observer or accepting work. */
-  constructor(
-    host: Pick<ITrayHost<any, any, any>, 'on'>,
-    options: Readonly<{ shutdown?: IRuntimeShutdownOptions; report?: (error: unknown) => void }>
-  ) {
+  constructor(host: Pick<ITrayHost<any, any, any>, 'on'>, options: IRuntimeOptions) {
     this.#host = host
-    this.#options = options
+    this.#options = readRuntimeOptions(options)
     if (!this.#host || typeof this.#host !== 'object')
       throw createTrayError(TrayErrorCode.runtimeContractInvalid)
     this.#bridge = readRuntimeBridge(this.#host as object)!
     if (!this.#bridge) throw createTrayError(TrayErrorCode.runtimeContractInvalid)
     this.#shutdown = this.#options.shutdown ?? { mode: TrayShutdownMode['strict-drain'] }
+    if (
+      typeof this.#shutdown.mode !== 'string' ||
+      !Object.hasOwn(TrayShutdownMode, this.#shutdown.mode)
+    )
+      throw createTrayError(TrayErrorCode.runtimeContractInvalid)
     this.#active = new Map<number, ReturnType<typeof createAbortController>>()
     this.#inFlight = new Set<Promise<unknown>>()
     this.#runOwner = {

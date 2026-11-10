@@ -476,34 +476,54 @@ function snapshotOptions<
 >(options: ICreateHostOptions<THost, TPlugins>): ICreateHostOptions<THost, TPlugins> {
   if (options === null || typeof options !== 'object')
     throw createTrayError(TrayErrorCode.invalidEntry)
-  /** Read the concrete Host factory once before constructing any resource. */
-  const create = options.create
-  /** Capture the original plugin array once before making its immutable admission snapshot. */
-  const plugins = options.plugins
-  /** Capture the required mutation queue wait budget before validation. */
-  const mutationAdmissionMs = options.mutationAdmissionMs
-  /** Capture the explicit bounded physical-cleanup wait budget before validation. */
-  const quiescenceMs = options.quiescenceMs
-  /** Capture the caller-owned shutdown policy without changing its observable identity. */
-  const shutdown = options.shutdown
+  /** Every caller-owned read happens once here; a throwing getter becomes `TRAY_INVALID_ENTRY`. */
+  let input: ReturnType<typeof readCreateInput<THost, TPlugins>>
+  try {
+    input = readCreateInput(options)
+  } catch (error) {
+    throw createTrayError(TrayErrorCode.invalidEntry, error)
+  }
+  const { create, plugins, mutationAdmissionMs, quiescenceMs, shutdown, mode } = input
   if (
     typeof create !== 'function' ||
-    !Array.isArray(plugins) ||
+    plugins === undefined ||
     !Number.isFinite(mutationAdmissionMs) ||
     mutationAdmissionMs < 0 ||
     !Number.isFinite(quiescenceMs) ||
     quiescenceMs < 0 ||
     !shutdown ||
-    (shutdown.mode !== TrayShutdownMode.bounded &&
-      shutdown.mode !== TrayShutdownMode['strict-drain'])
+    (mode !== TrayShutdownMode.bounded && mode !== TrayShutdownMode['strict-drain'])
   )
     throw createTrayError(TrayErrorCode.invalidEntry)
   return Object.freeze({
     create,
-    plugins: Object.freeze([...plugins]) as ICreateHostOptions<THost, TPlugins>['plugins'],
+    plugins: Object.freeze(plugins) as unknown as ICreateHostOptions<THost, TPlugins>['plugins'],
     mutationAdmissionMs,
     quiescenceMs,
     shutdown,
-    report: options.report
+    report: input.report
   })
+}
+
+/**
+ * Reads each creation option exactly once, copies the plugin array and reads the shutdown mode.
+ * Callers classify any throw from a getter, Proxy or iterator; validation happens afterwards.
+ */
+function readCreateInput<
+  THost extends ITrayHostSource,
+  TPlugins extends readonly ITrayPluginConstraint<THost>[]
+>(options: ICreateHostOptions<THost, TPlugins>) {
+  /** Original plugin value; copied only when it is an array, so validation can reject others. */
+  const plugins: unknown = options.plugins
+  /** Caller-owned shutdown policy, kept by identity. */
+  const shutdown = options.shutdown
+  return {
+    create: options.create,
+    plugins: Array.isArray(plugins) ? [...(plugins as readonly unknown[])] : undefined,
+    mutationAdmissionMs: options.mutationAdmissionMs,
+    quiescenceMs: options.quiescenceMs,
+    shutdown,
+    mode: shutdown ? shutdown.mode : undefined,
+    report: options.report
+  }
 }
