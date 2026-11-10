@@ -12,15 +12,15 @@ This package owns no sessions, connections, pending tables, timers, or IO. Norma
 pnpm add @migaia/rpc-contract
 ```
 
-| Entry                                    | Content                                                                                    |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Root                                     | Protocol, interface types, portable values, errors, and codes                              |
-| `/protocol`                              | `migaia.rpc/2` types, constants, pure shape checks, and flat wire-error graphs             |
-| `/interfaces`                            | Host, carrier, flow-plugin, and executing-feature interfaces                               |
-| `/portable`                              | Portable normalization, snapshots, and native backing shape rules                          |
-| `/errors`                                | Native error classes, identity properties, tree projection/restoration, and privacy checks |
-| `/error-code`                            | The single RPC-family code table and source constants                                      |
-| `/schema/protocol`, `/schema/wire-error` | Published JSON schemas                                                                     |
+| Entry                                    | Content                                                                                                                                                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Root                                     | Protocol, interface types, portable values, errors, and codes                                                                                                                                                                                    |
+| `/protocol`                              | `migaia.rpc/2` types, constants, pure shape checks, and flat wire-error graphs                                                                                                                                                                   |
+| `/interfaces`                            | Host, carrier, flow-plugin, and executing-feature interfaces                                                                                                                                                                                     |
+| `/portable`                              | Portable normalization, snapshots, and native backing shape rules                                                                                                                                                                                |
+| `/errors`                                | Native error classes, identity properties, tree projection/restoration, and privacy checks                                                                                                                                                       |
+| `/error-code`                            | The single RPC-family code table and source constants                                                                                                                                                                                            |
+| `/schema/protocol`, `/schema/wire-error` | Published JSON schemas: `/schema/protocol` validates protocol frames, whose errors are the flat `{root,nodes}` graph from `serializeRpcWireError`; `/schema/wire-error` validates the recursive error tree from `serializeRpcError` in `/errors` |
 
 Every RPC package may declare a direct dependency on this package. `sideEffects: false` permits tree-shaking; importing only `/error-code` does not retain protocol, carrier codec, or portable execution paths.
 

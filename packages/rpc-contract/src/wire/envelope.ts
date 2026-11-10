@@ -10,7 +10,7 @@ import type { IRpcErrorWireMetadata } from '../contract/types.ts'
  */
 import { normalizeRpcTask, normalizeRpcSteps } from './metadata.ts'
 
-import { identifier, invalid } from './record.ts'
+import { identifier, invalid, readField } from './record.ts'
 
 import { normalizeRpcPortable } from '../portable/normalize.ts'
 import { isIdempotencyKey } from './metadata.ts'
@@ -129,12 +129,14 @@ export function normalizeRpcFrame(
     invalid(P.root, undefined, metadata)
   /** Fixed metadata reads do not enumerate unknown properties or create a frame snapshot. */
   const input = value as Record<string, unknown>
-  if (input.profile === undefined) invalid('/profile', undefined, metadata)
-  if (input.kind === undefined) invalid('/kind', undefined, metadata)
-  if (input.profile !== RpcWireProfile) invalid(P.profile, undefined, metadata)
-  if (typeof input.kind !== 'string' || !Object.hasOwn(K, input.kind))
-    invalid(P.kind, undefined, metadata)
-  if (input.kind === K.handshake) return normalizeRpcHandshakeRecord(input, metadata)
+  /** Profile and kind are each read once; every check below uses these values. */
+  const profile = readField(input, 'profile', P.profile, metadata)
+  const kind = readField(input, 'kind', P.kind, metadata)
+  if (profile === undefined) invalid('/profile', undefined, metadata)
+  if (kind === undefined) invalid('/kind', undefined, metadata)
+  if (profile !== RpcWireProfile) invalid(P.profile, undefined, metadata)
+  if (typeof kind !== 'string' || !Object.hasOwn(K, kind)) invalid(P.kind, undefined, metadata)
+  if (kind === K.handshake) return normalizeRpcHandshakeRecord(input, metadata)
   if (input.id === undefined) invalid(P.id, undefined, metadata)
   if (input.route === undefined) invalid('/route', undefined, metadata)
   if (input.kind !== K.control && input.kind !== K.directory && input.task === undefined)

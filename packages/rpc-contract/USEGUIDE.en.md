@@ -145,7 +145,7 @@ Standalone tree utilities `serializeRpcError/deserializeRpcError/normalizeRpcSer
 
 ## Schemas and bounds
 
-Use published `schema/protocol.schema.json` and `schema/wire-error.schema.json` as structural starting points. Pure normalizers also check known fields, graph edges, canonical bytes, and applicable aggregate budgets. Schema validation does not admit sessions, native sources, or lifetimes. Foreign implementation vectors live in rpc-integration's core-profile vectors and independent-peer tests.
+Use published `schema/protocol.schema.json` and `schema/wire-error.schema.json` as structural starting points: the first validates protocol frames, whose errors are the flat `{root,nodes}` graph produced by `serializeRpcWireError`; the second validates the recursive error tree produced by `serializeRpcError` in `/errors` and does not validate the flat graph. Pure normalizers also check known fields, graph edges, canonical bytes, and applicable aggregate budgets. Schema validation does not admit sessions, native sources, or lifetimes. Foreign implementation vectors live in rpc-integration's core-profile vectors and independent-peer tests.
 
 RpcWireLimit fixes identifiers at128 characters, traces256, idempotency keys128, relative duration2147483647ms, handshake65536bytes, and at most8versions/16codecs/64extensions. Directories contain at most4096methods. Public constants/normalizers define stream/error/portable bounds.
 

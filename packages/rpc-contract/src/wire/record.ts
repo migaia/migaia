@@ -55,3 +55,20 @@ export function isIdentifier(value: unknown): value is string {
     typeof value === 'string' && value.length > 0 && value.length <= RpcWireLimit.maxIdentifierChars
   )
 }
+
+/**
+ * Read one fixed protocol field once. A throwing getter becomes the envelope error for `pointer`
+ * with the getter error on `cause`, so validation and later use see the same value.
+ */
+export function readField(
+  input: Record<string, unknown>,
+  key: string,
+  pointer: string,
+  metadata?: IRpcErrorWireMetadata
+): unknown {
+  try {
+    return input[key]
+  } catch (cause) {
+    return invalid(pointer, cause, metadata)
+  }
+}

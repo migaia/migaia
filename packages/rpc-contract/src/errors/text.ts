@@ -1,6 +1,8 @@
 /** Stable RPC error text shared by host and its plugins; no execution policy lives here. */
 /** Stable text retained by the core endpoint graph and its shared contracts. */
 export const RpcCoreErrorText = {
+  /** A feature factory could not read its options (a throwing getter); the error is on cause. */
+  featureOptionsInvalid: 'Feature options could not be read',
   /** Stable fallback and wire presentation for callback failures classified by the Core owner. */
   callbackFailed: 'RPC callback failed',
   /** Contract-only installation refuses activation until the probe-core runtime is available. */

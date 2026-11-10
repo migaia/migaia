@@ -4,6 +4,7 @@
  * with the invoking walker rather than this policy module.
  */
 import { isArrayBuffer } from '@migaia/utils/bytes'
+import { tryReadProperty } from '@migaia/utils/error'
 import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 import type { IPortableWalkerStrategy } from '@migaia/serialize'
 import { createContractError } from '../contract/contract-error.ts'
@@ -59,11 +60,13 @@ type IRpcPortableScalar = null | boolean | number | string
 
 /** Detect existing Contract errors so ordinary nested getter failures retain their exact identity. */
 function isContractError(value: unknown): value is Error & { readonly code: string } {
-  return (
-    value instanceof Error &&
-    (value as { readonly source?: unknown }).source === RPC_CONTRACT_SOURCE &&
-    typeof (value as { readonly code?: unknown }).code === 'string'
-  )
+  if (!(value instanceof Error)) return false
+  // Guarded reads: a throwing source/code getter means "not a Contract error", so the original
+  // failure is still wrapped and kept on cause instead of being replaced by the getter error.
+  const source = tryReadProperty(value as { readonly source?: unknown }, 'source')
+  if (source.threw || source.value !== RPC_CONTRACT_SOURCE) return false
+  const code = tryReadProperty(value as { readonly code?: unknown }, 'code')
+  return !code.threw && typeof code.value === 'string'
 }
 
 /** Preserve native Contract classes and source/code while retaining trapped failures on cause. */
@@ -240,11 +243,14 @@ export const rpcWirePortableStrategy: IRpcWirePortableStrategy = {
     /** The existing mapper borrows one explicit traversal context without changing species. */
     const context = { visit, depth, ancestors, guard, bounds }
     /** Preserve map/species output without reading or probing its application-owned properties. */
-    return value.map((child) => {
-      /** Preserve the original bare visitor receiver rather than invoking it as a context method. */
-      const visit = context.visit
-      return visit(child, context.depth, context.ancestors, context.guard, context.bounds)
-    })
+    // The intrinsic map is called on the array, so an own `map` override cannot skip the visitor.
+    return Reflect.apply(Array.prototype.map, value, [
+      (child: unknown) => {
+        /** Preserve the original bare visitor receiver rather than invoking it as a context method. */
+        const visit = context.visit
+        return visit(child, context.depth, context.ancestors, context.guard, context.bounds)
+      }
+    ])
   },
   key: assertRpcPortableRecordKey,
   write: writeRpcPortableRecord,

@@ -46,13 +46,28 @@ function validateIdentity(
     invalid('/directory/self', RpcShapeReason.record, metadata, inspection)
   /** The original identity is borrowed by every later consumer. */
   const identity = value as Record<string, unknown>
-  for (const field of ['name', 'instanceId'] as const)
+  // Exactly two identity fields, fixed by the directory contract.
+  for (const field of ['name', 'instanceId'] as const) {
+    /** One read per field, so the checked value is the value later consumers see. */
+    let text: unknown
+    try {
+      text = identity[field]
+    } catch (cause) {
+      invalid(
+        `/directory/self/${field}`,
+        RpcShapeReason['runtime-identity'],
+        metadata,
+        inspection,
+        cause
+      )
+    }
     if (
-      typeof identity[field] !== 'string' ||
-      identity[field].length === 0 ||
-      identity[field].length > RpcWireLimit.maxIdentifierChars
+      typeof text !== 'string' ||
+      text.length === 0 ||
+      text.length > RpcWireLimit.maxIdentifierChars
     )
       invalid(`/directory/self/${field}`, RpcShapeReason['runtime-identity'], metadata, inspection)
+  }
   normalizeRpcGeneration(identity.generation, metadata)
 }
 

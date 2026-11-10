@@ -96,11 +96,18 @@ function validateNode(
   /** A node keeps the existing scalar-first error order before optional data and routes. */
   let bytes = 0
   for (const field of textFields) {
-    if (node[field] === undefined)
+    /** One read per field; the getter error, if any, becomes the graph error's cause. */
+    let text: unknown
+    try {
+      text = node[field]
+    } catch (cause) {
+      invalidGraph(`${pointer}/${field}`, cause, metadata)
+    }
+    if (text === undefined)
       invalidGraph(`${pointer}/${field}`, undefined, metadata, RpcWireErrorViolation.required)
-    if (typeof node[field] !== 'string' || (field !== F.message && node[field].length === 0))
+    if (typeof text !== 'string' || (field !== F.message && text.length === 0))
       invalidGraph(`${pointer}/${field}`, undefined, metadata)
-    bytes += countText(node[field], `${pointer}/${field}`, metadata)
+    bytes += countText(text, `${pointer}/${field}`, metadata)
   }
   /** Structural JSON bytes use the same normalized data already produced by the portable walker. */
   let serializedBytes = bytes

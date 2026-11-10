@@ -145,7 +145,7 @@ console.log('native error graph preserved')
 
 ## 语法与预算依据
 
-使用包内`schema/protocol.schema.json`和`schema/wire-error.schema.json`作为JSON结构起点。纯 normalizer 还检查已知字段、图边、canonical bytes 与适用的累计预算；schema检查不等同于会话、原生source或lifecycle接纳。外语实现向量位于rpc-integration的core-profile向量与独立peer测试。
+使用包内`schema/protocol.schema.json`和`schema/wire-error.schema.json`作为JSON结构起点：前者校验协议帧，帧内错误是`serializeRpcWireError`产出的`{root,nodes}`扁平图；后者校验`/errors`中`serializeRpcError`产出的递归错误树，不能用来校验扁平图。纯 normalizer 还检查已知字段、图边、canonical bytes 与适用的累计预算；schema检查不等同于会话、原生source或lifecycle接纳。外语实现向量位于rpc-integration的core-profile向量与独立peer测试。
 
 `RpcWireLimit`固定标识128字符、trace256字符、idempotencyKey128字符、相对期限上限2147483647ms、握手65536字节、最多8版本/16codec/64扩展。方法目录最多4096方法；具体stream/error/portable预算由相应公开常量和normalizer维护。
 

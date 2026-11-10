@@ -12,15 +12,15 @@ contract 定义唯一线上协议、host/plugin/feature 接口、可移植值规
 pnpm add @migaia/rpc-contract
 ```
 
-| 入口                                     | 内容                                                          |
-| ---------------------------------------- | ------------------------------------------------------------- |
-| 根入口                                   | 协议、接口类型、portable、错误契约和错误码汇总                |
-| `/protocol`                              | `migaia.rpc/2` 数据类型、常量、纯形状检查、flat wire-error 图 |
-| `/interfaces`                            | host、载体、信息流 plugin 与执行 feature 的接口类型           |
-| `/portable`                              | 可移植值规范化、快照与原生 backing 形状规则                   |
-| `/errors`                                | 原生错误类、身份属性、错误树投影与恢复、隐私检查              |
-| `/error-code`                            | RPC 家族唯一错误码表及 source 常量                            |
-| `/schema/protocol`、`/schema/wire-error` | 随包发布的 JSON Schema                                        |
+| 入口                                     | 内容                                                                                                                                                                                                |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 根入口                                   | 协议、接口类型、portable、错误契约和错误码汇总                                                                                                                                                      |
+| `/protocol`                              | `migaia.rpc/2` 数据类型、常量、纯形状检查、flat wire-error 图                                                                                                                                       |
+| `/interfaces`                            | host、载体、信息流 plugin 与执行 feature 的接口类型                                                                                                                                                 |
+| `/portable`                              | 可移植值规范化、快照与原生 backing 形状规则                                                                                                                                                         |
+| `/errors`                                | 原生错误类、身份属性、错误树投影与恢复、隐私检查                                                                                                                                                    |
+| `/error-code`                            | RPC 家族唯一错误码表及 source 常量                                                                                                                                                                  |
+| `/schema/protocol`、`/schema/wire-error` | 随包发布的 JSON Schema：`/schema/protocol` 校验协议帧，其中错误为 `serializeRpcWireError` 产出的 `{root,nodes}` 扁平图；`/schema/wire-error` 校验 `/errors` 的 `serializeRpcError` 产出的递归错误树 |
 
 所有 RPC 包都可以直接声明本包依赖。包设置 `sideEffects: false`；只导入 `/error-code` 不会把协议、载体编解码或 portable 执行路径带入包。
 
