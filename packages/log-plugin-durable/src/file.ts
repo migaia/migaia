@@ -1,6 +1,7 @@
-import { DurableErrorField } from './errors.ts'
+import { isOwnDurableError } from './errors.ts'
+
 import { detectServerRuntime } from '@migaia/utils'
-import { createDurableError, LogDurableErrorCode, ERROR_SOURCE } from './errors.ts'
+import { createDurableError, LogDurableErrorCode } from './errors.ts'
 import { createLogStore, type ILogStorePersistence } from './store.ts'
 import {
   snapshotLogStoreState,
@@ -269,11 +270,7 @@ export async function fileLogStore(
     return store
   } catch (error) {
     /** Already coded durable failures retain identity while raw driver errors gain their cause. */
-    const coded =
-      error instanceof Error &&
-      Object.getOwnPropertyDescriptor(error, DurableErrorField.source)?.value === ERROR_SOURCE
-        ? error
-        : sqliteFailure(error)
+    const coded = isOwnDurableError(error) ? error : sqliteFailure(error)
     if (database) {
       try {
         database.close()

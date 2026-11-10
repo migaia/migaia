@@ -39,3 +39,18 @@ export const DurableErrorField = {
   /** A native transaction's semantic code is preserved when both identity fields exist. */
   code: 'code'
 } as const
+
+/** Registered durable codes, built once from the fixed code table. */
+const durableCodes: ReadonlySet<unknown> = new Set(Object.values(LogDurableErrorCode))
+
+/**
+ * True only for an Error that carries both the durable source and a registered durable code, read
+ * as own data properties. A forged source without a valid code is wrapped like any other failure.
+ */
+export function isOwnDurableError(error: unknown): error is Error {
+  return (
+    error instanceof Error &&
+    Object.getOwnPropertyDescriptor(error, DurableErrorField.source)?.value === ERROR_SOURCE &&
+    durableCodes.has(Object.getOwnPropertyDescriptor(error, DurableErrorField.code)?.value)
+  )
+}

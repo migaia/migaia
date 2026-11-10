@@ -1,10 +1,16 @@
 import { detectServerRuntime } from '@migaia/utils'
-import { LogEntryDataKey, type ILogPlugin, type ILogPluginCore } from '@migaia/log-host/plugin'
+import {
+  LogEntryDataKey,
+  type ILogPlugin,
+  type ILogPluginCore,
+  LogFailureSource
+} from '@migaia/log-host/plugin'
 import {
   DEFAULT_THINKING_LABEL,
   REASONING_PLUGIN_NAME,
   ReasoningPhase,
-  ReasoningTag
+  ReasoningTag,
+  REASONING_PHASE_DATA_KEY
 } from './state-constants.ts'
 import type { IReasoningExtension, IReasoningPluginConfig } from './typing.ts'
 
@@ -68,10 +74,15 @@ class ReasoningInstallation {
   /** Starting thinking completes an unfinished response, then resets the thinking buffer. */
   startThinking(label?: string): void {
     if (!this.#active) return
-    if (this.#phase !== ReasoningPhase.idle && this.#phase !== ReasoningPhase.thinking)
-      this.#complete(ReasoningTag.response, ReasoningPhase.responding)
+    /** Text of an unfinished response, taken before the new phase is committed. */
+    const unfinished =
+      this.#phase !== ReasoningPhase.idle && this.#phase !== ReasoningPhase.thinking
+        ? this.#take()
+        : ''
+    // Commit the new phase before any callback runs, so a reentrant writer or sink sees it.
     this.#phase = ReasoningPhase.thinking
     this.#chunks = []
+    this.#publish(ReasoningTag.response, ReasoningPhase.responding, unfinished)
     /** An empty explicit label preserves the original empty-heading behavior. */
     const text = label ?? this.#options.labels?.thinking ?? DEFAULT_THINKING_LABEL
     this.#emit(`${text}\n\n`)
@@ -88,17 +99,24 @@ class ReasoningInstallation {
   /** Finish thinking explicitly; any other phase keeps its buffer for its own end call. */
   endThinking(): void {
     if (!this.#active || this.#phase !== ReasoningPhase.thinking) return
+    /** Phase text taken and state cleared before the writer can reenter. */
+    const text = this.#take()
     this.#emit('\n\n')
-    this.#complete(ReasoningTag.thinking, ReasoningPhase.thinking)
+    this.#publish(ReasoningTag.thinking, ReasoningPhase.thinking, text)
   }
 
   /** Starting a response completes unfinished thinking before selecting the new label. */
   startResponse(label?: string): void {
     if (!this.#active) return
-    if (this.#phase !== ReasoningPhase.idle && this.#phase !== ReasoningPhase.responding)
-      this.#complete(ReasoningTag.thinking, ReasoningPhase.thinking)
+    /** Text of an unfinished thinking phase, taken before the new phase is committed. */
+    const unfinished =
+      this.#phase !== ReasoningPhase.idle && this.#phase !== ReasoningPhase.responding
+        ? this.#take()
+        : ''
+    // Commit the new phase before any callback runs, so a reentrant writer or sink sees it.
     this.#phase = ReasoningPhase.responding
     this.#chunks = []
+    this.#publish(ReasoningTag.thinking, ReasoningPhase.thinking, unfinished)
     /** Responses have no default heading when both label sources are absent. */
     const text = label ?? this.#options.labels?.response
     if (text) this.#emit(`${text}\n\n`)
@@ -115,31 +133,34 @@ class ReasoningInstallation {
   /** End a response with one newline and one audit entry; other phases are left untouched. */
   endResponse(): void {
     if (!this.#active || this.#phase !== ReasoningPhase.responding) return
+    /** Phase text taken and state cleared before the writer can reenter. */
+    const text = this.#take()
     this.#emit('\n')
-    this.#complete(ReasoningTag.response, ReasoningPhase.responding)
+    this.#publish(ReasoningTag.response, ReasoningPhase.responding, text)
   }
 
-  /** Snapshot completed text once, then clear state before dispatch can run or reenter. */
-  #complete(tag: (typeof ReasoningTag)[keyof typeof ReasoningTag], phase: ReasoningPhase): void {
+  /** Snapshot the phase text once and clear phase state before any callback can run or reenter. */
+  #take(): string {
     /** One final join keeps total accumulation work linear in the phase text. */
     const text = this.#chunks.join('')
     this.#phase = ReasoningPhase.idle
     this.#chunks = []
+    return text
+  }
+
+  /** Publish one completed phase entry; empty text publishes nothing. */
+  #publish(tag: ReasoningTag, phase: ReasoningPhase, text: string): void {
     if (!text) return
     if (this.#options.asyncOutput) this.#core.defer(() => this.#dispatch(tag, phase, text))
     else this.#dispatch(tag, phase, text)
   }
 
   /** Publish ordinary structured data; silent suppresses only console's duplicate display. */
-  #dispatch(
-    tag: (typeof ReasoningTag)[keyof typeof ReasoningTag],
-    phase: ReasoningPhase,
-    text: string
-  ): void {
+  #dispatch(tag: ReasoningTag, phase: ReasoningPhase, text: string): void {
     this.#core.dispatchRaw({
       tag,
       message: text,
-      data: { reasoningPhase: phase, [LogEntryDataKey.silent]: true }
+      data: { [REASONING_PHASE_DATA_KEY]: phase, [LogEntryDataKey.silent]: true }
     })
   }
 
@@ -154,7 +175,7 @@ class ReasoningInstallation {
     try {
       this.#writer.write(text)
     } catch (error) {
-      this.#core.reportFailure({ source: 'sink', error })
+      this.#core.reportFailure({ source: LogFailureSource.sink, error })
     }
   }
 

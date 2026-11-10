@@ -2,7 +2,7 @@ export { defineLogFeature } from './feature-metadata.ts'
 export { defineLogPlugin } from './log-plugin.ts'
 export { defineOutputPlugin } from './output.ts'
 export { projectLogEntry } from './projection.ts'
-export { LogEntryDataKey } from './state-constants.ts'
+export { LogEntryDataKey, LogFailureSource } from './state-constants.ts'
 export type {
   IErrorInfo,
   ILogEntry,

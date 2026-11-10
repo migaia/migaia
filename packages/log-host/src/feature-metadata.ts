@@ -3,7 +3,7 @@ import { defineFeature, inspectFeatures } from '@migaia/plugin-host/features'
 import { type IFeature, type IFeatureRecord } from '@migaia/plugin-host'
 import type { ILogEntry, ILogFeature, ILogFeatureDefinition } from './typing.ts'
 import { FeaturePhase, LogDeliveryPolicy } from './state-constants.ts'
-import { invalidOption } from './errors.ts'
+import { invalidOption, isArrayOption } from './errors.ts'
 
 /** Per-output batch capacity and drain options remain log-owned. */
 export type IBatchOptions = {
@@ -98,7 +98,7 @@ export function featureScope(
   record: IFeatureRecord = {},
   output = false
 ): Map<string, ILogFeature<any>> {
-  if (Array.isArray(record)) throw invalidOption()
+  if (isArrayOption(record)) throw invalidOption()
   /** Native inspection owns exact-identity and dependency-graph admission. */
   let roots: IFeatureRecord
   try {

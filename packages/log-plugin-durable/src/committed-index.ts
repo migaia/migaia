@@ -1,10 +1,10 @@
-import { DurableErrorField } from './errors.ts'
+import { isOwnDurableError } from './errors.ts'
+
 import {
   createDurableError,
   createDurableTypeError,
   tagDurableError,
-  LogDurableErrorCode,
-  ERROR_SOURCE
+  LogDurableErrorCode
 } from './errors.ts'
 import { snapshotPayload } from './snapshot.ts'
 import { LogRecordState } from './state-constants.ts'
@@ -83,11 +83,7 @@ export function prepareLogAppend(
     )
       throw createDurableTypeError(LogDurableErrorCode.invalidOption, DurableText.invalidOption)
   } catch (cause) {
-    if (
-      cause instanceof Error &&
-      Object.getOwnPropertyDescriptor(cause, DurableErrorField.source)?.value === ERROR_SOURCE
-    )
-      throw cause
+    if (isOwnDurableError(cause)) throw cause
     throw createDurableTypeError(LogDurableErrorCode.invalidOption, DurableText.invalidOption, {
       cause
     })
@@ -96,7 +92,11 @@ export function prepareLogAppend(
     throw createDurableError(LogDurableErrorCode.logSequenceExhausted, DurableText.exhausted)
   /** Empty batches and exhausted heads never consult the native clock. */
   const stamp = Math.max(time, now === undefined ? Date.now() : now)
-  return records.map((row, index) => ({ seq: lastSeq + index + 1, time: stamp, ...row }))
+  /** Index loop, so a caller-owned `map` override cannot replace the projected rows. */
+  const rows: (ILogRecord & (typeof records)[number])[] = []
+  for (let index = 0; index < records.length; index += 1)
+    rows.push({ seq: lastSeq + index + 1, time: stamp, ...records[index] } as never)
+  return rows
 }
 
 /**
@@ -151,11 +151,7 @@ export function snapshotLogStoreState(
     if (expected !== head.lastSeq + 1) corruptStore()
     return { lastSeq: head.lastSeq, time: head.time, floor: head.floor, records }
   } catch (cause) {
-    if (
-      cause instanceof Error &&
-      Object.getOwnPropertyDescriptor(cause, DurableErrorField.source)?.value === ERROR_SOURCE
-    )
-      throw cause
+    if (isOwnDurableError(cause)) throw cause
     throw createDurableError(LogDurableErrorCode.logStoreCorrupt, DurableText.corrupt, { cause })
   }
 }

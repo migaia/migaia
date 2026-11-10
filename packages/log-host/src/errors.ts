@@ -73,3 +73,25 @@ export function createLogTypeError(
 ): TypeError {
   return attachErrorIdentity(new TypeError(text, options), { source: ERROR_SOURCE, code })
 }
+
+/**
+ * Copy a public definition with one read of each own enumerable property. A throwing getter or a
+ * failing Proxy trap becomes INVALID_OPTION with the original error on `cause`.
+ */
+export function snapshotDefinition<T extends object>(definition: T): T {
+  if (definition === null || typeof definition !== 'object') return definition
+  try {
+    return { ...definition }
+  } catch (error) {
+    throw invalidOption(error)
+  }
+}
+
+/** `Array.isArray` for caller input; a revoked Proxy's TypeError becomes INVALID_OPTION on cause. */
+export function isArrayOption(value: unknown): boolean {
+  try {
+    return Array.isArray(value)
+  } catch (error) {
+    throw invalidOption(error)
+  }
+}

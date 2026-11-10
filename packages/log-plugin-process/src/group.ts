@@ -170,7 +170,9 @@ export class ProcessGroup {
   #shutdown(reason: IShutdownReason, code: number): Promise<void> {
     if (this.#shutdownPromise) return this.#shutdownPromise
     this.#shuttingDown = true
-    this.#shutdownPromise = this.#runShutdown(reason, code)
+    // Publish the shared promise before any member handler runs, so a signal raised synchronously
+    // by a handler joins this shutdown instead of starting a second one.
+    this.#shutdownPromise = Promise.resolve().then(() => this.#runShutdown(reason, code))
     return this.#shutdownPromise
   }
 

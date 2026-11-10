@@ -170,9 +170,10 @@ class BinlogController {
       return Promise.reject(error)
     }
     /** Scalar success alone adds the original first-sequence projection continuation. */
-    const result = port
-      ? this.#runtime.appendPort(port, captured, this.#echoCommitted)
-      : this.#runtime.run(LogOperation.append, () => this.#appendOrdinary(captured))
+    const result =
+      port !== undefined
+        ? this.#runtime.appendPort(port, captured, this.#echoCommitted)
+        : this.#runtime.run(LogOperation.append, () => this.#appendOrdinary(captured))
     return result.then(firstSequence)
   }
   /** Batch calls keep the original transaction-port Promise or ordinary FIFO result. */
@@ -191,7 +192,7 @@ class BinlogController {
     } catch (error) {
       return Promise.reject(error)
     }
-    if (port) return this.#runtime.appendPort(port, captured, this.#echoCommitted)
+    if (port !== undefined) return this.#runtime.appendPort(port, captured, this.#echoCommitted)
     return this.#runtime.run(LogOperation.append, () => this.#appendOrdinary(captured))
   }
   /** Ordinary appends finish their commit and optional metadata echo before returning sequences. */

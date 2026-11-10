@@ -1,3 +1,4 @@
+import { snapshotDefinition } from './errors.ts'
 import { definePlugin, type IFeatureOutputs, type IPluginConfig } from '@migaia/plugin-host'
 import type {
   ILogControlExtensions,
@@ -73,8 +74,10 @@ export function defineLogPlugin<
   O extends Record<string, unknown> = Record<never, never>,
   C extends IPluginConfig = IPluginConfig
 >(
-  definition: ILogPluginDefinition<N, F, O, C>
+  requested: ILogPluginDefinition<N, F, O, C>
 ): NoInfer<IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, C, F>> {
+  /** One read of the caller's definition; every later check and use reads this copy. */
+  const definition = snapshotDefinition(requested)
   /** This owner holds only definition data and lifecycle callback dispatch. */
   const owner = new LogPluginDefinition(definition)
   return definePlugin<

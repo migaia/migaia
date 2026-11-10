@@ -15,8 +15,9 @@ import type { IHttpFetcher, IHttpPluginConfig, IHttpResponse } from './typing.ts
 type IRetryHint = { readonly retryable: boolean; readonly delay: number | undefined }
 
 /** Attach this package's identity to a native Error while retaining the original failure on cause. */
-function httpError(code: ILogHttpErrorCode, text: string, cause?: unknown): Error {
-  return attachErrorIdentity(new Error(text, cause === undefined ? undefined : { cause }), {
+function httpError(code: ILogHttpErrorCode, text: string, ...cause: [] | [unknown]): Error {
+  // Presence is the argument count, so a fetcher that rejects with `undefined` keeps its cause.
+  return attachErrorIdentity(new Error(text, cause.length > 0 ? { cause: cause[0] } : undefined), {
     source: ERROR_SOURCE,
     code
   })
@@ -85,19 +86,35 @@ class HttpOutput {
       this.#hints.set(error, { retryable: true, delay: undefined })
       throw error
     }
-    if (response.ok) return
+    /** Response fields read once; a throwing accessor is a malformed response, not retried. */
+    let ok: boolean
+    let status: number
+    let retryAfter: string | null = null
+    try {
+      ok = response.ok
+      status = response.status
+      if (!ok && (status === 429 || status >= 500))
+        retryAfter = response.headers.get(HttpRequest.retryAfter)
+    } catch (cause) {
+      const error = httpError(
+        LogHttpErrorCode.deliveryFailed,
+        LogHttpErrorText.transportFailed,
+        cause
+      )
+      this.#hints.set(error, { retryable: false, delay: undefined })
+      throw error
+    }
+    if (ok) return
     /** Status failure text and native Error identity are preserved for the final failure channel. */
     const error = httpError(
       LogHttpErrorCode.deliveryFailed,
-      LogHttpErrorText.deliveryFailed(response.status)
+      LogHttpErrorText.deliveryFailed(status)
     )
     /** Only network failure, 429 and server errors qualify for host-managed retry. */
-    const retryable = response.status === 429 || response.status >= 500
+    const retryable = status === 429 || status >= 500
     this.#hints.set(error, {
       retryable,
-      delay: retryable
-        ? parseRetryAfter(response.headers.get(HttpRequest.retryAfter), this.#maxRetryAfterMs)
-        : undefined
+      delay: retryable ? parseRetryAfter(retryAfter, this.#maxRetryAfterMs) : undefined
     })
     throw error
   }
@@ -115,8 +132,15 @@ class HttpOutput {
 
 /** Create one HTTP output with host-owned policy and the unchanged JSON entries envelope. */
 export function httpPlugin<const F extends ILogFeatureRecord = Record<never, never>>(
-  options: IHttpPluginConfig<F>
+  requested: IHttpPluginConfig<F>
 ): ReturnType<typeof defineOutputPlugin<typeof HTTP_PLUGIN_NAME, F>> {
+  /** One read of every option; a throwing getter becomes INVALID_OPTION with the error on cause. */
+  let options: IHttpPluginConfig<F>
+  try {
+    options = Object.freeze({ ...requested })
+  } catch (cause) {
+    throw httpError(LogHttpErrorCode.invalidOption, LogHttpErrorText.invalidOption, cause)
+  }
   /** A named owner retains request state; SDK callbacks only forward to its methods. */
   const output = new HttpOutput(options)
   return defineOutputPlugin({

@@ -1,3 +1,4 @@
+import { safeErrorReason } from '@migaia/utils/error'
 /** Stable diagnostics preserve the moved process messages and error traceability. */
 export const LogProcessErrorText = {
   /** New group members are refused during the current group shutdown. */
@@ -16,6 +17,10 @@ export const LogProcessErrorText = {
   shutdownCleanupFailed: 'logger shutdown cleanup failed',
   /** A frozen/sealed error receives a native-type wrapper retaining the original through cause. */
   taggingFailed: 'logger error tagging failed',
-  /** A rejected primitive is rendered exactly as the original event payload. */
-  rejectionReason: (reason: unknown): string => String(reason)
+  /**
+   * A rejected primitive is rendered exactly as the original event payload. A value whose string
+   * conversion throws gets a fixed placeholder, so crash shutdown is still reached.
+   */
+  rejectionReason: (reason: unknown): string =>
+    safeErrorReason(reason, '<unprintable rejection reason>')
 } as const

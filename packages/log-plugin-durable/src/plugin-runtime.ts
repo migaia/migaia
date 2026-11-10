@@ -1,3 +1,5 @@
+import { isOwnDurableError } from './errors.ts'
+import { LogFailureSource } from '@migaia/log-host/plugin'
 import { DurableErrorField } from './errors.ts'
 import { createConcurrencyLimiter, deferred } from '@migaia/utils/promise'
 import { noop } from '@migaia/utils/function'
@@ -6,8 +8,7 @@ import {
   createDurableError,
   createDurableTypeError,
   tagDurableError,
-  LogDurableErrorCode,
-  ERROR_SOURCE
+  LogDurableErrorCode
 } from './errors.ts'
 import { createObservation } from './observation.ts'
 import { logStorageFailure } from './store.ts'
@@ -88,7 +89,8 @@ class DurableRuntime {
     void this.#ready.catch(noop)
   }
   /** Host sink provenance preserves each original storage error and cause. */
-  readonly report = (error: unknown): void => this.core.reportFailure({ source: 'sink', error })
+  readonly report = (error: unknown): void =>
+    this.core.reportFailure({ source: LogFailureSource.sink, error })
   /** Observer failures stay on the host's existing hook failure channel. */
   readonly reportHook = (error: unknown): void => this.core.reportFailure({ source: 'hook', error })
   /** Native listener identity is stable for registration and revocation. */
@@ -421,11 +423,7 @@ export function captureDurableOptions(
     }
     return { store, observe, echo }
   } catch (error) {
-    if (
-      error instanceof Error &&
-      Object.getOwnPropertyDescriptor(error, DurableErrorField.source)?.value === ERROR_SOURCE
-    )
-      throw error
+    if (isOwnDurableError(error)) throw error
     throw createDurableTypeError(LogDurableErrorCode.invalidOption, DurableText.invalidOption, {
       cause: error
     })
@@ -440,7 +438,11 @@ export function captureAppendPort(
   try {
     if (!options || typeof options !== 'object')
       throw createDurableTypeError(LogDurableErrorCode.invalidOption, DurableText.invalidOption)
-    return options.transaction
+    /** One read of the transaction option; explicit null is invalid, only undefined means none. */
+    const transaction = options.transaction
+    if (transaction === null)
+      throw createDurableTypeError(LogDurableErrorCode.invalidOption, DurableText.invalidOption)
+    return transaction
   } catch (error) {
     throw optionFailure(error)
   }
@@ -476,11 +478,7 @@ export function captureUndoListOptions(
 }
 /** All option access failures retain their cause while existing logger admission errors stay intact. */
 function optionFailure(error: unknown): Error {
-  if (
-    error instanceof Error &&
-    Object.getOwnPropertyDescriptor(error, DurableErrorField.source)?.value === ERROR_SOURCE
-  )
-    return error
+  if (isOwnDurableError(error)) return error
   return createDurableTypeError(LogDurableErrorCode.invalidOption, DurableText.invalidOption, {
     cause: error
   })

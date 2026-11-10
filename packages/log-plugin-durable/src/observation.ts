@@ -1,7 +1,8 @@
-import { DurableErrorField } from './errors.ts'
+import { isOwnDurableError } from './errors.ts'
+
 import { defaultLogFailureReporter } from '@migaia/log-host'
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
-import { createDurableTypeError, LogDurableErrorCode, ERROR_SOURCE } from './errors.ts'
+import { createDurableTypeError, LogDurableErrorCode } from './errors.ts'
 import { DurableText } from './error-text.ts'
 import type { ILogObservation, ILogStoreOptions } from './types.ts'
 
@@ -119,11 +120,7 @@ export function captureStoreOptions(input: ILogStoreOptions | undefined): ILogSt
       throw createDurableTypeError(LogDurableErrorCode.invalidOption, DurableText.invalidOption)
     return { observe, report }
   } catch (error) {
-    if (
-      error instanceof Error &&
-      Object.getOwnPropertyDescriptor(error, DurableErrorField.source)?.value === ERROR_SOURCE
-    )
-      throw error
+    if (isOwnDurableError(error)) throw error
     throw createDurableTypeError(LogDurableErrorCode.invalidOption, DurableText.invalidOption, {
       cause: error
     })

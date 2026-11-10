@@ -1,5 +1,6 @@
-import { DurableErrorField } from './errors.ts'
-import { createDurableTypeError, LogDurableErrorCode, ERROR_SOURCE } from './errors.ts'
+import { isOwnDurableError } from './errors.ts'
+
+import { createDurableTypeError, LogDurableErrorCode } from './errors.ts'
 import { DurableText } from './error-text.ts'
 import type { ILogPayload, ILogRecordInput } from './types.ts'
 
@@ -96,15 +97,22 @@ function copyRecords(
 ): readonly { readonly kind: string; readonly payload: ILogPayload }[] {
   if (!Array.isArray(records))
     throw createDurableTypeError(LogDurableErrorCode.invalidOption, DurableText.invalidOption)
-  return records.map((record) => {
+  /** Index loop, so a caller-owned `map` override cannot skip payload validation. */
+  const copied: { readonly kind: string; readonly payload: ILogPayload }[] = []
+  /** Length read once from the caller's array. */
+  const length = records.length
+  for (let index = 0; index < length; index += 1) {
+    /** One read of each slot. */
+    const record = records[index]
     if (!record || typeof record !== 'object')
       throw createDurableTypeError(LogDurableErrorCode.invalidOption, DurableText.invalidOption)
     const kind = Object.getOwnPropertyDescriptor(record, 'kind')
     const payload = Object.getOwnPropertyDescriptor(record, 'payload')
     if (!kind || !('value' in kind) || !payload || !('value' in payload)) invalid()
     requireText(kind.value)
-    return { kind: kind.value, payload: snapshotPayload(payload.value) }
-  })
+    copied.push({ kind: kind.value, payload: snapshotPayload(payload.value) })
+  }
+  return copied
 }
 
 /** Contains reflection failures at the sole payload admission boundary while preserving their cause. */
@@ -112,11 +120,7 @@ export function snapshotPayload(input: unknown): ILogPayload {
   try {
     return copyPayload(input)
   } catch (error) {
-    if (
-      error instanceof Error &&
-      Object.getOwnPropertyDescriptor(error, DurableErrorField.source)?.value === ERROR_SOURCE
-    )
-      throw error
+    if (isOwnDurableError(error)) throw error
     throw createDurableTypeError(
       LogDurableErrorCode.logPayloadInvalid,
       DurableText.payloadInvalid,
@@ -134,11 +138,7 @@ export function snapshotLogRecords(
   try {
     return copyRecords(records)
   } catch (error) {
-    if (
-      error instanceof Error &&
-      Object.getOwnPropertyDescriptor(error, DurableErrorField.source)?.value === ERROR_SOURCE
-    )
-      throw error
+    if (isOwnDurableError(error)) throw error
     throw createDurableTypeError(
       LogDurableErrorCode.logPayloadInvalid,
       DurableText.payloadInvalid,

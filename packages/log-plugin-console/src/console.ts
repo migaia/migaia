@@ -1,3 +1,4 @@
+import { snapshotConsoleOptions } from './environment.ts'
 import { LogLevel } from '@migaia/log-host'
 import {
   defineOutputPlugin,
@@ -6,7 +7,8 @@ import {
   type ILogOutputFeatureRecord,
   type ILogFormat,
   type ILogOutputRecord,
-  type ILogPluginCore
+  type ILogPluginCore,
+  LogFailureSource
 } from '@migaia/log-host/plugin'
 import { consoleProcess } from './environment.ts'
 import { prettyFeature } from './pretty.ts'
@@ -90,7 +92,7 @@ class ConsoleRaw {
       if (this.#stdout) this.#stdout.write(text)
       else this.#console.log(text)
     } catch (error) {
-      this.#core.reportFailure({ source: 'sink', error })
+      this.#core.reportFailure({ source: LogFailureSource.sink, error })
     }
   }
   /** Revocation releases only the host reference and leaves borrowed capabilities untouched. */
@@ -101,8 +103,10 @@ class ConsoleRaw {
 
 /** Create an optional console output with native pretty arguments and host-owned delivery policies. */
 export function consolePlugin<const F extends ILogOutputFeatureRecord = Record<never, never>>(
-  options: IConsoleOptions<F> = {}
+  requested: IConsoleOptions<F> = {}
 ): ReturnType<typeof defineOutputPlugin<typeof CONSOLE_PLUGIN_NAME, F, IConsoleExtension>> {
+  /** One read of every option; later reads use this copy. */
+  const options = snapshotConsoleOptions(requested)
   /** The named owner holds capability and rendering state; SDK callbacks only forward to methods. */
   const output = new ConsoleOutput(options)
   return defineOutputPlugin({

@@ -1,13 +1,9 @@
-import { DurableErrorField } from './errors.ts'
+import { isOwnDurableError } from './errors.ts'
+
 import { createConcurrencyLimiter, deferred } from '@migaia/utils/promise'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { createEventChannel, invokeEachLive } from '@migaia/event-subscriber'
-import {
-  createDurableError,
-  createDurableTypeError,
-  LogDurableErrorCode,
-  ERROR_SOURCE
-} from './errors.ts'
+import { createDurableError, createDurableTypeError, LogDurableErrorCode } from './errors.ts'
 import { snapshotLogRecords } from './snapshot.ts'
 import {
   createObservation,
@@ -42,11 +38,7 @@ export type ILogStorePersistence = {
 
 /** Retain known durable errors; raw native failures stay reachable through their exact cause. */
 export function logStorageFailure(error: unknown): Error {
-  if (
-    error instanceof Error &&
-    Object.getOwnPropertyDescriptor(error, DurableErrorField.source)?.value === ERROR_SOURCE
-  )
-    return error
+  if (isOwnDurableError(error)) return error
   return createDurableError(LogDurableErrorCode.logStoreIoFailed, DurableText.ioFailed, {
     cause: error
   })

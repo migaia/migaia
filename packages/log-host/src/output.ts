@@ -51,7 +51,14 @@ import {
 } from './state-constants.ts'
 import { LogHostErrorCode, ERROR_SOURCE } from './error-code.ts'
 import { LogHostErrorText } from './error-text.ts'
-import { invalidOption, createLogError, tagLogError, createLogCleanupError } from './errors.ts'
+import {
+  invalidOption,
+  isArrayOption,
+  snapshotDefinition,
+  createLogError,
+  tagLogError,
+  createLogCleanupError
+} from './errors.ts'
 import { DeliveryAttempt } from './delivery-attempt.ts'
 
 /** Common output policy is independent of whether the transport consumes formatted text. */
@@ -672,7 +679,7 @@ class OutputPlugin<
     this.#name = definition.name
     /** Preserve native container and descriptor rejection before removing output-only false values. */
     const input = definition.features
-    if (input !== undefined && (!input || typeof input !== 'object' || Array.isArray(input)))
+    if (input !== undefined && (!input || typeof input !== 'object' || isArrayOption(input)))
       throw invalidOption()
     /** The native inspector receives the same prototype and surviving descriptors as the input. */
     const local =
@@ -778,8 +785,10 @@ export function defineOutputPlugin<
   const F extends ILogOutputFeatureRecord = Record<never, never>,
   O extends Record<string, unknown> = Record<never, never>
 >(
-  definition: IOutputDefinition<O, F> & { name: N }
+  requested: IOutputDefinition<O, F> & { name: N }
 ): IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, IPluginConfig, IEnabledLogFeatures<F>> {
+  /** One read of the caller's definition; every later check and use reads this copy. */
+  const definition = snapshotDefinition(requested)
   /** Definition callbacks forward to one named owner; plugin-host owns actual installation. */
   const owner = new OutputPlugin(definition)
   return definePlugin<

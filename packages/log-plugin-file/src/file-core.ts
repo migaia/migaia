@@ -12,8 +12,9 @@ import type { IFilePluginConfig, IFileWriter } from './typing.ts'
 const FILE_PLUGIN_NAME = 'file'
 
 /** Attach local identity to the existing native wrapper while preserving the exact cause. */
-function fileError(code: ILogFileErrorCode, text: string, cause?: unknown): Error {
-  return attachErrorIdentity(new Error(text, cause === undefined ? undefined : { cause }), {
+function fileError(code: ILogFileErrorCode, text: string, ...cause: [] | [unknown]): Error {
+  // Presence is the argument count, so a writer that rejects with `undefined` keeps its cause.
+  return attachErrorIdentity(new Error(text, cause.length > 0 ? { cause: cause[0] } : undefined), {
     source: ERROR_SOURCE,
     code
   })
@@ -110,4 +111,16 @@ export function createFilePlugin<const F extends ILogFeatureRecord = Record<neve
     retryable: (error: unknown) => output.retryable(error),
     deliver: (records) => output.deliver(records)
   })
+}
+
+/**
+ * Copy file plugin options with one read of each property. A throwing getter becomes INVALID_OPTION
+ * with the original error on `cause`; later code reads only this copy.
+ */
+export function snapshotFileOptions<T extends object>(options: T): T {
+  try {
+    return Object.freeze({ ...options })
+  } catch (error) {
+    throw fileError(LogFileErrorCode.invalidOption, LogFileErrorText.invalidOption, error)
+  }
 }

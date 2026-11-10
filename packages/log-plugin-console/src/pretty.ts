@@ -1,8 +1,14 @@
+import { snapshotConsoleOptions } from './environment.ts'
 import { Ansis } from 'ansis'
 import { LogLevel } from '@migaia/log-host'
-import { defineLogFeature, type ILogEntry, type ILogFeature } from '@migaia/log-host/plugin'
+import {
+  defineLogFeature,
+  type ILogEntry,
+  type ILogFeature,
+  LogEntryDataKey
+} from '@migaia/log-host/plugin'
 import { consoleProcess } from './environment.ts'
-import { ConsoleColorMode, ConsoleEnvironmentKey, TOPIC_CHAIN_DATA_KEY } from './state-constants.ts'
+import { ConsoleColorMode, ConsoleEnvironmentKey } from './state-constants.ts'
 import type { IPrettyOptions } from './typing.ts'
 
 /** The format owner retains policy while every console delivery preserves native arguments. */
@@ -20,7 +26,7 @@ export class PrettyRenderer {
 
   /** Capture descriptor policy without borrowing caller-mutable configuration objects. */
   constructor(options: IPrettyOptions) {
-    this.#options = Object.freeze({ ...options })
+    this.#options = snapshotConsoleOptions(options)
     /** Only process environment and stdout are read from the recognized server runtime. */
     const process = consoleProcess()
     this.#environment = Object.freeze({ ...process?.env })
@@ -73,7 +79,7 @@ export class PrettyRenderer {
     /** UUID generation is host-owned; pretty only consumes its display marker. */
     const uuid = entry.data.uuidDisplay ? this.dim(`{${entry.data.uuid}} `, isTTY) : ''
     /** A forwarded topic chain retains declaration order and the established separator. */
-    const topics = entry.data[TOPIC_CHAIN_DATA_KEY] as readonly string[] | undefined
+    const topics = entry.data[LogEntryDataKey.topicChain] as readonly string[] | undefined
     /** Empty chains contribute no display prefix. */
     const topic = topics?.length ? `${this.dim(`[${topics.join(' -> ')}]`, isTTY)}: ` : ''
     return `${timestamp}${tag} ${uuid}${context}${topic}${entry.message}`
