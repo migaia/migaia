@@ -59,6 +59,9 @@ const RegistryText = {
   documentMissing: (path) => `missing registry: ${path}`,
   /** Existing marker guidance is part of the script's diagnostic contract. */
   regionMissing: 'error registry generated region is missing; run with --write',
+  /** Write mode found neither the generated region nor the section heading it inserts before. */
+  insertionPointMissing:
+    'error registry has no generated region and no "## 5. 什么不是错误码" heading to insert before',
   /** Existing stale-region guidance is consumed by registry tests. */
   stale: 'error registry is stale; run with --write',
   /** The CLI lists its complete supported mode set. */
@@ -295,10 +298,14 @@ export const writeErrorRegistry = (root = repositoryRoot) => {
   const generated = renderErrorRegistry(collectErrorRegistry(root))
   const start = document.indexOf(REGISTRY_START)
   const end = document.indexOf(REGISTRY_END)
+  /** Fallback insertion point used only when the document has no generated region yet. */
+  const fallback = '\n## 5. 什么不是错误码'
+  if (!(start >= 0 && end >= start) && !document.includes(fallback))
+    throw withCode(ErrorRegistryErrorCode.regionMissing, RegistryText.insertionPointMissing)
   const next =
     start >= 0 && end >= start
       ? `${document.slice(0, start)}${generated}${document.slice(end + REGISTRY_END.length)}`
-      : document.replace('\n## 5. 什么不是错误码', `\n${generated}\n\n## 5. 什么不是错误码`)
+      : document.replace(fallback, `\n${generated}\n\n## 5. 什么不是错误码`)
   /** Same-directory temporary file keeps the prior document complete until rename. */
   const temporary = `${path}.${process.pid}.tmp`
   try {

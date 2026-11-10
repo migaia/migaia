@@ -277,7 +277,7 @@ export const checkPublicExports = async ({
   /** Scope admission is validated against either side before differences are filtered. */
   const admitted = new Set(scope)
   for (const pkg of admitted)
-    if (!(pkg in expected.packages) && !(pkg in actual.packages))
+    if (!Object.hasOwn(expected.packages, pkg) && !Object.hasOwn(actual.packages, pkg))
       throw withCode(PublicExportsErrorCode.scopeUnknown, PublicExportsText.scopeUnknown(pkg))
   /** Unadmitted packages must remain exactly equal to the tracked baseline. */
   const differences = diffPublicExports(expected, actual)
