@@ -40,7 +40,7 @@ The hub must be a single copy for the whole page. Declare it as a singleton in t
 
 ```ts
 shared: {
-  '@migaia/micro-hub': { singleton: true, requiredVersion: '^0.0.1' }
+  '@migaia/micro-hub': { singleton: true, requiredVersion: '^0.0.3' }
 }
 ```
 

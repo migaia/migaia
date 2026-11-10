@@ -140,6 +140,22 @@ export function assertName(kind: NameKind, name: unknown): asserts name is strin
   }
 }
 
+/**
+ * Snapshots a contract spec once, so later checks read plain data. A throwing getter or revoked
+ * Proxy becomes `INVALID_OPTION` with the original error as `cause`.
+ */
+function readSpec<T extends object>(name: string, spec: T): T {
+  try {
+    return { ...spec }
+  } catch (error) {
+    throw createMicroHubTypeError(
+      MicroHubErrorCode.invalidOption,
+      MicroHubErrorText.unreadableInput(`contract "${name}" spec`),
+      { cause: error }
+    )
+  }
+}
+
 /** Returns true when `value` is a frozen marker of the given kind created by this module. */
 export const isMarker = (value: unknown, marker: ContractMarker): boolean =>
   typeof value === 'object' && value !== null && (value as { marker?: unknown }).marker === marker
@@ -172,7 +188,13 @@ function readSection(
         MicroHubErrorText.invalidSection(contract, section, member)
       )
     }
-    copy[member] = entry
+    // Define as own data, so a member named __proto__ stays a member instead of a prototype.
+    Object.defineProperty(copy, member, {
+      value: entry,
+      enumerable: true,
+      writable: true,
+      configurable: true
+    })
   }
   return Object.freeze(copy)
 }
@@ -207,6 +229,7 @@ export function defineContract<
   }
 > {
   assertName(NameKind.contract, name)
+  spec = readSpec(name, spec)
   if (!Number.isSafeInteger(spec.version) || spec.version < 1) {
     throw createMicroHubTypeError(
       MicroHubErrorCode.invalidOption,

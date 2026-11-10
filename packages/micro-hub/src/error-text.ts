@@ -50,7 +50,14 @@ export const MicroHubErrorText = {
     `[micro-hub] the owner of "${contract}" disconnected while "${member}" was in flight`,
   /** Paired with `INVALID_OPTION` for names. */
   invalidName: (kind: string, name: unknown): string =>
-    `[micro-hub] ${kind} name must be a non-empty string without ".", got ${String(name)}`,
+    `[micro-hub] ${kind} name must be a non-empty string without ".", got ${
+      typeof name === 'object' || typeof name === 'function' ? typeof name : String(name)
+    }`,
+  /**
+   * Paired with `INVALID_OPTION` when reading a caller's options object or contract spec throws,
+   * for example from a getter or a revoked Proxy; the original error is the `cause`.
+   */
+  unreadableInput: (subject: string): string => `[micro-hub] ${subject} could not be read`,
   /** Paired with `INVALID_OPTION` for contract versions. */
   invalidVersion: (contract: string): string =>
     `[micro-hub] contract "${contract}" version must be a positive integer`,

@@ -40,7 +40,7 @@ hub 必须是整页唯一的一份。主应用和每个 remote 都把它声明�
 
 ```ts
 shared: {
-  '@migaia/micro-hub': { singleton: true, requiredVersion: '^0.0.1' }
+  '@migaia/micro-hub': { singleton: true, requiredVersion: '^0.0.3' }
 }
 ```
 

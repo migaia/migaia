@@ -16,7 +16,7 @@ import type {
 } from './driver.ts'
 import { MicroHubErrorCode } from './error-code.ts'
 import { MicroHubErrorText } from './error-text.ts'
-import { createMicroHubError } from './errors.ts'
+import { createMicroHubError, createMicroHubTypeError } from './errors.ts'
 import { APP_PLUGIN_PREFIX, MicroCapability, NameKind, capabilityExtensionKey } from './text.ts'
 import type { IContractView, IMicroApp, IMicroHub, IOwnOptions, IOwnedContract } from './types.ts'
 
@@ -36,6 +36,24 @@ const HOST_EXECUTION = Object.freeze({ mutationTimeoutMs: 10_000, pipelineDrainT
 
 /** The live hub of this realm; the package is a singleton, so this module state is the registry. */
 let current: IMicroHub | undefined
+
+/**
+ * Snapshots the shell's options and plugin list once, so a throwing getter or revoked Proxy becomes
+ * `INVALID_OPTION` with the original error as `cause` instead of an uncoded native error.
+ */
+function readHubOptions(options: ICreateMicroHubOptions): ICreateMicroHubOptions {
+  try {
+    /** Plain copy; every later read uses it, never the caller's object. */
+    const input = { ...options }
+    return { plugins: [...input.plugins], report: input.report }
+  } catch (error) {
+    throw createMicroHubTypeError(
+      MicroHubErrorCode.invalidOption,
+      MicroHubErrorText.unreadableInput('createMicroHub options'),
+      { cause: error }
+    )
+  }
+}
 
 /** Last-resort reporter used when no `report` option is given or the given one throws. */
 function defaultReport(error: unknown): void {
@@ -77,6 +95,7 @@ export function createMicroHub(options: ICreateMicroHubOptions): IMicroHub {
       MicroHubErrorText.hubAlreadyCreated
     )
   }
+  options = readHubOptions(options)
   /** Capability kinds present in this hub, checked against every plugin's `requires`. */
   const kinds = new Set(options.plugins.map((plugin) => plugin.kind))
   for (const plugin of options.plugins) {
