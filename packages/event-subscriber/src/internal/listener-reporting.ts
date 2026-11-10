@@ -37,13 +37,13 @@ export const reportLateFailure = <
     try {
       reportResult = report({ event: event as never, error: failure })
     } catch (error) {
-      reportTerminal(options, diagnostic, error)
+      reportTerminal(options, diagnostic, [error])
       return
     }
-    observeRejection(reportResult, (error) => reportTerminal(options, diagnostic, error))
+    observeRejection(reportResult, (error) => reportTerminal(options, diagnostic, [error]))
     return
   }
-  reportTerminal(options, diagnostic, undefined)
+  reportTerminal(options, diagnostic)
 }
 
 /**
@@ -62,13 +62,13 @@ export const observeRejection = (value: unknown, onRejected: (error: unknown) =>
 const reportTerminal = <T, S extends IEventApiStyle | undefined = undefined, V = undefined>(
   options: IEventChannelOptions<T, S, V>,
   diagnostic: AggregateError,
-  failure: unknown
+  failure: readonly [unknown] | readonly [] = []
 ): void => {
   /**
    * Errors passed to the terminal reporter: the diagnostic entries plus the reporter's own failure,
    * if any.
    */
-  const errors = failure === undefined ? diagnostic.errors : [...diagnostic.errors, failure]
+  const errors = [...diagnostic.errors, ...failure]
   reportTerminalDiagnostic(
     EventSubscriberErrorCode.unhandledListenerFailure,
     errors,

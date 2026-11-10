@@ -161,25 +161,25 @@ export function reportEventProjectionFailure<T, S extends IEventApiStyle | undef
       /** Reporter result; a rejection is forwarded to the terminal path. */
       const result = report({ event: event as never, error: diagnostic })
       Promise.resolve(result).catch((failure: unknown) =>
-        reportProjectionTerminal(options, diagnostic, failure)
+        reportProjectionTerminal(options, diagnostic, [failure])
       )
       return
     } catch (failure) {
-      reportProjectionTerminal(options, diagnostic, failure)
+      reportProjectionTerminal(options, diagnostic, [failure])
       return
     }
   }
-  reportProjectionTerminal(options, diagnostic, undefined)
+  reportProjectionTerminal(options, diagnostic)
 }
 
 /** Preserves projection code while appending reporter and terminal failures in order. */
 function reportProjectionTerminal<T, S extends IEventApiStyle | undefined, V>(
   options: IEventChannelOptions<T, S, V>,
   diagnostic: Error,
-  failure: unknown
+  failure: readonly [unknown] | readonly [] = []
 ): void {
   /** Errors passed to the terminal reporter: the diagnostic plus the reporter's own failure, if any. */
-  const errors = failure === undefined ? [diagnostic] : [diagnostic, failure]
+  const errors = [diagnostic, ...failure]
   reportTerminalDiagnostic(
     EventSubscriberErrorCode.valueProjectionFailed,
     errors,
