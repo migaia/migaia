@@ -8,7 +8,8 @@ import { type IReleaseDescriptor } from '@migaia/lifecycle'
 import { CapabilityGraphErrorCode } from './error-code.ts'
 
 import { CapabilityGraphErrorText } from './error-text.ts'
-import { createCapabilityGraphError } from './errors.ts'
+import { CAPABILITY_GRAPH_SOURCE } from './errors.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import {
   GraphBlockedReason,
   type ICapabilityGraphNodeState,
@@ -185,17 +186,16 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
   try {
     onError = options.onError
   } catch (error) {
-    throw createCapabilityGraphError(
-      CapabilityGraphErrorCode.invalidOption,
-      CapabilityGraphErrorText.invalidOption,
-      { cause: error }
-    )
+    throw attachErrorIdentity(new Error(CapabilityGraphErrorText.invalidOption, { cause: error }), {
+      source: CAPABILITY_GRAPH_SOURCE,
+      code: CapabilityGraphErrorCode.invalidOption
+    })
   }
   if (onError !== undefined && typeof onError !== 'function') {
-    throw createCapabilityGraphError(
-      CapabilityGraphErrorCode.invalidOption,
-      CapabilityGraphErrorText.invalidOption
-    )
+    throw attachErrorIdentity(new Error(CapabilityGraphErrorText.invalidOption), {
+      source: CAPABILITY_GRAPH_SOURCE,
+      code: CapabilityGraphErrorCode.invalidOption
+    })
   }
 
   return new StaticCapabilityGraph(onError)

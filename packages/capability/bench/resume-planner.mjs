@@ -2,25 +2,17 @@ import { performance } from 'node:perf_hooks'
 import assert from 'node:assert/strict'
 import { planResume } from '../dist/graph/dependency.js'
 import { CapabilityGraphErrorCode } from '../dist/graph/error-code.js'
-import { createCapabilityGraphError, graphMessageFor } from '../dist/graph/errors.js'
+import { staticGraphFailure } from '../dist/graph/static-node.js'
 import { createTopologyIndex } from '../dist/graph/topology.js'
 
 /** Measures planner time independently of the deterministic unit test suite. */
 function measure(length) {
   const index = createTopologyIndex({
     onCycle: (path) => {
-      throw createCapabilityGraphError(
-        CapabilityGraphErrorCode.dependencyCycle,
-        graphMessageFor(CapabilityGraphErrorCode.dependencyCycle),
-        { detail: { path } }
-      )
+      throw staticGraphFailure(CapabilityGraphErrorCode.dependencyCycle, { path })
     },
     onInvalid: (reason, nodeId) => {
-      throw createCapabilityGraphError(
-        CapabilityGraphErrorCode.invalidNode,
-        graphMessageFor(CapabilityGraphErrorCode.invalidNode),
-        { detail: { reason, nodeId } }
-      )
+      throw staticGraphFailure(CapabilityGraphErrorCode.invalidNode, { reason, nodeId })
     }
   })
   index.add({ id: 'p', dependencies: [] })

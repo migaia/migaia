@@ -4,8 +4,10 @@ import type { IGenerationToken } from '@migaia/lifecycle'
 import type { IGraphNodeId, IGraphDependency, IGraphNodeDefinition } from './index.ts'
 import { CapabilityGraphNodeState, type ICapabilityGraphNodeState } from './state-constants.ts'
 import { CapabilityGraphErrorCode, type ICapabilityGraphErrorCode } from './error-code.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import {
-  createCapabilityGraphError,
+  CAPABILITY_GRAPH_SOURCE,
+  freezeGraphDetail,
   graphFailure,
   graphMessageFor,
   type ICapabilityGraphError
@@ -16,7 +18,12 @@ export function staticGraphFailure(
   code: ICapabilityGraphErrorCode,
   detail?: Readonly<Record<string, unknown>>
 ): ICapabilityGraphError {
-  return createCapabilityGraphError(code, graphMessageFor(code), { detail })
+  return attachErrorIdentity(
+    new Error(graphMessageFor(code)),
+    detail === undefined
+      ? { source: CAPABILITY_GRAPH_SOURCE, code }
+      : { source: CAPABILITY_GRAPH_SOURCE, code, detail: freezeGraphDetail(detail) }
+  ) as ICapabilityGraphError
 }
 
 /** Static registry facts and diagnostics; lifecycle resources stay with the node startup owner. */

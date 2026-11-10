@@ -20,32 +20,12 @@ export type ICapabilityGraphError = Error & {
 }
 
 /** Snapshots public diagnostic data so callers cannot mutate error identity. */
-function freezeDetail(
+export function freezeGraphDetail(
   detail: Readonly<Record<string, unknown>>
 ): Readonly<Record<string, unknown>> {
   const snapshot: Record<string, unknown> = { ...detail }
   if (Array.isArray(snapshot.path)) snapshot.path = Object.freeze([...snapshot.path])
   return Object.freeze(snapshot)
-}
-
-/** Creates a graph-owned Error while preserving the original as cause. */
-export function createCapabilityGraphError(
-  code: ICapabilityGraphErrorCode,
-  message: string,
-  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }
-): ICapabilityGraphError {
-  const error = new Error(
-    message,
-    options !== undefined && 'cause' in options ? { cause: options.cause } : undefined
-  )
-  attachErrorIdentity(error, { source: CAPABILITY_GRAPH_SOURCE, code })
-  if (options?.detail !== undefined) {
-    Object.defineProperty(error, 'detail', {
-      value: freezeDetail(options.detail),
-      enumerable: true
-    })
-  }
-  return error as ICapabilityGraphError
 }
 
 /** Keeps a same-source Error identity and wraps foreign errors so both sources remain traceable. */
@@ -61,7 +41,7 @@ export function graphFailure(
         attachErrorIdentity(primary, { source: CAPABILITY_GRAPH_SOURCE, code })
         if (detail !== undefined)
           Object.defineProperty(primary, 'detail', {
-            value: freezeDetail(detail),
+            value: freezeGraphDetail(detail),
             enumerable: true
           })
         return primary as ICapabilityGraphError
@@ -78,13 +58,18 @@ export function graphFailure(
       attachErrorIdentity(aggregate, { source: CAPABILITY_GRAPH_SOURCE, code })
       if (detail !== undefined)
         Object.defineProperty(aggregate, 'detail', {
-          value: freezeDetail(detail),
+          value: freezeGraphDetail(detail),
           enumerable: true
         })
       return aggregate as unknown as ICapabilityGraphError
     }
   }
-  return createCapabilityGraphError(code, graphMessageFor(code), { cause: primary, detail })
+  return attachErrorIdentity(
+    new Error(graphMessageFor(code), { cause: primary }),
+    detail === undefined
+      ? { source: CAPABILITY_GRAPH_SOURCE, code }
+      : { source: CAPABILITY_GRAPH_SOURCE, code, detail: freezeGraphDetail(detail) }
+  ) as ICapabilityGraphError
 }
 
 /** Maps a code to its stable public message without scattering literals at throw sites. */
