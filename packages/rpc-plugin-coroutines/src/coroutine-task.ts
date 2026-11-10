@@ -178,6 +178,8 @@ async function runCoroutineTask(
     )
   } finally {
     await connection.finish(input.report)
+    // Retire both keys: a retained connect token must not reach a finished task's connection.
+    coroutinePorts.delete(connect)
     coroutinePorts.delete(port1)
     for (const port of [port1, port2]) {
       try {

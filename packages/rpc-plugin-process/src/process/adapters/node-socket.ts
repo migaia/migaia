@@ -426,7 +426,8 @@ class NodeSocketListener {
           )
         }
       }
-      await Promise.all(
+      /** Every pending close settles before the sidecar cleanup, whatever their outcome. */
+      const releases = await Promise.allSettled(
         [...this.#scope.pendingSet].map((release) => release(this.#scope.closeReason))
       )
       /** Node owns removal of a Unix socket path created by this server. */
@@ -437,6 +438,19 @@ class NodeSocketListener {
           reportSafely(this.#scope.options.report, error)
         }
       }
+      // The first failed close stays the primary failure; later ones are reported, not dropped.
+      /** Whether a primary close failure has been chosen. */
+      let primaryFound = false
+      /** The first rejected close reason, rethrown after the sidecar cleanup. */
+      let primary: unknown
+      for (const release of releases)
+        if (release.status === 'rejected') {
+          if (!primaryFound) {
+            primaryFound = true
+            primary = release.reason
+          } else reportSafely(this.#scope.options.report, release.reason)
+        }
+      if (primaryFound) throw primary
     } finally {
       this.#scope.options.signal?.removeEventListener('abort', this.#onAbort)
     }

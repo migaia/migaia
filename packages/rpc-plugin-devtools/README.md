@@ -21,9 +21,9 @@ const tools = devtoolsPlugin({ maxEvents: 1000 })
 try {
   const recording = tools.collector.record({ maxEvents: 2000 })
   tools.collector.pause()
-  console.log(tools.describe().paused)
+  console.log(tools.collector.describe().paused)
   tools.collector.resume()
-  console.log(tools.describe().paused)
+  console.log(tools.collector.describe().paused)
   const text = tools.collector.exportRecord(recording.stop())
   console.log(tools.collector.importRecord(text).header.version)
 } finally {
@@ -37,7 +37,7 @@ try {
 
 同一 tools.plugin 可安装到多个真实 Host，每个安装有自己的观察寿命，事件进入同一个 collector。每个 Host 内只安装一次同一定义。一个 Host 允许不同 namespace 的 transport；业务仍在 `host.<ns>.*`，Devtools 不增加根调用方法。
 
-Host.close 撤回其观察；应用在所有使用结束后调用 tools.close 或 collector.close。关闭 collector 不关闭业务 Host。query/watch/stats/describe/close、pause/resume、record、clear、export/import 和 service 均通过 tools.collector 操作。
+Host.close 撤回其观察；应用在所有使用结束后调用 tools.collector.close()。关闭 collector 不关闭业务 Host。query/watch/stats/describe/close、pause/resume、record、clear、export/import 和 service 均通过 tools.collector 操作。
 
 ## 选择观察与保留
 

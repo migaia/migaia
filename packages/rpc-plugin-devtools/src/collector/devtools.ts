@@ -84,8 +84,15 @@ function captureBytes(content: unknown, view: IRpcProbeEventView): number {
  * Pure record codecs remain callable after close.
  */
 /** Validate collector configuration and allocate its owned storage without installing callbacks. */
-function collectorState(options: IRpcDevtoolsOptions) {
-  if (typeof options !== 'object' || options === null) invalid()
+function collectorState(requested: IRpcDevtoolsOptions) {
+  if (typeof requested !== 'object' || requested === null) invalid()
+  /** Every option is read once; a throwing getter is the coded invalid-option error with its cause. */
+  let options: IRpcDevtoolsOptions
+  try {
+    options = Object.freeze({ ...requested })
+  } catch (cause) {
+    invalid(cause)
+  }
   /** One capacity is shared by all main-ring columns. */
   const maxEvents = capacity(
     options.maxEvents,
@@ -281,6 +288,12 @@ class RpcDevtoolsCollector {
   /** Return the exact Core-branded host object installed during construction. */
   get value(): IRpcDevtools {
     return this.#state.devtools
+  }
+
+  /** Delete every descriptor published for one endpoint. */
+  forgetEndpoint(endpointId: string): void {
+    for (const [key, descriptor] of this.#state.descriptors)
+      if (descriptor.endpointId === endpointId) this.#state.descriptors.delete(key)
   }
 
   /** Cold operations reject terminal state with the stable package CLOSED identity. */
@@ -535,7 +548,8 @@ class RpcDevtoolsCollector {
         return
       if (
         this.#state.threshold !== 0xffffffff &&
-        rpcProbeSampleKey(view.senderId ?? '', view.messageId ?? '') >= this.#state.threshold
+        view.messageId !== undefined &&
+        rpcProbeSampleKey(view.senderId ?? '', view.messageId) >= this.#state.threshold
       ) {
         this.#state.counters.sampledOut++
         return
@@ -544,6 +558,10 @@ class RpcDevtoolsCollector {
       let content: unknown
       /** Byte charge follows the retained payload reference. */
       let bytes = 0
+      /** Content for the recording and watch sinks, unaffected by the main-ring budget. */
+      let sinkContent: unknown
+      /** Byte size of `sinkContent`. */
+      let sinkBytes = 0
       if ((this.#state.captureMask & (1 << view.stage)) !== 0 && view.content !== undefined) {
         content = view.content
         if (this.#state.redact) {
@@ -562,6 +580,9 @@ class RpcDevtoolsCollector {
         }
         if (content !== undefined) {
           bytes = captureBytes(content, view)
+          // The byte budget belongs to the main ring only; recording and watch keep their copy.
+          sinkContent = content
+          sinkBytes = bytes
           /** Replacement credits bytes from the retiring slot before evaluating the budget. */
           const retiredBytes =
             this.#state.ring.count === this.#state.ring.capacity
@@ -597,11 +618,11 @@ class RpcDevtoolsCollector {
       )
         this.#state.statistics.update(view)
       if (this.#state.closed || this.#state.paused) return
-      this.#state.recording?.write(view, this.#state.sequence, content, bytes)
+      this.#state.recording?.write(view, this.#state.sequence, sinkContent, sinkBytes)
       if (this.#state.watchers.length !== 0) {
         if (this.#state.watchPending!.count === this.#state.watchPending!.capacity)
           this.#state.watchDropped++
-        this.#state.watchPending!.write(view, this.#state.sequence, content, bytes)
+        this.#state.watchPending!.write(view, this.#state.sequence, sinkContent, sinkBytes)
         if (!this.#state.watchScheduled) {
           this.#state.watchScheduled = true
           enqueueBatch(this.#notifyWatchers)
@@ -615,7 +636,21 @@ class RpcDevtoolsCollector {
   }
 }
 
+/** Collector owner behind each public collector value, for installation cleanup. */
+const collectorOwners = new WeakMap<object, RpcDevtoolsCollector>()
+
+/**
+ * Drop the descriptors one Host installation published, when that installation is disposed. A
+ * shared long-lived collector then stops describing carriers of a Host that no longer exists.
+ */
+export function forgetDevtoolsEndpoint(collector: IRpcDevtools, endpointId: string): void {
+  collectorOwners.get(collector)?.forgetEndpoint(endpointId)
+}
+
 /** Create one collector owner and return its exact Core-installed probe identity. */
 export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtools {
-  return new RpcDevtoolsCollector(options).value
+  /** The owner stays reachable from its public value for installation cleanup. */
+  const owner = new RpcDevtoolsCollector(options)
+  collectorOwners.set(owner.value, owner)
+  return owner.value
 }

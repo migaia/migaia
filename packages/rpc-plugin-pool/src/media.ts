@@ -111,7 +111,8 @@ export class PoolMedia implements IRpcTargetSource {
   }
   /** Synchronous native capability admission does not inspect a transfer getter. */
   assertTransfer(_carrierId: string, options?: object): void {
-    this.#handle?.assertTransfer(options)
+    // Check against the member's current native handle, the one that will carry the operation.
+    this.handle?.assertTransfer(options)
   }
   /** Only the original native supervisor supplies retry authority. */
   nativeGeneration(_carrierId: string): IRpcNativePoolMember['native'] | undefined {

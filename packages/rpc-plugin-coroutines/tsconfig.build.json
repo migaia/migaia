@@ -1,7 +1,7 @@
 {
   // The actual independent-publish artifact: real ESM `.js` + `.d.ts` output
   // under `dist/`, source only (no tests).
-  // Run via `pnpm --filter ./packages/rpc run build`.
+  // Run via `pnpm --filter ./packages/rpc-plugin-coroutines run build`.
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,

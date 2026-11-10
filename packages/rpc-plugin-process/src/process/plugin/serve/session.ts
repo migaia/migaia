@@ -1,3 +1,4 @@
+import { reportSafely } from '../binding.ts'
 /**
  * Retains one genuine Host Session handle, native capacity lease and member-control receipt. Drain,
  * fallback registration and physical retirement reuse those original owners.
@@ -132,7 +133,8 @@ export class ProcessServeSession implements IRpcNativeMemberRecord {
       try {
         await this.#context.drain(this.#handle, this.#remaining())
       } catch (error) {
-        this.#context.report(error)
+        // Detach and lease release below must run even if the reporter itself throws.
+        reportSafely(this.#context.report, error)
       }
     }
     try {

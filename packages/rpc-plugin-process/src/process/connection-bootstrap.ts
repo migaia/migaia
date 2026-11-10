@@ -1,3 +1,4 @@
+import { reportSafely } from './plugin/binding.ts'
 /** Native token admission precedes Session without owning RPC negotiation or application auth. */
 import { withTimeout, type IAbortSignal } from '@migaia/utils/promise'
 import { UtilsTimeoutError } from '@migaia/utils/error'
@@ -122,7 +123,8 @@ class ProcessConnectionBootstrap {
       try {
         await this.#raw.close()
       } catch (cleanup) {
-        this.#options.report(cleanup)
+        // A throwing reporter must not replace the bootstrap failure that is rethrown below.
+        reportSafely(this.#options.report, cleanup)
       }
       if (error instanceof UtilsTimeoutError)
         throw createProcessError(RpcProcessErrorCode.handshakeTimeout, error)
@@ -197,7 +199,8 @@ class ProcessConnectionBootstrap {
           signal
         )
       } catch (cleanup) {
-        this.#options.report(cleanup)
+        // A throwing reporter must not replace the bootstrap failure that is rethrown below.
+        reportSafely(this.#options.report, cleanup)
       }
       throw error
     }

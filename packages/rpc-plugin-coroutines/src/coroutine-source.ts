@@ -1,3 +1,4 @@
+import { reportUnhandledError } from '@migaia/utils/error'
 /**
  * Connects owned coroutine supervision or borrowed native-port custody to SDK member generations
  * and controls. Native task settlement and cleanup remain separate from Host request execution.
@@ -111,7 +112,15 @@ export class CoroutineSource {
   ) {
     this.#options = options
     this.#context = context
-    this.#report = options.report ?? context.report
+    /** Caller reporter guarded so its own failure never replaces the task failure it reports. */
+    const report = options.report ?? context.report
+    this.#report = (error: unknown) => {
+      try {
+        report(error)
+      } catch (reportError) {
+        reportUnhandledError(reportError)
+      }
+    }
     if (source.task) {
       this.#supervisor = createCoroutineSupervisor({
         ...options.supervisor,

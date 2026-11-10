@@ -21,9 +21,9 @@ const tools = devtoolsPlugin({ maxEvents: 1000 })
 try {
   const recording = tools.collector.record({ maxEvents: 2000 })
   tools.collector.pause()
-  console.log(tools.describe().paused)
+  console.log(tools.collector.describe().paused)
   tools.collector.resume()
-  console.log(tools.describe().paused)
+  console.log(tools.collector.describe().paused)
   const text = tools.collector.exportRecord(recording.stop())
   console.log(tools.collector.importRecord(text).header.version)
 } finally {
@@ -37,7 +37,7 @@ It prints `true`, `false`, and `1`. Observe real work by installing tools.plugin
 
 One tools object may be installed on several real Hosts. Each installation has its own observation lifetime and feeds the same collector. Install that definition once per Host. A Host allows transports with distinct namespaces; calls remain under `host.<ns>.*`, without root call methods added by Devtools.
 
-Host.close removes its observation. The application calls tools.close or collector.close after all uses end. Collector closure does not close business Hosts. Use tools.collector for query/watch/stats/describe/close, pause/resume, record, clear, export/import, and service.
+Host.close removes its observation. The application calls tools.collector.close() after all uses end. Collector closure does not close business Hosts. Use tools.collector for query/watch/stats/describe/close, pause/resume, record, clear, export/import, and service.
 
 ## Observation and retention
 

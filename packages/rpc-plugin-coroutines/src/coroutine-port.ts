@@ -53,11 +53,25 @@ export class CoroutinePort implements IRpcMessageIO {
     if ('error' in inspection) throw inspection.error
     if (inspection.then) {
       /** Only a pending seal retains these original native write facts. */
-      const operation = { owner: this, value, transfer }
+      const operation = { owner: this, value, transfer, options }
       return assimilateCapturedThen<void>(inspection.then, started).then(() =>
-        operation.owner.#sendNative(operation.value, operation.transfer)
+        operation.owner.#sendAdmitted(operation.value, operation.transfer, operation.options)
       )
     }
+    this.#sendNative(value, transfer)
+  }
+  /** True once the carrier is retired; a late asynchronous admission must not post after it. */
+  #closed = false
+  /**
+   * Hand off a write whose asynchronous admission just finished, unless the carrier closed or the
+   * write was cancelled meanwhile; the pending write was already settled by that close or cancel.
+   */
+  #sendAdmitted(
+    value: unknown,
+    transfer: readonly ArrayBuffer[] | undefined,
+    options: IRpcCarrierWriteOptions | undefined
+  ): void {
+    if (this.#closed || options?.signal?.aborted) return
     this.#sendNative(value, transfer)
   }
   /** Task-owned ports and exact transfer lists remain the only native physical authority. */
@@ -96,7 +110,9 @@ export class CoroutinePort implements IRpcMessageIO {
     return () => entry.port.removeEventListener(entry.type, entry.listener)
   }
   /** Only the task wrapper closes actual ports after user finally; carrier retirement removes hooks. */
-  close(): void {}
+  close(): void {
+    this.#closed = true
+  }
 }
 
 /** One actual channel uses the shared canonical codec/receiver rather than identity or ACK bridges. */

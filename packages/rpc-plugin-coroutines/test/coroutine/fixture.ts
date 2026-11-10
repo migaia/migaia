@@ -45,11 +45,17 @@ function coroutineServiceFixtureState(
   runtime: boolean,
   late: boolean
 ) {
+  /** Task contexts in spawn order. */
   const contexts: ICoroutineTaskContext[] = []
+  /** Per-task completion handles; tests settle them to end a task. */
   const finishes: ReturnType<typeof deferred<void>>[] = []
+  /** Child RPC hosts created by the tasks. */
   const children: IRpcHost[] = []
+  /** Parent handles of tasks that have finished. */
   const finished: ICoroutineConnect[] = []
+  /** Notices received by the child service. */
   const notices: unknown[] = []
+  /** Counts child-side cancellable waits entered and cancelled. */
   const cancellation = { entered: 0, cancelled: 0 }
   /** Runtime-mode cases retain their original child installation barrier. */
   const installed = deferred<void>()
@@ -156,6 +162,7 @@ export function ordinaryHost() {
     () => host,
     (name, request) => host.pipeline(name, request)
   )
+  /** Ordinary host with the native RPC test modules. */
   const host = defineHost({
     modules: rpcNativeTestModules,
     ...rpc,
@@ -172,6 +179,7 @@ export function outlet(host: object): IRpcNamespace & ICoroutineNamespaceExtensi
 /** Consume the exact returned iterator and preserve its ordinary settlement. */
 export async function values(stream: ReturnType<IRpcNamespace['stream']>): Promise<unknown[]> {
   assert(Symbol.asyncIterator in stream)
+  /** Values collected from the stream. */
   const result: unknown[] = []
   for await (const value of stream) result.push(value)
   return result

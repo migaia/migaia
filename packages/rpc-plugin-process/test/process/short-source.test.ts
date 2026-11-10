@@ -97,11 +97,23 @@ describe('short Process sources', () => {
      * The raw runtime diagnostic is evidence for the documented loader requirement, not a
      * fabricated parent cause.
      */
-    const entry = fileURLToPath(new URL('./fixtures/short-module-error.ts', import.meta.url))
-    await expect(execute(process.execPath, [entry], { timeout: 10_000 })).rejects.toMatchObject({
-      code: 1,
-      stderr: expect.stringContaining('ERR_MODULE_NOT_FOUND')
-    })
+    /** Temporary module pair; the `.js` specifier is generated, never kept as tracked source. */
+    const directory = await mkdtemp(join(tmpdir(), 'dx-short-module-'))
+    try {
+      /** Entry that names its TypeScript dependency with the `.js` extension Node cannot map. */
+      const entry = join(directory, 'entry.ts')
+      await writeFile(join(directory, 'dependency.ts'), 'export const fixtureValue = 1\n')
+      await writeFile(
+        entry,
+        "import { fixtureValue } from './dependency.js'\nconsole.log(fixtureValue)\n"
+      )
+      await expect(execute(process.execPath, [entry], { timeout: 10_000 })).rejects.toMatchObject({
+        code: 1,
+        stderr: expect.stringContaining('ERR_MODULE_NOT_FOUND')
+      })
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
   })
 
   it.skipIf(process.platform === 'win32')(

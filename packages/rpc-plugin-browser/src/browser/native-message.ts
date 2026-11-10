@@ -91,9 +91,23 @@ class BrowserMessageIO implements IRpcMessageIO {
       /** Explicit write facts are retained only by the asynchronous continuation. */
       const operation = { owner: this, value, transfer, options }
       return assimilateCapturedThen<void>(inspection.then, started).then(() =>
-        operation.owner.#sendNative(operation.value, operation.transfer, operation.options)
+        operation.owner.#sendAdmitted(operation.value, operation.transfer, operation.options)
       )
     }
+    this.#sendNative(value, transfer, options)
+  }
+  /** True once the carrier is retired; a late asynchronous admission must not post after it. */
+  #closed = false
+  /**
+   * Hand off a write whose asynchronous admission just finished, unless the carrier closed or the
+   * write was cancelled meanwhile; the pending write was already settled by that close or cancel.
+   */
+  #sendAdmitted(
+    value: unknown,
+    transfer: readonly ArrayBuffer[] | undefined,
+    options: IRpcCarrierWriteOptions | undefined
+  ): void {
+    if (this.#closed || options?.signal?.aborted) return
     this.#sendNative(value, transfer, options)
   }
   /** Readonly observation still borrows the original source's exact native write. */
@@ -176,7 +190,9 @@ class BrowserMessageIO implements IRpcMessageIO {
     }
   }
   /** Logical retirement removes native listeners through SDK; borrowed native objects stay open. */
-  close(): void {}
+  close(): void {
+    this.#closed = true
+  }
   /** Native event reflection failures reach the existing SDK callback or installation reporter. */
   #failure(error: unknown): void {
     if (this.#error) this.#error(error)

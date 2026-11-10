@@ -319,11 +319,17 @@ export class PoolScheduler<T extends IPoolResource> implements IRpcPoolControls 
       return
     }
     if (member.idleTimer !== undefined) return
-    member.idleTimer = this.#scheduler.schedule(
-      () => this.#expireIdle(member),
-      this.#options.idleTimeoutMs
-    )
-    member.idleTimer.unref?.()
+    try {
+      member.idleTimer = this.#scheduler.schedule(
+        () => this.#expireIdle(member),
+        this.#options.idleTimeoutMs
+      )
+      member.idleTimer.unref?.()
+    } catch (error) {
+      // The member stays usable without idle retirement; the scheduler failure is reported.
+      member.idleTimer = undefined
+      this.#report(error)
+    }
   }
   /** A real idle expiry retires only an unreserved member; original close reporting owns failure. */
   #expireIdle(member: IPoolSlot<T>): void {

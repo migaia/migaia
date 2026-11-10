@@ -1,4 +1,5 @@
 /** One genuine flow installation lends readonly probe events to the original caller-owned collector. */
+import { forgetDevtoolsEndpoint } from './collector/devtools.ts'
 import {
   defineFlowPlugin,
   type IRpcFlowPlugin,
@@ -26,7 +27,14 @@ function setupDevtools(
     () => context.self!().instanceId,
     context.report
   )
-  return { observe: emitter.observe, dispose: () => emitter.dispose() }
+  return {
+    observe: emitter.observe,
+    dispose: () => {
+      emitter.dispose()
+      // The collector may outlive this Host; drop the descriptors this installation published.
+      forgetDevtoolsEndpoint(collector, context.self!().instanceId)
+    }
+  }
 }
 
 /** Construct separate explicit owners without attaching collector methods to a native definition. */

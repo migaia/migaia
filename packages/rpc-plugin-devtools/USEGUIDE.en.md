@@ -43,12 +43,12 @@ const task: ICoroutineUserTask = async ({ connect, signal }) => {
 type IWorkerApi = { double(value: number): number }
 const plugins = [tools.plugin, coroutinePlugin({ spawn: task })] as const
 const parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })
-const watch = tools.watch({ stages: ['message'] })
+const watch = tools.collector.watch({ stages: ['message'] })
 try {
   const next = watch.next()
   console.log(await parent.coroutine.request('double', 21))
   console.log((await next).value?.events.length)
-  console.log(tools.stats().methods)
+  console.log(tools.collector.stats().methods)
 } finally {
   await watch.return(undefined)
   await parent.close()

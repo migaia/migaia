@@ -235,7 +235,23 @@ function projectWrapped(
     })
   }
   /** Projection prevents planted stdio, bootstrap, limits or permissions from replacing rpc data. */
-  const next = validateLaunchCommand(result)
+  let next: IProcessLaunchCommand
+  try {
+    next = validateLaunchCommand(result)
+  } catch (cause) {
+    // A Proxy trap in the returned command throws a native error; give it the option identity.
+    if (
+      cause instanceof Error &&
+      Object.getOwnPropertyDescriptor(cause, 'code')?.value ===
+        RpcProcessErrorCode.pluginInvalidOption
+    )
+      throw cause
+    throw attachErrorIdentity(new TypeError(RpcProcessErrorText.pluginInvalidOption, { cause }), {
+      source: ERROR_SOURCE,
+      code: RpcProcessErrorCode.pluginInvalidOption,
+      detail: { field: PROCESS_SHORT_WRAP_FIELD }
+    })
+  }
   return { ...spec, command: next.command, args: next.args, cwd: next.cwd, env: next.env }
 }
 

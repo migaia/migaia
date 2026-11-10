@@ -81,14 +81,28 @@ class ThreadNativeIO implements IRpcMessageIO {
     if ('error' in inspection) throw inspection.error
     if (inspection.then) {
       /** This explicit context is retained only while an asynchronous seal is pending. */
-      const operation = { owner: this, value, transfer }
+      const operation = { owner: this, value, transfer, options }
       return assimilateCapturedThen<void>(inspection.then, started).then(() =>
-        operation.owner.#sendNative(operation.value, operation.transfer)
+        operation.owner.#sendAdmitted(operation.value, operation.transfer, operation.options)
       )
     }
     this.#sendNative(value, transfer)
   }
 
+  /** True once the carrier is retired; a late asynchronous admission must not post after it. */
+  #closed = false
+  /**
+   * Hand off a write whose asynchronous admission just finished, unless the carrier closed or the
+   * write was cancelled meanwhile; the pending write was already settled by that close or cancel.
+   */
+  #sendAdmitted(
+    value: unknown,
+    transfer: readonly ArrayBuffer[] | undefined,
+    options: IRpcCarrierWriteOptions | undefined
+  ): void {
+    if (this.#closed || options?.signal?.aborted) return
+    this.#sendNative(value, transfer)
+  }
   /** Observation remains adjacent to the same native postMessage and exact transfer list. */
   #sendNative(value: unknown, transfer?: readonly ArrayBuffer[]): void {
     this.#observe(RpcProbeDirection.outbound, value, transfer)
@@ -162,6 +176,7 @@ class ThreadNativeIO implements IRpcMessageIO {
 
   /** Native execution and borrowed-port disposal remain with their original acquisition owner. */
   close(): void {
+    this.#closed = true
     /** Clear custody before invoking a native remover that could reenter disposal. */
     const remove = this.#removeMessageError
     this.#removeMessageError = undefined
