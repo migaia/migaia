@@ -336,12 +336,9 @@ export class DynamicCapabilityGraph<TBinding> implements IDynamicCapabilityGraph
       )
     // Replacement is atomic: the new definition and topology are committed only after the old
     // instances are released, so a failed release leaves the graph exactly as it was. Changed
-    // edges are still validated first: a trial write rejects malformed or cyclic edges before any
-    // release, and the old (acyclic) edges are restored at once.
-    if (!sameTopology) {
-      this.#context.topologyIndex.setDependencies(node.id, node.dependencies)
-      this.#context.topologyIndex.setDependencies(node.id, oldDependencies)
-    }
+    // edges are still validated first, without writing, so malformed or cyclic edges reject
+    // before any release.
+    if (!sameTopology) this.#context.topologyIndex.checkDependencies(node.id, node.dependencies)
     /** Old frontier, provider-first; this is what release tears down. */
     const released = orderedDynamicEntries(this.#context, oldAffected)
     if (options?.restartDependents === false) {

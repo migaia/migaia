@@ -82,6 +82,11 @@ export type ITopologyIndexWriter = Readonly<{
   remove(id: string): void
   /** Replaces captured edges without changing the node's ordinal; malformed edges or cycles reject. */
   setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void
+  /**
+   * Runs the same structural and cycle checks as `setDependencies` without changing anything, so a
+   * caller can reject a replacement before it starts any irreversible work.
+   */
+  checkDependencies(id: string, dependencies: readonly ITopologyDependency[]): void
 }>
 
 /** Isolated working topology; every read and write rejects after either settlement operation. */
@@ -348,6 +353,28 @@ class TopologyIndex implements ITopologyIndex {
     this.#assertWritable()
     /** Present immutable node facts are the sole source for this operation. */
     const node = this.#requireNode(id)
+    /** Frozen candidate edges, admitted before they replace the old facts. */
+    const snapshots = this.#admitDependencies(node, dependencies)
+    for (const dependency of node.dependencies)
+      this.#removeReverseEdge(dependency.provider, node.id)
+    for (const dependency of snapshots)
+      this.#addReverseEdge(dependency.provider, node.id, dependency.required)
+    this.#nodes.set(node.id, Object.freeze({ ...node, dependencies: snapshots }))
+    this.#recomputeLevels([node.id])
+  }
+
+  /** Validates a candidate edge set for a present node without writing it. */
+  checkDependencies(id: string, dependencies: readonly ITopologyDependency[]): void {
+    this.#admitDependencies(this.#requireNode(id), dependencies)
+  }
+
+  /** Snapshots and validates candidate edges (shape and cycles); returns the frozen snapshot. */
+  #admitDependencies(
+    node: IStoredTopologyNode,
+    dependencies: readonly ITopologyDependency[]
+  ): readonly ITopologyDependency[] {
+    /** The node whose edges are being replaced. */
+    const id = node.id
     /** Frozen candidate edges replace the old facts only after structural validation succeeds. */
     const snapshots = snapshotTopologyDependencies(dependencies, id, (reason, nodeId, failure) =>
       failure === undefined
@@ -365,13 +392,7 @@ class TopologyIndex implements ITopologyIndex {
       return provider !== undefined && provider.level >= node.level
     })
     if (mightCycle) this.#assertAcyclic(id, snapshots)
-
-    for (const dependency of node.dependencies)
-      this.#removeReverseEdge(dependency.provider, node.id)
-    for (const dependency of snapshots)
-      this.#addReverseEdge(dependency.provider, node.id, dependency.required)
-    this.#nodes.set(node.id, Object.freeze({ ...node, dependencies: snapshots }))
-    this.#recomputeLevels([node.id])
+    return snapshots
   }
 
   /**

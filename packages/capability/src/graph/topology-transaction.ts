@@ -115,6 +115,12 @@ export class TopologyTransaction implements ITopologyTransaction {
     this.#working.setDependencies(id, dependencies)
   }
 
+  /** Validates dependencies against the transaction view without writing them. */
+  checkDependencies(id: string, dependencies: readonly ITopologyDependency[]): void {
+    this.#assertOpen()
+    this.#working.checkDependencies(id, dependencies)
+  }
+
   /** Publishes all isolated changes atomically and closes the transaction. */
   commit(): void {
     this.#assertOpen()

@@ -331,8 +331,9 @@ export async function startDynamicEntries<TBinding>(
 /**
  * Validate every returned instance and read its value once. If any instance is invalid or its value
  * getter throws, nothing is published: the returned instances go back to `releaseBatch`, the batch
- * entries are marked failed (or blocked when the failure cannot be attributed), and START_FAILED is
- * thrown with the original failure as cause.
+ * entries are marked failed (or blocked when the failure cannot be attributed). A malformed
+ * instance throws GRAPH_INVALID_NODE as before; a value getter failure throws START_FAILED with the
+ * original failure as cause.
  */
 async function readStartedInstances<TBinding>(
   context: IDynamicGraphContext<TBinding>,
@@ -341,10 +342,14 @@ async function readStartedInstances<TBinding>(
 ): Promise<unknown[]> {
   /** Values read once, in batch order. */
   const values: unknown[] = []
+  /** Set when an instance itself is malformed; that failure keeps its own GRAPH_INVALID_NODE code. */
+  let invalid: unknown
   try {
     for (const instance of instances) {
-      if (!instance || typeof instance !== 'object' || typeof instance.release !== 'function')
-        throw dynamicFailure(CapabilityGraphErrorCode.invalidNode)
+      if (!instance || typeof instance !== 'object' || typeof instance.release !== 'function') {
+        invalid = dynamicFailure(CapabilityGraphErrorCode.invalidNode)
+        throw invalid
+      }
       values.push(instance.value)
     }
     return values
@@ -359,6 +364,7 @@ async function readStartedInstances<TBinding>(
       entry.error = error
       entry.blockedReason = attributable ? undefined : GraphBlockedReason.failed
     }
+    if (error === invalid) throw error
     throw graphFailure(CapabilityGraphErrorCode.startFailed, error, {
       nodes: startable.map((entry) => entry.definition.id)
     })
