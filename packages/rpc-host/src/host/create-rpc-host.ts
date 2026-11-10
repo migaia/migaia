@@ -13,27 +13,29 @@ export function createRpcHost<
   TRemote = Record<never, never>,
   const TPlugins extends readonly IRpcHostPlugin[] = readonly IRpcHostPlugin[]
 >(options: IRpcHostOptions<TPlugins>): Promise<IRpcHost<TRemote, TPlugins>> {
-  /** The plugin list is read once; a throwing getter or revoked Proxy is HOST_PLUGIN_INVALID. */
-  let plugins: readonly IRpcHostPlugin[]
+  /** The plugin list, read once; undefined when the read itself threw. */
+  let plugins: unknown
+  /** True when the list is an array; a throwing getter or revoked Proxy leaves it false. */
+  let isList = false
   try {
     plugins = options.plugins
-    if (!Array.isArray(plugins))
-      throw tagRpcError(
-        new TypeError(HostErrorText.pluginInvalid),
-        RpcCoreErrorCode.hostPluginInvalid
-      )
+    isList = Array.isArray(plugins)
   } catch (cause) {
-    if (cause instanceof TypeError && cause.message === HostErrorText.pluginInvalid) throw cause
     throw tagRpcError(
       new TypeError(HostErrorText.pluginInvalid, { cause }),
       RpcCoreErrorCode.hostPluginInvalid
     )
   }
+  if (!isList)
+    throw tagRpcError(
+      new TypeError(HostErrorText.pluginInvalid),
+      RpcCoreErrorCode.hostPluginInvalid
+    )
   /** The exact native definitions alone carry SDK registration identity. */
   const namespaces = new Map<string, IRpcHostPlugin>()
   /** Fixed intervention stages must be installed before any transport in this cold native batch. */
   const flows: IRpcHostPlugin[] = []
-  for (const plugin of plugins) {
+  for (const plugin of plugins as readonly IRpcHostPlugin[]) {
     /** Configuration copies and public discriminator fields cannot impersonate SDK definitions. */
     const metadata = readRpcDefinition(plugin)
     if (!metadata)

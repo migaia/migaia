@@ -140,6 +140,8 @@ class RpcStreamFrameDecoder {
   #delivering = false
   /** Chunks pushed from inside onFrame, decoded in order once the current chunk is done. */
   #queued: Uint8Array[] = []
+  /** Next queued chunk to decode; chunks before it are done. Kept if onFrame throws mid-queue. */
+  #cursor = 0
   /** Initialize owned storage before publishing the resource's callbacks. */
   constructor(options: IRpcStreamFrameDecoderOptions, maxFrameBytes: () => number) {
     this.#state = rpcStreamFrameDecoderState(options, maxFrameBytes)
@@ -153,24 +155,25 @@ class RpcStreamFrameDecoder {
             this.#state.options.errorMetadata
           )
         // A chunk pushed from inside onFrame waits until the current chunk's remaining frames are
-        // delivered, so frames always arrive in byte order.
-        if (this.#delivering) {
+        // delivered, so frames always arrive in byte order. Queued chunks count as consumed.
+        if (this.#delivering || this.#cursor < this.#queued.length) {
           this.#queued.push(chunk.slice())
+          if (!this.#delivering) this.#deliver()
           return chunk.byteLength
         }
         this.#delivering = true
         try {
           /** Bytes consumed from the caller's own chunk. */
           const consumed = this.#decode(chunk)
-          for (let index = 0; index < this.#queued.length && !this.#state.terminal; index += 1)
-            this.#decode(this.#queued[index]!)
+          this.#drain()
           return consumed
         } finally {
-          this.#queued = []
-          this.#delivering = false
+          this.#settle()
         }
       },
       finish: () => {
+        // Chunks left queued by a throwing onFrame are decoded before the end is checked.
+        if (!this.#delivering && this.#cursor < this.#queued.length) this.#deliver()
         if (this.#state.terminal) return
         if (this.#state.headerBytes !== 0 || this.#state.payload !== undefined) {
           this.#fail(RpcContractErrorCode.invalidFrame)
@@ -179,10 +182,34 @@ class RpcStreamFrameDecoder {
         this.#state.terminal = true
       },
       close: () => {
+        this.#queued = []
+        this.#cursor = 0
         this.#state.terminal = true
         this.#state.payload = undefined
         this.#state.headerBytes = 0
       }
+    }
+  }
+  /** Decode queued chunks in order; the cursor moves first, so a throwing onFrame keeps the rest. */
+  #drain(): void {
+    while (this.#cursor < this.#queued.length && !this.#state.terminal)
+      this.#decode(this.#queued[this.#cursor++]!)
+  }
+  /** Decode the queue outside any onFrame call. */
+  #deliver(): void {
+    this.#delivering = true
+    try {
+      this.#drain()
+    } finally {
+      this.#settle()
+    }
+  }
+  /** End a delivery; a fully drained (or terminal) queue is released. */
+  #settle(): void {
+    this.#delivering = false
+    if (this.#state.terminal || this.#cursor >= this.#queued.length) {
+      this.#queued = []
+      this.#cursor = 0
     }
   }
   /** Decode one chunk in byte order, delivering every completed frame; returns bytes consumed. */
