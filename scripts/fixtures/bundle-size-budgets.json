@@ -24,19 +24,19 @@
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/createRpcHost.ts",
-    "gzip": 116907,
+    "gzip": 116914,
     "owner": "rpc-host",
     "forbidden": []
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/storage-host.ts",
-    "gzip": 86983,
+    "gzip": 87006,
     "owner": "storage-host",
     "forbidden": []
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/createTray.ts",
-    "gzip": 200078,
+    "gzip": 200312,
     "owner": "tray",
     "forbidden": []
   },
