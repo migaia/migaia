@@ -86,7 +86,14 @@ export const SerializeErrorCode = {
   /** A reserved tagged header is truncated or malformed; reject the damaged input. */
   tagInvalid: 'TAG_INVALID',
   /** A valid format tag is not registered; supply the corresponding codec revision. */
-  tagUnknown: 'TAG_UNKNOWN'
+  tagUnknown: 'TAG_UNKNOWN',
+  /**
+   * `dispose()` failed for a reason outside serialize, such as a parser `dispose` or an injected
+   * scheduler whose `now`, `schedule` or `cancel` threw. Disposal still ran parser cleanup. An
+   * uncoded native error gets this code attached in place and keeps its type and identity; any
+   * other value is wrapped, with the original on `cause` and on `errors[0]`.
+   */
+  disposeFailed: 'DISPOSE_FAILED'
 } as const
 
 /** Stable serialization failure values; diagnostic kind and parser type are separate domains. */

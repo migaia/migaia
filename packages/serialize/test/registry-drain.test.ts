@@ -98,10 +98,24 @@ describe('cleanup 判别联合 + detached sink', () => {
       }
     )
     const pending = registry.encode('x', { type: 'a' }).catch(() => undefined)
-    const disposePromise = registry.dispose({ deadlineAt: 100 })
-    manual.advance(101)
-    await disposePromise
+    /** Observer failures surfaced to the global error queue instead of being dropped. */
+    const surfaced: unknown[] = []
+    vi.stubGlobal('queueMicrotask', (task: () => void) => {
+      try {
+        task()
+      } catch (error) {
+        surfaced.push(error)
+      }
+    })
+    try {
+      const disposePromise = registry.dispose({ deadlineAt: 100 })
+      manual.advance(101)
+      await disposePromise
+    } finally {
+      vi.unstubAllGlobals()
+    }
     expect(disposed).toBe(true)
+    expect(surfaced).toEqual([expect.objectContaining({ message: 'timeout boom' })])
     release?.()
     await pending
   })

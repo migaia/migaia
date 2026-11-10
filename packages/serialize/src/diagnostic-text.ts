@@ -29,6 +29,8 @@ export const SerializeDiagnosticText = {
   noChunks: 'serialize produced no chunks',
   /** Decode cancellation retains its historically distinct diagnostic. */
   deserializeAborted: 'deserialize aborted',
+  /** A dispose failure that serialize did not raise itself; the original is on cause. */
+  disposeFailed: 'serialize registry dispose failed',
   /** Disposal snapshots the first deadline before closing admission. */
   deadlineRead: 'serialize dispose deadlineAt could not be read',
   /** Only finite absolute deadlines enter registry disposal. */

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { type IScheduler } from '@migaia/utils/scheduler'
 import { createSerializeRegistry, type ISerializeChunk } from '../src/index.ts'
 
@@ -343,9 +343,23 @@ describe('deadline failure never skips parser cleanup', () => {
       }
     )
 
-    await expect(registry.dispose({ deadlineAt: 10 })).rejects.toBe(scheduleFailure)
+    /** Reporter failures surfaced to the global error queue instead of being dropped. */
+    const surfaced: unknown[] = []
+    vi.stubGlobal('queueMicrotask', (task: () => void) => {
+      try {
+        task()
+      } catch (error) {
+        surfaced.push(error)
+      }
+    })
+    try {
+      await expect(registry.dispose({ deadlineAt: 10 })).rejects.toBe(scheduleFailure)
+    } finally {
+      vi.unstubAllGlobals()
+    }
     expect(reported).toHaveLength(1)
     expect(reported[0]).toMatchObject({ kind: 'cleanup-error', error: cleanupFailure })
+    expect(surfaced).toEqual([expect.objectContaining({ message: 'cleanup reporter failure' })])
   })
 
   it('deadline primary plus detached parser rejection stays observed without unhandled rejection', async () => {

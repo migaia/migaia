@@ -1,4 +1,5 @@
 import { SerializeContext } from './operation-constants.ts'
+import { attachErrorIdentity, isNativeErrorValue, reportUnhandledError } from '@migaia/utils/error'
 /** Registry admission, parser ownership, operations and terminal draining share one owner. */
 import { createAbortController } from '@migaia/lifecycle/abort'
 import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle/scope'
@@ -285,7 +286,8 @@ class SerializeRegistryOwner {
           phase: SerializePhase.decode,
           context,
           chunkIndex: 0,
-          bytesConsumed: chunk[0] === SerializeChunkKind.bytes ? chunk[1].byteLength : 0,
+          bytesConsumed:
+            validatedChunk[0] === SerializeChunkKind.bytes ? validatedChunk[1].byteLength : 0,
           code: SerializeErrorCode.aborted,
           cause: signal.reason
         })
@@ -348,8 +350,9 @@ class SerializeRegistryOwner {
         deadlineAt,
         pendingCount: this.#pending.size
       })
-    } catch {
-      // Timeout observers are contained exactly as in the original registry transaction.
+    } catch (error) {
+      // Cleanup continues; the observer's own failure goes to the host exception queue.
+      reportUnhandledError(error)
     }
   }
 
@@ -422,17 +425,48 @@ class SerializeRegistryOwner {
             source: SERIALIZE_SOURCE,
             error: cleanupError
           })
-        } catch {
-          // Cleanup reporters cannot replace the original terminal result.
+        } catch (error) {
+          // A failing reporter cannot replace the terminal result; deliver it to the host queue.
+          reportUnhandledError(error)
         }
       }
     }
-    if (state.hasPrimaryError) throw state.primaryError
+    if (state.hasPrimaryError) throw toDisposeFailure(state.primaryError)
   }
 }
 
 /** First disposal failure survives later deadline cancellation and parser cleanup errors. */
 type IDisposeFailure = { hasPrimaryError: boolean; primaryError: unknown }
+
+/**
+ * Give a dispose failure the package identity. A failure that already carries a complete identity
+ * keeps it. An uncoded native error (a parser dispose or injected scheduler failure) gets
+ * DISPOSE_FAILED attached in place, so its type, stack and identity stay the caller's. Any other
+ * value becomes a new DISPOSE_FAILED error with the original kept on `cause` and `errors`, so even
+ * an `undefined` failure stays reachable.
+ */
+function toDisposeFailure(error: unknown): unknown {
+  if (isNativeErrorValue(error)) {
+    /** Own descriptors only, so no application getter runs. */
+    const source = Object.getOwnPropertyDescriptor(error, 'source')
+    /** Own code descriptor, read the same way. */
+    const code = Object.getOwnPropertyDescriptor(error, 'code')
+    if (typeof source?.value === 'string' && typeof code?.value === 'string') return error
+    if (!source && !code && Object.isExtensible(error))
+      return attachErrorIdentity(error, {
+        source: SERIALIZE_SOURCE,
+        code: SerializeErrorCode.disposeFailed
+      })
+  }
+  return createSerializeError(
+    SerializeErrorCode.disposeFailed,
+    SerializeDiagnosticText.disposeFailed,
+    {
+      cause: error,
+      errors: [error]
+    }
+  )
+}
 
 /** Records only the first scheduler/drain failure for the terminal transaction. */
 function recordDisposeFailure(state: IDisposeFailure, error: unknown): void {

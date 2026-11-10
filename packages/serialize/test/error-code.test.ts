@@ -9,12 +9,18 @@ import {
 } from '../src/errors.ts'
 
 describe('serialize error-code contract', () => {
-  it('declares 11 unique codes under the package source', () => {
+  it('declares 12 unique codes under the package source', () => {
     const codes = Object.values(SerializeErrorCode)
-    expect(codes).toHaveLength(11)
-    expect(new Set(codes).size).toBe(11)
+    expect(codes).toHaveLength(12)
+    expect(new Set(codes).size).toBe(12)
     expect(codes).toEqual(
-      expect.arrayContaining(['ENV_UNSUPPORTED', 'TAG_MISSING', 'TAG_INVALID', 'TAG_UNKNOWN'])
+      expect.arrayContaining([
+        'ENV_UNSUPPORTED',
+        'TAG_MISSING',
+        'TAG_INVALID',
+        'TAG_UNKNOWN',
+        'DISPOSE_FAILED'
+      ])
     )
     expect(SERIALIZE_SOURCE).toBe('serialization')
   })
