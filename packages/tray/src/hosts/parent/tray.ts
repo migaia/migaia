@@ -53,7 +53,8 @@ export type ICreateTrayOptions<
 }>
 /**
  * Snapshots the caller's options once. Missing hosts, or a getter, Proxy or iterator that throws,
- * becomes `TRAY_HOST_INVALID`; the thrown error stays on `cause`.
+ * becomes `TRAY_HOST_INVALID`; a routing value that cannot be iterated becomes
+ * `TRAY_ROUTING_INVALID`; null routing means none. The thrown error stays on `cause`.
  */
 function readTrayOptions<
   THosts extends readonly IAnyTrayHost[],
@@ -62,18 +63,16 @@ function readTrayOptions<
   if (!options || typeof options !== 'object') throw createTrayError(TrayErrorCode.hostInvalid)
   /** Plain copy read once; arrays are copied so later reads never touch caller objects. */
   let input: ICreateTrayOptions<THosts, TRouting> | undefined
+  /** Routing as read; null and undefined both mean no custom policies, as before. */
+  let routing: unknown
   try {
     /** Hosts read once, so a getter runs a single time. */
     const hosts = options.hosts
-    /** Routing read once; absent routing stays absent. */
-    const routing = options.routing
+    routing = options.routing
     input = Array.isArray(hosts)
       ? Object.freeze({
           hosts: Object.freeze([...hosts]) as unknown as THosts,
-          routing:
-            routing === undefined
-              ? undefined
-              : (Object.freeze([...routing]) as unknown as TRouting),
+          routing: undefined,
           probe: options.probe,
           report: options.report
         })
@@ -82,7 +81,16 @@ function readTrayOptions<
     throw createTrayError(TrayErrorCode.hostInvalid, error)
   }
   if (!input) throw createTrayError(TrayErrorCode.hostInvalid)
-  return input
+  if (routing == null) return input
+  try {
+    // A routing value that cannot be iterated is a routing error, not a host error.
+    return Object.freeze({
+      ...input,
+      routing: Object.freeze([...(routing as Iterable<ITrayRoutingPolicy>)]) as unknown as TRouting
+    })
+  } catch (error) {
+    throw createTrayError(TrayErrorCode.routingInvalid, error)
+  }
 }
 
 /**
