@@ -310,7 +310,20 @@ func hasFields(value any, required []string) bool {
 }
 func identifier(value any) bool {
 	text, ok := value.(string)
-	return ok && len(text) > 0 && utf8.RuneCountInString(text) <= 128
+	return ok && len(text) > 0 && utf16Length(text) <= 128
+}
+
+// utf16Length counts UTF-16 code units, the length unit of the canonical JS and Python peers.
+func utf16Length(text string) int {
+	units := 0
+	for _, r := range text {
+		if r >= 0x10000 {
+			units += 2
+		} else {
+			units++
+		}
+	}
+	return units
 }
 func stringList(value any, maximum int, pattern *regexp.Regexp, nonempty bool) bool {
 	items, ok := value.([]any)

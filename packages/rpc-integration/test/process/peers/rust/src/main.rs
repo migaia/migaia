@@ -626,7 +626,7 @@ fn valid_stream(input: &Value) -> bool {
 fn valid_route(input: &Value) -> bool {
     has_fields(input,&["applicationVersion","senderId","receiverId","targetId"]) &&
     ["applicationVersion","senderId","receiverId","targetId"].iter().all(|key|identifier(value(input,key))) &&
-    input.get("sentAt").is_none_or(|value|finite_number(value,f64::MAX)) &&
+    input.get("sentAt").is_some_and(|value|finite_number(value,f64::MAX)) &&
     input.get("remainingMs").is_none_or(|value|finite_number(value,2_147_483_647.0)) &&
     input.get("trace").is_none_or(|value|matches!(value,Value::String(text) if (1..=256).contains(&text.len()) && text.bytes().all(|ch|(32..=126).contains(&ch)))) &&
     input.get("forwardRoute").is_none_or(|route|route.as_array().is_some_and(|route|route.len() <= MAX_FORWARD_ROUTE_NODES && route.iter().all(identifier)))

@@ -326,12 +326,7 @@ class CorePerformanceCell {
       if (value !== this.#payload) throw new Error(CorePerfText.payload)
       return
     }
-    if (
-      !(value instanceof Uint8Array) ||
-      value.byteLength !== this.#payload.byteLength ||
-      value[0] !== 97 ||
-      value[value.length - 1] !== 97
-    )
+    if (!(value instanceof Uint8Array) || Buffer.compare(value, this.#payload) !== 0)
       throw new Error(CorePerfText.payload)
   }
   /** Release every host before its native ports; cleanup errors remain classified and visible. */

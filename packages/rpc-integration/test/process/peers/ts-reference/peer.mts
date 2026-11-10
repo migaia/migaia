@@ -135,6 +135,8 @@ class FrameReader {
   #decoder = new FrameDecoder()
   /** Completed frames not yet consumed by the protocol loop. */
   #queued: Buffer[] = []
+  /** Read cursor into `#queued`; the array is cleared once drained instead of shifted. */
+  #cursor = 0
   /** Source iterator supports stdio and Unix sockets alike. */
   #source: AsyncIterator<Uint8Array>
 
@@ -143,6 +145,10 @@ class FrameReader {
   }
 
   async read(): Promise<Buffer | undefined> {
+    if (this.#cursor === this.#queued.length) {
+      this.#queued = []
+      this.#cursor = 0
+    }
     while (this.#queued.length === 0) {
       this.#decoder.throwDeferredFault()
       const next = await this.#source.next()
@@ -150,9 +156,9 @@ class FrameReader {
         this.#decoder.finish()
         return undefined
       }
-      this.#queued.push(...this.#decoder.push(next.value))
+      this.#queued = this.#decoder.push(next.value)
     }
-    return this.#queued.shift()
+    return this.#queued[this.#cursor++]
   }
 }
 

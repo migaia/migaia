@@ -36,7 +36,7 @@ node "$(git rev-parse --path-format=absolute --git-common-dir)/../scripts/exclus
 | `test:suite-parity`            | 核对各 RPC 包从旧包迁移过来的测试：旧测试文件里的每个用例名都必须在新位置存在并通过。                                                                      |
 | `test:packed`                  | 以 workspace concurrency 2 构建八个 RPC owner，再运行既有 packed-export smoke，在临时消费目录检查公开路径可解析、已退役子路径仍不可导入。                  |
 | `test:coverage:family`         | 合并九个测试 owner：contract、Host、六个 plugin 包与本私有工作区；覆盖八个当前运行时源码 owner，迁出的协程测试在新 owner 统计。                            |
-| `typecheck` / `typecheck:test` | 对测试、bench 和配置做类型检查（本包没有 `src` 运行时代码，两者检查同一份配置）。                                                                          |
+| `typecheck` / `typecheck:test` | 对 `src` 与 `test` 做类型检查；`bench/` 不在检查范围内（本包没有 `src` 运行时代码，两者检查同一份配置）。                                                  |
 | `fmt` / `lint`                 | 格式化和 lint 测试、bench 与 vitest 配置。                                                                                                                 |
 | `bench:ipc`                    | IPC 性能测量驱动，见[第 6 节](#6-性能测量)。                                                                                                               |
 
