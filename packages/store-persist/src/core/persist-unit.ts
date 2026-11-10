@@ -1,4 +1,4 @@
-import { runPersistCallback } from '../errors.ts'
+import { runPersistCallback } from './persist-callback.ts'
 import { createAbortController, type IAbortController } from '@migaia/lifecycle'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'

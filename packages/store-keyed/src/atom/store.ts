@@ -1,4 +1,4 @@
-import { runAtomCallback, toAtomCallbackFailure } from '../errors.ts'
+import { runAtomCallback, toAtomCallbackFailure } from './callback-failure.ts'
 import {
   ReactiveErrorPhase,
   type IReactiveComputed,
