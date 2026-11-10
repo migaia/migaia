@@ -67,3 +67,19 @@ async function hanMutation(): Promise<void> {
 }
 it('rejects a real reachable forbidden export and unchanged-budget overflow', forbiddenMutation)
 it('rejects a surviving Han literal in the measured UTF-8 artifact', hanMutation)
+
+/**
+ * PluginHost gzip on main b344a3d38 (rolldown, same script), the baseline for the error-slimming
+ * clause that requires at least a 1.5 KB drop. Fixed historical evidence, not a budget row.
+ */
+const pluginHostBaselineGzip = 52384
+/** Minimum required drop: 1.5 KB. */
+const requiredDrop = 1536
+/** The PluginHost entry stays at least 1.5 KB below its pre-program baseline. */
+async function pluginHostDrop(): Promise<void> {
+  /** Same production entry as the PluginHost budget row. */
+  const row = budgets.find((candidate) => candidate.entry.endsWith('/PluginHost.ts'))!
+  const result = await measureBundle(resolve(root, row.entry))
+  expect(pluginHostBaselineGzip - result.gzip).toBeGreaterThanOrEqual(requiredDrop)
+}
+it('keeps PluginHost at least 1.5 KB below its pre-program gzip baseline', pluginHostDrop)

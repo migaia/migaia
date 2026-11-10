@@ -54,3 +54,18 @@ asyncOnly.useGeneratorPipeline(numericGenerator)
 asyncOnly.useAsyncGeneratorPipeline(numericAsyncGenerator)
 // @ts-expect-error Installing async alone does not admit sync as the selected mode.
 defineHost({ modules: [asyncPipelineModule], host: { pipeline: { mode: 'sync' } } })
+
+// BC6: explicit generics that stop before TModules/TMode keep the empty-module defaults,
+// so a non-empty module list is rejected instead of silently dropping module members.
+defineHost<Record<string, never>, number>({
+  // @ts-expect-error The default module axis is readonly [], which cannot hold asyncPipelineModule.
+  modules: [asyncPipelineModule]
+})
+/** Supplying the module and mode axes accepts the same selection. */
+const explicitAxes = defineHost<
+  Record<string, never>,
+  number,
+  readonly [typeof asyncPipelineModule],
+  'async'
+>({ modules: [asyncPipelineModule], host: { pipeline: { mode: 'async' } } })
+void explicitAxes.usePipeline
