@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import {
   defineOutputPlugin,
@@ -137,7 +138,7 @@ export function httpPlugin<const F extends ILogFeatureRecord = Record<never, nev
   /** One read of every option; a throwing getter becomes INVALID_OPTION with the error on cause. */
   let options: IHttpPluginConfig<F>
   try {
-    options = Object.freeze({ ...requested })
+    options = Object.freeze(snapshotOptionProperties(requested))
   } catch (cause) {
     throw httpError(LogHttpErrorCode.invalidOption, LogHttpErrorText.invalidOption, cause)
   }

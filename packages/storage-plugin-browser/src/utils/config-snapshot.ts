@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 
@@ -12,7 +13,7 @@ export function snapshotBrowserConfig<T>(
 ): T {
   if (options === null || typeof options !== 'object') return options
   try {
-    return Array.isArray(options) ? options : { ...options }
+    return Array.isArray(options) ? options : snapshotOptionProperties(options)
   } catch (cause) {
     throw new StorageError(code, { cause })
   }

@@ -89,7 +89,19 @@ function collectorState(requested: IRpcDevtoolsOptions) {
   /** Every option is read once; a throwing getter is the coded invalid-option error with its cause. */
   let options: IRpcDevtoolsOptions
   try {
-    options = Object.freeze({ ...requested })
+    // Each known option is read once here (class-instance options included); later code uses this.
+    options = Object.freeze({
+      stages: requested.stages,
+      capture: requested.capture,
+      methods: requested.methods,
+      sample: requested.sample,
+      maxEvents: requested.maxEvents,
+      maxContentBytes: requested.maxContentBytes,
+      maxInterned: requested.maxInterned,
+      exposeContent: requested.exposeContent,
+      redact: requested.redact,
+      onError: requested.onError
+    })
   } catch (cause) {
     invalid(cause)
   }

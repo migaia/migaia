@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import {
   defineOutputPlugin,
@@ -119,7 +120,7 @@ export function createFilePlugin<const F extends ILogFeatureRecord = Record<neve
  */
 export function snapshotFileOptions<T extends object>(options: T): T {
   try {
-    return Object.freeze({ ...options })
+    return Object.freeze(snapshotOptionProperties(options))
   } catch (error) {
     throw fileError(LogFileErrorCode.invalidOption, LogFileErrorText.invalidOption, error)
   }

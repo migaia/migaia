@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { ERROR_SOURCE, LogConsoleErrorCode, LogConsoleErrorText } from './error-code.ts'
 import { detectServerRuntime } from '@migaia/utils'
@@ -15,7 +16,7 @@ export function consoleProcess(): IConsoleProcess | undefined {
  */
 export function snapshotConsoleOptions<T extends object>(options: T): T {
   try {
-    return Object.freeze({ ...options })
+    return Object.freeze(snapshotOptionProperties(options))
   } catch (error) {
     throw attachErrorIdentity(new TypeError(LogConsoleErrorText.invalidOption, { cause: error }), {
       source: ERROR_SOURCE,

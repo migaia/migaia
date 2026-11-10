@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { ERROR_SOURCE, LogHostErrorCode, type ILogHostErrorCode } from './error-code.ts'
 import { LogHostErrorText } from './error-text.ts'
@@ -81,7 +82,7 @@ export function createLogTypeError(
 export function snapshotDefinition<T extends object>(definition: T): T {
   if (definition === null || typeof definition !== 'object') return definition
   try {
-    return { ...definition }
+    return snapshotOptionProperties(definition)
   } catch (error) {
     throw invalidOption(error)
   }

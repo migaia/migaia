@@ -19,7 +19,7 @@ import {
 } from './errors.ts'
 import { SsrWireType, SsrWorkOutcome } from './ssr-constants.ts'
 import { StoreSsrErrorText } from './error-text.ts'
-import { snapshotOwnDescriptors } from '@migaia/utils/object'
+import { snapshotOwnDescriptors, snapshotOptionProperties } from '@migaia/utils/object'
 import { isPlainObject } from '@migaia/utils/object'
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
@@ -1349,7 +1349,7 @@ function hasCompleteIdentity(error: unknown): boolean {
  */
 function snapshotSsrOptions<T extends object>(options: T): T {
   try {
-    return { ...options }
+    return snapshotOptionProperties(options)
   } catch (error) {
     throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.optionsObject, {
       cause: error

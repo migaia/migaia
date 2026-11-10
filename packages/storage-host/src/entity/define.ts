@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 import { EntityFeatureName } from './constants.ts'
 import { EntityText } from './text.ts'
 import { passthrough } from '../schema/passthrough.ts'
@@ -210,7 +211,7 @@ class EntityPluginDefinition<TDomain, TStored, TId extends string> {
      */
     let options: IEntityPluginOptions<TDomain, TStored, any>
     try {
-      options = { ...requested }
+      options = snapshotOptionProperties(requested)
     } catch (cause) {
       throw new StorageError(StorageHostErrorCode.invalidConfig, { cause })
     }

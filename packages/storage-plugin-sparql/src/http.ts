@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 import { bytesToBase64 } from '@migaia/utils/bytes'
 import { throwIfAborted } from '@migaia/storage-host/sdk'
 import { invalidArgument, sparqlError } from './errors.ts'
@@ -71,7 +72,7 @@ export function httpEndpoint(requested: ISparqlHttpOptions): ISparqlEndpoint {
   /** Every option is read once; a throwing getter is INVALID_ARGUMENT with its cause. */
   let options: ISparqlHttpOptions
   try {
-    options = { ...requested }
+    options = snapshotOptionProperties(requested)
   } catch (cause) {
     throw invalidArgument(cause)
   }

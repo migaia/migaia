@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 /**
  * Host-owned exact-reference provenance for local control decisions; public diagnostics live in
  * contract.
@@ -312,7 +313,7 @@ export function createRpcTimeoutError(
  */
 export function snapshotRpcOptions<T extends object>(value: T, message: string): T {
   try {
-    return Object.freeze({ ...value })
+    return Object.freeze(snapshotOptionProperties(value))
   } catch (cause) {
     throw tagRpcError(new TypeError(message, { cause }), RpcCoreErrorCode.invalidConfig)
   }

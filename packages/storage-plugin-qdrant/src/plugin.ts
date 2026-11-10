@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 import {
   definePlugin,
   defineStorageBackendKind,
@@ -85,7 +86,7 @@ function readQdrantOptions<TId extends string>(
   /** One read of every option. */
   let snapshot: IQdrantOptions & { readonly id?: TId }
   try {
-    snapshot = { ...options }
+    snapshot = snapshotOptionProperties(options)
   } catch (cause) {
     throw invalidArgument(cause)
   }
