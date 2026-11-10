@@ -130,6 +130,13 @@ export type IErrorIdentity = {
  * returns the target that receives any remaining identity fields.
  */
 export type IErrorIdentityHooks<T extends object> = {
+  /**
+   * Leaves `source` and `code` configurable instead of locked. An owner that deliberately
+   * reclassifies its own error in place (for example lifecycle across cancellation boundaries) sets
+   * this and redefines `code` from `onConflict`; every other caller keeps the default lock. `phase`
+   * and `detail` stay locked either way.
+   */
+  readonly reclassifiable?: boolean
   readonly onConflict?: (context: {
     readonly target: T
     readonly key: string
@@ -142,6 +149,17 @@ export type IErrorIdentityHooks<T extends object> = {
     readonly incoming: unknown
     readonly cause: unknown
   }) => T
+}
+
+/**
+ * Whether one identity key stays configurable: only `source` and `code`, and only when the caller
+ * opted into in-place reclassification.
+ */
+function isReclassifiableKey(
+  key: string,
+  hooks: { readonly reclassifiable?: boolean } | undefined
+): boolean {
+  return hooks?.reclassifiable === true && (key === 'source' || key === 'code')
 }
 
 /**
@@ -173,7 +191,7 @@ export function attachErrorIdentity<T extends object>(
     if (existing) continue
     try {
       Object.defineProperty(target, key, {
-        configurable: false,
+        configurable: isReclassifiableKey(key, hooks),
         enumerable: true,
         value,
         writable: false
