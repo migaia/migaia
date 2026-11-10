@@ -26,19 +26,45 @@
     "entry": "scripts/fixtures/bundle-size-entries/createRpcHost.ts",
     "gzip": 116914,
     "owner": "rpc-host",
-    "forbidden": []
+    "forbidden": [
+      "packages/plugin-host/src/modules/enablement/**",
+      "packages/plugin-host/src/modules/activation/**",
+      "packages/plugin-host/src/modules/pipeline-modes/sync.ts",
+      "packages/plugin-host/src/modules/pipeline-modes/generator.ts",
+      "packages/plugin-host/src/modules/pipeline-modes/async-generator.ts",
+      "packages/middleware-pipeline/src/runners/sync.ts",
+      "packages/middleware-pipeline/src/runners/generator.ts",
+      "packages/middleware-pipeline/src/runners/async-generator.ts"
+    ]
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/storage-host.ts",
     "gzip": 87006,
     "owner": "storage-host",
-    "forbidden": []
+    "forbidden": [
+      "packages/plugin-host/src/modules/enablement/**",
+      "packages/plugin-host/src/modules/activation/**",
+      "packages/plugin-host/src/modules/named-pipelines/**",
+      "packages/plugin-host/src/modules/pipeline-modes/generator.ts",
+      "packages/plugin-host/src/modules/pipeline-modes/async-generator.ts",
+      "packages/middleware-pipeline/src/runners/generator.ts",
+      "packages/middleware-pipeline/src/runners/async-generator.ts"
+    ]
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/createTray.ts",
     "gzip": 200312,
     "owner": "tray",
-    "forbidden": []
+    "forbidden": [
+      "packages/plugin-host/src/modules/enablement/**",
+      "packages/plugin-host/src/modules/activation/**",
+      "packages/plugin-host/src/modules/pipeline-modes/sync.ts",
+      "packages/plugin-host/src/modules/pipeline-modes/generator.ts",
+      "packages/plugin-host/src/modules/pipeline-modes/async-generator.ts",
+      "packages/middleware-pipeline/src/runners/sync.ts",
+      "packages/middleware-pipeline/src/runners/generator.ts",
+      "packages/middleware-pipeline/src/runners/async-generator.ts"
+    ]
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/store-middleware.ts",
