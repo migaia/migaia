@@ -1,5 +1,5 @@
 import { SerializeContext } from './operation-constants.ts'
-import { attachErrorIdentity, isNativeErrorValue, reportUnhandledError } from '@migaia/utils/error'
+import { identifyBoundaryFailure, reportUnhandledError } from '@migaia/utils/error'
 /** Registry admission, parser ownership, operations and terminal draining share one owner. */
 import { createAbortController } from '@migaia/lifecycle/abort'
 import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle/scope'
@@ -446,25 +446,18 @@ type IDisposeFailure = { hasPrimaryError: boolean; primaryError: unknown }
  * an `undefined` failure stays reachable.
  */
 function toDisposeFailure(error: unknown): unknown {
-  if (isNativeErrorValue(error)) {
-    /** Own descriptors only, so no application getter runs. */
-    const source = Object.getOwnPropertyDescriptor(error, 'source')
-    /** Own code descriptor, read the same way. */
-    const code = Object.getOwnPropertyDescriptor(error, 'code')
-    if (typeof source?.value === 'string' && typeof code?.value === 'string') return error
-    if (!source && !code && Object.isExtensible(error))
-      return attachErrorIdentity(error, {
-        source: SERIALIZE_SOURCE,
-        code: SerializeErrorCode.disposeFailed
-      })
-  }
-  return createSerializeError(
-    SerializeErrorCode.disposeFailed,
-    SerializeDiagnosticText.disposeFailed,
-    {
-      cause: error,
-      errors: [error]
-    }
+  return identifyBoundaryFailure(
+    error,
+    { source: SERIALIZE_SOURCE, code: SerializeErrorCode.disposeFailed },
+    (cause) =>
+      createSerializeError(
+        SerializeErrorCode.disposeFailed,
+        SerializeDiagnosticText.disposeFailed,
+        {
+          cause,
+          errors: [cause]
+        }
+      )
   )
 }
 

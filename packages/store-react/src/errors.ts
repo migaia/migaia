@@ -1,5 +1,5 @@
 import { ERROR_SOURCE, StoreReactErrorCode, type IStoreReactErrorCode } from './error-code.ts'
-import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
+import { attachErrorIdentity, identifyBoundaryFailure } from '@migaia/utils/error'
 import { StoreReactErrorText } from './error-text.ts'
 
 export { StoreReactErrorCode, type IStoreReactErrorCode }
@@ -47,20 +47,9 @@ export function identifyStoreReactFailure(
   code: IStoreReactErrorCode,
   text: string
 ): Error {
-  if (isNativeErrorValue(error)) {
-    try {
-      /** Inspect identity without invoking application-owned metadata accessors. */
-      const source = Object.getOwnPropertyDescriptor(error, 'source')
-      /** Complete foreign identities keep their semantic package owner. */
-      const existingCode = Object.getOwnPropertyDescriptor(error, 'code')
-      if (typeof source?.value === 'string' && typeof existingCode?.value === 'string') return error
-      if (!source && !existingCode && Object.isExtensible(error))
-        return tagStoreReactError(error, code)
-    } catch (metadataError) {
-      return createStoreReactAggregateError(code, [error, metadataError], text)
-    }
-  }
-  return createStoreReactError(code, text, { cause: error })
+  return identifyBoundaryFailure(error, { source: STORE_REACT_SOURCE, code }, (cause) =>
+    createStoreReactError(code, text, { cause })
+  ) as Error
 }
 
 /** Classifies owned cleanup failures, preserving native identity or the original through cause. */

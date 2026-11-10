@@ -1,5 +1,5 @@
 import { ERROR_SOURCE, StoreWasmErrorCode, type IStoreWasmErrorCode } from './error-code.ts'
-import { attachErrorIdentity, isNativeErrorValue, tryReadProperty } from '@migaia/utils/error'
+import { attachErrorIdentity, identifyBoundaryFailure, tryReadProperty } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { StoreWasmErrorText } from './error-text.ts'
 
@@ -68,20 +68,9 @@ export function identifyStoreWasmFailure(
   code: IStoreWasmErrorCode,
   text: string
 ): Error {
-  if (isNativeErrorValue(error)) {
-    try {
-      /** Inspect application error identity without running metadata getters. */
-      const source = Object.getOwnPropertyDescriptor(error, 'source')
-      /** Complete foreign identities remain traceable to their actual package owner. */
-      const existingCode = Object.getOwnPropertyDescriptor(error, 'code')
-      if (typeof source?.value === 'string' && typeof existingCode?.value === 'string') return error
-      if (!source && !existingCode && Object.isExtensible(error))
-        return tagStoreWasmError(error, code)
-    } catch (metadataError) {
-      return createStoreWasmAggregateError(code, [error, metadataError], text)
-    }
-  }
-  return createStoreWasmError(code, text, { cause: error })
+  return identifyBoundaryFailure(error, { source: STORE_WASM_SOURCE, code }, (cause) =>
+    createStoreWasmError(code, text, { cause })
+  ) as Error
 }
 
 /** Shares one cancellation boundary across all five field constructors, keeping the original reason. */
