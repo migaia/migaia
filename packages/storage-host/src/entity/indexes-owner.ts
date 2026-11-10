@@ -1,3 +1,4 @@
+import { rethrowIfAborted } from './repository-shared.ts'
 import { isStorageErrorFamily } from '../core/error-family.ts'
 import { isPlainObject } from '@migaia/utils/object'
 import { asyncDisposeKey } from '@migaia/plugin-host'
@@ -350,6 +351,7 @@ export class EntityIndexesOwner<
                 )
                 if (value !== undefined) current = match(value)
               } catch (cause) {
+                rethrowIfAborted(cause)
                 const issue: IInvalidRecordIssue<TDomain> = {
                   key: physical,
                   raw,
@@ -618,31 +620,32 @@ export class EntityIndexesOwner<
     let domain: TDomain | undefined
     /** Legacy ownership is observed before a canonical shadow can make the candidate uncounted. */
     let legacy: true | undefined
-    try {
-      if (candidate.phase === RecordIndexBackfillPhase.legacy) {
-        const canonicalId = decodeRepositoryKey(this.#context.name, candidate.key)
-        const legacyId =
-          Array.isArray(candidate.key) &&
-          candidate.key.length === 2 &&
-          candidate.key[0] === this.#context.name &&
-          (typeof candidate.key[1] === 'string' || Array.isArray(candidate.key[1]))
-            ? (candidate.key[1] as IStorageKey)
-            : undefined
-        if (canonicalId === undefined && legacyId === undefined)
-          return { decodedBytes: 0, outcome: 'skipped', counted: false }
-        if (canonicalId !== undefined)
-          return { decodedBytes: 0, outcome: 'skipped', counted: false }
-        if (legacyId !== undefined) {
-          legacy = true
-          const id = legacyId
-          const canonicalRaw = await this.#context.recordStore!.getRecord(
-            composeRepositoryKey(this.#context.name, id),
-            ctx
-          )
-          if (canonicalRaw !== undefined)
-            return { decodedBytes: 0, outcome: 'skipped', counted: false, legacy }
-        }
+    // The legacy ownership checks read the backend; a backend failure there must propagate, not be
+    // mistaken for an invalid record that backfill may skip and still mark complete.
+    if (candidate.phase === RecordIndexBackfillPhase.legacy) {
+      const canonicalId = decodeRepositoryKey(this.#context.name, candidate.key)
+      const legacyId =
+        Array.isArray(candidate.key) &&
+        candidate.key.length === 2 &&
+        candidate.key[0] === this.#context.name &&
+        (typeof candidate.key[1] === 'string' || Array.isArray(candidate.key[1]))
+          ? (candidate.key[1] as IStorageKey)
+          : undefined
+      if (canonicalId === undefined && legacyId === undefined)
+        return { decodedBytes: 0, outcome: 'skipped', counted: false }
+      if (canonicalId !== undefined) return { decodedBytes: 0, outcome: 'skipped', counted: false }
+      if (legacyId !== undefined) {
+        legacy = true
+        const id = legacyId
+        const canonicalRaw = await this.#context.recordStore!.getRecord(
+          composeRepositoryKey(this.#context.name, id),
+          ctx
+        )
+        if (canonicalRaw !== undefined)
+          return { decodedBytes: 0, outcome: 'skipped', counted: false, legacy }
       }
+    }
+    try {
       const envelope = await this.#context.decodeEnvelope(candidate.raw, ctx, runtime)
       domain = await this.#context.materialize(envelope, ctx, runtime)
     } catch (cause) {

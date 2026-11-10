@@ -1,3 +1,4 @@
+import { StorageContractErrorCode } from '@migaia/storage-contract'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   getBackendEntityAccess,
@@ -517,3 +518,24 @@ export type IEntityQueryMutationContext<T> = {
   run: Parameters<NonNullable<IRecordQuerySource['mutate']>>[1]
 }
 /** Own one entity repository, its backend access and versioned materialization route. */
+
+/**
+ * Cancellation is never an invalid record: rethrow an ABORTED failure (directly or as the cause of
+ * a stage wrapper) before the invalid-record skip policy can turn it into a partial result.
+ */
+export function rethrowIfAborted(cause: unknown): void {
+  if (readsAborted(cause)) throw cause
+  if (cause !== null && typeof cause === 'object') {
+    /** Stage wrappers keep the original failure as an own `cause` data property. */
+    const inner = Object.getOwnPropertyDescriptor(cause, 'cause')?.value
+    if (readsAborted(inner)) throw cause
+  }
+}
+
+/** True for an Error whose own `code` data property is the contract ABORTED code. */
+function readsAborted(value: unknown): boolean {
+  return (
+    value instanceof Error &&
+    Object.getOwnPropertyDescriptor(value, 'code')?.value === StorageContractErrorCode.aborted
+  )
+}

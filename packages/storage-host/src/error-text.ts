@@ -1,5 +1,7 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** A plugin detect check threw; the check's own error is on cause. */
+  detectFailed: 'storage plugin detect check failed',
   /** Tell host callers which assembly supplies journal runtime and private log stores. */
   journalNotAssembled:
     'Install storageJournalPlugin() from @migaia/storage-host/plugins/journal before using log stores.',

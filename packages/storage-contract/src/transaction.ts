@@ -108,8 +108,16 @@ export const readTransactionConflictPolicy = (
 ): IConflictPolicy => {
   if (options === undefined) return 'conflict'
   if (typeof options === 'object' && options !== null && !Array.isArray(options)) {
-    /** The ordinary option field selects one existing write policy. */
-    const policy = (options as { conflictPolicy?: unknown }).conflictPolicy
+    /** The ordinary option field selects one existing write policy; a getter failure is the cause. */
+    let policy: unknown
+    try {
+      policy = (options as { conflictPolicy?: unknown }).conflictPolicy
+    } catch (cause) {
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+        backend,
+        cause
+      })
+    }
     if (policy === undefined || policy === 'conflict') return 'conflict'
     if (policy === 'replace') return 'replace'
   }

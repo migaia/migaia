@@ -100,7 +100,7 @@ const error = new StorageContractError(StorageContractErrorCode.invalidArgument,
   cause
 })
 console.log(error.source, error.code, error.cause === cause)
-// @migaia/storage-contract INVALID_ARGUMENT true
+// storage.contract INVALID_ARGUMENT true
 ```
 
 既有错误实例仍冻结，cause 与 stack 保留。归档迁移通过原 `onArchiveRunError` 报告进度，不向错误实例添加状态。

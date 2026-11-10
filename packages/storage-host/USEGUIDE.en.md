@@ -36,7 +36,7 @@ try {
 
 Plugins in one batch cannot borrow each other's unpublished backends. Install base backends first, then install a cache, archive or other composed plugin with `use()`. IDs must be unique throughout the host.
 
-`autoDetect` defaults to `true`. Set it to `false` when configuration must finish before checks, then explicitly call `detect()`. Concurrent checks share their Promise; successful checks are cached and failed checks can be retried. `installTimeoutMs` bounds the entire install batch in milliseconds, defaults to `30000`, and accepts finite nonnegative numbers. Failed installation rolls back that batch's resources without deleting previously installed backends.
+`autoDetect` defaults to `true`. Set it to `false` when configuration must finish before checks, then explicitly call `detect()`. Concurrent checks share their Promise; successful checks are cached and failed checks can be retried. `installTimeoutMs` bounds each plugin's installation separately, in milliseconds, defaults to `30000`, and accepts finite nonnegative numbers. Failed installation rolls back that batch's resources without deleting previously installed backends.
 
 ## Transactions and record queries
 

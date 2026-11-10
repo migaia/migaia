@@ -201,9 +201,19 @@ class EntityPluginDefinition<TDomain, TStored, TId extends string> {
   readonly #version: number
 
   /** Validate scalar declaration facts without running role admission or creating a repository. */
-  constructor(id: TId, options: IEntityPluginOptions<TDomain, TStored, any>) {
-    if (options === null || typeof options !== 'object' || Array.isArray(options))
+  constructor(id: TId, requested: IEntityPluginOptions<TDomain, TStored, any>) {
+    if (requested === null || typeof requested !== 'object' || Array.isArray(requested))
       invalidDefinition(EntityText.entityDefinitionMustBeAnObject)
+    /**
+     * Every option is read once; a throwing getter is INVALID_CONFIG with the getter error on
+     * cause.
+     */
+    let options: IEntityPluginOptions<TDomain, TStored, any>
+    try {
+      options = { ...requested }
+    } catch (cause) {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, { cause })
+    }
     this.#id = id
     this.#version = options.version === undefined ? 1 : options.version
     validateDefinition(options, this.#version)

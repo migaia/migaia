@@ -285,21 +285,23 @@ export function readConcurrencyDecision(
     throw new TypeError(StorageContractErrorText.concurrencyDecision)
   /** A changing result cannot supply different action/budget fields during validation and use. */
   const { action, timeoutMs, delayMs } = value as IConcurrencyDecision
+  /** The validated fields, frozen; callers apply this copy, never the caller's object again. */
+  const decision = Object.freeze({ action, timeoutMs, delayMs }) as IConcurrencyDecision
   if (action === ConcurrencyAction.reject && timeoutMs === undefined && delayMs === undefined)
-    return value as IConcurrencyDecision
+    return decision
   if (
     action === ConcurrencyAction.wait &&
     phase === ConcurrencyPhase.acquire &&
     delayMs === undefined &&
     (timeoutMs === undefined || (Number.isFinite(timeoutMs) && timeoutMs >= 0))
   )
-    return value as IConcurrencyDecision
+    return decision
   if (
     action === ConcurrencyAction.retry &&
     timeoutMs === undefined &&
     (delayMs === undefined || (Number.isFinite(delayMs) && delayMs >= 0))
   )
-    return value as IConcurrencyDecision
+    return decision
   throw new TypeError(StorageContractErrorText.concurrencyDecision)
 }
 

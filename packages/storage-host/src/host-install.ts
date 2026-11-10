@@ -18,7 +18,7 @@ import {
   StorageContractErrorCode
 } from '@migaia/storage-contract'
 import { raceWithAbort } from '@migaia/utils/promise'
-import { createStorageTypeError, StorageError } from './errors.ts'
+import { createStorageError, createStorageTypeError, StorageError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.ts'
 import { readStorageNativePluginDefinition, readStorageNativePluginMetadata } from './contracts.ts'
@@ -397,7 +397,7 @@ export class StorageHostInstaller {
           ...entryState.observerBinding.identity(),
           code: readStorageHookFailureCode(error, this.#owner.report)
         }))
-      throw error
+      throw toDetectFailure(error)
     }
   }
 
@@ -542,4 +542,23 @@ export class StorageHostInstaller {
     entryState.storeCell.set(snapshot.store)
     this.#owner.events.emit(Hook.afterBackendCreate, entryState.observerBinding.identity)
   }
+}
+
+/**
+ * Give a failed detect check the storage identity. Errors that storage already coded keep their
+ * identity; anything else from the plugin's check becomes EXTENSION_FAILED with the original on
+ * cause.
+ */
+function toDetectFailure(error: unknown): unknown {
+  if (error instanceof Error) {
+    /** Own `source` data property, read without invoking a getter. */
+    const source = Object.getOwnPropertyDescriptor(error, 'source')?.value
+    if (typeof source === 'string' && source.startsWith('storage.')) return error
+  }
+  // A detect check is a plugin-supplied extension callback; EXTENSION_FAILED is its registered code.
+  return createStorageError(
+    StorageHostErrorCode.extensionFailed,
+    StorageErrorText.detectFailed,
+    error
+  )
 }

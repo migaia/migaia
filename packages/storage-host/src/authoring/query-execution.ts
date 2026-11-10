@@ -1,3 +1,4 @@
+import { invokeQuerySource } from './query-plan.ts'
 // Query execution: opening, consuming and mutating record queries (see ./query.ts).
 import {
   QueryOperation,
@@ -241,8 +242,8 @@ export function openRecordQuery(
       release,
       iterator:
         reduction === undefined
-          ? source.receiver.execute(input)
-          : source.receiver.reduce!({ ...input, reduction: reduction.request }),
+          ? invokeQuerySource(source, 'execute', [input])
+          : invokeQuerySource(source, 'reduce', [{ ...input, reduction: reduction.request }]),
       read,
       close,
       report,
@@ -413,7 +414,7 @@ export async function mutateRecordQuery(
       ? storageKeyBytesIdentity(encodeRdfQuadSnapshot(request.oldQuad))
       : undefined
   try {
-    return await source.receiver.mutate!(
+    return await invokeQuerySource(source, 'mutate', [
       request,
       async (port: IQueryMutationPort<IRecordQueryInput, unknown>) => {
         /** A native owner supplies exactly these two functions once per actual write attempt. */
@@ -468,7 +469,7 @@ export async function mutateRecordQuery(
           true
         )
       }
-    )
+    ])
   } catch (cause) {
     throw queryExecutionFailure(cause)
   }

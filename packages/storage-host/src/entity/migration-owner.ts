@@ -1,3 +1,4 @@
+import { rethrowIfAborted } from './repository-shared.ts'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   getBackendEnvelopeStages,
@@ -244,6 +245,7 @@ export class EntityMigrationOwner<
             value
           })
         } catch (cause) {
+          rethrowIfAborted(cause)
           const issue: IInvalidRecordIssue<TDomain> = {
             key: recordId,
             raw,
@@ -321,6 +323,7 @@ export class EntityMigrationOwner<
           value
         })
       } catch (cause) {
+        rethrowIfAborted(cause)
         const issue: IInvalidRecordIssue<TDomain> = {
           key: id,
           raw,

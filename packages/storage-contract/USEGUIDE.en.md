@@ -100,7 +100,7 @@ const error = new StorageContractError(StorageContractErrorCode.invalidArgument,
   cause
 })
 console.log(error.source, error.code, error.cause === cause)
-// @migaia/storage-contract INVALID_ARGUMENT true
+// storage.contract INVALID_ARGUMENT true
 ```
 
 Existing error instances remain frozen; original cause and stack survive. Archive migration reports progress through its existing `onArchiveRunError` hook rather than adding state to errors.

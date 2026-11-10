@@ -1,3 +1,4 @@
+import { rethrowIfAborted } from './repository-shared.ts'
 import { missingEntityFeature } from './assembly.ts'
 import { EntityFeatureName } from './constants.ts'
 import { asyncDisposeKey } from '@migaia/plugin-host'
@@ -192,6 +193,7 @@ export class EntityQueryOwner<
           value = await this.#context.materialize(envelope, ctx, runtime)
           if (value !== undefined) project?.(value)
         } catch (cause) {
+          rethrowIfAborted(cause)
           value = undefined
           const issue: IInvalidRecordIssue<TDomain> = {
             key: row.id,

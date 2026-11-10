@@ -134,8 +134,8 @@ it('projects explicit selectors and indexed list through the shared query route'
 
   const selectedStream: IIndexedUser[] = []
   for await (const value of repository.stream({
-    index: 'tags',
-    range: { lower: 'admin', upper: 'admin' }
+    index: 'selected',
+    range: { lower: 'ada@example.com', upper: 'ada@example.com' }
   }))
     selectedStream.push(value)
   expect(selectedStream).toEqual([{ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] }])
@@ -143,7 +143,7 @@ it('projects explicit selectors and indexed list through the shared query route'
   expect(diagnostics).toEqual(
     diagnostics.map(() => expect.stringContaining('uses authoritative full-scan fallback'))
   )
-  expect(selectorCalls).toBe(4)
+  expect(selectorCalls).toBe(6)
 })
 
 it('fallback batch does not execute secondary-index selectors', async () => {

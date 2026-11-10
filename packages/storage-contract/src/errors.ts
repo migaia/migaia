@@ -33,9 +33,9 @@ export type IStorageContractErrorDetails = {
 }
 
 /**
- * Represents a contract error with `source` fixed to `@migaia/storage-contract`.
- * `StorageContractErrorCode` defines the codes. Freezes the instance after construction and
- * preserves stack and the reachable cause chain. Details are not deep-frozen or cloned.
+ * Represents a contract error with `source` fixed to `storage.contract`. `StorageContractErrorCode`
+ * defines the codes. Freezes the instance after construction and preserves stack and the reachable
+ * cause chain. Details are not deep-frozen or cloned.
  */
 export class StorageContractError extends Error {
   /** Stable package identity, always STORAGE_CONTRACT_SOURCE. */

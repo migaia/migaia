@@ -315,7 +315,7 @@ function planRecordSource(
   }
   try {
     /** The original author receives the same captured receiver and canonical AST identities. */
-    const result = source.receiver.plan!(conditions)
+    const result = invokeQuerySource(source, 'plan', [conditions])
     if (result === undefined) return undefined
     if (result === null || typeof result !== 'object' || Array.isArray(result))
       throw new TypeError(StorageContractErrorText.queryArgument)
@@ -636,4 +636,19 @@ export function planRecordQuery(
       ...(pushdown.index === undefined ? {} : { index: pushdown.index })
     }
   }
+}
+
+/** The source callbacks captured at snapshot time. */
+type IQuerySourceMethod = 'execute' | 'reduce' | 'mutate' | 'watch' | 'plan'
+
+/**
+ * Call a source callback captured by `snapshotQuerySource`, on the original source receiver. Later
+ * mutation of the source object cannot change which function runs.
+ */
+export function invokeQuerySource(
+  source: IQuerySourceSnapshot,
+  method: IQuerySourceMethod,
+  args: readonly unknown[]
+): any {
+  return Reflect.apply(source[method] as (...input: unknown[]) => unknown, source.receiver, args)
 }

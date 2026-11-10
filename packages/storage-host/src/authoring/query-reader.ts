@@ -1,3 +1,4 @@
+import { invokeQuerySource } from './query-plan.ts'
 // Compiled query readers: filter, projection, traversal, ordering and heap stages (see ./query.ts).
 import {
   QueryOperation,
@@ -486,12 +487,14 @@ async function openQueryMatch(
       undefined
     )
     assertQueryActive(context.ctx)
-    context.current = context.rdfSource.receiver.execute({
-      pattern,
-      steps: [],
-      ctx: context.ctx,
-      ...(currentScope === undefined ? {} : { operationScope: currentScope })
-    })
+    context.current = invokeQuerySource(context.rdfSource, 'execute', [
+      {
+        pattern,
+        steps: [],
+        ctx: context.ctx,
+        ...(currentScope === undefined ? {} : { operationScope: currentScope })
+      }
+    ])
     return
   }
 }

@@ -1,3 +1,4 @@
+import { invokeQuerySource } from './query-plan.ts'
 // Query step snapshots and shared watch/read surfaces for query branches (see ./query.ts).
 import {
   QueryOperator,
@@ -41,7 +42,7 @@ export function queryWatch(
       /** Strict native admission rejects opaque callbacks and client traversal before subscribing. */
       const captured = prepareQueryExecution(source, plan, true, ctx)
       try {
-        return source.receiver.watch!(querySourceInput(source, plan, captured))
+        return invokeQuerySource(source, 'watch', [querySourceInput(source, plan, captured)])
       } catch (cause) {
         throw queryExecutionFailure(cause)
       }
