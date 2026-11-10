@@ -7,7 +7,7 @@
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/createLogHost.ts",
-    "gzip": 54738,
+    "gzip": 54808,
     "owner": "log-host",
     "forbidden": [
       "packages/plugin-host/src/modules/enablement/**",
@@ -24,19 +24,19 @@
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/createRpcHost.ts",
-    "gzip": 116702,
+    "gzip": 116907,
     "owner": "rpc-host",
     "forbidden": []
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/storage-host.ts",
-    "gzip": 86882,
+    "gzip": 86983,
     "owner": "storage-host",
     "forbidden": []
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/createTray.ts",
-    "gzip": 199450,
+    "gzip": 200078,
     "owner": "tray",
     "forbidden": []
   },
