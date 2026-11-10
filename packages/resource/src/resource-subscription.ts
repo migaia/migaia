@@ -49,6 +49,9 @@ export class ResourceSubscription<T> {
         : undefined
     })
     this.#context.cleanups.push(this.release)
+    // The effect's first run is synchronous; if its listener disposed the Resource, the cleanup
+    // list has already run, so release this effect now.
+    if (this.#context.terminal.lifecycle !== LifecycleState.open) this.release()
     return this.release
   }
 

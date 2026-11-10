@@ -53,6 +53,12 @@ export const ResourceErrorText = {
   setupInvalid: 'resource setup must be a function that returns a fetcher function',
   /** Explains that setup cleanups can only be registered while setup runs. */
   setupClosed: 'resource setup context is closed; register onDispose during setup',
+  /** Wraps an error thrown by the createResource setup callback; the original is on cause. */
+  setupFailed: 'resource setup callback failed',
+  /** Wraps an error thrown by a mutate updater; the original is on cause. */
+  mutateFailed: 'resource mutate updater failed',
+  /** Wraps cleanup failures raised while disposing a Resource; the first one is on cause. */
+  disposeCleanupFailed: 'resource dispose cleanup failed',
   /** Explains that `subscribe()` received a non-function listener. */
   listenerInvalid: 'resource subscribe listener must be a function',
   /** Explains that `select()` received a non-function selector. */

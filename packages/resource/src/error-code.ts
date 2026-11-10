@@ -91,7 +91,27 @@ export const ResourceErrorCode = {
    * context inside an async callback). The cleanup is rejected instead of leaking. Register every
    * cleanup synchronously inside setup.
    */
-  setupClosed: 'RESOURCE_SETUP_CLOSED'
+  setupClosed: 'RESOURCE_SETUP_CLOSED',
+
+  /**
+   * The `createResource()` setup callback threw. Registered setup cleanups have already run. An
+   * uncoded native error carries this code itself; any other thrown value is on `cause`. Fix the
+   * setup callback.
+   */
+  setupFailed: 'RESOURCE_SETUP_FAILED',
+
+  /**
+   * The updater passed to `mutate()` threw. Resource state is unchanged. An uncoded native error
+   * carries this code itself; any other thrown value is on `cause`.
+   */
+  mutateFailed: 'MUTATE_FAILED',
+
+  /**
+   * One or more cleanups registered on the Resource threw during `dispose()`. Disposal still ran
+   * every cleanup and the Resource is terminal. The first cleanup error is thrown with this code
+   * attached and later cleanup errors attached to it; a non-error first value is on `cause`.
+   */
+  disposeCleanupFailed: 'DISPOSE_CLEANUP_FAILED'
 } as const
 
 export type IResourceErrorCode = (typeof ResourceErrorCode)[keyof typeof ResourceErrorCode]

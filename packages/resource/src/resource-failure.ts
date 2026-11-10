@@ -90,7 +90,7 @@ export function createCancellationFailure(error: unknown): IResourceError {
   if (
     error !== null &&
     (typeof error === 'object' || typeof error === 'function') &&
-    (error as { source?: unknown }).source === RESOURCE_SOURCE
+    readsResourceSource(error)
   ) {
     return tagResourceError(error, ResourceErrorCode.cancellationCleanupFailed) as IResourceError
   }
@@ -122,4 +122,11 @@ export const appendDisposeCleanupErrors = (
 /** Creates the original setup-contract native TypeError without changing its identity or text. */
 export function createResourceSetupError(code: string, message: string): TypeError {
   return tagResourceError(new TypeError(message), code)
+}
+
+/** Guarded `source` read; a throwing getter means the error is not a Resource-owned error. */
+function readsResourceSource(error: object): boolean {
+  /** One read of the source property, with any getter failure captured. */
+  const source = tryReadProperty(error as { source?: unknown }, 'source')
+  return !source.threw && source.value === RESOURCE_SOURCE
 }

@@ -2,6 +2,9 @@
 import { LifecycleState } from '@migaia/lifecycle'
 import type { IResourceContext } from './resource-context.ts'
 import { abortError, appendDisposeCleanupErrors } from './resource-failure.ts'
+import { identifyResourceFailure } from './errors.ts'
+import { ResourceErrorCode } from './error-code.ts'
+import { ResourceErrorText } from './error-text.ts'
 
 /** Explicit per-disposal failure collection replaces the former captured local accumulator. */
 type IResourceCleanupFailures = {
@@ -44,7 +47,12 @@ export function disposeResourceContext<T>(context: IResourceContext<T>): void {
     recordResourceCleanupFailure(failures, error)
   }
   context.terminal.forceTerminal()
-  if (failures.hasPrimary) throw appendDisposeCleanupErrors(failures.primary, failures.errors)
+  if (failures.hasPrimary)
+    throw identifyResourceFailure(
+      appendDisposeCleanupErrors(failures.primary, failures.errors),
+      ResourceErrorCode.disposeCleanupFailed,
+      ResourceErrorText.disposeCleanupFailed
+    )
 }
 
 /** Runs a registered cleanup with the original unbound receiver and contains its failure. */

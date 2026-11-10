@@ -10,7 +10,7 @@ import {
   type IObserver
 } from '@migaia/reactive/extension'
 import { LifecycleState } from '@migaia/lifecycle'
-import { createResourceError } from './errors.ts'
+import { createResourceError, identifyResourceFailure } from './errors.ts'
 import { ResourceErrorCode } from './error-code.ts'
 import { ResourceErrorText } from './error-text.ts'
 import { ResourceDiagnosticText } from './diagnostic-text.ts'
@@ -308,7 +308,10 @@ export class Resource<T> implements IObserver, IDisposable {
     /** Success data passed to an updater. */
     const previous = current.status === ResourceStatus.success ? current.data : undefined
     /** New data; an updater runs before any state changes, so its throw leaves state intact. */
-    const data = typeof next === 'function' ? (next as IResourceUpdater<T>)(previous) : next
+    const data =
+      typeof next === 'function'
+        ? applyResourceUpdater(next as IResourceUpdater<T>, previous)
+        : next
     /** One clock sample for both timestamps; overflow throws before state changes. */
     const now = readResourceSchedulerNow(this.#context)
     /** Finite TTL arithmetic is admitted before any cache mutation. */
@@ -414,5 +417,21 @@ export class Resource<T> implements IObserver, IDisposable {
         }
         throw this.#context.currentPromise
     }
+  }
+}
+
+/**
+ * Run a mutate updater. A thrown uncoded error gets MUTATE_FAILED attached in place; a non-error
+ * value is wrapped with it on `cause`.
+ */
+function applyResourceUpdater<T>(updater: IResourceUpdater<T>, previous: T | undefined): T {
+  try {
+    return updater(previous)
+  } catch (error) {
+    throw identifyResourceFailure(
+      error,
+      ResourceErrorCode.mutateFailed,
+      ResourceErrorText.mutateFailed
+    )
   }
 }

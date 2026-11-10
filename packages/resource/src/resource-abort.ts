@@ -2,6 +2,7 @@
 import type { IRuntime } from '@migaia/reactive'
 import { ReactiveErrorPhase } from '@migaia/reactive/extension'
 import { observeAbortSubscription } from '@migaia/lifecycle/abort'
+import { reportUnhandledError } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   abortError,
@@ -135,7 +136,9 @@ function reportResourceAbortCleanup<T>(context: IResourceAbortContext<T>, error:
     context.runtime.reportError(createCancellationFailure(error), {
       phase: ReactiveErrorPhase.asyncFlush
     })
-  } catch {
-    // Last-boundary diagnostics remain best effort, as before.
+  } catch (failure) {
+    // The runtime reporter itself failed; hand both failures to the host exception queue.
+    reportUnhandledError(failure)
+    reportUnhandledError(error)
   }
 }

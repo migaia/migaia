@@ -579,7 +579,7 @@ hydrate(snapshot: IResourceCacheSnapshot<T>): void;
 dispose(): void;
 ```
 
-彻底终结资源：中止在途请求（`GenerationController.dispose()`）、清理依赖登记、释放内部状态 `Signal`。幂等——二次调用是空操作。清理过程中若某一步失败，第一个失败原样抛出，后续失败的错误挂在其 `.errors` 数组上（不会因为一步失败就跳过其余清理步骤）。释放后数据读取/请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 不抛错。
+彻底终结资源：中止在途请求（`GenerationController.dispose()`）、清理依赖登记、释放内部状态 `Signal`。幂等——二次调用是空操作。清理过程中若某一步失败，抛出第一个失败本身，并在它上面附加码 `DISPOSE_CLEANUP_FAILED`（抛出的不是错误对象时才包装，原值在 `cause` 上），后续失败挂在它的 `.errors` 数组上（不会因为一步失败就跳过其余清理步骤）。释放后数据读取/请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 不抛错。
 
 ---
 
@@ -753,7 +753,7 @@ type IResourceCacheSnapshot<T> = {
 import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'
 ```
 
-稳定错误码表，**9 个码**，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。
+稳定错误码表，**14 个码**，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。
 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。
 
 | `ResourceErrorCode` 键      | 码值                          | 触发条件                                                                                                                                        |
@@ -767,6 +767,11 @@ import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@mi
 | `invalidOption`             | `INVALID_OPTION`              | 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求                                                             |
 | `suspenseProbeFailed`       | `SUSPENSE_PROBE_FAILED`       | `fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable                                                  |
 | `fetchFailed` | `FETCH_FAILED` | 重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写 |
+| `setupInvalid` | `RESOURCE_SETUP_INVALID` | `createResource()` 的 setup 不是函数，或 setup 返回的不是 fetcher 函数；已登记的 setup 清理已执行 |
+| `setupClosed` | `RESOURCE_SETUP_CLOSED` | setup 返回后才调用 `onDispose()`（例如在异步回调里使用了逃逸的 context）；该清理被拒绝 |
+| `setupFailed` | `RESOURCE_SETUP_FAILED` | setup 回调本身抛错；已登记的 setup 清理已执行。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上 |
+| `mutateFailed` | `MUTATE_FAILED` | `mutate()` 的 updater 抛错；状态不变。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上 |
+| `disposeCleanupFailed` | `DISPOSE_CLEANUP_FAILED` | `dispose()` 时某个已登记清理抛错；其余清理照常执行；第一个清理错误本身带上这个码，后续错误挂在它的 `.errors` 上 |
 
 `requestAborted`/`requestCancelled` 抛出/落入状态的值始终是原生 `DOMException`（`name === 'AbortError'`），调用方通常按 `error.name === 'AbortError'` 判定并静默处理，而不是当作真实失败；`code` 只作为附加字段挂上，不改变类型。调用方应始终以 `error.code === ResourceErrorCode.xxx` 判别，不要硬编码码值字符串。
 

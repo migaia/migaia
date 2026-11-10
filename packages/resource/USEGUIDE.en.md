@@ -579,7 +579,7 @@ hydrate(snapshot: IResourceCacheSnapshot<T>): void;
 dispose(): void;
 ```
 
-Ends the resource for good: aborts the running request (`GenerationController.dispose()`), clears the dependency registrations and releases the internal state signal. Idempotent: a second call is a no-op. If a cleanup step fails, the first failure is thrown as is and later failures are attached to its `.errors` array; one failing step never skips the remaining steps. After disposal, data reads and request operations throw `RESOURCE_DISPOSED`; `disposed`, `refreshing` and `observed` stay readable, and `markDirty()`, `onDependencyDisconnected()` and another `dispose()` do not throw.
+Ends the resource for good: aborts the running request (`GenerationController.dispose()`), clears the dependency registrations and releases the internal state signal. Idempotent: a second call is a no-op. If a cleanup step fails, the first failure is thrown with code `DISPOSE_CLEANUP_FAILED` attached to it (a non-error value is wrapped and kept on `cause`), and later failures are attached to its `.errors` array; one failing step never skips the remaining steps. After disposal, data reads and request operations throw `RESOURCE_DISPOSED`; `disposed`, `refreshing` and `observed` stay readable, and `markDirty()`, `onDependencyDisconnected()` and another `dispose()` do not throw.
 
 ---
 
@@ -698,7 +698,7 @@ A snapshot carries only durations, never the sender's absolute time. `remainingT
 import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'
 ```
 
-The stable error-code table has **9 codes**, declared only in `src/error-code.ts`. The package's own errors use the `source` `'resource'`; errors that already carry a full foreign identity keep their original package identity. `RESOURCE_SOURCE` exports this stable source: when classifying errors across packages, compare against it and `ResourceErrorCode` instead of copying string literals.
+The stable error-code table has **14 codes**, declared only in `src/error-code.ts`. The package's own errors use the `source` `'resource'`; errors that already carry a full foreign identity keep their original package identity. `RESOURCE_SOURCE` exports this stable source: when classifying errors across packages, compare against it and `ResourceErrorCode` instead of copying string literals.
 
 | `ResourceErrorCode` key | Code | When |
 | --- | --- | --- |
@@ -711,6 +711,11 @@ The stable error-code table has **9 codes**, declared only in `src/error-code.ts
 | `invalidOption` | `INVALID_OPTION` | An option passed to the constructor or a call (`ttl`, `retry`, `retryDelay`, `scheduler`, ...) does not meet its requirements |
 | `suspenseProbeFailed` | `SUSPENSE_PROBE_FAILED` | The `fetcher` threw a value for Suspense, but reading its `.then` threw, so it cannot be classified as a thenable |
 | `fetchFailed` | `FETCH_FAILED` | An unclassified fetch failure once retries are exhausted; native errors keep their identity where possible, frozen errors and non-Error values stay on `cause`, existing foreign identities are not rewritten |
+| `setupInvalid` | `RESOURCE_SETUP_INVALID` | `createResource()` got a setup that is not a function, or setup returned something other than a fetcher function; registered setup cleanups have already run |
+| `setupClosed` | `RESOURCE_SETUP_CLOSED` | `onDispose()` was called after setup returned (for example from an escaped context in an async callback); the cleanup is rejected |
+| `setupFailed` | `RESOURCE_SETUP_FAILED` | The setup callback threw; registered setup cleanups have already run. The thrown error carries this code itself; a non-error value is wrapped and kept on `cause` |
+| `mutateFailed` | `MUTATE_FAILED` | The `mutate()` updater threw; state is unchanged. The thrown error carries this code itself; a non-error value is wrapped and kept on `cause` |
+| `disposeCleanupFailed` | `DISPOSE_CLEANUP_FAILED` | A registered cleanup threw during `dispose()`; the other cleanups still ran; the first cleanup error carries this code and later ones are on its `.errors` |
 
 Values thrown or stored for `requestAborted`/`requestCancelled` are always native `DOMException`s (`name === 'AbortError'`). Callers usually check `error.name === 'AbortError'` and handle them quietly rather than as real failures; `code` is only an attached field and does not change the type. Branch on `error.code === ResourceErrorCode.xxx` and never hard-code the code strings.
 

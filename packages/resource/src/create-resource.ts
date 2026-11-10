@@ -10,6 +10,8 @@ import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { ResourceErrorCode } from './error-code.ts'
 import { ResourceErrorText } from './error-text.ts'
 import { createResourceSetupError } from './resource-failure.ts'
+import { createResourceError, identifyResourceFailure } from './errors.ts'
+import { createAbortController } from '@migaia/lifecycle'
 import { Resource, registerResourceCleanup } from './resource.class.ts'
 import type { IResourceFetcher, IResourceOptions } from './resource-types.ts'
 
@@ -42,7 +44,7 @@ export type ICreateResourceOptions<T> = IResourceOptions<T> & {
 /** Owns one synchronous setup's context, abort signal and reverse-order cleanup registration. */
 class ResourceSetupOwner {
   /** Setup-scoped signal aborts on rollback or Resource disposal. */
-  #controller = new AbortController()
+  #controller = createAbortController()
   /** Registered cleanup order is retained for both rollback and normal disposal. */
   #cleanups: (() => void)[] = []
   /** Only synchronous setup may register additional cleanup ownership. */
@@ -71,7 +73,7 @@ class ResourceSetupOwner {
     let resource: Resource<T>
     try {
       /** Local setup invocation retains its original undefined callback receiver. */
-      const fetcher = setup(this.#context)
+      const fetcher = invokeResourceSetup(setup, this.#context)
       if (typeof fetcher !== 'function')
         throw createResourceSetupError(
           ResourceErrorCode.setupInvalid,
@@ -150,7 +152,38 @@ export function createResource<T>(
 ): Resource<T> {
   if (typeof setup !== 'function')
     throw createResourceSetupError(ResourceErrorCode.setupInvalid, ResourceErrorText.setupInvalid)
+  /** Options are read once here; a throwing getter becomes INVALID_OPTION with its error as cause. */
+  let runtimeOption: IRuntime | undefined
+  let resourceOptions: IResourceOptions<T>
+  try {
+    ;({ runtime: runtimeOption, ...resourceOptions } = options)
+  } catch (error) {
+    throw createResourceError(
+      ResourceErrorCode.invalidOption,
+      ResourceErrorText.optionsSnapshotFailed,
+      { cause: error }
+    )
+  }
   /** Import remains cold; the shared default runtime is acquired only for this builder call. */
-  const { runtime = getDefaultRuntime(), ...resourceOptions } = options
+  const runtime = runtimeOption ?? getDefaultRuntime()
   return new ResourceSetupOwner(runtime, resourceOptions).construct(setup, runtime, resourceOptions)
+}
+
+/**
+ * Run the setup callback with its original undefined receiver. A thrown uncoded error gets
+ * RESOURCE_SETUP_FAILED attached in place; a non-error value is wrapped with it on `cause`.
+ */
+function invokeResourceSetup<T>(
+  setup: IResourceSetup<T>,
+  context: IResourceSetupContext
+): IResourceFetcher<T> {
+  try {
+    return setup(context)
+  } catch (error) {
+    throw identifyResourceFailure(
+      error,
+      ResourceErrorCode.setupFailed,
+      ResourceErrorText.setupFailed
+    )
+  }
 }
