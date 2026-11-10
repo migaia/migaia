@@ -7,12 +7,14 @@ import { BootstrapVia, ProcessLimit, StderrMode, StdinMode, StdoutMode } from '.
 import type { IProcessSpec } from './types.ts'
 
 /** Rejects one named field without interpolating its value or bootstrap payload. */
-export function invalidProcessOption(field: string, range = false): never {
+export function invalidProcessOption(field: string, range = false, cause?: unknown): never {
   throw createSupervisionError(
     range ? RangeError : TypeError,
     SupervisionErrorCode.invalidOption,
     SupervisionErrorText.invalidOption,
-    { detail: { field, kind: PROCESS_KIND } }
+    cause === undefined
+      ? { detail: { field, kind: PROCESS_KIND } }
+      : { cause, detail: { field, kind: PROCESS_KIND } }
   )
 }
 
@@ -22,8 +24,15 @@ function closedRecord(
   field: string,
   allowed?: readonly string[]
 ): Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value))
-    invalidProcessOption(field)
+  if (value === null || typeof value !== 'object') invalidProcessOption(field)
+  /** A revoked Proxy throws from Array.isArray; that becomes INVALID_OPTION with the error on cause. */
+  let isArray: boolean
+  try {
+    isArray = Array.isArray(value)
+  } catch (error) {
+    invalidProcessOption(field, false, error)
+  }
+  if (isArray) invalidProcessOption(field)
   /** Open environment sets skip closed-schema membership checks entirely. */
   const record = value as Record<string, unknown>
   // Closed lists contain at most nine fields, fixed by the process spec declarations below.

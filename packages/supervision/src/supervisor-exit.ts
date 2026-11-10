@@ -101,7 +101,22 @@ export function onExit<
     return
   }
   /** Serving exits use the canonical profile once, independent of current attempt authority. */
-  const classification = context.options.profile.classifyExit(status)
+  let classification: ReturnType<typeof context.options.profile.classifyExit>
+  try {
+    classification = context.options.profile.classifyExit(status)
+  } catch (classifyError) {
+    // An unclassifiable exit is still an exit: publish it as a crash and retire the slot so the
+    // supervisor leaves ready and releases its budget lease.
+    const error = createSupervisionError(
+      Error,
+      SupervisionErrorCode.exitUnexpected,
+      SupervisionErrorText.exitUnexpected,
+      { cause: classifyError, detail: { kind: context.options.profile.kind } }
+    )
+    publishExit(context, slot, ExitReason.crashed, error)
+    void retire(context, slot, UnitStopMode.force, ExitReason.launchFailed, error)
+    return
+  }
   /** Clean exit differs from restart-worthy failures without introducing an error code for state. */
   const reason = classification.reason
   /** A clean exit has no error; all failures retain the profile's original cause and details. */

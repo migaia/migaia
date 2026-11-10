@@ -1,4 +1,5 @@
 /** Owns child-side shutdown cancellation and once-only exit after parent loss. */
+import { reportUnhandledError } from '@migaia/utils/error'
 import { ProcessField } from './text.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { createAbortController } from '@migaia/lifecycle'
@@ -95,8 +96,14 @@ class ParentLossGuard {
 
   /** Shutdown failure is reported before forced exit, preserving original error identity. */
   #failed(error: unknown): void {
-    this.#options.report(error)
-    this.#finish(ParentLossExitCode.forced)
+    try {
+      this.#options.report(error)
+    } catch (reportError) {
+      // The forced exit below must still happen; the reporter's own failure goes to the global error queue.
+      reportUnhandledError(reportError)
+    } finally {
+      this.#finish(ParentLossExitCode.forced)
+    }
   }
 
   /** Cancels the deadline before delivering the first exit result. */
