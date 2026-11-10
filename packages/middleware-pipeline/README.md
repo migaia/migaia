@@ -108,7 +108,7 @@ run(0, 2)
 pnpm add @migaia/middleware-pipeline
 ```
 
-只有根入口；运行时仅依赖 `@migaia/utils`，无需 DOM 或 Node，包标记为 `sideEffects: false`。
+入口：除根入口外，还有四个模式子入口 `/sync`、`/async`、`/generator`、`/async-generator`（各导出一个模式对象，传给 `createPipeline({ mode })`），以及 `/admission` 子入口（供 plugin-host 等宿主在构造期校验管线选项）。运行时仅依赖 `@migaia/utils`，无需 DOM 或 Node，包标记为 `sideEffects: false`。
 
 ## 常用 API
 

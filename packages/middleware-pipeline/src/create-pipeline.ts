@@ -175,9 +175,21 @@ export type INormalizedPipelineOptions = Readonly<
 /** Stable no-op violation sink used when a host omits reporting. */
 const ignoreViolation: IMiddlewarePipelineViolationHandler = () => undefined
 
-/** Admits only ordinary option records at construction and run boundaries. */
-const isOptionRecord = (value: unknown): value is object =>
-  value !== null && !Array.isArray(value) && typeof value === 'object'
+/**
+ * Admits only ordinary option records at construction and run boundaries. A revoked Proxy makes
+ * `Array.isArray` throw; that native TypeError leaves with the package INVALID_OPTION identity.
+ */
+const isOptionRecord = (value: unknown): value is object => {
+  if (value === null || typeof value !== 'object') return false
+  try {
+    return !Array.isArray(value)
+  } catch (error) {
+    throw attachErrorIdentity(error as TypeError, {
+      source: MIDDLEWARE_PIPELINE_SOURCE,
+      code: MiddlewarePipelineErrorCode.invalidOption
+    })
+  }
+}
 
 /** Returns whether a runtime value belongs to the public mode domain. */
 const isPipelineMode = (value: unknown): value is IMiddlewarePipelineMode =>
@@ -307,8 +319,9 @@ export const selectSignal = (
       source: MIDDLEWARE_PIPELINE_SOURCE,
       code: MiddlewarePipelineErrorCode.invalidOption
     })
-  /** Call-time signal wins when supplied; creation signal remains the fallback. */
-  return (readOption(control, 'signal') as IAbortSignal | undefined) ?? options.signal
+  /** Call-time signal wins when supplied; only omission (`undefined`) selects the creation signal. */
+  const signal = readOption(control, 'signal')
+  return signal === undefined ? options.signal : (signal as IAbortSignal)
 }
 
 /**

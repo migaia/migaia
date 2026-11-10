@@ -108,7 +108,7 @@ The default remains `next: 'single'`: duplicate calls are violations and generat
 pnpm add @migaia/middleware-pipeline
 ```
 
-There is one root entry. Its only runtime dependency is `@migaia/utils`; it needs neither DOM nor Node and declares `sideEffects: false`.
+Entries: Besides the root entry there are four mode entries, `/sync`, `/async`, `/generator` and `/async-generator` (each exports one mode object to pass as `createPipeline({ mode })`), and the `/admission` entry, which hosts such as plugin-host use to check pipeline options at construction. The only runtime dependency is `@migaia/utils`; it needs neither DOM nor Node and declares `sideEffects: false`.
 
 ## Essential API
 

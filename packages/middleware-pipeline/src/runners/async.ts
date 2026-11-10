@@ -203,18 +203,15 @@ class AsyncPipelineFrame<TValue> {
         ? new ObservedTraversalPromise(pending)
         : undefined
     branch.promise = observed
-    /** Marks a fulfilled traversal so the frame can skip awaiting it again. */
-    const settled = (value: unknown): void => {
-      branch.value = value
-      branch.settled = true
-    }
-    /** This exact record consumes rejection without calling the public observation hook. */
-    const failed = (error: unknown): void => {
-      branch.failed = true
-      branch.error = error
-      branch.settled = true
-    }
-    branch.completion = observed ? observed.consume(settled, failed) : pending.then(settled, failed)
+    branch.completion = observed
+      ? observed.consume(
+          (settledValue: unknown) => settleBranch(branch, settledValue),
+          (error: unknown) => failBranch(branch, error)
+        )
+      : pending.then(
+          (settledValue: unknown) => settleBranch(branch, settledValue),
+          (error: unknown) => failBranch(branch, error)
+        )
     return observed ?? pending
   }
   /** Awaits stage and started branches, preserving active control and original failure order. */
@@ -331,3 +328,16 @@ export const runAsyncPipeline = <TValue>(
 }
 
 /** A sync branch stores only its suffix position and submitted payload. */
+
+/** Marks a fulfilled traversal so the frame can skip awaiting it again. */
+function settleBranch(branch: IAsyncBranch, value: unknown): void {
+  branch.value = value
+  branch.settled = true
+}
+
+/** Records a rejected traversal; the frame consumes it without calling the public observation hook. */
+function failBranch(branch: IAsyncBranch, error: unknown): void {
+  branch.failed = true
+  branch.error = error
+  branch.settled = true
+}

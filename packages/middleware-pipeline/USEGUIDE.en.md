@@ -335,7 +335,7 @@ Prints `1,3 true`. Async-generator uses the same rule and awaits traversal and e
 
 ## Entry point, ownership and execution model
 
-The package has one entry, `@migaia/middleware-pipeline`, and one runtime dependency, `@migaia/utils`. It depends on neither DOM nor Node nor a lifecycle host. The root exports `createPipeline()`, mode and generator-signal constants, public stage/control/context types, and error codes. Concrete executors and adapters are internal and cannot be imported from the root.
+The root entry is `@migaia/middleware-pipeline`. Besides the root entry there are four mode entries, `/sync`, `/async`, `/generator` and `/async-generator` (each exports one mode object to pass as `createPipeline({ mode })`), and the `/admission` entry, which hosts such as plugin-host use to check pipeline options at construction. The package has one runtime dependency, `@migaia/utils`. It depends on neither DOM nor Node nor a lifecycle host. The root exports `createPipeline()`, mode and generator-signal constants, public stage/control/context types, and error codes. Concrete executors and adapters are internal and cannot be imported from the root.
 
 A pipeline contains only read-only `mode`, `lift()` and `run()`. Current values, indices, cancellation contexts and next-call state belong to each individual run. One pipeline can be reused, with runs isolated from one another. Every run copies the stage list: replacing, inserting or deleting entries in the caller's array afterwards does not change that run's function sequence.
 

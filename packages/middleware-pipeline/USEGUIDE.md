@@ -335,7 +335,7 @@ console.log(completed.join(','), reported[0] === failure)
 
 ## 入口、所有权与运行模型
 
-只有根入口 `@migaia/middleware-pipeline`，运行时依赖为 `@migaia/utils`，不依赖 DOM、Node 或外部生命周期宿主。根入口提供 `createPipeline()`、模式与生成器信号常量、公开 stage/control/context 类型，以及错误码；具体执行器和适配器属于包内实现，不能从根入口导入。
+根入口是 `@migaia/middleware-pipeline`。除根入口外，还有四个模式子入口 `/sync`、`/async`、`/generator`、`/async-generator`（各导出一个模式对象，传给 `createPipeline({ mode })`），以及 `/admission` 子入口（供 plugin-host 等宿主在构造期校验管线选项）。运行时依赖为 `@migaia/utils`，不依赖 DOM、Node 或外部生命周期宿主。根入口提供 `createPipeline()`、模式与生成器信号常量、公开 stage/control/context 类型，以及错误码；具体执行器和适配器属于包内实现，不能从根入口导入。
 
 pipeline 是执行规则固定的对象，只含只读 `mode`、`lift()` 和 `run()`。每次运行的当前值、索引、取消上下文与 `next` 状态都属于该次 `run()`；同一个 pipeline 可以复用，各次运行相互隔离。每次运行都复制一份 stage 列表，之后替换、插入或删除原数组的项，不改变本轮执行的函数列表。
 
