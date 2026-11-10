@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { ERROR_SOURCE, WasmErrorCode, WasmErrorText } from '../src/error-code.ts'
 
 /** Wasm-pack owns this generated module; apply the package's initialization rules after generation. */
 const path = new URL('../src/wasm_provider.js', import.meta.url)
@@ -43,7 +44,8 @@ const asyncDocumentation = `/**
  *
  * @param module_or_path - Optional input object; defaults to the sibling WASM asset URL.
  * @returns Raw exports whose \`memory\` backs the named JavaScript wrappers.
- * @throws Rejects with the original fetch, compilation, linking, or start error.
+ * @throws Rejects with a \`TypeError\` coded \`MODULE_LOAD_FAILED\` when fetching fails (the fetch
+ *   error is its \`cause\`), or with the original compilation, linking, or start error.
  */`
 /** Releasing metadata never transfers or releases the separately owned arena allocation. */
 const freeDocumentation = `/**
@@ -51,6 +53,19 @@ const freeDocumentation = `/**
      * Call once; do not read properties or reuse this wrapper after disposal.
      * Input and output arena allocations remain live until \`dealloc_bytes(id)\`.
      */`
+/**
+ * Generated helper that wraps a failed module fetch in a coded `TypeError`, keeping the original
+ * failure on `cause`. Values come from the package error table at build time.
+ */
+const loadFailure = `/** Wrap a failed module fetch with the package error code; the original stays on cause. */
+function __migaia_load_failed(error) {
+    const failure = new TypeError(${JSON.stringify(WasmErrorText.moduleLoadFailed)}, { cause: error });
+    Object.defineProperty(failure, 'source', { value: ${JSON.stringify(ERROR_SOURCE)}, enumerable: true });
+    Object.defineProperty(failure, 'code', { value: ${JSON.stringify(WasmErrorCode.moduleLoadFailed)}, enumerable: true });
+    throw failure;
+}
+
+`
 /** Explicit resource management uses exactly the same release operation as free(). */
 const disposeDocumentation = `/**
      * Releases this result's metadata when leaving an explicit resource-management scope.
@@ -71,6 +86,10 @@ if (source.indexOf(anchor) < 0 || source.indexOf(anchor) !== source.lastIndexOf(
         "    if (typeof module_or_path === 'string'",
         "    // Resolve promised inputs before choosing fetch or direct instantiation.\n    module_or_path = await module_or_path;\n\n    if (typeof module_or_path === 'string'"
       )
+      .replace(
+        '        module_or_path = fetch(module_or_path);',
+        '        module_or_path = fetch(module_or_path).then(undefined, __migaia_load_failed);'
+      )
       .replace('    free() {', `    ${freeDocumentation}\n    free() {`)
       .replace(
         'function initSync(module) {',
@@ -86,7 +105,7 @@ if (source.indexOf(anchor) < 0 || source.indexOf(anchor) !== source.lastIndexOf(
       )
       .replace(
         'async function __wbg_init(module_or_path) {',
-        `${asyncDocumentation
+        `${loadFailure}${asyncDocumentation
           .replace(
             '@param module_or_path',
             '@param {{ module_or_path: import("./wasm_provider.js").InitInput | Promise<import("./wasm_provider.js").InitInput> } | import("./wasm_provider.js").InitInput | Promise<import("./wasm_provider.js").InitInput>} [module_or_path]'

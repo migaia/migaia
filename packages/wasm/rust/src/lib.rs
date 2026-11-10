@@ -8,6 +8,21 @@ use std::{
 
 use wasm_bindgen::prelude::*;
 
+/// Stable public conversion-error texts. Every conversion path reads these so one message never
+/// drifts between paths; `ConversionResult.error` consumers see exactly these strings.
+const OUTPUT_TOO_LARGE: &str = "conversion output is too large";
+/// Output allocation failed after the size check passed.
+const OUTPUT_ALLOCATION_FAILED: &str = "conversion output allocation failed";
+/// The caller passed an id the arena does not own, or a length beyond its capacity.
+const UNKNOWN_ALLOCATION: &str = "unknown allocation id or length past capacity";
+/// The arena has no free id left for a new allocation.
+const ARENA_EXHAUSTED: &str = "arena exhausted";
+/// Prefix for JSON-to-MessagePack failures; the underlying error follows it.
+const JSON_TO_MSGPACK_FAILED: &str = "json to msgpack failed";
+/// Prefix for MessagePack-to-JSON failures; the underlying error follows it.
+const MSGPACK_TO_JSON_FAILED: &str = "msgpack to json failed";
+
+
 /// Backing store for one allocation.
 ///
 /// Stored as `Vec<u64>` (not `Vec<u8>`) on purpose: `Vec<T>` is allocated with
@@ -266,7 +281,7 @@ impl Write for ArenaWriter<'_> {
     /// Writes one serializer chunk, growing only the owned output block as needed.
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let required = self.position.checked_add(bytes.len()).ok_or_else(|| {
-            io::Error::new(io::ErrorKind::WriteZero, "conversion output is too large")
+            io::Error::new(io::ErrorKind::WriteZero, OUTPUT_TOO_LARGE)
         })?;
         let block = self
             .arena
@@ -274,11 +289,11 @@ impl Write for ArenaWriter<'_> {
             .get_mut(&self.id)
             .expect("conversion output allocation");
         let capacity = block.len().checked_mul(8).ok_or_else(|| {
-            io::Error::new(io::ErrorKind::WriteZero, "conversion output is too large")
+            io::Error::new(io::ErrorKind::WriteZero, OUTPUT_TOO_LARGE)
         })?;
         if required > capacity {
             let doubled = capacity.max(8).checked_mul(2).ok_or_else(|| {
-                io::Error::new(io::ErrorKind::WriteZero, "conversion output is too large")
+                io::Error::new(io::ErrorKind::WriteZero, OUTPUT_TOO_LARGE)
             })?;
             let words = doubled.max(required).div_ceil(8);
             // Fallible growth: an aborting `resize` would trap inside the arena
@@ -286,7 +301,7 @@ impl Write for ArenaWriter<'_> {
             block.try_reserve_exact(words - block.len()).map_err(|_| {
                 io::Error::new(
                     io::ErrorKind::OutOfMemory,
-                    "conversion output allocation failed",
+                    OUTPUT_ALLOCATION_FAILED,
                 )
             })?;
             block.resize(words, 0);
@@ -330,10 +345,10 @@ fn with_input(
     convert: impl FnOnce(&mut Arena, &[u8]) -> ConversionResult,
 ) -> ConversionResult {
     let Some(block) = arena.map.get_mut(&id) else {
-        return fail("unknown allocation id or length past capacity");
+        return fail(UNKNOWN_ALLOCATION);
     };
     if len as usize > block.len() * 8 {
-        return fail("unknown allocation id or length past capacity");
+        return fail(UNKNOWN_ALLOCATION);
     }
     let input = std::mem::take(block);
     // SAFETY: input owns the aligned initialized allocation independently of arena;
@@ -347,7 +362,7 @@ fn with_input(
 /// Converts JSON to MessagePack while borrowing input and writing output in one arena transaction.
 fn convert_json_to_msgpack(arena: &mut Arena, input: &[u8]) -> ConversionResult {
     let Some(output_id) = allocate_output(arena, INITIAL_OUTPUT_BYTES) else {
-        return fail("arena exhausted");
+        return fail(ARENA_EXHAUSTED);
     };
     let outcome = {
         let mut writer = ArenaWriter {
@@ -363,9 +378,9 @@ fn convert_json_to_msgpack(arena: &mut Arena, input: &[u8]) -> ConversionResult 
         match result {
             Ok(()) => match deserializer.end() {
                 Ok(()) => Ok(writer.position),
-                Err(error) => Err(format!("json to msgpack failed: {error}")),
+                Err(error) => Err(format!("{JSON_TO_MSGPACK_FAILED}: {error}")),
             },
-            Err(error) => Err(format!("json to msgpack failed: {error}")),
+            Err(error) => Err(format!("{JSON_TO_MSGPACK_FAILED}: {error}")),
         }
     };
     match outcome {
@@ -384,7 +399,7 @@ fn convert_json_to_msgpack(arena: &mut Arena, input: &[u8]) -> ConversionResult 
 /// Converts MessagePack to JSON while borrowing input and writing output in one arena transaction.
 fn convert_msgpack_to_json(arena: &mut Arena, input: &[u8]) -> ConversionResult {
     let Some(output_id) = allocate_output(arena, INITIAL_OUTPUT_BYTES) else {
-        return fail("arena exhausted");
+        return fail(ARENA_EXHAUSTED);
     };
     let outcome = {
         let mut writer = ArenaWriter {
@@ -400,8 +415,8 @@ fn convert_msgpack_to_json(arena: &mut Arena, input: &[u8]) -> ConversionResult 
         };
         match result {
             Ok(()) if cursor.position() == input.len() as u64 => Ok(writer.position),
-            Ok(()) => Err("msgpack to json failed: trailing bytes".to_string()),
-            Err(error) => Err(format!("msgpack to json failed: {error}")),
+            Ok(()) => Err(format!("{MSGPACK_TO_JSON_FAILED}: trailing bytes")),
+            Err(error) => Err(format!("{MSGPACK_TO_JSON_FAILED}: {error}")),
         }
     };
     match outcome {
