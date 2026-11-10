@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 import { MicroHubErrorCode } from './error-code.ts'
 import { MicroHubErrorText } from './error-text.ts'
 import { createMicroHubTypeError } from './errors.ts'
@@ -146,11 +147,11 @@ export function assertName(kind: NameKind, name: unknown): asserts name is strin
  */
 function readSpec<T extends object>(name: string, spec: T): T {
   try {
-    return { ...spec }
+    return snapshotOptionProperties(spec)
   } catch (error) {
     throw createMicroHubTypeError(
       MicroHubErrorCode.invalidOption,
-      MicroHubErrorText.unreadableInput(`contract "${name}" spec`),
+      MicroHubErrorText.unreadableContractSpec(name),
       { cause: error }
     )
   }

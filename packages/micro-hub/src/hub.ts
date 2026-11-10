@@ -1,3 +1,4 @@
+import { snapshotOptionProperties } from '@migaia/utils/object'
 import { createEventChannel, type IEventChannel } from '@migaia/event-subscriber'
 import {
   LifecycleErrorPolicy,
@@ -42,17 +43,23 @@ let current: IMicroHub | undefined
  * `INVALID_OPTION` with the original error as `cause` instead of an uncoded native error.
  */
 function readHubOptions(options: ICreateMicroHubOptions): ICreateMicroHubOptions {
+  /** Plain copy; every later read uses it, never the caller's object. */
+  let input: ICreateMicroHubOptions
+  /** True when `plugins` is an array; a revoked Proxy throws inside the guarded read. */
+  let isList = false
   try {
-    /** Plain copy; every later read uses it, never the caller's object. */
-    const input = { ...options }
-    return { plugins: [...input.plugins], report: input.report }
+    input = snapshotOptionProperties(options)
+    isList = Array.isArray(input.plugins)
   } catch (error) {
     throw createMicroHubTypeError(
       MicroHubErrorCode.invalidOption,
-      MicroHubErrorText.unreadableInput('createMicroHub options'),
+      MicroHubErrorText.unreadableHubOptions,
       { cause: error }
     )
   }
+  if (!isList)
+    throw createMicroHubTypeError(MicroHubErrorCode.invalidOption, MicroHubErrorText.pluginsInvalid)
+  return { plugins: [...input.plugins], report: input.report }
 }
 
 /** Last-resort reporter used when no `report` option is given or the given one throws. */

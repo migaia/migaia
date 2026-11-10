@@ -54,10 +54,18 @@ export const MicroHubErrorText = {
       typeof name === 'object' || typeof name === 'function' ? typeof name : String(name)
     }`,
   /**
-   * Paired with `INVALID_OPTION` when reading a caller's options object or contract spec throws,
-   * for example from a getter or a revoked Proxy; the original error is the `cause`.
+   * Paired with `INVALID_OPTION` when reading the createMicroHub options throws, for example from a
+   * getter or a revoked Proxy; the original error is the `cause`.
    */
-  unreadableInput: (subject: string): string => `[micro-hub] ${subject} could not be read`,
+  unreadableHubOptions: '[micro-hub] createMicroHub options could not be read',
+  /** Paired with `INVALID_OPTION` when `plugins` is not an array of capability plugins. */
+  pluginsInvalid: '[micro-hub] createMicroHub options.plugins must be an array of plugins',
+  /**
+   * Paired with `INVALID_OPTION` when reading a contract spec throws (getter or revoked Proxy); the
+   * original error is the `cause`.
+   */
+  unreadableContractSpec: (contract: string): string =>
+    `[micro-hub] contract "${contract}" spec could not be read`,
   /** Paired with `INVALID_OPTION` for contract versions. */
   invalidVersion: (contract: string): string =>
     `[micro-hub] contract "${contract}" version must be a positive integer`,
