@@ -1,3 +1,5 @@
+import { UNPRINTABLE_ERROR } from './error-text.ts'
+import { safeErrorReason } from '@migaia/utils/error'
 import { PLUGIN_HOST_SOURCE } from './error-code.ts'
 import { attachErrorIdentity } from '@migaia/utils/error'
 /** Owns registration-local Feature construction and install-result admission, without publication. */
@@ -106,7 +108,7 @@ class PluginHostInstallFeatureSession<TDomainCore extends object, TValue> {
   /** Returns the original diagnostic result so Feature reporting observes any async rejection. */
   #reportFeatureRejection(error: unknown): void {
     return this.#port.diagnostic(
-      error instanceof Error ? error.message : String(error),
+      safeErrorReason(error, UNPRINTABLE_ERROR),
       PluginHostErrorCode.pluginInstallFailed,
       error
     )
@@ -308,7 +310,7 @@ class PluginHostInstallFeatureSession<TDomainCore extends object, TValue> {
   #reportThenableRejection(error: unknown): void {
     reportDiagnostic(
       this.#port.diagnostic,
-      error instanceof Error ? error.message : String(error),
+      safeErrorReason(error, UNPRINTABLE_ERROR),
       PluginHostErrorCode.pluginInstallFailed,
       error
     )

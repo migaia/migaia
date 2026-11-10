@@ -202,7 +202,22 @@ export function createHostRuntimeContext<
     pipelineModes: new Map()
   } as IPluginHostRuntimeContext<TDomainCore, TValue, TInstalled, TPipelines>
   /** Only omission selects defaults; null remains an invalid execution policy. */
-  const execution = options.execution === undefined ? {} : options.execution
+  let executionOption: unknown
+  try {
+    executionOption = options.execution
+  } catch (error) {
+    throw attachErrorIdentity(
+      new TypeError(PluginHostInternalText.EXECUTION_OBJECT, { cause: error }),
+      {
+        source: PLUGIN_HOST_SOURCE,
+        code: PluginHostErrorCode.invalidOption
+      }
+    )
+  }
+  /** One read of the option; later checks reuse this value so a changing getter cannot diverge. */
+  const execution = (executionOption === undefined ? {} : executionOption) as NonNullable<
+    IPluginHostOptions['execution']
+  >
   if (execution === null || typeof execution !== 'object')
     throw attachErrorIdentity(new TypeError(PluginHostInternalText.EXECUTION_OBJECT), {
       source: PLUGIN_HOST_SOURCE,

@@ -1,12 +1,16 @@
+import { safeErrorReason } from '@migaia/utils/error'
 /** Existing package prefix keeps public messages stable across every producing module. */
 export const PLUGIN_HOST_PREFIX = '[plugin-host] '
 
 /** Uses stable English package text; consumers localize by `(source, code)` at their boundary. */
 const prefixed = (en: string): string => `${PLUGIN_HOST_PREFIX}${en}`
 
+/** Shown in place of a thrown value whose message or string conversion itself throws. */
+export const UNPRINTABLE_ERROR = '<unprintable error>'
+
 /** Renders one original rollback failure without changing the captured error list or its identity. */
 function formatRollbackFailure(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return safeErrorReason(error, UNPRINTABLE_ERROR)
 }
 
 /** PluginHost 错误与诊断文本集中维护处；按稳定 code 分类，文本工厂只格式化消息而不创建错误。 */
@@ -39,7 +43,9 @@ const ERROR_TEXT = {
     prefixed(`feature prerequisite ${String(key)} was removed with owner ${owner}`),
   /** Stable diagnostic for an enablement notification failure that never rolls state back. */
   ENABLEMENT_HOOK_FAILED: (name: string, hook: string, error: unknown) =>
-    prefixed(`plugin ${name} ${hook} notification failed: ${String(error)}`),
+    prefixed(
+      `plugin ${name} ${hook} notification failed: ${safeErrorReason(error, UNPRINTABLE_ERROR)}`
+    ),
   /** Admission 读取 plugin/resource getter 失败时使用，原始异常挂在 cause。 */
   INVALID_OPTION: prefixed('plugin-host option read failed'),
   /** Rejects an invalid release hook during definition or admission, before Host mutation. */

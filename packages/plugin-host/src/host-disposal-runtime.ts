@@ -1,3 +1,5 @@
+import { safeErrorReason } from '@migaia/utils/error'
+import { UNPRINTABLE_ERROR } from './error-text.ts'
 /** Owns the unique Host disposal result and composes existing lifecycle drains and cleanup owners. */
 import { deferred } from '@migaia/utils/promise'
 import type { PluginHostState } from './host-state.ts'
@@ -128,7 +130,7 @@ export class PluginHostDisposalRuntime<TRegistration> {
     for (const error of errors) {
       reportDiagnostic(
         this.#port.diagnostic,
-        error instanceof Error ? error.message : String(error),
+        safeErrorReason(error, UNPRINTABLE_ERROR),
         PluginHostErrorCode.cleanupIncomplete,
         error
       )

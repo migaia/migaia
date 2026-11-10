@@ -1,3 +1,4 @@
+import { isArrayInput } from '../../errors.ts'
 import { PLUGIN_HOST_SOURCE } from '../../error-code.ts'
 import { attachErrorIdentity } from '@migaia/utils/error'
 /**
@@ -39,7 +40,11 @@ type IAdmittedDependencyMutationOptions = Readonly<{
 export const admitDependencyMutationOptions = (
   value: unknown
 ): IAdmittedDependencyMutationOptions => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    isArrayInput(value, PluginHostErrorCode.invalidOption)
+  )
     throw attachErrorIdentity(new TypeError(ERROR_TEXT.INVALID_OPTION), {
       source: PLUGIN_HOST_SOURCE,
       code: PluginHostErrorCode.invalidOption

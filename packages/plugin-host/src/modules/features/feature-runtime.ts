@@ -99,10 +99,15 @@ export const compileFeatures = (roots: Readonly<Record<string, object>>): IFeatu
 export const inspectFeatures = <TFeatures extends IFeatureRecord>(
   roots: TFeatures
 ): IFeatureInspection<TFeatures> => {
+  /**
+   * One validated read of the roots (non-record input is rejected first); compilation and the
+   * returned map describe the same input.
+   */
+  const snapshot = Object.freeze(snapshotFeatureRecord(roots)) as TFeatures
   /** Inspection reuses the same canonical graph compilation as installation. */
-  const plan = compileFeatures(roots)
+  const plan = compileFeatures(snapshot)
   return Object.freeze({
-    roots: Object.freeze({ ...roots }) as TFeatures,
+    roots: snapshot,
     ordered: Object.freeze([...plan.ordered]) as readonly IFeature<any, any, any>[]
   })
 }

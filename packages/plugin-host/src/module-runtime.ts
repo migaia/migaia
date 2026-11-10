@@ -1,3 +1,4 @@
+import { isArrayInput } from './errors.ts'
 import type { IPluginHostRuntimeContext } from './host-runtime-context.ts'
 import type { PluginHostRuntimePorts } from './host-runtime-ports.ts'
 import type { IPluginHostOptions } from './host-options-types.ts'
@@ -50,7 +51,7 @@ export class HostModules {
   readonly #runtimes: Readonly<{ dispose?(): void | Promise<void> }>[] = []
   /** Reject invalid identities and dependency sets before constructing any module. */
   constructor(modules: readonly IHostModule[] = []) {
-    if (!Array.isArray(modules))
+    if (!isArrayInput(modules, PluginHostErrorCode.invalidHostModule))
       throw new PluginHostError(PluginHostErrorCode.invalidHostModule, HostModuleText.invalid)
     for (const module of modules) {
       /** Only the private registry can supply an installation implementation. */

@@ -115,3 +115,16 @@ export function identifyPluginHostCallbackFailure(error: unknown): Error {
     cause: error
   })
 }
+
+/**
+ * `Array.isArray` for caller input at an admission boundary. A revoked Proxy makes the check throw;
+ * that native `TypeError` gets the package source and `code` attached so it never leaves uncoded.
+ */
+export function isArrayInput(value: unknown, code: IPluginHostErrorCode): boolean {
+  try {
+    return Array.isArray(value)
+  } catch (error) {
+    // Only a revoked Proxy throws here, and it throws a fresh native TypeError.
+    throw attachErrorIdentity(error as TypeError, { source: PLUGIN_HOST_SOURCE, code })
+  }
+}

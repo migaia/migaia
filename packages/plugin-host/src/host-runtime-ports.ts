@@ -1,3 +1,5 @@
+import { UNPRINTABLE_ERROR } from './error-text.ts'
+import { safeErrorReason } from '@migaia/utils/error'
 /**
  * Owns Host admission, hook marks and inter-runtime capabilities; runtime state is explicit and
  * lifecycle algorithms stay in their original owners.
@@ -220,7 +222,7 @@ export class PluginHostRuntimePorts<
   /** Adds producer provenance while preserving the original failure as cause. */
   readonly wrapDisposalError = (error: unknown, phase: string): PluginHostError => {
     /** Existing error text conversion is part of the disposal diagnostic contract. */
-    const detail = error instanceof Error ? error.message : String(error)
+    const detail = safeErrorReason(error, UNPRINTABLE_ERROR)
     return this.#context.owner.registerDisposalNode(
       new PluginHostError(
         PluginHostErrorCode.pluginDisposeFailed,

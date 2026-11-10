@@ -133,7 +133,7 @@ pnpm add @migaia/plugin-host
 
 本包管理插件安装、Feature 依赖、配置、stage 归属与释放，不实现领域业务，也不重复实现管线执行算法。运行时依赖为 `@migaia/capability`、`@migaia/lifecycle`、`@migaia/middleware-pipeline`、`@migaia/utils`。管线运行和 stage 提升复用 middleware-pipeline；生命周期 scope、变更队列与清理复用 lifecycle。
 
-只有根入口 `@migaia/plugin-host` 与稳定子入口 `@migaia/plugin-host/composition`。不要依赖内部文件。普通应用使用根入口的 Host、插件、Feature、句柄和错误工具；composition 是单一组合 owner 的窄协议，不是另一套应用 Host。
+公开入口是根入口 `@migaia/plugin-host`、组合协议子入口 `@migaia/plugin-host/composition`，以及按需安装的能力模块子入口：`/features`、`/feature-dependencies`、`/enablement`、`/activation`、`/named-pipelines`、`/pipeline-modes/sync`、`/pipeline-modes/async`、`/pipeline-modes/generator`、`/pipeline-modes/async-generator`、`/feature-overlay` 与 `/feature-overlay/notifications`。能力模块通过 Host 的 `modules` 选项安装，没装的模块对应的方法不存在。不要依赖内部文件。普通应用使用根入口的 Host、插件、Feature、句柄和错误工具；composition 是单一组合 owner 的窄协议，不是另一套应用 Host。
 
 类 `PluginHost<TDomainCore, TValue, TInstalled, TPipelines, TModules>` 的首个类型参数 TDomainCore 必须提供；运行时 createPluginDomainCore 的默认实现返回空对象。末尾 TPipelines 轴默认 `Record<never, never>`；pipeline 值类型默认 `never`，安装类型清单默认 `readonly []`；defineHost 的领域类型参数另有默认值。`TInstalled` 参与安装约束和配置推导，运行期 `use()` 不改变 Host 变量的静态类型，而是按输入顺序返回精确句柄 tuple。插件合并、提取等仅类型 helper 以发布声明为准；`IPluginHostCoreFor<THost>` 从 Host 类型提取领域 core 与 pipeline 轴，类型元数据不会安装运行时能力。
 

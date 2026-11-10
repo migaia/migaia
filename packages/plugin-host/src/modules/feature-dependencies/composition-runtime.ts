@@ -1,3 +1,4 @@
+import { isArrayInput } from '../../errors.ts'
 import { PLUGIN_HOST_SOURCE } from '../../error-code.ts'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IPluginHostCompositionRuntimePort } from '../../composition-runtime-types.ts'
@@ -221,7 +222,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
   /** Binds exact live receipts into one prepared removal capability. */
   prepareUnUseBatch(receipts: readonly IRegistrationToken[]): IPluginPreparedRemovalBatch {
     this.#port.assertActive()
-    if (!Array.isArray(receipts))
+    if (!isArrayInput(receipts, PluginHostErrorCode.invalidOption))
       throw attachErrorIdentity(new TypeError(PluginHostInternalText.REGISTRATION_RECEIPTS_ARRAY), {
         source: PLUGIN_HOST_SOURCE,
         code: PluginHostErrorCode.invalidOption
@@ -285,6 +286,12 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     /** Every original receipt must admit removal before committed state or publication changes. */
     for (const registration of state.registrations)
       this.#port.removal.assertRemovalAllowed(registration)
+    /** One deadline covers all registrations and their release steps. False is explicitly unbounded. */
+    // Read before the irreversible commit so a failing clock cannot strand revoked registrations.
+    const deadlineAt =
+      this.#port.pipelineDrainTimeoutMs === false
+        ? undefined
+        : this.#port.scheduler.now() + this.#port.pipelineDrainTimeoutMs
     state.committed = true
     for (const registration of state.registrations) {
       this.#port.removal.revokeRegistration(registration)
@@ -293,11 +300,6 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     this.#port.state.commit()
     /** Publication is read immediately after logical revocation and before awaiting cleanup. */
     const snapshot = this.#port.createView() as TView
-    /** One deadline covers all registrations and their release steps. False is explicitly unbounded. */
-    const deadlineAt =
-      this.#port.pipelineDrainTimeoutMs === false
-        ? undefined
-        : this.#port.scheduler.now() + this.#port.pipelineDrainTimeoutMs
     /** One strict-cleanup chain retains the original fence, leaf order and shared deadline. */
     const physicalTask = this.#runStrictCleanup(state.registrations, beforeCleanup, deadlineAt)
     /** The bounded observer stores completed detail without translating its cleanup failures. */
