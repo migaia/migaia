@@ -21,6 +21,11 @@ export type IMutationQueueOptions = {
   readonly onAdmissionDiagnostic?: (info: {
     readonly owner: string | undefined
     readonly waitedMs: number
+    /**
+     * Present only when disarming the admission watchdog failed: a `QUEUE_ADMISSION_TIMEOUT` error
+     * whose `cause` is the cancellation failure. Absent on the plain wait diagnostic.
+     */
+    readonly error?: unknown
   }) => void
   /**
    * Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers.

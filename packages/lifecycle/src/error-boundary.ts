@@ -30,11 +30,16 @@ export function attachLifecycleSecondaryErrors(
       : undefined
   /** Readable existing list; a throwing or non-array `errors` contributes nothing. */
   const carried = existing && !existing.threw && Array.isArray(existing.value) ? existing.value : []
-  /** Secondary failures without the primary, already-carried or repeated objects, first-seen order. */
-  const distinct = secondaryErrors.filter(
-    (error, index) =>
-      error !== primary && !carried.includes(error) && secondaryErrors.indexOf(error) === index
-  )
+  /** Primary, already-carried and already-kept errors; nothing in it is appended again. */
+  const excluded = new Set<unknown>(carried)
+  excluded.add(primary)
+  /** Insertion-ordered membership keeps first-seen order in one pass. */
+  const distinct: unknown[] = []
+  for (const error of secondaryErrors)
+    if (!excluded.has(error)) {
+      excluded.add(error)
+      distinct.push(error)
+    }
   /** Either the primary (attached in place) or utils' freshly built AggregateError fallback. */
   const attached = attachSecondaryErrors(primary, distinct)
   if (attached === primary) return primary

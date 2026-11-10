@@ -255,16 +255,21 @@ function finishForce(
     // case still throws it exactly as-is) — this tagged wrapper is a parallel diagnostic channel
     // only, carrying `(source, code)` for callers that want that without losing the raw error's own
     // identity/type.
-    context.report(
-      createLifecycleError(
-        LifecycleErrorCode.releaseForceFailed,
-        LifecycleErrorText.releaseForceFailed,
-        {
-          cause: forceOutcome.error
-        }
-      )
-    )
+    // The original force failure is recorded first so a throwing reporter cannot replace it.
     errors.push(forceOutcome.error)
+    try {
+      context.report(
+        createLifecycleError(
+          LifecycleErrorCode.releaseForceFailed,
+          LifecycleErrorText.releaseForceFailed,
+          {
+            cause: forceOutcome.error
+          }
+        )
+      )
+    } catch (reportError) {
+      errors.push(reportError)
+    }
   }
   return errors
 }
@@ -564,9 +569,11 @@ export async function releaseInPlanOrder(
 }
 
 export function createDisposeTransaction(
-  mode: IDisposeTransactionMode,
+  requestedMode: IDisposeTransactionMode,
   options: IDisposeTransactionOptions = {}
 ): IDisposeTransaction {
+  /** Frozen snapshot; later caller mutation of the mode object cannot change this transaction. */
+  const mode = Object.freeze({ ...requestedMode }) as IDisposeTransactionMode
   const errorPolicy = options.errorPolicy ?? 'throw'
   const scheduler = resolveSchedulerOption(options)
   const report = options.report
