@@ -1,3 +1,4 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { assertErrorPolicyReporter } from './error-boundary.ts'
 import type {
   ICollectedError,
@@ -7,7 +8,7 @@ import type {
   ILifecycleState
 } from './types.ts'
 import { ASYNC_OWNER_BRAND } from './types.ts'
-import { createLifecycleError } from './errors.ts'
+import { LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
 import { OwnedEntryList } from './owned-entries.ts'
@@ -94,16 +95,18 @@ class SyncLifecycleScope {
   /** Registers a `syncSafe` resource with a validated snapshot of its descriptor. */
   own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T {
     if (this.#releasing) {
-      throw createLifecycleError(
-        LifecycleErrorCode.scopeReentrantOwn,
-        LifecycleErrorText.scopeReentrantOwn
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.scopeReentrantOwn),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeReentrantOwn },
+        lifecycleIdentity
       )
     }
     this.#assertOpen()
     if (descriptor?.syncSafe !== true) {
-      throw createLifecycleError(
-        LifecycleErrorCode.scopeSyncViolation,
-        LifecycleErrorText.syncScopeRequiresSyncSafe
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.syncScopeRequiresSyncSafe),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeSyncViolation },
+        lifecycleIdentity
       )
     }
     /** Same admission as the async scope; the snapshot is what dispose() releases. */
@@ -114,9 +117,10 @@ class SyncLifecycleScope {
       ASYNC_OWNER_BRAND
     ]
     if (brand === true) {
-      throw createLifecycleError(
-        LifecycleErrorCode.scopeSyncViolation,
-        LifecycleErrorText.syncScopeOwnsAsyncOwner
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.syncScopeOwnsAsyncOwner),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeSyncViolation },
+        lifecycleIdentity
       )
     }
     if (admission.descriptor.order !== 0) this.#customOrder = true
@@ -143,9 +147,10 @@ class SyncLifecycleScope {
   dispose(): readonly ICollectedError[] {
     if (this.#disposed || this.#lifecycle === LifecycleState.terminal) {
       if (this.#releasing) {
-        throw createLifecycleError(
-          LifecycleErrorCode.scopeReentrantDispose,
-          LifecycleErrorText.scopeReentrantDispose
+        throw attachErrorIdentity(
+          new Error(LifecycleErrorText.scopeReentrantDispose),
+          { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeReentrantDispose },
+          lifecycleIdentity
         )
       }
       return []
@@ -206,10 +211,18 @@ class SyncLifecycleScope {
   /** Throws the closing or terminal boundary error for a registration after `close()`. */
   #assertOpen(): void {
     if (this.#lifecycle === LifecycleState.terminal) {
-      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.scopeTerminal)
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.scopeTerminal),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeTerminal },
+        lifecycleIdentity
+      )
     }
     if (this.#lifecycle === LifecycleState.closing) {
-      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.scopeClosing),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeClosed },
+        lifecycleIdentity
+      )
     }
   }
 }

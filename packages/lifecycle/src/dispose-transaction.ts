@@ -1,10 +1,11 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { defaultLifecycleScheduler } from './scheduler.ts'
 import { assertErrorPolicyReporter, attachLifecycleSecondaryErrors } from './error-boundary.ts'
-import { containAsyncRejection, safeReport } from './errors.ts'
+import { containAsyncRejection, safeReport, LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
 import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.ts'
 import { DisposerContext, type IDisposerContext } from './disposer-context.ts'
-import { createErrorCollector, createLifecycleError, createLifecycleTypeError } from './errors.ts'
+import { createErrorCollector } from './errors.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
 import { boundedWait } from './bounded-wait.ts'
@@ -132,9 +133,10 @@ function raceGraceful(
     // The overrun stays observable as a diagnostic only.
     if (effectiveDeadline !== undefined && scheduler.now() >= effectiveDeadline) {
       context.report(
-        createLifecycleError(
-          LifecycleErrorCode.deadlineExceeded,
-          LifecycleErrorText.syncGracefulOverBudget
+        attachErrorIdentity(
+          new Error(LifecycleErrorText.syncGracefulOverBudget),
+          { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.deadlineExceeded },
+          lifecycleIdentity
         )
       )
     }
@@ -167,9 +169,10 @@ async function awaitGraceful(
     // as a diagnostic (not an item error — timing out is a normal degrade path) and go straight to
     // `force`.
     context.report(
-      createLifecycleError(
-        LifecycleErrorCode.deadlineExceeded,
-        LifecycleErrorText.sharedDeadlinePassed
+      attachErrorIdentity(
+        new Error(LifecycleErrorText.sharedDeadlinePassed),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.deadlineExceeded },
+        lifecycleIdentity
       )
     )
     return { ok: false, timedOut: true }
@@ -259,12 +262,10 @@ function finishForce(
     errors.push(forceOutcome.error)
     try {
       context.report(
-        createLifecycleError(
-          LifecycleErrorCode.releaseForceFailed,
-          LifecycleErrorText.releaseForceFailed,
-          {
-            cause: forceOutcome.error
-          }
+        attachErrorIdentity(
+          new Error(LifecycleErrorText.releaseForceFailed, { cause: forceOutcome.error }),
+          { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.releaseForceFailed },
+          lifecycleIdentity
         )
       )
     } catch (reportError) {
@@ -292,10 +293,14 @@ function normalizeReleaseContext(context: IReleaseContext): IReleaseContext {
     report = context.report
     disposer = context.disposer
   } catch (error) {
-    throw createLifecycleTypeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerAccessorFailed,
-      { cause: error, detail: { field: 'scheduler' } }
+    throw attachErrorIdentity(
+      new TypeError(LifecycleErrorText.schedulerAccessorFailed, { cause: error }),
+      {
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.invalidOption,
+        detail: { field: 'scheduler' }
+      },
+      lifecycleIdentity
     )
   }
   if (deadlineAt !== undefined) validateSchedulerTime(deadlineAt, 'deadlineAt')
@@ -386,12 +391,10 @@ export type IDisposeTransaction = {
 
 /** Creates one tagged lifecycle error for a descriptor value that violates admission shape. */
 const invalidDescriptor = (field: string): unknown =>
-  createLifecycleError(
-    LifecycleErrorCode.invalidOption,
-    LifecycleErrorText.disposeDescriptorInvalid,
-    {
-      detail: { field }
-    }
+  attachErrorIdentity(
+    new Error(LifecycleErrorText.disposeDescriptorInvalid),
+    { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption, detail: { field } },
+    lifecycleIdentity
   )
 
 /**
@@ -683,9 +686,10 @@ export async function mergeCleanupResults(
   values: readonly (ICleanupResult | PromiseLike<ICleanupResult>)[]
 ): Promise<ICleanupResult> {
   if (!Array.isArray(values))
-    throw createLifecycleTypeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.cleanupResultInvalid
+    throw attachErrorIdentity(
+      new TypeError(LifecycleErrorText.cleanupResultInvalid),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   /** Each branch owns its error order; Promise.all preserves the caller's branch order. */
   const groups = await Promise.all(
@@ -701,9 +705,10 @@ export async function mergeCleanupResults(
           /** Capture the error array once before waiting for any later work. */
           const errors = result?.cleanupErrors
           if (!Array.isArray(errors))
-            throw createLifecycleTypeError(
-              LifecycleErrorCode.invalidOption,
-              LifecycleErrorText.cleanupResultInvalid
+            throw attachErrorIdentity(
+              new TypeError(LifecycleErrorText.cleanupResultInvalid),
+              { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+              lifecycleIdentity
             )
           observed.push(...errors)
           next = result.physicalCompletion
@@ -763,15 +768,17 @@ export function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger {
   /** Throws the appropriate lifecycle boundary error before a new operation can mutate state. */
   const assertOpen = (): void => {
     if (activeItem) {
-      throw createLifecycleError(
-        LifecycleErrorCode.scopeReentrantOwn,
-        LifecycleErrorText.disposalLedgerReentrant
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.disposalLedgerReentrant),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeReentrantOwn },
+        lifecycleIdentity
       )
     }
     if (lifecycle !== LifecycleState.open) {
-      throw createLifecycleError(
-        LifecycleErrorCode.scopeClosed,
-        LifecycleErrorText.disposalLedgerClosed
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.disposalLedgerClosed),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeClosed },
+        lifecycleIdentity
       )
     }
   }
@@ -779,9 +786,10 @@ export function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger {
   /** Starts one callback on the caller's current stack and observes thenable completion once. */
   const start = (source: string, callback: () => unknown): void => {
     if (typeof source !== 'string' || typeof callback !== 'function') {
-      throw createLifecycleError(
-        LifecycleErrorCode.invalidOption,
-        LifecycleErrorText.disposeDescriptorInvalid
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.disposeDescriptorInvalid),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+        lifecycleIdentity
       )
     }
     assertOpen()
@@ -821,16 +829,18 @@ export function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger {
   /** Seals admission and returns one immutable outcome object for all repeated callers. */
   const seal = (): ISyncStartedDisposalOutcome => {
     if (activeItem) {
-      throw createLifecycleError(
-        LifecycleErrorCode.scopeReentrantOwn,
-        LifecycleErrorText.disposalLedgerReentrant
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.disposalLedgerReentrant),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeReentrantOwn },
+        lifecycleIdentity
       )
     }
     if (outcome) return outcome
     if (lifecycle !== LifecycleState.open) {
-      throw createLifecycleError(
-        LifecycleErrorCode.scopeClosed,
-        LifecycleErrorText.disposalLedgerClosed
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.disposalLedgerClosed),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeClosed },
+        lifecycleIdentity
       )
     }
     lifecycle = LifecycleState.closing

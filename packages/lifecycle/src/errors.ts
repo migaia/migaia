@@ -1,6 +1,12 @@
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import type { ICollectedError, IErrorPolicy } from './types.ts'
-import { attachErrorIdentity, attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
+import {
+  attachErrorIdentity,
+  attachSecondaryErrors,
+  tryReadProperty,
+  type IErrorIdentity,
+  type IErrorIdentityHooks
+} from '@migaia/utils/error'
 import { ERROR_SOURCE, LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
 import { assertErrorPolicyReporter } from './error-boundary.ts'
@@ -26,91 +32,44 @@ export type ILifecycleError = Error & {
   readonly errors?: readonly unknown[]
 }
 
-/** Attaches lifecycle identity with configurable descriptors for same-package reclassification. */
-function attachLifecycleIdentity<T extends Error>(error: T, code: string): T {
-  /** Existing source descriptor used to reject cross-package identity replacement. */
-  const source = Object.getOwnPropertyDescriptor(error, 'source')
-  if (source !== undefined && source.value !== LIFECYCLE_SOURCE) {
-    return attachErrorIdentity(error, { source: LIFECYCLE_SOURCE, code })
-  }
-  if (source === undefined) {
-    Object.defineProperty(error, 'source', {
+/**
+ * Rewrites a configurable lifecycle `code` in place when one primary error crosses a cancellation
+ * boundary and is reclassified. Every other identity conflict (a foreign `source`, a locked `code`)
+ * fails closed with the utils conflict error, exactly as a plain `attachErrorIdentity` call would.
+ */
+function reclassifyLifecycleCode(context: {
+  readonly target: Error
+  readonly key: string
+  readonly incoming: unknown
+}): Error {
+  /** Only an existing configurable code written by lifecycle itself may be rewritten. */
+  const descriptor =
+    context.key === 'code' ? Object.getOwnPropertyDescriptor(context.target, 'code') : undefined
+  if (descriptor?.configurable === true) {
+    Object.defineProperty(context.target, 'code', {
       configurable: true,
       enumerable: true,
-      value: LIFECYCLE_SOURCE,
+      value: context.incoming,
       writable: false
     })
+    return context.target
   }
-  /** Existing lifecycle code descriptor, which may be reclassified at a later boundary. */
-  const existingCode = Object.getOwnPropertyDescriptor(error, 'code')
-  if (existingCode === undefined || existingCode.value !== code) {
-    if (existingCode !== undefined && existingCode.configurable !== true) {
-      return attachErrorIdentity(error, { source: LIFECYCLE_SOURCE, code })
-    }
-    Object.defineProperty(error, 'code', {
-      configurable: true,
-      enumerable: true,
-      value: code,
-      writable: false
-    })
-  }
-  return error
+  /** Current identity with the conflicting key replaced, so utils raises its own conflict error. */
+  const identity = {
+    source: Object.getOwnPropertyDescriptor(context.target, 'source')?.value,
+    code: Object.getOwnPropertyDescriptor(context.target, 'code')?.value,
+    [context.key]: context.incoming
+  } as IErrorIdentity
+  return attachErrorIdentity(context.target, identity)
 }
 
 /**
- * Builds a `(source, code)`-tagged error without ever touching `stack` — the engine populates it at
- * construction and this function never reassigns it, so the original throw site is always visible.
+ * Identity hooks for every error lifecycle throws: `source`/`code` stay configurable so lifecycle
+ * can reclassify its own primary error in place; conflicts follow `reclassifyLifecycleCode`.
  */
-export function createLifecycleError(
-  code: string,
-  message: string,
-  options?: {
-    readonly cause?: unknown
-    readonly phase?: string
-    readonly detail?: Readonly<Record<string, unknown>>
-    readonly errors?: readonly unknown[]
-  }
-): ILifecycleError {
-  const hasCause = options !== undefined && 'cause' in options
-  const error = new Error(message, hasCause ? { cause: options.cause } : undefined)
-  attachLifecycleIdentity(error, code)
-  if (options?.phase !== undefined) {
-    Object.defineProperty(error, 'phase', { value: options.phase, enumerable: true })
-  }
-  if (options?.detail !== undefined) {
-    Object.defineProperty(error, 'detail', { value: options.detail, enumerable: true })
-  }
-  if (options?.errors !== undefined) attachSecondaryErrors(error, options.errors)
-  return error as ILifecycleError
-}
-
-/**
- * Stamps `(source, code)` onto an error object we did not construct ourselves (e.g. a built-in
- * `AggregateError`) without touching `stack`, `message`, or `errors`. Used where the error's _type_
- * matters to callers (`AggregateError`) so `createLifecycleError`'s plain `Error` cannot be used.
- */
-export function tagLifecycleError<E extends Error>(error: E, code: string): E {
-  /** Existing source descriptor used to distinguish lifecycle-local reclassification. */
-  const source = Object.getOwnPropertyDescriptor(error, 'source')
-  /** Existing code descriptor whose configurability determines whether identity can be preserved. */
-  const existingCode = Object.getOwnPropertyDescriptor(error, 'code')
-  if (
-    source?.value === LIFECYCLE_SOURCE &&
-    existingCode !== undefined &&
-    existingCode.value !== code &&
-    existingCode.configurable === true
-  ) {
-    // Lifecycle deliberately reclassifies one primary Error as it crosses cancellation
-    // boundaries. Preserve object identity while keeping cross-source conflicts fail-closed.
-    Object.defineProperty(error, 'code', {
-      configurable: true,
-      enumerable: true,
-      value: code,
-      writable: false
-    })
-    return error
-  }
-  return attachLifecycleIdentity(error, code)
+export const lifecycleIdentity: IErrorIdentityHooks<Error> = {
+  reclassifiable: true,
+  onConflict: (context) => reclassifyLifecycleCode(context)
 }
 
 /**
@@ -129,56 +88,38 @@ export function createLifecycleFailure(
     /** Preserve getter failures as secondary evidence while keeping the original value as cause. */
     const stackRead = tryReadProperty(error as { stack?: unknown }, 'stack')
     if (messageRead.threw || stackRead.threw)
-      return createLifecycleError(code, message, {
-        cause: error,
-        errors: [
+      return attachSecondaryErrors(
+        attachErrorIdentity(
+          new Error(message, { cause: error }),
+          { source: LIFECYCLE_SOURCE, code },
+          lifecycleIdentity
+        ),
+        [
           ...(messageRead.threw ? [messageRead.error] : []),
           ...(stackRead.threw ? [stackRead.error] : [])
         ]
-      })
+      ) as ILifecycleError
     if (typeof messageRead.value !== 'string' || typeof stackRead.value !== 'string')
-      return createLifecycleError(code, message, { cause: error })
+      return attachErrorIdentity(
+        new Error(message, { cause: error }),
+        { source: LIFECYCLE_SOURCE, code },
+        lifecycleIdentity
+      ) as ILifecycleError
     try {
-      return tagLifecycleError(error as Error, code) as ILifecycleError
+      return attachErrorIdentity(
+        error as Error,
+        { source: LIFECYCLE_SOURCE, code },
+        lifecycleIdentity
+      ) as ILifecycleError
     } catch {
       // Frozen or already non-configurable errors cannot be retagged without replacing identity.
     }
   }
-  return createLifecycleError(code, message, { cause: error })
-}
-
-/**
- * Creates a native `RangeError` for input validation and attaches the supplied code. Preserves the
- * native type required by `docs/contracts/error-codes.md`.
- */
-export function createLifecycleRangeError(
-  code: string,
-  message: string,
-  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }
-): RangeError {
-  const error = new RangeError(
-    message,
-    options?.cause === undefined ? undefined : { cause: options.cause }
-  )
-  tagLifecycleError(error, code)
-  if (options?.detail !== undefined)
-    Object.defineProperty(error, 'detail', { value: options.detail, enumerable: true })
-  return error
-}
-
-/** Creates a lifecycle-tagged native TypeError without replacing its runtime type. */
-export function createLifecycleTypeError(
-  code: string,
-  message: string,
-  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }
-): TypeError {
-  /** Whether caller explicitly supplied a cause, including an intentional `undefined` throw. */
-  const hasCause = options !== undefined && 'cause' in options
-  const error = new TypeError(message, hasCause ? { cause: options.cause } : undefined)
-  tagLifecycleError(error, code)
-  if (options?.detail !== undefined)
-    Object.defineProperty(error, 'detail', { value: options.detail, enumerable: true })
-  return error
+  return attachErrorIdentity(
+    new Error(message, { cause: error }),
+    { source: LIFECYCLE_SOURCE, code },
+    lifecycleIdentity
+  ) as ILifecycleError
 }
 
 /** Collects errors under one of the four policies and produces the correct finalize behavior. */
@@ -264,12 +205,13 @@ export function createErrorCollector(
       // A single failure remains the same instance; only multiple failures need an aggregate.
       if (entries.length === 1) throw entries[0]!.error
       if (entries.length > 1) {
-        throw tagLifecycleError(
+        throw attachErrorIdentity(
           new AggregateError(
             entries.map((entry) => entry.error),
             message
           ),
-          LifecycleErrorCode.scopeDisposalFailed
+          { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeDisposalFailed },
+          lifecycleIdentity
         )
       }
       return []

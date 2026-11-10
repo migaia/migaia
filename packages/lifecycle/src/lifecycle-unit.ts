@@ -1,6 +1,7 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import type { ILifecycleState, IUnitState } from './types.ts'
-import { containAsyncRejection, createLifecycleError } from './errors.ts'
+import { containAsyncRejection, LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
 import { createTerminalController } from './terminal-controller.ts'
@@ -49,12 +50,10 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
 
   const reportStartFailed = (rawError: unknown): void => {
     if (!report) return
-    const tagged = createLifecycleError(
-      LifecycleErrorCode.unitStartFailed,
-      LifecycleErrorText.unitStartFailed,
-      {
-        cause: rawError
-      }
+    const tagged = attachErrorIdentity(
+      new Error(LifecycleErrorText.unitStartFailed, { cause: rawError }),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.unitStartFailed },
+      lifecycleIdentity
     )
     try {
       const result: unknown = report(tagged)
@@ -68,10 +67,18 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
 
   const assertOpen = (): void => {
     if (terminal.lifecycle === LifecycleState.terminal) {
-      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.unitTerminal)
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.unitTerminal),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeTerminal },
+        lifecycleIdentity
+      )
     }
     if (terminal.lifecycle === LifecycleState.closing) {
-      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.unitClosing)
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.unitClosing),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeClosed },
+        lifecycleIdentity
+      )
     }
   }
 
@@ -148,9 +155,10 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
       if (terminal.lifecycle === LifecycleState.terminal) return
       terminal.close()
       generations.dispose(
-        createLifecycleError(
-          LifecycleErrorCode.generationDisposed,
-          LifecycleErrorText.unitDisposedReason
+        attachErrorIdentity(
+          new Error(LifecycleErrorText.unitDisposedReason),
+          { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.generationDisposed },
+          lifecycleIdentity
         )
       )
       terminal.forceTerminal()

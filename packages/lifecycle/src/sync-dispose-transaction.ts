@@ -1,9 +1,11 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { observeThenableRejection, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import {
   createErrorCollector,
-  createLifecycleError,
   createLifecycleFailure,
-  safeReport
+  safeReport,
+  LIFECYCLE_SOURCE,
+  lifecycleIdentity
 } from './errors.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
@@ -34,9 +36,10 @@ function runSyncCallback(
     observeThenableRejection(result, { then: probe.thenFn }, reportLate)
     return {
       ok: false,
-      error: createLifecycleError(
-        LifecycleErrorCode.scopeSyncViolation,
-        LifecycleErrorText.syncCallbackReturnedThenable
+      error: attachErrorIdentity(
+        new Error(LifecycleErrorText.syncCallbackReturnedThenable),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeSyncViolation },
+        lifecycleIdentity
       )
     }
   }

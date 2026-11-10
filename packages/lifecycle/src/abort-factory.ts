@@ -1,7 +1,8 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IAbortController } from './abort.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
-import { LIFECYCLE_SOURCE, createLifecycleError } from './errors.ts'
+import { LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
 
 type IHostAbortControllerConstructor = new () => IAbortController
 
@@ -11,22 +12,25 @@ const resolveHostConstructor = (): IHostAbortControllerConstructor => {
   try {
     candidate = (globalThis as { AbortController?: unknown }).AbortController
   } catch (error) {
-    throw createLifecycleError(
-      LifecycleErrorCode.envUnsupported,
-      LifecycleErrorText.envUnsupported,
+    throw attachErrorIdentity(
+      new Error(LifecycleErrorText.envUnsupported, { cause: error }),
       {
-        cause: error,
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.envUnsupported,
         detail: { capability: 'AbortController' }
-      }
+      },
+      lifecycleIdentity
     )
   }
   if (typeof candidate !== 'function') {
-    throw createLifecycleError(
-      LifecycleErrorCode.envUnsupported,
-      LifecycleErrorText.envUnsupported,
+    throw attachErrorIdentity(
+      new Error(LifecycleErrorText.envUnsupported),
       {
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.envUnsupported,
         detail: { capability: 'AbortController' }
-      }
+      },
+      lifecycleIdentity
     )
   }
   return candidate as IHostAbortControllerConstructor
@@ -52,13 +56,14 @@ const validateHostController = (candidate: unknown): IAbortController => {
     }
     return controller
   } catch (error) {
-    throw createLifecycleError(
-      LifecycleErrorCode.envUnsupported,
-      LifecycleErrorText.envUnsupported,
+    throw attachErrorIdentity(
+      new Error(LifecycleErrorText.envUnsupported, { cause: error }),
       {
-        cause: error,
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.envUnsupported,
         detail: { capability: 'AbortController' }
-      }
+      },
+      lifecycleIdentity
     )
   }
 }
@@ -83,13 +88,14 @@ const instantiate = (constructor: IHostAbortControllerConstructor): IAbortContro
       typeof (error as { readonly code?: unknown }).code === 'string'
     )
       throw error
-    throw createLifecycleError(
-      LifecycleErrorCode.envUnsupported,
-      LifecycleErrorText.envUnsupported,
+    throw attachErrorIdentity(
+      new Error(LifecycleErrorText.envUnsupported, { cause: error }),
       {
-        cause: error,
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.envUnsupported,
         detail: { capability: 'AbortController' }
-      }
+      },
+      lifecycleIdentity
     )
   }
 }
@@ -160,7 +166,11 @@ export class ClosingSignalSource {
     if (this.#controller === undefined) {
       this.#controller = this.#create()
       this.#controller.abort(
-        createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosedReason)
+        attachErrorIdentity(
+          new Error(LifecycleErrorText.scopeClosedReason),
+          { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeClosed },
+          lifecycleIdentity
+        )
       )
     }
     return this.#controller.signal

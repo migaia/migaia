@@ -1,6 +1,7 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
-import { createLifecycleError } from './errors.ts'
+import { LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
 import type { IReleaseContext } from './types.ts'
 
 /**
@@ -28,9 +29,10 @@ export class DisposerContext implements IDisposerContext {
 
   /** Rejects owner-disposal self-joins without touching the canonical external Promise. */
   join(): never {
-    throw createLifecycleError(
-      LifecycleErrorCode.scopeReentrantDispose,
-      LifecycleErrorText.scopeReentrantDispose
+    throw attachErrorIdentity(
+      new Error(LifecycleErrorText.scopeReentrantDispose),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeReentrantDispose },
+      lifecycleIdentity
     )
   }
 

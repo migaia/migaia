@@ -1,10 +1,35 @@
 import { describe, expect, it, vi } from 'vitest'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import {
   containAsyncRejection,
   createErrorCollector,
-  createLifecycleError,
-  LIFECYCLE_SOURCE
+  lifecycleIdentity,
+  LIFECYCLE_SOURCE,
+  type ILifecycleError
 } from '../src/errors.ts'
+
+/**
+ * Builds an error exactly as lifecycle throw sites do: native constructor plus shared identity
+ * hooks.
+ */
+function lifecycleError(
+  code: string,
+  message: string,
+  extras: { cause?: unknown; phase?: string; detail?: Readonly<Record<string, unknown>> } = {}
+): ILifecycleError {
+  /** Identity fields present only when the throw site supplies them. */
+  const identity = {
+    source: LIFECYCLE_SOURCE,
+    code,
+    ...(extras.phase === undefined ? {} : { phase: extras.phase }),
+    ...(extras.detail === undefined ? {} : { detail: extras.detail })
+  }
+  return attachErrorIdentity(
+    new Error(message, 'cause' in extras ? { cause: extras.cause } : undefined),
+    identity,
+    lifecycleIdentity
+  ) as ILifecycleError
+}
 
 describe('containAsyncRejection: non-Promise thenable', () => {
   it('reads `then` exactly once and observes the eventual rejection', async () => {
@@ -228,28 +253,28 @@ describe('firstError: subsequent errors are fully observed', () => {
 
 describe('error code structural contract', () => {
   it('every created error carries source and code', () => {
-    const error = createLifecycleError('SOME_CODE', 'message')
+    const error = lifecycleError('SOME_CODE', 'message')
     expect(error.source).toBe(LIFECYCLE_SOURCE)
     expect(error.code).toBe('SOME_CODE')
   })
 
   it('phase and detail are attached only when provided', () => {
-    const withExtras = createLifecycleError('X', 'm', { phase: 'force', detail: { a: 1 } })
+    const withExtras = lifecycleError('X', 'm', { phase: 'force', detail: { a: 1 } })
     expect(withExtras.phase).toBe('force')
     expect(withExtras.detail).toEqual({ a: 1 })
-    const withoutExtras = createLifecycleError('Y', 'm')
+    const withoutExtras = lifecycleError('Y', 'm')
     expect(withoutExtras.phase).toBeUndefined()
     expect(withoutExtras.detail).toBeUndefined()
   })
 
   it('the original error is reachable via `cause` and identity-preserved (===)', () => {
     const original = new Error('root cause')
-    const wrapped = createLifecycleError('WRAP', 'wrapper', { cause: original })
+    const wrapped = lifecycleError('WRAP', 'wrapper', { cause: original })
     expect(wrapped.cause).toBe(original)
   })
 
   it('stack is populated and this function never reassigns it', () => {
-    const error = createLifecycleError('X', 'm')
+    const error = lifecycleError('X', 'm')
     expect(typeof error.stack).toBe('string')
     expect(error.stack!.length).toBeGreaterThan(0)
   })
@@ -271,8 +296,42 @@ describe('error code structural contract', () => {
   })
 
   it('(source, code) pairs are stable identifiers usable for a uniqueness check', () => {
-    const a = createLifecycleError('DUPLICATE', 'm1')
-    const b = createLifecycleError('DUPLICATE', 'm2')
+    const a = lifecycleError('DUPLICATE', 'm1')
+    const b = lifecycleError('DUPLICATE', 'm2')
     expect(`${a.source}:${a.code}`).toBe(`${b.source}:${b.code}`)
+  })
+})
+
+describe('lifecycle identity reclassification', () => {
+  it('rewrites a lifecycle code in place on the same error instance', () => {
+    const error = lifecycleError('FIRST', 'm')
+    const reclassified = attachErrorIdentity(
+      error,
+      { source: LIFECYCLE_SOURCE, code: 'SECOND' },
+      lifecycleIdentity
+    )
+    expect(reclassified).toBe(error)
+    expect(error.code).toBe('SECOND')
+    expect(Object.getOwnPropertyDescriptor(error, 'code')?.configurable).toBe(true)
+  })
+
+  it('keeps phase and detail locked even though source and code stay configurable', () => {
+    const error = lifecycleError('X', 'm', { phase: 'force', detail: { a: 1 } })
+    expect(Object.getOwnPropertyDescriptor(error, 'source')?.configurable).toBe(true)
+    expect(Object.getOwnPropertyDescriptor(error, 'phase')?.configurable).toBe(false)
+    expect(Object.getOwnPropertyDescriptor(error, 'detail')?.configurable).toBe(false)
+  })
+
+  it('fails closed on a foreign source and on a locked code', () => {
+    const foreign = attachErrorIdentity(new Error('foreign'), { source: 'other.domain', code: 'X' })
+    expect(() =>
+      attachErrorIdentity(foreign, { source: LIFECYCLE_SOURCE, code: 'Y' }, lifecycleIdentity)
+    ).toThrowError(expect.objectContaining({ code: 'ERROR_IDENTITY_CONFLICT' }))
+    const locked = new Error('locked')
+    Object.defineProperty(locked, 'code', { value: 'LOCKED', configurable: false })
+    expect(() =>
+      attachErrorIdentity(locked, { source: LIFECYCLE_SOURCE, code: 'Y' }, lifecycleIdentity)
+    ).toThrowError(expect.objectContaining({ code: 'ERROR_IDENTITY_CONFLICT' }))
+    expect(locked).toHaveProperty('source', LIFECYCLE_SOURCE)
   })
 })

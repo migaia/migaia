@@ -1,7 +1,13 @@
+import { attachErrorIdentity, attachSecondaryErrors } from '@migaia/utils/error'
 import { attachLifecycleSecondaryErrors } from './error-boundary.ts'
 import type { ILifecycleOwner, IReleaseDescriptor } from './types.ts'
 import { ASYNC_OWNER_BRAND } from './types.ts'
-import { createLifecycleError, createLifecycleFailure } from './errors.ts'
+import {
+  createLifecycleFailure,
+  LIFECYCLE_SOURCE,
+  lifecycleIdentity,
+  type ILifecycleError
+} from './errors.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
 import {
@@ -219,11 +225,14 @@ class ProvisionalScope {
         parentCode === LifecycleErrorCode.scopeClosed ||
         parentCode === LifecycleErrorCode.scopeTerminal
       ) {
-        throw createLifecycleError(
-          LifecycleErrorCode.provisionalParentClosed,
-          LifecycleErrorText.provisionalParentClosed,
-          { cause: error, errors: cleanupErrors }
-        )
+        throw attachSecondaryErrors(
+          attachErrorIdentity(
+            new Error(LifecycleErrorText.provisionalParentClosed, { cause: error }),
+            { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.provisionalParentClosed },
+            lifecycleIdentity
+          ),
+          cleanupErrors
+        ) as ILifecycleError
       }
       throw attachLifecycleSecondaryErrors(
         error,
@@ -297,19 +306,23 @@ const noSettleError: unique symbol = Symbol('no settle error')
 
 /** Builds the PROVISIONAL_SETTLED error for use after commit or rollback. */
 function createSettledError(): Error {
-  return createLifecycleError(
-    LifecycleErrorCode.provisionalSettled,
-    LifecycleErrorText.provisionalSettled
+  return attachErrorIdentity(
+    new Error(LifecycleErrorText.provisionalSettled),
+    { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.provisionalSettled },
+    lifecycleIdentity
   )
 }
 
 /** Builds the `signal.reason` for a scope settled by commit or rollback. */
 function createSettleReason(settledBy: IProvisionalScopeState): Error {
-  return createLifecycleError(
-    LifecycleErrorCode.provisionalSettled,
-    settledBy === ProvisionalScopeState.committed
-      ? LifecycleErrorText.provisionalCommittedReason
-      : LifecycleErrorText.provisionalRolledBackReason
+  return attachErrorIdentity(
+    new Error(
+      settledBy === ProvisionalScopeState.committed
+        ? LifecycleErrorText.provisionalCommittedReason
+        : LifecycleErrorText.provisionalRolledBackReason
+    ),
+    { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.provisionalSettled },
+    lifecycleIdentity
   )
 }
 

@@ -1,4 +1,5 @@
-import { createLifecycleError } from './errors.ts'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
 import type { IDisposer } from './types.ts'
@@ -77,9 +78,10 @@ class QuiescenceTracker<TKey> implements IQuiescenceTracker<TKey> {
     /** Existing sealed state rejects synchronously before modifying the count. */
     const existing = this.#store.get(key)
     if (existing?.sealed) {
-      throw createLifecycleError(
-        LifecycleErrorCode.quiescenceSealed,
-        LifecycleErrorText.quiescenceSealed
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.quiescenceSealed),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.quiescenceSealed },
+        lifecycleIdentity
       )
     }
     /** This release keeps its exact state even if a later epoch uses the same string key. */
@@ -103,9 +105,10 @@ class QuiescenceTracker<TKey> implements IQuiescenceTracker<TKey> {
     /** The original sealed entry is shared by every strict wait on this key. */
     const existing = this.#store.get(key)
     if (!existing?.sealed) {
-      throw createLifecycleError(
-        LifecycleErrorCode.quiescenceUnsealedWait,
-        LifecycleErrorText.quiescenceUnsealedWait
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.quiescenceUnsealedWait),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.quiescenceUnsealedWait },
+        lifecycleIdentity
       )
     }
     if (existing.count === 0) return Promise.resolve()

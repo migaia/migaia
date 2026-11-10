@@ -1,8 +1,13 @@
-import { attachSecondaryErrors, safeErrorReason, tryReadProperty } from '@migaia/utils/error'
+import {
+  attachSecondaryErrors,
+  safeErrorReason,
+  tryReadProperty,
+  attachErrorIdentity
+} from '@migaia/utils/error'
 import type { IErrorPolicy } from './types.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
-import { createLifecycleTypeError, tagLifecycleError } from './errors.ts'
+import { LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
 
 /**
  * Lifecycle's single entry point for attaching secondary failures (cleanup, rollback, cancellation)
@@ -50,7 +55,11 @@ export function attachLifecycleSecondaryErrors(
     value: safeErrorReason(primary, fallbackMessage),
     writable: true
   })
-  return tagLifecycleError(attached as AggregateError, fallbackCode)
+  return attachErrorIdentity(
+    attached as AggregateError,
+    { source: LIFECYCLE_SOURCE, code: fallbackCode },
+    lifecycleIdentity
+  )
 }
 
 /**
@@ -65,9 +74,13 @@ export function assertErrorPolicyReporter(
 ): void {
   if (policy !== 'report' && policy !== 'firstError') return
   if (typeof report === 'function') return
-  throw createLifecycleTypeError(
-    LifecycleErrorCode.invalidOption,
-    LifecycleErrorText.errorPolicyReporterMissing,
-    { detail: { field: 'report', errorPolicy: policy } }
+  throw attachErrorIdentity(
+    new TypeError(LifecycleErrorText.errorPolicyReporterMissing),
+    {
+      source: LIFECYCLE_SOURCE,
+      code: LifecycleErrorCode.invalidOption,
+      detail: { field: 'report', errorPolicy: policy }
+    },
+    lifecycleIdentity
   )
 }

@@ -1462,7 +1462,7 @@ options（`errorPolicy`、`report`、`deadlineAt`、`scheduler`、`onAdmissionDi
 
 ### 已收回内部的辅助 API
 
-`createLifecycleUnit` 及其 option/result types 不再从 package 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay`、`tagLifecycleError`、`createLifecycleRangeError` 只供包内部使用，root 与 leaf 均不再暴露。`/scheduler` 公开 snapshot/resolve 准入工具。错误构造器与 scheduler 算术 helper 均已收回内部，不提供兼容 alias；业务错误使用所属包的身份。
+`createLifecycleUnit` 及其 option/result types 不再从 package 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay` 只供包内部使用，root 与 leaf 均不再暴露；`tagLifecycleError`、`createLifecycleRangeError` 等错误工厂已删除，包内统一用原生错误加 `@migaia/utils/error` 的 `attachErrorIdentity`。`/scheduler` 公开 snapshot/resolve 准入工具。错误构造器与 scheduler 算术 helper 均已收回内部，不提供兼容 alias；业务错误使用所属包的身份。
 
 Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 交 utils 共享宿主异常队列；省略时这些诊断不外发。
 

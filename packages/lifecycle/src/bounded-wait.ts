@@ -1,8 +1,7 @@
 import { defaultLifecycleScheduler } from './scheduler.ts'
 import { captureCleanupReporter } from './abortable-delay.ts'
-import { safeReport } from './errors.ts'
-import { tryReadProperty } from '@migaia/utils/error'
-import { createLifecycleTypeError } from './errors.ts'
+import { safeReport, LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
+import { tryReadProperty, attachErrorIdentity } from '@migaia/utils/error'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
 import { attachLifecycleSecondaryErrors } from './error-boundary.ts'
@@ -33,10 +32,10 @@ export const boundedWait = async (
   /** Capture the optional callback once without allowing its getter failure to escape uncoded. */
   const reportRead = options === undefined ? undefined : tryReadProperty(options, 'reportCleanup')
   if (reportRead?.threw)
-    throw createLifecycleTypeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.waitCleanupReporterInvalid,
-      { cause: reportRead.error }
+    throw attachErrorIdentity(
+      new TypeError(LifecycleErrorText.waitCleanupReporterInvalid, { cause: reportRead.error }),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   /** An owner may observe cleanup without replacing the task/deadline winner. */
   const reportCleanup = captureCleanupReporter(reportRead?.value)

@@ -1,3 +1,4 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { assertErrorPolicyReporter } from './error-boundary.ts'
 import type {
   ICollectedError,
@@ -12,8 +13,9 @@ import { DisposerContext } from './disposer-context.ts'
 import {
   containAsyncRejection,
   createErrorCollector,
-  createLifecycleError,
-  safeReport
+  safeReport,
+  LIFECYCLE_SOURCE,
+  lifecycleIdentity
 } from './errors.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
@@ -191,9 +193,10 @@ class LifecycleScope {
    */
   own<T>(resource: T, descriptor: IReleaseDescriptor): T {
     if (this.#isInsideRelease()) {
-      throw createLifecycleError(
-        LifecycleErrorCode.scopeReentrantOwn,
-        LifecycleErrorText.scopeReentrantOwn
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.scopeReentrantOwn),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeReentrantOwn },
+        lifecycleIdentity
       )
     }
     this.#assertOpen()
@@ -251,9 +254,10 @@ class LifecycleScope {
   dispose(): Promise<readonly ICollectedError[]> {
     if (this.#disposePromise) {
       if (this.#isInsideRelease()) {
-        throw createLifecycleError(
-          LifecycleErrorCode.scopeReentrantDispose,
-          LifecycleErrorText.scopeReentrantDispose
+        throw attachErrorIdentity(
+          new Error(LifecycleErrorText.scopeReentrantDispose),
+          { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeReentrantDispose },
+          lifecycleIdentity
         )
       }
       // Concurrent, non-reentrant call: reuse the one real disposal in flight.
@@ -340,10 +344,18 @@ class LifecycleScope {
   /** Throws the closing or terminal boundary error for a registration after `close()`. */
   #assertOpen(): void {
     if (this.#lifecycle === LifecycleState.terminal) {
-      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.scopeTerminal)
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.scopeTerminal),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeTerminal },
+        lifecycleIdentity
+      )
     }
     if (this.#lifecycle === LifecycleState.closing) {
-      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
+      throw attachErrorIdentity(
+        new Error(LifecycleErrorText.scopeClosing),
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.scopeClosed },
+        lifecycleIdentity
+      )
     }
   }
 

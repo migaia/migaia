@@ -8,13 +8,8 @@
  * contract.
  */
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import { attachSecondaryErrors } from '@migaia/utils/error'
-import {
-  createLifecycleError,
-  createLifecycleFailure,
-  createLifecycleRangeError,
-  createLifecycleTypeError
-} from './errors.ts'
+import { attachSecondaryErrors, attachErrorIdentity } from '@migaia/utils/error'
+import { createLifecycleFailure, LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
 
@@ -38,21 +33,25 @@ function invokeSchedulerMethod<T>(
 /** Canonical runtime check for scheduler-produced and scheduler-consumed numeric values. */
 export function validateSchedulerTime(value: unknown, label: string): number {
   if (typeof value !== 'number') {
-    throw createLifecycleTypeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerNumberType,
+    throw attachErrorIdentity(
+      new TypeError(LifecycleErrorText.schedulerNumberType),
       {
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.invalidOption,
         detail: { field: label }
-      }
+      },
+      lifecycleIdentity
     )
   }
   if (!Number.isFinite(value)) {
-    throw createLifecycleRangeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerNumberRange,
+    throw attachErrorIdentity(
+      new RangeError(LifecycleErrorText.schedulerNumberRange),
       {
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.invalidOption,
         detail: { field: label }
-      }
+      },
+      lifecycleIdentity
     )
   }
   return value
@@ -62,12 +61,14 @@ export function validateSchedulerTime(value: unknown, label: string): number {
 export function validateSchedulerDelay(value: unknown, label = 'delayMs'): number {
   const number = validateSchedulerTime(value, label)
   if (number < 0) {
-    throw createLifecycleRangeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerDelayRange,
+    throw attachErrorIdentity(
+      new RangeError(LifecycleErrorText.schedulerDelayRange),
       {
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.invalidOption,
         detail: { field: label }
-      }
+      },
+      lifecycleIdentity
     )
   }
   return number
@@ -78,12 +79,14 @@ export function addSchedulerTime(base: number, delta: number, label: string): nu
   /** Candidate absolute scheduler time produced by adding the validated increment. */
   const target = base + delta
   if (!Number.isFinite(target)) {
-    throw createLifecycleRangeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerTimeOverflow,
+    throw attachErrorIdentity(
+      new RangeError(LifecycleErrorText.schedulerTimeOverflow),
       {
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.invalidOption,
         detail: { field: label, base, delta }
-      }
+      },
+      lifecycleIdentity
     )
   }
   return target
@@ -98,9 +101,10 @@ export function addSchedulerTime(base: number, delta: number, label: string): nu
  */
 function snapshotScheduledTask(value: unknown): IScheduledTask {
   if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
-    throw createLifecycleError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerTaskInvalid
+    throw attachErrorIdentity(
+      new Error(LifecycleErrorText.schedulerTaskInvalid),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   }
   /** Injected task object; the receiver of every forwarded method. */
@@ -110,16 +114,17 @@ function snapshotScheduledTask(value: unknown): IScheduledTask {
   try {
     cancel = (value as { cancel?: unknown }).cancel
   } catch (error) {
-    throw createLifecycleTypeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerTaskCancelGetterFailed,
-      { cause: error }
+    throw attachErrorIdentity(
+      new TypeError(LifecycleErrorText.schedulerTaskCancelGetterFailed, { cause: error }),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   }
   if (typeof cancel !== 'function') {
-    throw createLifecycleError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerTaskInvalid
+    throw attachErrorIdentity(
+      new Error(LifecycleErrorText.schedulerTaskInvalid),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   }
   /** Cancels the injected timer with its original receiver. */
@@ -141,20 +146,28 @@ function snapshotScheduledTask(value: unknown): IScheduledTask {
     unref = (value as { unref?: unknown }).unref
   } catch (error) {
     return reject(
-      createLifecycleTypeError(
-        LifecycleErrorCode.invalidOption,
-        LifecycleErrorText.schedulerAccessorFailed,
-        { cause: error, detail: { field: 'unref' } }
+      attachErrorIdentity(
+        new TypeError(LifecycleErrorText.schedulerAccessorFailed, { cause: error }),
+        {
+          source: LIFECYCLE_SOURCE,
+          code: LifecycleErrorCode.invalidOption,
+          detail: { field: 'unref' }
+        },
+        lifecycleIdentity
       )
     )
   }
   if (unref === undefined) return { cancel: cancelTask }
   if (typeof unref !== 'function') {
     return reject(
-      createLifecycleError(
-        LifecycleErrorCode.invalidOption,
-        LifecycleErrorText.schedulerTaskInvalid,
-        { detail: { field: 'unref' } }
+      attachErrorIdentity(
+        new Error(LifecycleErrorText.schedulerTaskInvalid),
+        {
+          source: LIFECYCLE_SOURCE,
+          code: LifecycleErrorCode.invalidOption,
+          detail: { field: 'unref' }
+        },
+        lifecycleIdentity
       )
     )
   }
@@ -181,17 +194,18 @@ export function snapshotScheduler(value: unknown): IScheduler | undefined {
     schedule = (value as { schedule?: unknown }).schedule
     deferred = (value as { defer?: unknown }).defer
   } catch (error) {
-    throw createLifecycleTypeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerAccessorFailed,
-      { cause: error }
+    throw attachErrorIdentity(
+      new TypeError(LifecycleErrorText.schedulerAccessorFailed, { cause: error }),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   }
   if (typeof now !== 'function' || typeof schedule !== 'function') return undefined
   if (deferred !== undefined && typeof deferred !== 'function')
-    throw createLifecycleTypeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerDeferInvalid
+    throw attachErrorIdentity(
+      new TypeError(LifecycleErrorText.schedulerDeferInvalid),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   return {
     now: () =>
@@ -239,10 +253,14 @@ export function resolveSchedulerOption(
   try {
     schedulerOption = options?.scheduler
   } catch (error) {
-    throw createLifecycleTypeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerAccessorFailed,
-      { cause: error, detail: { field: 'scheduler' } }
+    throw attachErrorIdentity(
+      new TypeError(LifecycleErrorText.schedulerAccessorFailed, { cause: error }),
+      {
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.invalidOption,
+        detail: { field: 'scheduler' }
+      },
+      lifecycleIdentity
     )
   }
   if (schedulerOption === undefined) return fallback
@@ -253,9 +271,10 @@ export function resolveSchedulerOption(
 export function resolveScheduler(value: unknown): IScheduler {
   const snapshot = snapshotScheduler(value)
   if (snapshot === undefined) {
-    throw createLifecycleError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerInvalid
+    throw attachErrorIdentity(
+      new Error(LifecycleErrorText.schedulerInvalid),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   }
   return snapshot

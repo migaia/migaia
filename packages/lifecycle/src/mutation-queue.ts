@@ -1,6 +1,7 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { defaultLifecycleScheduler } from './scheduler.ts'
 import { attachLifecycleSecondaryErrors } from './error-boundary.ts'
-import { containAsyncRejection, createLifecycleError } from './errors.ts'
+import { containAsyncRejection, LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText, LifecycleErrorTextFactory } from './error-text.ts'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
@@ -85,9 +86,10 @@ function validateScheduleHandle(handle: unknown): asserts handle is IScheduledTa
     typeof handle !== 'object' ||
     typeof (handle as { cancel?: unknown }).cancel !== 'function'
   ) {
-    throw createLifecycleError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.schedulerTaskInvalid
+    throw attachErrorIdentity(
+      new Error(LifecycleErrorText.schedulerTaskInvalid),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   }
 }
@@ -158,10 +160,14 @@ class MutationQueue {
     // task that wants to submit follow-up work is to enqueue it without awaiting its own successor.
     if (owner !== undefined && this.#running && this.#runningOwner === owner) {
       return Promise.reject(
-        createLifecycleError(
-          LifecycleErrorCode.queueSelfDependency,
-          LifecycleErrorTextFactory.mutationSelfDependency(owner),
-          { detail: { owner } }
+        attachErrorIdentity(
+          new Error(LifecycleErrorTextFactory.mutationSelfDependency(owner)),
+          {
+            source: LIFECYCLE_SOURCE,
+            code: LifecycleErrorCode.queueSelfDependency,
+            detail: { owner }
+          },
+          lifecycleIdentity
         )
       )
     }
@@ -294,18 +300,26 @@ class MutationQueue {
       record.timeoutSettled = true
       record.admissionTimer = undefined
       record.reject(
-        createLifecycleError(
-          LifecycleErrorCode.queueAdmissionTimeout,
-          LifecycleErrorText.mutationAdmissionTimedOut,
-          { cause: error, detail: { owner: record.owner, phase: 'timeout-clock' } }
+        attachErrorIdentity(
+          new Error(LifecycleErrorText.mutationAdmissionTimedOut, { cause: error }),
+          {
+            source: LIFECYCLE_SOURCE,
+            code: LifecycleErrorCode.queueAdmissionTimeout,
+            detail: { owner: record.owner, phase: 'timeout-clock' }
+          },
+          lifecycleIdentity
         )
       )
       return
     }
-    record.timeoutError = createLifecycleError(
-      LifecycleErrorCode.queueAdmissionTimeout,
-      LifecycleErrorTextFactory.mutationAdmissionTimeout(timeoutMs),
-      { detail: { owner: record.owner, waitedMs } }
+    record.timeoutError = attachErrorIdentity(
+      new Error(LifecycleErrorTextFactory.mutationAdmissionTimeout(timeoutMs)),
+      {
+        source: LIFECYCLE_SOURCE,
+        code: LifecycleErrorCode.queueAdmissionTimeout,
+        detail: { owner: record.owner, waitedMs }
+      },
+      lifecycleIdentity
     )
     if (record.admissionTimer !== undefined && !record.timeoutSettled) {
       record.timeoutSettled = true
@@ -335,13 +349,14 @@ class MutationQueue {
     this.#reportAdmissionDiagnostic(
       record,
       waitedMs,
-      createLifecycleError(
-        LifecycleErrorCode.queueAdmissionTimeout,
-        LifecycleErrorText.mutationAdmissionTimedOut,
+      attachErrorIdentity(
+        new Error(LifecycleErrorText.mutationAdmissionTimedOut, { cause: cancelError }),
         {
-          cause: cancelError,
+          source: LIFECYCLE_SOURCE,
+          code: LifecycleErrorCode.queueAdmissionTimeout,
           detail: { owner: record.owner, phase: 'dequeue-disarm', waitedMs }
-        }
+        },
+        lifecycleIdentity
       )
     )
   }

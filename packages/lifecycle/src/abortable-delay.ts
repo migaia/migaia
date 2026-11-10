@@ -1,9 +1,10 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { attachLifecycleSecondaryErrors } from './error-boundary.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
-import { createLifecycleFailure, createLifecycleTypeError } from './errors.ts'
+import { createLifecycleFailure, LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
 import {
   observeAbortSubscription,
   type IObservedAbortSubscription
@@ -15,9 +16,10 @@ import { validateSchedulerDelay } from './scheduler.ts'
 export function captureCleanupReporter(value: unknown): ((error: unknown) => void) | undefined {
   if (value === undefined || typeof value === 'function')
     return value as ((error: unknown) => void) | undefined
-  throw createLifecycleTypeError(
-    LifecycleErrorCode.invalidOption,
-    LifecycleErrorText.waitCleanupReporterInvalid
+  throw attachErrorIdentity(
+    new TypeError(LifecycleErrorText.waitCleanupReporterInvalid),
+    { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+    lifecycleIdentity
   )
 }
 

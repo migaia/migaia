@@ -1,8 +1,8 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
-import { createLifecycleTypeError } from './errors.ts'
-import { attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
+import { LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
+import { attachSecondaryErrors, tryReadProperty, attachErrorIdentity } from '@migaia/utils/error'
 
 /** Idempotent handle for one lifecycle-owned abort registration. */
 export type IObservedAbortSubscription = {
@@ -31,18 +31,17 @@ export function observeAbortSubscription(
     addEventListener = signal.addEventListener
     removeEventListener = signal.removeEventListener
   } catch (error) {
-    throw createLifecycleTypeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.abortSignalInvalid,
-      {
-        cause: error
-      }
+    throw attachErrorIdentity(
+      new TypeError(LifecycleErrorText.abortSignalInvalid, { cause: error }),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   }
   if (typeof addEventListener !== 'function' || typeof removeEventListener !== 'function') {
-    throw createLifecycleTypeError(
-      LifecycleErrorCode.invalidOption,
-      LifecycleErrorText.abortSignalInvalid
+    throw attachErrorIdentity(
+      new TypeError(LifecycleErrorText.abortSignalInvalid),
+      { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.invalidOption },
+      lifecycleIdentity
     )
   }
   let removed = false

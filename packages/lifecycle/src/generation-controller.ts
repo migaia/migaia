@@ -1,15 +1,8 @@
 import { defaultLifecycleScheduler } from './scheduler.ts'
 import { attachLifecycleSecondaryErrors } from './error-boundary.ts'
-import { safeReport } from './errors.ts'
-import { attachSecondaryErrors } from '@migaia/utils/error'
-import {
-  containAsyncRejection,
-  createLifecycleError,
-  createLifecycleFailure,
-  createLifecycleTypeError,
-  tagLifecycleError,
-  type ILifecycleError
-} from './errors.ts'
+import { safeReport, LIFECYCLE_SOURCE, lifecycleIdentity } from './errors.ts'
+import { attachSecondaryErrors, attachErrorIdentity } from '@migaia/utils/error'
+import { containAsyncRejection, createLifecycleFailure, type ILifecycleError } from './errors.ts'
 import { LifecycleErrorCode } from './error-code.ts'
 import { LifecycleErrorText } from './error-text.ts'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
@@ -203,9 +196,10 @@ export function createGenerationController(
       )
     }
     if (errors.length > 1) {
-      throw tagLifecycleError(
+      throw attachErrorIdentity(
         new AggregateError(errors, LifecycleErrorText.generationCancellationFailed),
-        LifecycleErrorCode.generationCancellationFailed
+        { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.generationCancellationFailed },
+        lifecycleIdentity
       )
     }
   }
@@ -280,28 +274,34 @@ export function createGenerationController(
     },
     begin(beginOptions) {
       if (disposed) {
-        throw createLifecycleError(
-          LifecycleErrorCode.generationDisposed,
-          LifecycleErrorText.generationDisposed
+        throw attachErrorIdentity(
+          new Error(LifecycleErrorText.generationDisposed),
+          { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.generationDisposed },
+          lifecycleIdentity
         )
       }
       let timeoutMs: number | undefined
       try {
         timeoutMs = beginOptions?.timeoutMs
       } catch (error) {
-        throw createLifecycleTypeError(
-          LifecycleErrorCode.invalidOption,
-          LifecycleErrorText.generationTimeoutAccessorFailed,
-          { cause: error, detail: { field: 'timeoutMs' } }
+        throw attachErrorIdentity(
+          new TypeError(LifecycleErrorText.generationTimeoutAccessorFailed, { cause: error }),
+          {
+            source: LIFECYCLE_SOURCE,
+            code: LifecycleErrorCode.invalidOption,
+            detail: { field: 'timeoutMs' }
+          },
+          lifecycleIdentity
         )
       }
       if (timeoutMs !== undefined) validateSchedulerDelay(timeoutMs, 'timeoutMs')
       releaseCurrent(
         currentToken === undefined
           ? undefined
-          : createLifecycleError(
-              LifecycleErrorCode.generationSuperseded,
-              LifecycleErrorText.generationSupersededReason
+          : attachErrorIdentity(
+              new Error(LifecycleErrorText.generationSupersededReason),
+              { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.generationSuperseded },
+              lifecycleIdentity
             )
       )
       generation++
@@ -369,9 +369,10 @@ export function createGenerationController(
               firedSynchronously = scheduling
               try {
                 releaseCurrent(
-                  createLifecycleError(
-                    LifecycleErrorCode.generationTimedOut,
-                    LifecycleErrorText.generationTimedOutReason
+                  attachErrorIdentity(
+                    new Error(LifecycleErrorText.generationTimedOutReason),
+                    { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.generationTimedOut },
+                    lifecycleIdentity
                   )
                 )
               } catch (error) {
@@ -437,10 +438,11 @@ export function createGenerationController(
         try {
           /** Observe the nominal-void callback result through the canonical thenable boundary. */
           const result: unknown = options.onSuperseded(
-            createLifecycleError(
-              LifecycleErrorCode.generationSuperseded,
-              LifecycleErrorText.generationSupersededBeforeAdopt
-            )
+            attachErrorIdentity(
+              new Error(LifecycleErrorText.generationSupersededBeforeAdopt),
+              { source: LIFECYCLE_SOURCE, code: LifecycleErrorCode.generationSuperseded },
+              lifecycleIdentity
+            ) as ILifecycleError
           )
           containAsyncRejection(result, reportCallbackFailure)
         } catch (error) {
