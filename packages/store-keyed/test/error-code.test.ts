@@ -6,10 +6,10 @@ import {
 } from '../src/errors.ts'
 
 describe('store-keyed error-code contract', () => {
-  it('declares 10 unique codes under the package source', () => {
+  it('declares 11 unique codes under the package source', () => {
     const codes = Object.values(StoreKeyedErrorCode)
-    expect(codes).toHaveLength(10)
-    expect(new Set(codes).size).toBe(10)
+    expect(codes).toHaveLength(11)
+    expect(new Set(codes).size).toBe(11)
     expect(STORE_KEYED_SOURCE).toBe('store.keyed')
   })
 

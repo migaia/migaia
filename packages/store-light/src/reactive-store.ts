@@ -249,7 +249,9 @@ function createStoreCore<S extends Record<string, unknown>>(
   shape: IStoreDefinition<S>,
   options?: ICreateStoreOptions,
   /** Internal descriptor snapshot; prevents Proxy TOCTOU during strict creation. */
-  _descriptors?: Record<string, PropertyDescriptor>
+  _descriptors?: Record<string, PropertyDescriptor>,
+  /** Field builder modes already read once by a strict entry; reused instead of a second read. */
+  _modes?: ReadonlyMap<string, unknown>
 ): IReactiveStore<S> {
   /** Resolve an explicit owner first; cold imports and custom runtimes never request the default. */
   let runtime: IRuntime
@@ -547,19 +549,20 @@ function createStoreCore<S extends Record<string, unknown>>(
         /** Capture before later siblings can fail and abort this generation. */
         const signal = initSignal()
         /** Capture the public discriminant once; pre-discriminant builders are no longer supported. */
-        const mode = value.mode
+        const mode = _modes?.has(key) ? _modes.get(key) : value.mode
         if (mode !== StoreFieldMode.sync && mode !== StoreFieldMode.async)
           throw createStoreLightTypeError(
             StoreLightErrorCode.invalidOption,
             StoreLightErrorText.fieldBuilderMode
           )
         if (mode === StoreFieldMode.sync) {
+          // `mode` came from the strict entry's single read; this branch is the sync builder.
           const field = adoptField(
             value.create({
               runtime,
               signal,
               createSource: createTrackedFieldSource
-            })
+            }) as IDisposable
           )
           wasmFields.set(key, field)
           Object.defineProperty(store, key, {
@@ -977,19 +980,36 @@ export function createStore<S extends Record<string, unknown>>(
       { cause: error }
     )
   }
+  /** Each builder's mode, read exactly once here and reused by store construction. */
+  const modes = new Map<string, unknown>()
   for (const [key, descriptor] of Object.entries(descriptors)) {
-    if (
-      'value' in descriptor &&
-      isFieldBuilder(descriptor.value) &&
-      descriptor.value.mode !== StoreFieldMode.sync
-    ) {
+    if (!('value' in descriptor) || !isFieldBuilder(descriptor.value)) continue
+    /** One read of the builder's mode; a throwing getter is a shape error with the cause. */
+    let mode: unknown
+    try {
+      mode = descriptor.value.mode
+    } catch (error) {
+      throw createStoreLightError(
+        StoreLightErrorCode.invalidOption,
+        StoreLightErrorText.shapeInvalid,
+        {
+          cause: error
+        }
+      )
+    }
+    if (mode !== StoreFieldMode.sync)
       throw createStoreLightError(
         StoreLightErrorCode.syncFieldRequired,
         StoreLightErrorText.syncStoreField(key)
       )
-    }
+    modes.set(key, mode)
   }
   const snapshot = Object.create(Object.getPrototypeOf(shape)) as S
   Object.defineProperties(snapshot, descriptors)
-  return createStoreCore(snapshot as IStoreDefinition<S>, options, descriptors) as IReactiveStore<S>
+  return createStoreCore(
+    snapshot as IStoreDefinition<S>,
+    options,
+    descriptors,
+    modes
+  ) as IReactiveStore<S>
 }

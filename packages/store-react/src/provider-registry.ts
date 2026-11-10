@@ -79,7 +79,13 @@ function readRegistrationOwned(options: unknown, fallback: boolean): boolean {
     }
     return owned ?? fallback
   } catch (error) {
-    if (error instanceof Error && 'code' in error) throw error
+    // Only a complete own source/code identity passes through; anything else is INVALID_CONFIG.
+    if (
+      error instanceof Error &&
+      typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
+      typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
+    )
+      throw error
     throw createStoreReactError(
       StoreReactErrorCode.invalidConfig,
       StoreReactErrorText.ownedOption,

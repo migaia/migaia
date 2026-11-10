@@ -420,7 +420,7 @@ indexed snapshot keeps the collection's native shape, and replace follows that c
 
 keyed requires namespace and storage and offers its declared shared options. Its storage key is namespace + ':' + id. It cannot inventory an entire family; each handle owns persistence for one definition and key. handle.value is captured before hydration and is not the live AtomStore value, which must be read from AtomStore. Extending the real engine handle preserves its live disposed getter.
 
-clearFamily(storage, namespace) requires both arguments and returns `Promise<number>`. It enumerates storage.keys(), filters namespace + ':', and awaits removals in order. Its result counts matched enumerated keys rather than exclusive successful remove results. It neither clears AtomStore memory nor stops active handles, so later changes may recreate records. Logout that must also clear business values separately updates AtomStore and stops persistence as needed.
+clearFamily(storage, namespace) requires both arguments and returns `Promise<number>`. It enumerates storage.keys(), filters namespace + ':', and awaits removals in order. It covers text-channel entries only: persistKeyed entries that a codec wrote as binary archives are not enumerated and must be cleared separately. Its result counts matched enumerated keys rather than exclusive successful remove results. It neither clears AtomStore memory nor stops active handles, so later changes may recreate records. Logout that must also clear business values separately updates AtomStore and stops persistence as needed.
 
 ### Loading, migration, and local edits
 

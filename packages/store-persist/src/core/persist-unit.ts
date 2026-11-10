@@ -1,3 +1,4 @@
+import { runPersistCallback } from '../errors.ts'
 import { createAbortController, type IAbortController } from '@migaia/lifecycle'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
@@ -466,10 +467,11 @@ export function persistUnit<TState>(
               const snapshotRevision = changeRevision
               const envelope: IVersionedEnvelope<Partial<TState>> = {
                 version,
-                state: assertSynchronousCallbackResult(
-                  key,
-                  'partialize',
-                  partialize(unit.snapshot())
+                state: runPersistCallback(
+                  StorePersistErrorCode.encodeFailed,
+                  StorePersistErrorText.partializeFailed,
+                  () =>
+                    assertSynchronousCallbackResult(key, 'partialize', partialize(unit.snapshot()))
                 )
               }
               await writeEnvelopeWithStages(storage, key, codec, envelope, { signal }, codecStages)
@@ -581,7 +583,11 @@ export function persistUnit<TState>(
           const reconciled =
             extracted.merge === undefined
               ? mergePersistedPlainState(state, current, hydrationStartSnapshot)
-              : assertSynchronousCallbackResult(key, 'merge', merge(state, current))
+              : runPersistCallback(
+                  StorePersistErrorCode.mergeFailed,
+                  StorePersistErrorText.mergeFailed,
+                  () => assertSynchronousCallbackResult(key, 'merge', merge(state, current))
+                )
           unit.restore(reconciled)
         } finally {
           hydrating = false

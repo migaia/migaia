@@ -14,5 +14,7 @@ export const StoreDevtoolsErrorText = {
   invalidDepth: (name: string): string =>
     `[store] DevTools ${name} maxDepth must be a non-negative safe integer`,
   optionsObject: '[store] DevTools options must be an object',
+  /** RecordAction needs an object with a string `name`. */
+  actionInvalid: '[store] DevTools action must be an object with a string name',
   callbackOption: (name: string): string => `[store] DevTools ${name} must be a function`
 } as const

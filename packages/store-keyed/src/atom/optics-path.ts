@@ -141,8 +141,10 @@ export function computeUniqueKeys<T, Key>(
   label: string
 ): readonly Key[] {
   const seen = new Set<Key>()
-  const keys = items.map((item, index) => {
-    const key = keyOf(item, index)
+  /** A package-owned array; the caller's `map` is never invoked or returned. */
+  const keys: Key[] = []
+  for (let index = 0; index < items.length; index += 1) {
+    const key = keyOf(items[index]!, index)
     if (seen.has(key)) {
       throw createStoreKeyedError(
         StoreKeyedErrorCode.invalidOption,
@@ -150,8 +152,8 @@ export function computeUniqueKeys<T, Key>(
       )
     }
     seen.add(key)
-    return key
-  })
+    keys.push(key)
+  }
   return Object.freeze(keys)
 }
 

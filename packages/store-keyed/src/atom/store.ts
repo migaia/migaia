@@ -1,3 +1,4 @@
+import { runAtomCallback, toAtomCallbackFailure } from '../errors.ts'
 import {
   ReactiveErrorPhase,
   type IReactiveComputed,
@@ -327,7 +328,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
         previews.delete(definition as IAtomDefinition<unknown>)
         initial = preview.value as T
       } else {
-        initial = definition.create()
+        initial = runAtomCallback(() => definition.create())
         assertNotThenable(initial, 'atomDefFactory create()')
       }
       const node = nodeRuntime.signal(initial, {
@@ -397,10 +398,14 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
         // leave a runtime-owned instance behind until store disposal. The
         // factory itself is still necessarily invoked; callers should keep
         // primitive factories side-effect free and cheap.
-        value = target.create()
+        value = runAtomCallback(() => target.create())
         assertNotThenable(value, 'atomDefFactory create()')
       } else {
-        value = target.read((dependency) => previewDefinition(dependency))
+        try {
+          value = target.read((dependency) => previewDefinition(dependency))
+        } catch (error) {
+          throw toAtomCallbackFailure(error)
+        }
       }
       if (
         cached &&

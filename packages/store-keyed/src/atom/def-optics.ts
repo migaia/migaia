@@ -186,7 +186,9 @@ export function splitDef<T, Key = number>(
     },
     prune(store) {
       const list = store.get(source)
-      const active = new Set(list.map((item, index) => keyOf(item, index)))
+      /** Keys collected with an index loop; the caller's `map` is never invoked. */
+      const active = new Set<Key>()
+      for (let index = 0; index < list.length; index += 1) active.add(keyOf(list[index]!, index))
       return cache.prune((key) => active.has(key))
     }
   }

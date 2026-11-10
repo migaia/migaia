@@ -210,6 +210,9 @@ export function array(
                 }
               })
             } catch (primary) {
+              // An observer may have disposed this field during the flush; its block is released, so
+              // rollback must not write through a stale pointer.
+              if (disposed) throw primary
               try {
                 const currentView = raw()
                 for (const writes of Array.from(touched.values()).reverse()) {

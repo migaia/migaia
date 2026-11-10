@@ -83,7 +83,12 @@ export const StoreKeyedErrorCode = {
    *
    * Correct the input named in the error message.
    */
-  invalidOption: 'INVALID_OPTION'
+  invalidOption: 'INVALID_OPTION',
+  /**
+   * An atom factory's `create()` or a derived atom's `read` callback threw. The callback's error is
+   * on `cause`; errors that already carry their own source and code pass through unchanged.
+   */
+  callbackFailed: 'CALLBACK_FAILED'
 } as const
 
 export type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]

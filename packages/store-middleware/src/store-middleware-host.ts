@@ -324,7 +324,14 @@ function createStoreMiddlewareHostCore<S>(
             StoreMiddlewareErrorText.adapterInvalid
           )
       } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error) throw error
+        // Only a complete own source/code identity passes through unchanged.
+        if (
+          error !== null &&
+          typeof error === 'object' &&
+          typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
+          typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
+        )
+          throw error
         throw createStoreMiddlewareError(
           StoreMiddlewareErrorCode.invalidOption,
           StoreMiddlewareErrorText.adapterInvalid,
@@ -571,7 +578,8 @@ export function bindStoreMiddleware<S extends Record<string, unknown>>(
         StoreMiddlewareErrorText.cleanupFailed
       )
     }
-    throw error
+    // Rollback succeeded; the setup failure still leaves with the middleware identity.
+    throw identifyMiddlewareFailure(error)
   }
   // The Store reference was installed before this same canonical handle was frozen and registered.
   return host as IStoreMiddlewareBinding<S>

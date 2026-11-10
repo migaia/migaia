@@ -7,7 +7,8 @@ export const StoreSharedErrorText = {
   lockUnacquired:
     '[store] shared cell lock was not acquired before the contention limit; another writer may still be active or may have abandoned it',
   int32: (what: string, value: unknown): string =>
-    `[store] ${what} must be an int32, received ${String(value)}`,
+    // Only numbers are printed; other values are named by type so no caller coercion hook runs.
+    `[store] ${what} must be an int32, received ${typeof value === 'number' ? String(value) : typeof value}`,
   waitAsyncUnavailable:
     '[store] Atomics.waitAsync is unavailable; pump sync() from your own message loop instead',
   signalBufferSmall: '[store] shared signal buffer is too small',

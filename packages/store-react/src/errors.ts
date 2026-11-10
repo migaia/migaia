@@ -37,28 +37,37 @@ export function createStoreReactAggregateError(
   return tagStoreReactError(new AggregateError(errors, message), code)
 }
 
-/** Classifies owned cleanup failures, preserving native identity or the original through cause. */
-export function identifyRegistryDisposalFailure(error: unknown): Error {
+/**
+ * Gives a boundary failure the package identity. A complete foreign identity is kept; an uncoded
+ * native error gets `code` attached in place (type, stack and identity unchanged); any other value
+ * is wrapped with the original on `cause`.
+ */
+export function identifyStoreReactFailure(
+  error: unknown,
+  code: IStoreReactErrorCode,
+  text: string
+): Error {
   if (isNativeErrorValue(error)) {
     try {
       /** Inspect identity without invoking application-owned metadata accessors. */
       const source = Object.getOwnPropertyDescriptor(error, 'source')
       /** Complete foreign identities keep their semantic package owner. */
-      const code = Object.getOwnPropertyDescriptor(error, 'code')
-      if (typeof source?.value === 'string' && typeof code?.value === 'string') return error
-      if (!source && !code && Object.isExtensible(error))
-        return tagStoreReactError(error, StoreReactErrorCode.registryDisposalFailed)
+      const existingCode = Object.getOwnPropertyDescriptor(error, 'code')
+      if (typeof source?.value === 'string' && typeof existingCode?.value === 'string') return error
+      if (!source && !existingCode && Object.isExtensible(error))
+        return tagStoreReactError(error, code)
     } catch (metadataError) {
-      return createStoreReactAggregateError(
-        StoreReactErrorCode.registryDisposalFailed,
-        [error, metadataError],
-        StoreReactErrorText.registryDisposalFailed
-      )
+      return createStoreReactAggregateError(code, [error, metadataError], text)
     }
   }
-  return createStoreReactError(
+  return createStoreReactError(code, text, { cause: error })
+}
+
+/** Classifies owned cleanup failures, preserving native identity or the original through cause. */
+export function identifyRegistryDisposalFailure(error: unknown): Error {
+  return identifyStoreReactFailure(
+    error,
     StoreReactErrorCode.registryDisposalFailed,
-    StoreReactErrorText.registryDisposalFailed,
-    { cause: error }
+    StoreReactErrorText.registryDisposalFailed
   )
 }

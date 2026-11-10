@@ -155,7 +155,7 @@ On the client, RegistryBoundary retains in an effect and releases in cleanup. Th
 | fallback?:ReactNode                                     | null; displayed while pending rather than retaining old children                                        |
 | defaults.warnAsyncActions?:boolean                      | false; a configuration snapshot only, not automatically passed to createStore                           |
 
-An IStoreReadyBarrier factory is `()=>Promise<unknown> or unknown`. Normalization invokes it synchronously and admits its result with Promise.resolve. All barriers must fulfill before children render. Rejection is thrown during render for an outer Error Boundary; the Provider supplies no error UI. An Error reason retains its identity, including frozen Errors. A non-Error reason becomes READY_REJECTED with the original cause, without string coercion. Any equivalent initialization barrier can satisfy features.wasm; store-wasm's ensureWasm is an optional composition.
+An IStoreReadyBarrier factory is `()=>Promise<unknown> or unknown`. Normalization invokes it synchronously and admits its result with Promise.resolve. All barriers must fulfill before children render. Rejection is thrown during render for an outer Error Boundary; the Provider supplies no error UI. An uncoded Error reason keeps its identity and gets READY_REJECTED attached; an Error that already has a source and code is unchanged. A non-Error reason, or a frozen Error that cannot be tagged, becomes READY_REJECTED with the original on cause, without string coercion. Any equivalent initialization barrier can satisfy features.wasm; store-wasm's ensureWasm is an optional composition.
 
 Within one Provider/barrierScope, the same ready array identity reuses its list Promise. A new array creates another readiness generation and ReadyBoundary even with the same entries; old completion cannot unlock it. Factory results have a separate scope+factory cache: pending/successful results can be shared by different lists, while failure removes that factory's cache entry. Reusing the old array still reuses its cached rejected list Promise. A new array alone does not necessarily rerun a successful factory. Different Providers/request scopes remain isolated. Factory execution is not guaranteed exactly once across abandoned renders; an application owner should supply a stable Promise for non-idempotent initialization.
 
@@ -250,17 +250,17 @@ remove, replace, and register's returned disposer perform separate per-entry cle
 
 ### Errors and migration
 
-| StoreReactErrorCode property | code                     | Situation                                                  |
-| ---------------------------- | ------------------------ | ---------------------------------------------------------- |
-| registryDisposed             | REGISTRY_DISPOSED        | Registry admission or query after closing/terminal         |
-| registryDisposalFailed       | REGISTRY_DISPOSAL_FAILED | Owned cleanup failure                                      |
-| providerRequired             | PROVIDER_REQUIRED        | Provider-only hook or feature assertion without a Provider |
-| featureDisabled              | FEATURE_DISABLED         | Feature not explicitly enabled                             |
-| storeMissing                 | STORE_MISSING            | require of an unregistered token                           |
-| storeDuplicate               | STORE_DUPLICATE          | Duplicate register for one token                           |
-| crossRuntime                 | CROSS_RUNTIME            | Cross-graph injection into a Registry                      |
-| invalidConfig                | INVALID_CONFIG           | Invalid token/Provider/owned/ready/feature configuration   |
-| readyRejected                | READY_REJECTED           | Wrapper for a non-Error readiness rejection reason         |
+| StoreReactErrorCode property | code                     | Situation                                                                      |
+| ---------------------------- | ------------------------ | ------------------------------------------------------------------------------ |
+| registryDisposed             | REGISTRY_DISPOSED        | Registry admission or query after closing/terminal                             |
+| registryDisposalFailed       | REGISTRY_DISPOSAL_FAILED | Owned cleanup failure                                                          |
+| providerRequired             | PROVIDER_REQUIRED        | Provider-only hook or feature assertion without a Provider                     |
+| featureDisabled              | FEATURE_DISABLED         | Feature not explicitly enabled                                                 |
+| storeMissing                 | STORE_MISSING            | require of an unregistered token                                               |
+| storeDuplicate               | STORE_DUPLICATE          | Duplicate register for one token                                               |
+| crossRuntime                 | CROSS_RUNTIME            | Cross-graph injection into a Registry                                          |
+| invalidConfig                | INVALID_CONFIG           | Invalid token/Provider/owned/ready/feature configuration                       |
+| readyRejected                | READY_REJECTED           | Readiness rejection: attached to an uncoded Error, or wraps a non-Error reason |
 
 STORE_REACT_SOURCE is `'store.react'`. Errors created here carry source/code; foreign identities and underlying reactive ownership failures retain their actual owner. `createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` returns native Error. options defaults to undefined and forwards cause when it is not undefined. `createStoreReactAggregateError(code,errors:readonly unknown[],message)` returns native AggregateError. Arguments are required as shown, and both factories construct without automatically throwing, attach nonwritable source/code, and preserve stack and errors/cause chains.
 

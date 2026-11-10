@@ -35,14 +35,17 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
-    "@migaia/reactive": "workspace:^",
     "@migaia/store-light": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/reactive": "workspace:0.0.9",
     "@playwright/test": "^1.62.1",
     "typescript": "^7.0.2",
     "vite": "8.1.1",
     "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/reactive": "0.0.9"
   }
 }

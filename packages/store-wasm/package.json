@@ -33,13 +33,17 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
-    "@migaia/reactive": "workspace:^",
     "@migaia/store-light": "workspace:^",
-    "@migaia/utils": "workspace:^",
-    "@migaia/wasm": "workspace:^"
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/reactive": "workspace:0.0.9",
+    "@migaia/wasm": "workspace:0.1.3",
     "typescript": "^7.0.2",
     "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/reactive": "0.0.9",
+    "@migaia/wasm": "0.1.3"
   }
 }

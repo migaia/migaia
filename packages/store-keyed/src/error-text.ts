@@ -1,5 +1,7 @@
 /** Stable public diagnostics owned by `@migaia/store-keyed`. */
 export const StoreKeyedErrorText = {
+  /** An atom create/read callback threw; its error is on cause. */
+  callbackFailed: '[store] atom callback failed',
   weakRef:
     '[store] family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox',
   familyCapacity: '[store] family maxSize must be a positive integer',

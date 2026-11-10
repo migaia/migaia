@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createRuntime, type IRuntime } from '@migaia/reactive'
 import { StoreRegistryContext } from './provider-context.ts'
 import { createStoreRegistry, type StoreRegistry } from './provider-registry.ts'
-import { createStoreReactError } from './errors.ts'
+import { createStoreReactError, identifyStoreReactFailure } from './errors.ts'
 import { StoreReactErrorCode } from './error-code.ts'
 import { StoreReactErrorText } from './error-text.ts'
 import { StoreProviderState } from './provider-state-constants.ts'
@@ -25,13 +25,16 @@ function readyKey(promise: Promise<void>): number {
   return key
 }
 
-/** Normalizes a ready rejection without coercing hostile reasons or replacing Error identity. */
+/**
+ * Normalizes a ready rejection without coercing hostile reasons. An uncoded Error keeps its
+ * identity and gets READY_REJECTED attached; a non-error reason is wrapped with it on `cause`.
+ */
 export function normalizeStoreReadyError(reason: unknown): Error {
-  return reason instanceof Error
-    ? reason
-    : createStoreReactError(StoreReactErrorCode.readyRejected, StoreReactErrorText.readyRejected, {
-        cause: reason
-      })
+  return identifyStoreReactFailure(
+    reason,
+    StoreReactErrorCode.readyRejected,
+    StoreReactErrorText.readyRejected
+  )
 }
 
 /** Provider inputs separating registry ownership, Runtime selection and optional readiness gating. */

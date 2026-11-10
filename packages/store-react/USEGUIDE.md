@@ -378,7 +378,7 @@ Provider 从不销毁 Runtime，disposeOnUnmount 控制的是 Registry 及其 at
 | fallback?:ReactNode                                     | null；屏障 pending 时渲染占位，不保留旧 children                 |
 | defaults.warnAsyncActions?:boolean                      | false；仅配置快照，不自动传给 createStore                        |
 
-IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。
+IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。
 
 同一 Provider/barrierScope、同一 ready 数组身份复用列表 Promise；新数组产生新就绪代，即使元素相同也重建 ReadyBoundary，旧代完成不能放行新代。工厂结果另按 scope+factory 身份缓存，在途/成功结果可跨列表复用，失败后删除工厂缓存，但同一旧数组仍复用已缓存的失败列表 Promise；单换数组不保证重新运行已成功的工厂。不同 Provider/请求 scope 隔离。abandoned render 之间不保证工厂恰好运行一次；非幂等初始化应由应用 owner 提供稳定 Promise。
 
@@ -473,17 +473,17 @@ remove、replace 和 register 返回的注销函数触发的是单项清理：�
 
 ### 错误与迁移
 
-| StoreReactErrorCode 属性 | code                     | 场景                                         |
-| ------------------------ | ------------------------ | -------------------------------------------- |
-| registryDisposed         | REGISTRY_DISPOSED        | Registry closing/terminal 后继续接纳或查询   |
-| registryDisposalFailed   | REGISTRY_DISPOSAL_FAILED | owned 清理失败                               |
-| providerRequired         | PROVIDER_REQUIRED        | Provider-only hook/feature 断言没有 Provider |
-| featureDisabled          | FEATURE_DISABLED         | 特性未显式开启                               |
-| storeMissing             | STORE_MISSING            | require token 尚未注册                       |
-| storeDuplicate           | STORE_DUPLICATE          | 同 token 重复 register                       |
-| crossRuntime             | CROSS_RUNTIME            | Registry 注入跨图值                          |
-| invalidConfig            | INVALID_CONFIG           | token/Provider/owned/ready/feature 配置无效  |
-| readyRejected            | READY_REJECTED           | 非 Error ready 拒绝原因的包装                |
+| StoreReactErrorCode 属性 | code                     | 场景                                                     |
+| ------------------------ | ------------------------ | -------------------------------------------------------- |
+| registryDisposed         | REGISTRY_DISPOSED        | Registry closing/terminal 后继续接纳或查询               |
+| registryDisposalFailed   | REGISTRY_DISPOSAL_FAILED | owned 清理失败                                           |
+| providerRequired         | PROVIDER_REQUIRED        | Provider-only hook/feature 断言没有 Provider             |
+| featureDisabled          | FEATURE_DISABLED         | 特性未显式开启                                           |
+| storeMissing             | STORE_MISSING            | require token 尚未注册                                   |
+| storeDuplicate           | STORE_DUPLICATE          | 同 token 重复 register                                   |
+| crossRuntime             | CROSS_RUNTIME            | Registry 注入跨图值                                      |
+| invalidConfig            | INVALID_CONFIG           | token/Provider/owned/ready/feature 配置无效              |
+| readyRejected            | READY_REJECTED           | ready 拒绝：附加到未带码的 Error 上，非 Error 原因则包装 |
 
 STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。
 

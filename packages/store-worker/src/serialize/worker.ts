@@ -1,3 +1,4 @@
+import { reportUnhandledError } from '@migaia/utils/error'
 /**
  * Bridge borrowed serializers through Worker RPC with the original credit, iterator and disposal
  * owners.
@@ -227,7 +228,17 @@ class WorkerFrameQueue implements IWorkerFrameQueue {
       } else this.#chunks.push({ chunk: frame.chunk, sequence: frame.sequence })
       return
     }
-    this.finish()
+    // Only an explicit end frame ends the stream; any other kind is a malformed response.
+    if (frame.kind === WorkerSerializeFrameKind.end) {
+      this.finish()
+      return
+    }
+    this.fail(
+      createStoreWorkerError(
+        StoreWorkerErrorCode.invalidResponseChunk,
+        StoreWorkerErrorText.invalidChunk
+      )
+    )
   }
 
   /** Preserve the first terminal failure and settle current waiters. */
@@ -520,24 +531,28 @@ class WorkerParser implements ISerializeParser {
 
   /** Consumer return sends the original cancellation frame after the same endpoint readiness. */
   #cancelStream(streamId: string): void {
-    void this.#client.then((endpoint) => {
-      if (this.#disposePromise !== undefined) return
-      return endpoint.notify(
-        { streamId, kind: WorkerSerializeFrameKind.cancel, sequence: -1 },
-        WorkerSerializeFrameMethod
-      )
-    })
+    void this.#client
+      .then((endpoint) => {
+        if (this.#disposePromise !== undefined) return
+        return endpoint.notify(
+          { streamId, kind: WorkerSerializeFrameKind.cancel, sequence: -1 },
+          WorkerSerializeFrameMethod
+        )
+      })
+      .then(undefined, reportUnhandledError)
   }
 
   /** Consuming one original sequence returns exactly one remote credit. */
   #acknowledgeStream(streamId: string, sequence: number): void {
-    void this.#client.then((endpoint) => {
-      if (this.#disposePromise !== undefined) return
-      return endpoint.notify(
-        { streamId, kind: WorkerSerializeFrameKind.ack, sequence },
-        WorkerSerializeFrameMethod
-      )
-    })
+    void this.#client
+      .then((endpoint) => {
+        if (this.#disposePromise !== undefined) return
+        return endpoint.notify(
+          { streamId, kind: WorkerSerializeFrameKind.ack, sequence },
+          WorkerSerializeFrameMethod
+        )
+      })
+      .then(undefined, reportUnhandledError)
   }
 
   /** Fail streams, close the endpoint, then attempt explicitly owned physical termination. */

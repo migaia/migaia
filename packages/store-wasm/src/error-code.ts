@@ -46,9 +46,10 @@ export const StoreWasmErrorCode = {
   invalidOption: 'INVALID_OPTION',
 
   /**
-   * Reports multiple owned-resource cleanup failures during field release or construction rollback.
-   * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution
-   * order.
+   * Reports owned-resource cleanup failures during field release or construction rollback. Several
+   * release failures arrive as an `AggregateError` whose `errors` keep execution order. When a
+   * construction step fails and its rollback also fails, the uncoded construction error itself
+   * carries this code with the rollback failure on its `errors`.
    */
   cleanupFailed: 'CLEANUP_FAILED',
 

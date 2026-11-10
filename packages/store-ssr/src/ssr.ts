@@ -45,7 +45,8 @@ function readRegistrationOwned(options: unknown): boolean {
     }
     return owned ?? true
   } catch (error) {
-    if (error instanceof Error && 'code' in error) throw error
+    // Only an error with its own complete source/code identity passes through unchanged.
+    if (hasCompleteIdentity(error)) throw error
     throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.ownedOption, {
       cause: error
     })
@@ -559,7 +560,7 @@ export class SSRRequestScope {
     options: IAwaitResourcesOptions = {}
   ): Promise<readonly ISSRResourceFailure[]> {
     this.#assertActive()
-    const timeoutMs = assertTimeoutMs(options.timeoutMs)
+    const timeoutMs = assertTimeoutMs(readSsrOption(options, 'timeoutMs'))
     const failures: ISSRResourceFailure[] = []
     // 记录每个 key 上一次被等待的 promise 身份；getter 抛错的 key 记一个
     // 哨兵值，避免同一个持续抛错的 key 每轮重复报错。
@@ -816,7 +817,9 @@ export function createSSRRequestScope(options: ISSRRequestScopeOptions = {}): SS
  */
 export function serializeSSRState(state: ISSRState): string {
   assertSSRState(state)
-  return escapeJSONForHTML(JSON.stringify(state))
+  // Stringify a plain copy of the validated data, so a hidden toJSON on the original cannot
+  // substitute data that validation never saw.
+  return escapeJSONForHTML(JSON.stringify(jsonValueToUnknown(state as unknown as IJSONValue)))
 }
 
 /**
@@ -961,7 +964,7 @@ export async function createSSRStateScriptWith(
   options: ISSRScriptOptions
 ): Promise<string> {
   assertOptionObject(options)
-  const { codecs, elementId = '__STORE_STATE__', signal } = options
+  const { codecs, elementId = '__STORE_STATE__', signal } = snapshotSsrOptions(options)
   assertElementId(elementId)
   assertSSRState(state)
 
@@ -1012,7 +1015,12 @@ export async function readSSRStateFromDocumentWith(
   options: ISSRReadOptions
 ): Promise<ISSRState | undefined> {
   assertOptionObject(options)
-  const { codecs, elementId = '__STORE_STATE__', document: documentValue, signal } = options
+  const {
+    codecs,
+    elementId = '__STORE_STATE__',
+    document: documentValue,
+    signal
+  } = snapshotSsrOptions(options)
   const element = documentValue?.getElementById(elementId)
   const text = element?.textContent
   if (!text) return undefined
@@ -1208,10 +1216,13 @@ function walkJSONValue<T>(
   seen.add(value)
   try {
     if (Array.isArray(value)) {
-      const entries = value.map((entry, index) =>
-        walkJSONValue(entry, `${path}[${index}]`, seen, walker, depth + 1, state)
-      )
-      return walker.array(entries)
+      /** Index loop; the caller's own `map` is never invoked. */
+      const entries: unknown[] = []
+      for (let index = 0; index < value.length; index += 1)
+        entries.push(
+          walkJSONValue(value[index], `${path}[${index}]`, seen, walker, depth + 1, state)
+        )
+      return walker.array(entries as never)
     }
     if (!isPlainObject(value)) {
       throw createStoreSsrTypeError(
@@ -1309,10 +1320,50 @@ function jsonObjectToUnknownRecord(
 
 function jsonValueToUnknown(value: IJSONValue): unknown {
   if (value === null || typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map(jsonValueToUnknown)
+  if (Array.isArray(value)) {
+    /** Index loop; the caller's own `map` is never invoked. */
+    const items: unknown[] = []
+    for (let index = 0; index < value.length; index += 1)
+      items.push(jsonValueToUnknown(value[index]!))
+    return items
+  }
   const result: Record<string, unknown> = Object.create(null)
   for (const [key, entry] of readSnapshotEntries(value, 'value')) {
     result[key] = jsonValueToUnknown(entry as IJSONValue)
   }
   return result
+}
+
+/** True when an error carries both `source` and `code` as own string data properties. */
+function hasCompleteIdentity(error: unknown): boolean {
+  if (error === null || (typeof error !== 'object' && typeof error !== 'function')) return false
+  return (
+    typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
+    typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
+  )
+}
+
+/**
+ * Copy public options once; a throwing getter becomes INVALID_OPTION with the getter error on
+ * cause.
+ */
+function snapshotSsrOptions<T extends object>(options: T): T {
+  try {
+    return { ...options }
+  } catch (error) {
+    throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.optionsObject, {
+      cause: error
+    })
+  }
+}
+
+/** Read one public option; a throwing getter becomes INVALID_OPTION with the getter error on cause. */
+function readSsrOption<T extends object, K extends keyof T>(options: T, key: K): T[K] {
+  try {
+    return options[key]
+  } catch (error) {
+    throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.optionsObject, {
+      cause: error
+    })
+  }
 }

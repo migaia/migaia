@@ -20,7 +20,8 @@ import { StoreWasmErrorText } from './error-text.ts'
 const DEFAULT_MAX_BYTES = 256
 const MAX_STRING_BYTES = 0xffff_ffff - Uint32Array.BYTES_PER_ELEMENT
 const encoder = new TextEncoder()
-const decoder = new TextDecoder()
+// ignoreBOM keeps a leading U+FEFF that TextEncoder wrote, so every string round-trips exactly.
+const decoder = new TextDecoder(undefined, { ignoreBOM: true })
 
 /** Owned fixed-capacity UTF-8 field; capacity is a byte bound, not a JavaScript character count. */
 export type IWasmStringField = IDisposable & {

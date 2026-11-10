@@ -140,13 +140,37 @@ export function normalizeStoreConfig(
       return false
     }
   }
-  if (
-    barriers !== undefined &&
-    (!Array.isArray(barriers) || barriers.some((barrier) => !validBarrier(barrier)))
-  ) {
-    throw createStoreReactError(StoreReactErrorCode.invalidConfig, StoreReactErrorText.readyInvalid)
+  /** Package-owned copy of the barriers; the caller's array methods are never invoked. */
+  const normalizedBarriers: IStoreReadyBarrier[] = []
+  if (barriers !== undefined) {
+    try {
+      if (!Array.isArray(barriers))
+        throw createStoreReactError(
+          StoreReactErrorCode.invalidConfig,
+          StoreReactErrorText.readyInvalid
+        )
+      for (let index = 0; index < barriers.length; index += 1) {
+        /** One read of each barrier slot. */
+        const barrier = barriers[index]
+        if (!validBarrier(barrier))
+          throw createStoreReactError(
+            StoreReactErrorCode.invalidConfig,
+            StoreReactErrorText.readyInvalid
+          )
+        normalizedBarriers.push(barrier as IStoreReadyBarrier)
+      }
+    } catch (error) {
+      // A revoked Proxy or throwing slot getter becomes INVALID_CONFIG with the error on cause.
+      if (hasCompleteIdentity(error)) throw error
+      throw createStoreReactError(
+        StoreReactErrorCode.invalidConfig,
+        StoreReactErrorText.readyInvalid,
+        {
+          cause: error
+        }
+      )
+    }
   }
-  const normalizedBarriers = barriers ?? []
 
   const effectiveBarriers =
     wasm && normalizedBarriers.length === 0
@@ -164,7 +188,16 @@ export function normalizeStoreConfig(
   const ready =
     effectiveBarriers.length === 0
       ? null
-      : trackReady(getReadyPromise(effectiveBarriers, barrierScope))
+      : trackReady(
+          getReadyPromise(
+            effectiveBarriers,
+            barrierScope,
+            // The cache stays keyed by the caller's array identity across renders.
+            barriers !== undefined && normalizedBarriers.length > 0
+              ? (barriers as object)
+              : effectiveBarriers
+          )
+        )
 
   return {
     features: { wasm, experimental },
@@ -177,18 +210,22 @@ export function normalizeStoreConfig(
 
 const READY_PROMISES = new WeakMap<object, WeakMap<object, Promise<void>>>()
 
-function getReadyPromise(barriers: readonly IStoreReadyBarrier[], scope: object): Promise<void> {
+function getReadyPromise(
+  barriers: readonly IStoreReadyBarrier[],
+  scope: object,
+  key: object
+): Promise<void> {
   let scoped = READY_PROMISES.get(scope)
   if (!scoped) {
     scoped = new WeakMap()
     READY_PROMISES.set(scope, scoped)
   }
-  const cached = scoped.get(barriers as object)
+  const cached = scoped.get(key)
   if (cached) return cached
   const promise = Promise.all(barriers.map((barrier) => runBarrier(barrier, scope))).then(
     () => undefined
   )
-  scoped.set(barriers as object, promise)
+  scoped.set(key, promise)
   return promise
 }
 
@@ -362,4 +399,13 @@ export function useStoreFeature(path: IStoreFeaturePath): boolean {
 export function useAssertStoreFeature(path: IStoreFeaturePath, apiName?: string): void {
   const config = useStoreConfig()
   assertStoreFeature(config, path, apiName)
+}
+
+/** True when an error carries both `source` and `code` as own string data properties. */
+function hasCompleteIdentity(error: unknown): boolean {
+  if (error === null || (typeof error !== 'object' && typeof error !== 'function')) return false
+  return (
+    typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
+    typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
+  )
 }

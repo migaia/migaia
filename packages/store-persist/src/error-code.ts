@@ -46,7 +46,7 @@ export const StorePersistErrorCode = {
 
   /**
    * The JSON codec fails to serialize a value, or an uncoded snapshot, partialize or codec failure
-   * occurs inside an admitted transactional flush.
+   * occurs, either inside an admitted transactional flush or on the ordinary write path.
    *
    * Check whether the value is JSON-serializable. The original exception remains in `cause`.
    */
@@ -76,7 +76,14 @@ export const StorePersistErrorCode = {
    *
    * Correct the configuration before retrying. This is a permanent input error.
    */
-  invalidOption: 'INVALID_OPTION'
+  invalidOption: 'INVALID_OPTION',
+
+  /**
+   * A custom `merge` callback threw while reconciling hydrated state with the current state. The
+   * store keeps its current state and `hydrationError` holds this error; the callback's error is on
+   * `cause`.
+   */
+  mergeFailed: 'MERGE_FAILED'
 } as const
 
 /** Stable values declared by StorePersistErrorCode for locally identified failures. */

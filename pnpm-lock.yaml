@@ -1289,9 +1289,6 @@ importers:
 
   packages/store-indexed:
     dependencies:
-      '@migaia/reactive':
-        specifier: workspace:^
-        version: link:../reactive
       '@migaia/store-light':
         specifier: workspace:^
         version: link:../store-light
@@ -1299,6 +1296,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/reactive':
+        specifier: workspace:0.0.9
+        version: link:../reactive
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.62.1
@@ -1522,19 +1522,19 @@ importers:
 
   packages/store-wasm:
     dependencies:
-      '@migaia/reactive':
-        specifier: workspace:^
-        version: link:../reactive
       '@migaia/store-light':
         specifier: workspace:^
         version: link:../store-light
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
-      '@migaia/wasm':
-        specifier: workspace:^
-        version: link:../wasm
     devDependencies:
+      '@migaia/reactive':
+        specifier: workspace:0.0.9
+        version: link:../reactive
+      '@migaia/wasm':
+        specifier: workspace:0.1.3
+        version: link:../wasm
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

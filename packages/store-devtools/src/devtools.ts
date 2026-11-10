@@ -163,38 +163,15 @@ export function getDependencyTree(
   assertDepth(maxDepth, 'dependency tree')
   /** Runtime factories return the existing observer node behind the narrow public handle. */
   const observer = root as IObserver
-  const path = new Set<object>()
-  const visitObservable = (current: IObservable, depth: number): IDependencyTreeNode => {
-    const node: IDependencyTreeNode = {
-      kind: StoreDevtoolsNodeKind.observable,
-      label: nodeLabel(current),
-      version: current.version,
-      children: []
-    }
-    // 成环的那个节点自己带上标记——早期版本只取下游的 children，circular 被顺手丢掉了
-    if (path.has(current)) {
-      node.circular = true
-      return node
-    }
-    if (depth >= maxDepth || !('deps' in current)) return node
-    path.add(current)
-    try {
-      node.children = [...(current as IObservable & IObserver).deps].map((dependency) =>
-        visitObservable(dependency, depth + 1)
-      )
-    } finally {
-      path.delete(current)
-    }
-    return node
-  }
-  path.add(observer)
-  return {
+  /** Root node; children are expanded with an explicit stack, not the JavaScript call stack. */
+  const tree: IDependencyTreeNode = {
     kind: StoreDevtoolsNodeKind.observer,
     label: nodeLabel(observer),
-    children: depth0Exceeds(0, maxDepth)
-      ? []
-      : [...observer.deps].map((dependency) => visitObservable(dependency, 1))
+    children: []
   }
+  if (!depth0Exceeds(0, maxDepth))
+    expandTree(tree, observer, [...observer.deps], maxDepth, dependencyNode, dependenciesOf)
+  return tree
 }
 
 /**
@@ -210,37 +187,102 @@ export function getObserverTree(
   assertDepth(maxDepth, 'observer tree')
   /** Runtime factories return the existing observable node behind the narrow public handle. */
   const observable = root as IObservable
-  const path = new Set<object>()
-  const visitObserver = (current: IObserver, depth: number): IDependencyTreeNode => {
-    const node: IDependencyTreeNode = {
-      kind: StoreDevtoolsNodeKind.observer,
-      label: nodeLabel(current),
-      children: []
-    }
-    if (path.has(current)) {
-      node.circular = true
-      return node
-    }
-    if (depth >= maxDepth || !('subs' in current)) return node
-    path.add(current)
-    try {
-      node.children = [...(current as IObserver & IObservable).subs].map((subscriber) =>
-        visitObserver(subscriber, depth + 1)
-      )
-    } finally {
-      path.delete(current)
-    }
-    return node
-  }
-  path.add(observable)
-  return {
+  /** Root node; children are expanded with an explicit stack, not the JavaScript call stack. */
+  const tree: IDependencyTreeNode = {
     kind: StoreDevtoolsNodeKind.observable,
     label: nodeLabel(observable),
     version: observable.version,
-    children: depth0Exceeds(0, maxDepth)
-      ? []
-      : [...observable.subs].map((subscriber) => visitObserver(subscriber, 1))
+    children: []
   }
+  if (!depth0Exceeds(0, maxDepth))
+    expandTree(tree, observable, [...observable.subs], maxDepth, subscriberNode, subscribersOf)
+  return tree
+}
+
+/** One node being expanded: its tree node, graph object, child list and next child to visit. */
+type ITreeFrame = {
+  readonly node: IDependencyTreeNode
+  readonly owner: object
+  readonly children: readonly object[]
+  readonly depth: number
+  next: number
+}
+
+/**
+ * Expand a graph tree depth-first with an explicit stack. Shared nodes are expanded once per path,
+ * a node already on the current path is marked circular and not expanded, and nodes at maxDepth
+ * stay leaves. Supported depth no longer depends on the JavaScript call-stack size.
+ */
+function expandTree(
+  root: IDependencyTreeNode,
+  rootOwner: object,
+  rootChildren: readonly object[],
+  maxDepth: number,
+  createNode: (owner: object) => IDependencyTreeNode,
+  childrenOf: (owner: object) => readonly object[] | undefined
+): void {
+  /** Graph objects on the current root-to-node path. */
+  const path = new Set<object>([rootOwner])
+  /** Frames still being expanded; the last one is the current node. */
+  const stack: ITreeFrame[] = [
+    { node: root, owner: rootOwner, children: rootChildren, depth: 0, next: 0 }
+  ]
+  while (stack.length > 0) {
+    /** Node whose next child is visited now. */
+    const frame = stack[stack.length - 1]!
+    if (frame.next >= frame.children.length) {
+      path.delete(frame.owner)
+      stack.pop()
+      continue
+    }
+    /** Next child graph object of the current node. */
+    const child = frame.children[frame.next++]!
+    /** Tree node for that child. */
+    const node = createNode(child)
+    frame.node.children.push(node)
+    if (path.has(child)) {
+      node.circular = true
+      continue
+    }
+    /** Depth of `child` below the root. */
+    const depth = frame.depth + 1
+    /** The child's own children, or undefined when it is a leaf at this depth. */
+    const grandchildren = depth >= maxDepth ? undefined : childrenOf(child)
+    if (grandchildren === undefined) continue
+    path.add(child)
+    stack.push({ node, owner: child, children: grandchildren, depth, next: 0 })
+  }
+}
+
+/** Tree node for one dependency (an observable) in a dependency tree. */
+function dependencyNode(owner: object): IDependencyTreeNode {
+  /** The dependency graph object. */
+  const current = owner as IObservable
+  return {
+    kind: StoreDevtoolsNodeKind.observable,
+    label: nodeLabel(current),
+    version: current.version,
+    children: []
+  }
+}
+
+/** Dependencies of a dependency that is itself an observer; undefined for a plain source. */
+function dependenciesOf(owner: object): readonly object[] | undefined {
+  return 'deps' in owner ? [...(owner as IObservable & IObserver).deps] : undefined
+}
+
+/** Tree node for one subscriber (an observer) in an observer tree. */
+function subscriberNode(owner: object): IDependencyTreeNode {
+  return {
+    kind: StoreDevtoolsNodeKind.observer,
+    label: nodeLabel(owner as IObserver),
+    children: []
+  }
+}
+
+/** Subscribers of a subscriber that is itself observable; undefined for a plain observer. */
+function subscribersOf(owner: object): readonly object[] | undefined {
+  return 'subs' in owner ? [...(owner as IObserver & IObservable).subs] : undefined
 }
 
 /** MaxDepth 为 0 时连根的直接边都不展开——把这条边界判断和递归里的写法对齐。 */
@@ -404,14 +446,26 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
   }
   const recordAction = (action: Omit<IActionTrace, 'timestamp'>): void => {
     assertActive()
+    if (action === null || typeof action !== 'object')
+      throw createStoreDevtoolsError(
+        StoreDevtoolsErrorCode.invalidOption,
+        StoreDevtoolsErrorText.actionInvalid
+      )
+    /** Caller-owned properties and the clock, each read once before publishing to the queue. */
+    let entry: IActionTrace
     try {
-      /** Prepare all caller-owned properties and the clock before publishing to the queue. */
-      const entry = { ...action, timestamp: now() }
-      assertActive()
-      actions.push(entry)
+      entry = { ...action, timestamp: now() }
     } catch (error) {
       throw identifyDevtoolsFailure(error, StoreDevtoolsErrorText.preparationFailed)
     }
+    // Validate the copied name, so a getter runs once and its failure keeps its classification.
+    if (typeof entry.name !== 'string')
+      throw createStoreDevtoolsError(
+        StoreDevtoolsErrorCode.invalidOption,
+        StoreDevtoolsErrorText.actionInvalid
+      )
+    assertActive()
+    actions.push(entry)
   }
   record(StoreDevtoolsLabel.initial)
   let unsubscribe: (() => void) | undefined

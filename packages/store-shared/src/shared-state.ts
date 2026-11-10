@@ -200,7 +200,19 @@ const MAX_INT32_ARRAY_SLOTS = 0xffffffff
 
 /** Cross-realm brand check for the one supported shared-memory input type. */
 function isSharedBuffer(value: unknown): value is SharedArrayBuffer {
-  return Object.prototype.toString.call(value) === '[object SharedArrayBuffer]'
+  if (typeof SharedArrayBuffer !== 'function' || value === null || typeof value !== 'object')
+    return false
+  // The intrinsic byteLength getter checks the internal slot; a forged toStringTag cannot pass it.
+  /** Intrinsic getter of SharedArrayBuffer.prototype.byteLength. */
+  const byteLength = Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, 'byteLength')?.get
+  if (!byteLength) return false
+  try {
+    Reflect.apply(byteLength, value, [])
+    return true
+  } catch {
+    // The getter throws only when the slot is absent, which is exactly the "not shared" answer.
+    return false
+  }
 }
 
 /** Reject a buffer whose header belongs to an obsolete or foreign layout. */
@@ -799,8 +811,24 @@ export class SharedInt32Array implements IDisposable {
         StoreSharedErrorText.arrayLength
       )
     }
+    // The complete layout is validated before any caller-supplied initial value is consumed.
+    const valuesEnd = ARRAY_VALUES_OFFSET + length * ARRAY_VALUE_BYTES
+    /** 8-byte aligned start of the version slots, computed in plain arithmetic (no int32 wrap). */
+    const versionsOffset =
+      Math.ceil(valuesEnd / BigInt64Array.BYTES_PER_ELEMENT) * BigInt64Array.BYTES_PER_ELEMENT
+    const requiredBytes = versionsOffset + length * ARRAY_VERSION_BYTES
+    if (
+      !Number.isSafeInteger(requiredBytes) ||
+      requiredBytes / Int32Array.BYTES_PER_ELEMENT > MAX_INT32_ARRAY_SLOTS
+    ) {
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.invalidOption,
+        StoreSharedErrorText.arrayLengthTooLarge
+      )
+    }
     let preparedInitialValues: number[] | undefined
-    if (!buffer && initialValues && length > 0) {
+    // Only omission skips validation; any other supplied value must be iterable int32 values.
+    if (!buffer && initialValues !== undefined && length > 0) {
       try {
         preparedInitialValues = []
         for (const value of initialValues) {
@@ -817,19 +845,6 @@ export class SharedInt32Array implements IDisposable {
     }
     this.runtime = runtime
     this.length = length
-    const valuesEnd = ARRAY_VALUES_OFFSET + length * ARRAY_VALUE_BYTES
-    const versionsOffset =
-      (valuesEnd + BigInt64Array.BYTES_PER_ELEMENT - 1) & ~(BigInt64Array.BYTES_PER_ELEMENT - 1)
-    const requiredBytes = versionsOffset + length * ARRAY_VERSION_BYTES
-    if (
-      !Number.isSafeInteger(requiredBytes) ||
-      requiredBytes / Int32Array.BYTES_PER_ELEMENT > MAX_INT32_ARRAY_SLOTS
-    ) {
-      throw createStoreSharedRangeError(
-        StoreSharedErrorCode.invalidOption,
-        StoreSharedErrorText.arrayLengthTooLarge
-      )
-    }
     this.buffer = buffer ?? new SharedArrayBuffer(requiredBytes)
     if (this.buffer.byteLength < requiredBytes) {
       throw createStoreSharedRangeError(

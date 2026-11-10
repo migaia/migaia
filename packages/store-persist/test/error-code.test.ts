@@ -9,10 +9,10 @@ import {
 } from '../src/errors.ts'
 
 describe('store-persist error-code contract', () => {
-  it('declares 8 unique codes under the package source', () => {
+  it('declares 9 unique codes under the package source', () => {
     const codes = Object.values(StorePersistErrorCode)
-    expect(codes).toHaveLength(8)
-    expect(new Set(codes).size).toBe(8)
+    expect(codes).toHaveLength(9)
+    expect(new Set(codes).size).toBe(9)
     expect(STORE_PERSIST_SOURCE).toBe('store.persist')
   })
 

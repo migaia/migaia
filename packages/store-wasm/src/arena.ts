@@ -3,6 +3,7 @@ import {
   createStoreWasmAggregateError,
   createStoreWasmError,
   createStoreWasmRangeError,
+  identifyStoreWasmFailure,
   StoreWasmErrorCode
 } from './errors.ts'
 import { StoreWasmErrorText } from './error-text.ts'
@@ -124,11 +125,26 @@ export function disposeWasmField(
 
 /**
  * Re-throws the construction primary with the rollback failure appended to its non-enumerable
- * `errors`. Primitive, frozen or hostile primaries fall back to a coded aggregate whose first entry
- * is the primary, so both failures stay reachable.
+ * `errors`. An uncoded native primary also gets CLEANUP_FAILED attached; a primary that already has
+ * a complete identity, or a native WebAssembly error (declared pass-through), keeps it. Primitive,
+ * frozen or hostile primaries fall back to a coded aggregate whose first entry is the primary, so
+ * both failures stay reachable.
  */
 export function throwWasmConstructionFailure(primary: unknown, cleanup: unknown): never {
-  if (attachSecondaryErrors(primary, [cleanup]) === primary) throw primary
+  if (attachSecondaryErrors(primary, [cleanup]) === primary) {
+    // Native WebAssembly errors are the declared pass-through and stay uncoded.
+    if (
+      primary instanceof WebAssembly.RuntimeError ||
+      primary instanceof WebAssembly.CompileError ||
+      primary instanceof WebAssembly.LinkError
+    )
+      throw primary
+    throw identifyStoreWasmFailure(
+      primary,
+      StoreWasmErrorCode.cleanupFailed,
+      StoreWasmErrorText.cleanupFailed
+    )
+  }
   throw createStoreWasmAggregateError(
     StoreWasmErrorCode.cleanupFailed,
     [primary, cleanup],

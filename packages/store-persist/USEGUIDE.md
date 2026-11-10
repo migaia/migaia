@@ -420,7 +420,7 @@ indexed 的 snapshot 保持各集合自身形状，replace 遵循集合整体替
 
 keyed 必填 namespace、storage，其他共同选项按其公开类型提供；实际存储键是 namespace + ':' + id。它没有枚举整个 family 的能力，每个 handle 只管理这一个定义与键。handle.value 是水合前首次获取的值快照，不是实时 AtomStore 值；实时值从 AtomStore 读取。扩展保留原引擎的 live disposed getter，dispose 后立即反映终态。
 
-clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<number>`。它枚举 storage.keys()，按 namespace + ':' 前缀筛选后逐个 await remove；返回枚举时匹配的数量，不是 remove 返回 true 的独占计数。它不清 AtomStore 内存、不停止现有 handle；活跃值下次变化可再次写入。登出若要同时清业务值，应用还须操作 AtomStore，并按需先停止相关持久化，避免把删除当成永久禁写。
+clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<number>`。它枚举 storage.keys()，按 namespace + ':' 前缀筛选后逐个 await remove；只覆盖文本通道的条目：通过 codec 写成二进制存档的 persistKeyed 条目不会被枚举到，需要另行清理；返回枚举时匹配的数量，不是 remove 返回 true 的独占计数。它不清 AtomStore 内存、不停止现有 handle；活跃值下次变化可再次写入。登出若要同时清业务值，应用还须操作 AtomStore，并按需先停止相关持久化，避免把删除当成永久禁写。
 
 ### 加载、版本迁移与本地修改
 

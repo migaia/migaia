@@ -1,5 +1,9 @@
 /** Stable public diagnostics owned by `@migaia/store-persist`. */
 export const StorePersistErrorText = {
+  /** A partialize/snapshot callback on the ordinary write path threw; the error is on cause. */
+  partializeFailed: '[store] persist partialize failed',
+  /** A custom merge callback threw during hydration; the error is on cause. */
+  mergeFailed: '[store] persist merge failed',
   optionsObject: '[store] persist options must be an object',
   stringOption: (label: string): string => `[store] persist ${label} must be a string`,
   jsonSerialize: '[store] json codec cannot serialize this value',

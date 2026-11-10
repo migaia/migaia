@@ -99,7 +99,8 @@ export function persistKeyed<T>(
  * not an atomic family transaction: a removal failure rejects after any earlier removals. Existing
  * handles keep their in-memory values; this function does not notify or pause them, so an already
  * scheduled or later write can recreate an archive. Invalid namespace/storage shape rejects with
- * INVALID_OPTION; adapter failures otherwise follow the adapter's boundary.
+ * INVALID_OPTION; adapter failures otherwise follow the adapter's boundary. Only text-channel
+ * entries are enumerated: entries a codec wrote as binary archives are not removed here.
  */
 export async function clearFamily(storage: IPersistStorage, namespace: string): Promise<number> {
   assertPersistString(namespace, 'namespace')
