@@ -737,7 +737,13 @@ export class Session {
     /** Native observation removal is an infallible unsubscribe, after critical physical cleanup. */
     const unobserve = this.#unobserve
     this.#unobserve = undefined
-    await unobserve?.()
+    try {
+      await unobserve?.()
+    } catch (error) {
+      // A failing unsubscribe is reported and kept; the remaining joins and cleanup still run.
+      failures.push(error)
+      this.#options.report(error)
+    }
     try {
       await this.#reply
     } catch (error) {

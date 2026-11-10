@@ -1,3 +1,4 @@
+import { snapshotRpcOptions } from '../host/error-owner.ts'
 /**
  * Implements the passive local members namespace over genuine native records and existing indexes.
  * Queries project safe sampled facts and commands borrow original supervisor/generation operations;
@@ -35,8 +36,13 @@ import type {
 } from './native-members-types.ts'
 
 /** Preserve the original query rejection before any sampler or native handle is touched. */
-function validateMemberFilter(filter?: IRpcMemberListFilter): void {
-  if (filter === undefined) return
+function validateMemberFilter(requested?: IRpcMemberListFilter): void {
+  if (requested === undefined) return
+  /** Every filter field is read once; a throwing getter is INVALID_CONFIG with its cause. */
+  const filter =
+    requested !== null && typeof requested === 'object'
+      ? snapshotRpcOptions(requested, RuntimeApiErrorText.filterInvalid)
+      : requested
   /** Own-key discrimination rejects exact+prefix even if one value is undefined. */
   const name = filter?.name
   if (

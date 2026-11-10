@@ -1,3 +1,4 @@
+import { attachSecondaryErrors } from '@migaia/utils/error'
 /**
  * Owns one lazy remote stream's demand, source-qualified task, sticky terminal and actual
  * completion. Existing call features and generation cancellation bound the selected invocation;
@@ -29,7 +30,11 @@ import {
   type IRpcPortableValue
 } from '@migaia/rpc-contract/protocol'
 import { RpcStreamErrorText } from './error-text.ts'
-import { createRpcAbortError, createRpcTimeoutError } from '../host/error-owner.ts'
+import {
+  createRpcAbortError,
+  createRpcLifecycleError,
+  createRpcTimeoutError
+} from '../host/error-owner.ts'
 import { serializeHostWireError, deserializeHostWireError } from '../host/error-wire-metadata.ts'
 import { sameTask } from '../call/envelope.ts'
 import { resolveAbortReason } from '../host/abort-reason.ts'
@@ -422,7 +427,10 @@ export class StreamConsumer {
       return result
     } catch (error) {
       if (thrown && error !== value)
-        throw new AggregateError([value, error], RpcStreamErrorText.cleanupFailed)
+        throw attachSecondaryErrors(
+          createRpcLifecycleError(RpcStreamErrorText.cleanupFailed, value),
+          [value, error]
+        )
       throw error
     }
   }

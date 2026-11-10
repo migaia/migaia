@@ -136,6 +136,10 @@ class RpcStreamFrameDecoder {
   #state: ReturnType<typeof rpcStreamFrameDecoderState>
   /** Preserve the original stable resource surface and callback identities. */
   readonly value: IRpcStreamFrameDecoder
+  /** True while a push is delivering frames; a nested push is queued instead. */
+  #delivering = false
+  /** Chunks pushed from inside onFrame, decoded in order once the current chunk is done. */
+  #queued: Uint8Array[] = []
   /** Initialize owned storage before publishing the resource's callbacks. */
   constructor(options: IRpcStreamFrameDecoderOptions, maxFrameBytes: () => number) {
     this.#state = rpcStreamFrameDecoderState(options, maxFrameBytes)
@@ -148,47 +152,23 @@ class RpcStreamFrameDecoder {
             undefined,
             this.#state.options.errorMetadata
           )
-        /** Position in this caller-owned chunk. */
-        let offset = 0
-        while (!this.#state.terminal && offset < chunk.byteLength) {
-          if (this.#state.payload === undefined) {
-            /** Complete the prefix before allocating any frame payload. */
-            const copied = Math.min(4 - this.#state.headerBytes, chunk.byteLength - offset)
-            this.#state.header.set(chunk.subarray(offset, offset + copied), this.#state.headerBytes)
-            this.#state.headerBytes += copied
-            offset += copied
-            if (this.#state.headerBytes < 4) continue
-            /** Header bytes are unsigned and network ordered. */
-            const length = new DataView(this.#state.header.buffer).getUint32(0, false)
-            if (length === 0) {
-              this.#fail(RpcContractErrorCode.invalidFrame)
-              return offset
-            }
-            if (length > (0, this.#state.maxFrameBytes)()) {
-              this.#fail(RpcContractErrorCode.frameLimitExceeded)
-              return offset
-            }
-            this.#state.payload = new Uint8Array(length)
-            this.#state.payloadBytes = 0
-            this.#state.headerBytes = 0
-          }
-          /** Copy into decoder-owned memory because the sender may reuse its chunk buffer. */
-          const copied = Math.min(
-            this.#state.payload.byteLength - this.#state.payloadBytes,
-            chunk.byteLength - offset
-          )
-          this.#state.payload.set(chunk.subarray(offset, offset + copied), this.#state.payloadBytes)
-          this.#state.payloadBytes += copied
-          offset += copied
-          if (this.#state.payloadBytes === this.#state.payload.byteLength) {
-            /** Release the frame before invoking user code, permitting reentrant push. */
-            const complete = this.#state.payload
-            this.#state.payload = undefined
-            this.#state.payloadBytes = 0
-            ;(0, this.#state.options.onFrame)(complete)
-          }
+        // A chunk pushed from inside onFrame waits until the current chunk's remaining frames are
+        // delivered, so frames always arrive in byte order.
+        if (this.#delivering) {
+          this.#queued.push(chunk.slice())
+          return chunk.byteLength
         }
-        return offset
+        this.#delivering = true
+        try {
+          /** Bytes consumed from the caller's own chunk. */
+          const consumed = this.#decode(chunk)
+          for (let index = 0; index < this.#queued.length && !this.#state.terminal; index += 1)
+            this.#decode(this.#queued[index]!)
+          return consumed
+        } finally {
+          this.#queued = []
+          this.#delivering = false
+        }
       },
       finish: () => {
         if (this.#state.terminal) return
@@ -204,6 +184,50 @@ class RpcStreamFrameDecoder {
         this.#state.headerBytes = 0
       }
     }
+  }
+  /** Decode one chunk in byte order, delivering every completed frame; returns bytes consumed. */
+  #decode(chunk: Uint8Array): number {
+    /** Position in this caller-owned chunk. */
+    let offset = 0
+    while (!this.#state.terminal && offset < chunk.byteLength) {
+      if (this.#state.payload === undefined) {
+        /** Complete the prefix before allocating any frame payload. */
+        const copied = Math.min(4 - this.#state.headerBytes, chunk.byteLength - offset)
+        this.#state.header.set(chunk.subarray(offset, offset + copied), this.#state.headerBytes)
+        this.#state.headerBytes += copied
+        offset += copied
+        if (this.#state.headerBytes < 4) continue
+        /** Header bytes are unsigned and network ordered. */
+        const length = new DataView(this.#state.header.buffer).getUint32(0, false)
+        if (length === 0) {
+          this.#fail(RpcContractErrorCode.invalidFrame)
+          return offset
+        }
+        if (length > (0, this.#state.maxFrameBytes)()) {
+          this.#fail(RpcContractErrorCode.frameLimitExceeded)
+          return offset
+        }
+        this.#state.payload = new Uint8Array(length)
+        this.#state.payloadBytes = 0
+        this.#state.headerBytes = 0
+      }
+      /** Copy into decoder-owned memory because the sender may reuse its chunk buffer. */
+      const copied = Math.min(
+        this.#state.payload.byteLength - this.#state.payloadBytes,
+        chunk.byteLength - offset
+      )
+      this.#state.payload.set(chunk.subarray(offset, offset + copied), this.#state.payloadBytes)
+      this.#state.payloadBytes += copied
+      offset += copied
+      if (this.#state.payloadBytes === this.#state.payload.byteLength) {
+        /** Release the frame before invoking user code, permitting reentrant push. */
+        const complete = this.#state.payload
+        this.#state.payload = undefined
+        this.#state.payloadBytes = 0
+        ;(0, this.#state.options.onFrame)(complete)
+      }
+    }
+    return offset
   }
   /** Report once and discard the connection's partial framing state. */
   #fail = (

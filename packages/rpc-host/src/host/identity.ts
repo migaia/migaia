@@ -35,17 +35,27 @@ export function defaultRpcId(): string {
 
 /** Validate the supported public identity domain before any carrier can acquire resources. */
 function captureSelf(value: IRpcSelf): IRpcSelf {
+  if (!value)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+  /** Both fields read once; validation and the returned identity use the same values. */
+  let name: unknown
+  let instanceId: unknown
+  try {
+    name = value.name
+    instanceId = value.instanceId
+  } catch (cause) {
+    throw createRpcConfigurationError(RuntimeApiErrorText.identityInvalid, cause)
+  }
   if (
-    !value ||
-    typeof value.name !== 'string' ||
-    !value.name ||
-    value.name.length > 256 ||
-    typeof value.instanceId !== 'string' ||
-    !value.instanceId ||
-    value.instanceId.length > 256
+    typeof name !== 'string' ||
+    !name ||
+    name.length > 256 ||
+    typeof instanceId !== 'string' ||
+    !instanceId ||
+    instanceId.length > 256
   )
     throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
-  return Object.freeze({ name: value.name, instanceId: value.instanceId })
+  return Object.freeze({ name, instanceId })
 }
 
 /** A trusted native parent selects the child's global identity before its first source starts. */

@@ -1,3 +1,4 @@
+import { snapshotRpcOptions } from '../../host/error-owner.ts'
 /**
  * Compiles and validates cold probe filters, stage masks and callback references before
  * publication. Each compiled handle owns stage updates through the canonical private probe record;
@@ -41,12 +42,14 @@ function compileStages(stages: readonly IRpcProbeStageName[], allowEmpty: boolea
 
 /** Validate and snapshot cold probe inputs before the first host mutation. */
 function prepareProbeDefinition(
-  definition: IRpcProbeDefinition,
+  requested: IRpcProbeDefinition,
   host: object | undefined,
   hasHost: boolean
 ) {
-  if (typeof definition !== 'object' || definition === null)
+  if (typeof requested !== 'object' || requested === null)
     invalid(RpcCoreErrorText.probeDefinitionInvalid)
+  /** Every definition field is read once; a throwing getter is INVALID_CONFIG with its cause. */
+  const definition = snapshotRpcOptions(requested, RpcCoreErrorText.probeDefinitionInvalid)
   /** Initial subscriptions are compiled before any host field can be attached. */
   const stageMask = compileStages(definition.stages, false)
   /** Capture stays fixed while later stage changes may pause active subscription. */

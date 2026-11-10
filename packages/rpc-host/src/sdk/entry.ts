@@ -63,8 +63,19 @@ export function resolveRpcEntry(entry: true | IUrlLike, options: IRpcEntryOption
     return resolveRpcEntry(options.mainEntry, options)
   }
   /** Any object with a string `href` (such as a WHATWG URL) is an exact URL. */
-  if (typeof entry === 'object' && entry !== null && typeof entry.href === 'string')
-    return entry.href
+  if (typeof entry === 'object' && entry !== null) {
+    /** One read of `href`; a throwing getter is INVALID_CONFIG with its cause. */
+    let href: unknown
+    try {
+      href = entry.href
+    } catch (cause) {
+      throw tagRpcError(
+        new TypeError(RpcEntryErrorText.invalid, { cause }),
+        RpcCoreErrorCode.invalidConfig
+      )
+    }
+    if (typeof href === 'string') return href
+  }
   if (typeof entry !== 'string' || !entry)
     throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcEntryErrorText.invalid)
   /** A relative string is meaningful only with native-owner supplied entry data. */

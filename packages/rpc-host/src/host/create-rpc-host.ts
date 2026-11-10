@@ -13,16 +13,27 @@ export function createRpcHost<
   TRemote = Record<never, never>,
   const TPlugins extends readonly IRpcHostPlugin[] = readonly IRpcHostPlugin[]
 >(options: IRpcHostOptions<TPlugins>): Promise<IRpcHost<TRemote, TPlugins>> {
-  if (!Array.isArray(options.plugins))
+  /** The plugin list is read once; a throwing getter or revoked Proxy is HOST_PLUGIN_INVALID. */
+  let plugins: readonly IRpcHostPlugin[]
+  try {
+    plugins = options.plugins
+    if (!Array.isArray(plugins))
+      throw tagRpcError(
+        new TypeError(HostErrorText.pluginInvalid),
+        RpcCoreErrorCode.hostPluginInvalid
+      )
+  } catch (cause) {
+    if (cause instanceof TypeError && cause.message === HostErrorText.pluginInvalid) throw cause
     throw tagRpcError(
-      new TypeError(HostErrorText.pluginInvalid),
+      new TypeError(HostErrorText.pluginInvalid, { cause }),
       RpcCoreErrorCode.hostPluginInvalid
     )
+  }
   /** The exact native definitions alone carry SDK registration identity. */
   const namespaces = new Map<string, IRpcHostPlugin>()
   /** Fixed intervention stages must be installed before any transport in this cold native batch. */
   const flows: IRpcHostPlugin[] = []
-  for (const plugin of options.plugins) {
+  for (const plugin of plugins) {
     /** Configuration copies and public discriminator fields cannot impersonate SDK definitions. */
     const metadata = readRpcDefinition(plugin)
     if (!metadata)

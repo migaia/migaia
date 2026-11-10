@@ -305,3 +305,15 @@ export function createRpcTimeoutError(
   const error = new RpcTimeoutError(...args)
   return mintLocalRpcError(error, error.code, RpcTimeoutError)
 }
+
+/**
+ * Copy caller configuration with one read of each own enumerable property. A throwing getter or
+ * Proxy trap becomes INVALID_CONFIG (a TypeError with `message`) with the original on `cause`.
+ */
+export function snapshotRpcOptions<T extends object>(value: T, message: string): T {
+  try {
+    return Object.freeze({ ...value })
+  } catch (cause) {
+    throw tagRpcError(new TypeError(message, { cause }), RpcCoreErrorCode.invalidConfig)
+  }
+}
