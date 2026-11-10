@@ -4,6 +4,7 @@
  * order.
  */
 import type { IObservable, IObserver, IRuntime } from './types.ts'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import { internalsOf, type IRuntimeInternals } from './internals.ts'
 import { assertReactiveOwnedBy } from './ownership.ts'
 import { describeObservable, describeObserver, emitTraceSafely } from './diagnostics.ts'
@@ -22,9 +23,22 @@ import {
   invalidateSubsSnapshot
 } from './node-internals.ts'
 
-/** Preserves notification-entry membership when extension callbacks reconnect during marking. */
+/**
+ * Preserves notification-entry membership when extension callbacks reconnect during marking. The
+ * source value is already committed, so one throwing `markDirty` must not stop the others: every
+ * subscriber is marked, then the first failure is rethrown with any later ones attached.
+ */
 export function markSubscribers(observable: IObservable): void {
-  for (const subscriber of snapshotSubs(observable, observable.subs)) subscriber.markDirty()
+  /** Failures in subscriber order; the first keeps its original identity when rethrown. */
+  const failures: unknown[] = []
+  for (const subscriber of snapshotSubs(observable, observable.subs))
+    try {
+      subscriber.markDirty()
+    } catch (error) {
+      failures.push(error)
+    }
+  if (failures.length === 1) throw failures[0]
+  if (failures.length > 1) throw attachSecondaryErrors(failures[0], failures.slice(1))
 }
 
 /** Emits edge diagnostics at the caller's mutation point without changing graph control flow. */

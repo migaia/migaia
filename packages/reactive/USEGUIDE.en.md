@@ -194,7 +194,7 @@ Two-way Celsius/Fahrenheit syncing is written with two effects that each write w
 
 Hand-written two-way syncing has no limit on rounds, so the two listeners trigger each other forever, the page stops responding, and nothing tells you which two pieces of code are fighting.
 
-Each flush is capped at `maxFlushPasses` passes (default 100). Past the cap the Runtime stops, drops the remaining queued effects and reports `FLUSH_LOOP` with their `debugName`s: to `onError` for automatic flushes, or as a thrown error from a manual `flush()`.
+Within one flush, each effect may run at most `maxFlushPasses` times (default 100); the cap is counted per effect. When an effect passes it the Runtime stops, drops the remaining queued effects and reports `FLUSH_LOOP` with their `debugName`s: to `onError` for automatic flushes, or as a thrown error from a manual `flush()`.
 
 ```ts doc-test=run
 import { createRuntime } from '@migaia/reactive'
@@ -223,7 +223,7 @@ the page stays responsive, celsius = 12
 
 Prints `async-flush FLUSH_LOOP` from `onError`, then `the page stays responsive, celsius = 12`.
 
-The loop was cut after 20 passes (the `maxFlushPasses` set in the example) instead of running forever, and the reported `debugName`s point at the effects feeding each other.
+The loop was cut once an effect had run 20 times (the `maxFlushPasses` set in the example) instead of running forever, and the reported `debugName`s point at the effects feeding each other.
 
 ## One Runtime per server request
 
@@ -481,7 +481,7 @@ Method by method:
 
 - `batch(fn)`: merges several writes into one effect flush; it counts nesting depth on entry and only the outermost exit actually calls `flush()`. If `fn` throws and the closing `flush()` also throws, a writable plain `Error` stays the same object and gets the flush error attached on `cause`; a non-`Error` or a non-writable `Error` is preserved through an `AggregateError` with code `ACTION_FLUSH_FAILED`. If the `cause` getter of the application error throws, the aggregate's `errors` keep, in order, the application error, the flush error and the value the getter threw; `onError` also receives the getter's thrown value with phase `cause-read`.
 - `untracked(fn)`: turns dependency tracking off while `fn` runs, so reading any `Signal` / `Computed` registers no edge.
-- `flush()`: flushes the current queue synchronously. **Reentrancy**: calling `flush()` again inside an observer's `tick()` returns `'deferred'` (the outer flush is still running and this call does not flush); the outermost call returns `'completed'` once it has drained the queue. When one flush exceeds `maxFlushPasses` recomputation passes it throws `FLUSH_LOOP` (see the error codes), clears the rest of the queue, and the error message lists at most 8 dropped `debugName`s.
+- `flush()`: flushes the current queue synchronously. **Reentrancy**: calling `flush()` again inside an observer's `tick()` returns `'deferred'` (the outer flush is still running and this call does not flush); the outermost call returns `'completed'` once it has drained the queue. When one observer runs more than `maxFlushPasses` times within one flush, it throws `FLUSH_LOOP` (see the error codes), clears the rest of the queue, and the error message lists at most 8 dropped `debugName`s.
 - The creation option `schedulerStrategy` only changes when `flush` happens and does not hand out the Scheduler queue. A strategy must return synchronously; returning a thenable triggers an `INVALID_OPTION` diagnostic and falls back to the validated safe strategy. There is no public way to replace it while the Runtime lives.
 - `runTracedAction(name, fn)`: runs and traces one real action; `name` must be a non-empty string, otherwise it throws `INVALID_OPTION`. Without trace listeners it only runs `fn` inside the same callback error boundary and creates no trace event.
 - `reportError(error, context)`: the diagnostic channel. `context.observer` / `context.observable` are raw node objects that are first reduced to an `IRuntimeNodeDescriptor` before reaching `onError`. A throw or rejection from the reporter itself goes to the shared host exception queue of utils and never breaks graph operations in return.
@@ -675,7 +675,7 @@ The stable error code table has **18 codes**, declared only in `src/error-code.t
 | `copyConflict` | `COPY_CONFLICT` | Several runtime copies of this library were detected, or `assertSingleRuntimeCopy()` found more than one copy |
 | `brandCorrupted` | `BRAND_CORRUPTED` | A cross-copy diagnostic brand was found in an unexpected shape |
 | `versionExhausted` | `VERSION_EXHAUSTED` | A new version was requested after the monotonic version clock reached its limit (default `Number.MAX_SAFE_INTEGER`) |
-| `flushLoop` | `FLUSH_LOOP` | One flush exceeded `maxFlushPasses` recomputation passes (default 100) |
+| `flushLoop` | `FLUSH_LOOP` | One observer ran more than `maxFlushPasses` times (default 100) within one flush |
 | `observerFailed` | `OBSERVER_FAILED` | Several observers' `tick()` failed in one flush, or several observable lifecycle hooks failed; used as the `AggregateError` wrapper |
 | `actionFlushFailed` | `ACTION_FLUSH_FAILED` | An action inside `runBatched()` and its closing flush both failed; a plain writable error gets the aggregate on `cause`, and when `cause` cannot be read the three original values go straight into `AggregateError.errors` |
 | `schedulerFailed` | `SCHEDULER_FAILED` | Reserved: diagnostic channel code for unhandled errors caught from an async scheduling strategy callback or `reportError()` (no built-in throw or report point by default) |

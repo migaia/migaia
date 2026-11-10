@@ -194,7 +194,7 @@ console.log('再次读取:', report.value, '计算次数:', computations)
 
 手写的双向同步没有轮数限制，两个监听者会无限互相触发，卡在循环里的页面失去响应，也看不到是哪两段代码在打架。
 
-每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。
+一次冲刷中，同一个副作用最多运行 `maxFlushPasses` 次（默认 100），这个上限按每个副作用分别计数。某个副作用超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。
 
 ```ts doc-test=run
 import { createRuntime } from '@migaia/reactive'
@@ -223,7 +223,7 @@ async-flush FLUSH_LOOP
 
 先由 `onError` 输出 `async-flush FLUSH_LOOP`，再输出 `页面仍可响应，celsius = 12`。
 
-循环在 20 轮（示例里设的 `maxFlushPasses`）后被截断，而不是一直运行下去；报告里带的 `debugName` 指出了互相触发的副作用。
+循环在某个副作用运行满 20 次（示例里设的 `maxFlushPasses`）后被截断，而不是一直运行下去；报告里带的 `debugName` 指出了互相触发的副作用。
 
 ## 服务端每个请求一个 Runtime
 
@@ -481,7 +481,7 @@ type IRuntime = {
 
 - `batch(fn)`：显式合并多次写入为一次副作用刷新；进入时计深度，只有最外层退出才真正 `flush()`。若 `fn` 抛错且随后的收尾 `flush()` 也抛错，可写的普通 `Error` 保持原对象并在 `cause` 附上 flush 错误；非 `Error` 或不可写 `Error` 用携带 `ACTION_FLUSH_FAILED` 码的 `AggregateError` 保留原值。若业务错误的 `cause` getter 抛错，聚合错误的 `errors` 依次保留业务错误、flush 错误、getter 抛出值；`onError` 另收到 getter 抛出值及 `cause-read` phase。
 - `untracked(fn)`：`fn` 执行期间关闭依赖收集，读取任何 `Signal`/`Computed` 都不会建立依赖边。
-- `flush()`：同步冲刷当前队列。**重入语义**：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。
+- `flush()`：同步冲刷当前队列。**重入语义**：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。
 - `schedulerStrategy` 创建期选项只改变何时 `flush`，不交出 Scheduler 队列。策略须同步返回；返回 thenable 会触发 `INVALID_OPTION` 诊断并回退到已验证的安全策略。Runtime 存活期间不公开替换入口。
 - `runTracedAction(name, fn)`：执行并追踪一段真实 action；`name` 必须是非空字符串，否则抛 `INVALID_OPTION`。未启用 trace（无监听器）时只执行 fn 与同一 callback 错误边界，不创建 trace 事件。
 - `reportError(error, context)`：诊断通道；`context.observer`/`context.observable` 是原始节点对象，内部会先脱敏为 `IRuntimeNodeDescriptor` 再转发给 `onError`。reporter 自身 throw/rejection 交 utils 共享宿主异常队列，不反向破坏图操作。
@@ -676,7 +676,7 @@ import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive'
 | `copyConflict`         | `COPY_CONFLICT`         | 检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一                                                                |
 | `brandCorrupted`       | `BRAND_CORRUPTED`       | 跨副本诊断品牌被发现处于非预期形状                                                                                                             |
 | `versionExhausted`     | `VERSION_EXHAUSTED`     | 单调版本时钟达到配置上限（默认 `Number.MAX_SAFE_INTEGER`）后再次申请新版本号                                                                   |
-| `flushLoop`            | `FLUSH_LOOP`            | 一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）                                                                                          |
+| `flushLoop`            | `FLUSH_LOOP`            | 一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）                                                                                          |
 | `observerFailed`       | `OBSERVER_FAILED`       | 一次冲刷中多个 observer 的 `tick()` 失败、或多个 observable 生命周期钩子失败，作为 `AggregateError` 外壳                                       |
 | `actionFlushFailed`    | `ACTION_FLUSH_FAILED`   | `runBatched()` 内业务动作与收尾 flush 同时失败；普通可写错误在 `cause` 附加聚合结果，不可读 `cause` 的三个原值直接置于 `AggregateError.errors` |
 | `schedulerFailed`      | `SCHEDULER_FAILED`      | 预留：异步调度策略回调或 `reportError()` 捕获到未处理错误的诊断通道码（默认无内置抛出/上报点）                                                 |
