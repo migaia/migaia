@@ -229,10 +229,11 @@ function expandTree(
   createNode: (owner: object) => IDependencyTreeNode,
   childrenOf: (owner: object) => readonly object[] | undefined
 ): void {
-  /** Graph objects on the current root-to-node path. */
-  const path = new Set<object>([rootOwner])
-  /** Graph objects whose children were already listed somewhere in this tree. */
-  const expanded = new Set<object>([rootOwner])
+  /**
+   * Graph objects already expanded in this tree: true while still on the current root-to-node path,
+   * false once their frame is finished. One map keeps the per-node cost at one lookup.
+   */
+  const visits = new Map<object, boolean>([[rootOwner, true]])
   /** Frames still being expanded; the last one is the current node. */
   const stack: ITreeFrame[] = [
     { node: root, owner: rootOwner, children: rootChildren, depth: 0, next: 0 }
@@ -241,7 +242,7 @@ function expandTree(
     /** Node whose next child is visited now. */
     const frame = stack[stack.length - 1]!
     if (frame.next >= frame.children.length) {
-      path.delete(frame.owner)
+      visits.set(frame.owner, false)
       stack.pop()
       continue
     }
@@ -250,21 +251,23 @@ function expandTree(
     /** Tree node for that child. */
     const node = createNode(child)
     frame.node.children.push(node)
-    if (path.has(child)) {
+    /** True on the current path, false when expanded elsewhere, undefined when new. */
+    const visit = visits.get(child)
+    if (visit === true) {
       node.circular = true
       continue
     }
     /** Depth of `child` below the root. */
     const depth = frame.depth + 1
-    /** The child's own children, or undefined when it is a leaf at this depth. */
-    const grandchildren = depth >= maxDepth ? undefined : childrenOf(child)
-    if (grandchildren === undefined || grandchildren.length === 0) continue
-    if (expanded.has(child)) {
+    if (depth >= maxDepth) continue
+    if (visit === false) {
       node.shared = true
       continue
     }
-    expanded.add(child)
-    path.add(child)
+    /** The child's own children, or undefined for a plain source. */
+    const grandchildren = childrenOf(child)
+    if (grandchildren === undefined || grandchildren.length === 0) continue
+    visits.set(child, true)
     stack.push({ node, owner: child, children: grandchildren, depth, next: 0 })
   }
 }
