@@ -147,6 +147,19 @@ export class CallRecord {
     )
   }
 
+  /**
+   * Write-start guard: throws the terminal failure once the call ended, otherwise records the
+   * handoff and notifies the caller. Chunking reuses it; the written fact marks the first handoff.
+   */
+  #handoff(onWriteStart?: () => void, onFirstWriteStart?: () => void): void {
+    if (this.#terminal) throw this.#failure
+    /** Whether this is the logical first handoff of the call. */
+    const first = !this.#written
+    this.#written = true
+    onWriteStart?.()
+    if (first) onFirstWriteStart?.()
+  }
+
   /** Register before send; asynchronous encoding/queueing stays cancellable until actual handoff. */
   start(
     frame: IRpcEnvelope,
@@ -163,24 +176,13 @@ export class CallRecord {
       if (this.#callerSignal !== undefined && this.#callerSignal !== signal)
         this.#listen(this.#callerSignal)
       if (this.#terminal) return
-      /** Session invokes this receiver-free guard directly before the actual carrier.write. */
-      const handoff = (): void => {
-        if (this.#terminal) throw this.#failure
-        /**
-         * Chunking reuses this guard; the existing written fact identifies the logical first
-         * handoff.
-         */
-        const first = !this.#written
-        this.#written = true
-        onWriteStart?.()
-        if (first) onFirstWriteStart?.()
-      }
       /** Media owns this temporary frame until its physical write settles. */
       const writing = this.#owner.send(this, frame, {
         signal,
         transfer,
         ...(this.keepalive ? { keepalive: true } : {}),
-        onWriteStart: handoff
+        // Session calls this receiver-free guard directly before the actual carrier.write.
+        onWriteStart: () => this.#handoff(onWriteStart, onFirstWriteStart)
       })
       Promise.resolve(writing).then(
         () => {

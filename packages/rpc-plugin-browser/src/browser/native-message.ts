@@ -128,41 +128,46 @@ class BrowserMessageIO implements IRpcMessageIO {
   }
   /** The exact wrapper is removed by the SDK's existing reverse listener cleanup. */
   onMessage(listener: (value: unknown) => void): () => void {
-    /** Native source and payload getters are evaluated once, in the original source-first order. */
-    const receive = (event: MessageEvent<unknown>): void => {
-      /** Native reflection completes before the receiver callback can execute arbitrary code. */
-      let data: unknown
-      try {
-        if (this.#source.accept && !this.#source.accept(event)) {
-          rejectBrowserObservation(this.observation, this.#metadata)
-          return
-        }
-        data = event.data
-      } catch (cause) {
-        this.#failure(
-          this.#source.readError
-            ? this.#source.readError(cause)
-            : createBrowserTransportError(BrowserRpcErrorText.carrierOperationFailed, cause)
-        )
-        return
-      }
-      try {
-        emitBrowserObservation(
-          this.observation,
-          this.#metadata,
-          RpcProbeDirection.inbound,
-          data,
-          undefined,
-          this.#source.origin
-        )
-        listener(data)
-      } catch (failure) {
-        this.#report(failure)
-      }
+    /** Listener record whose `receive` identity is shared by add and remove. */
+    const subscription = {
+      receive: (event: MessageEvent<unknown>): void => this.#receive(listener, event)
     }
     this.#source.start?.()
-    this.#source.receiver.addEventListener(BrowserPeerEvent.message, receive)
-    return () => this.#source.receiver.removeEventListener(BrowserPeerEvent.message, receive)
+    this.#source.receiver.addEventListener(BrowserPeerEvent.message, subscription.receive)
+    return () =>
+      this.#source.receiver.removeEventListener(BrowserPeerEvent.message, subscription.receive)
+  }
+  /** Native source and payload getters are evaluated once, in the original source-first order. */
+  #receive(listener: (value: unknown) => void, event: MessageEvent<unknown>): void {
+    /** Native reflection completes before the receiver callback can execute arbitrary code. */
+    let data: unknown
+    try {
+      if (this.#source.accept && !this.#source.accept(event)) {
+        rejectBrowserObservation(this.observation, this.#metadata)
+        return
+      }
+      data = event.data
+    } catch (cause) {
+      this.#failure(
+        this.#source.readError
+          ? this.#source.readError(cause)
+          : createBrowserTransportError(BrowserRpcErrorText.carrierOperationFailed, cause)
+      )
+      return
+    }
+    try {
+      emitBrowserObservation(
+        this.observation,
+        this.#metadata,
+        RpcProbeDirection.inbound,
+        data,
+        undefined,
+        this.#source.origin
+      )
+      listener(data)
+    } catch (failure) {
+      this.#report(failure)
+    }
   }
   /** These borrowed browser sources have no native peer-close signal; Host close remains explicit. */
   onClose(): () => void {
@@ -176,18 +181,21 @@ class BrowserMessageIO implements IRpcMessageIO {
       return () => {
         if (this.#error === listener) this.#error = undefined
       }
-    /** The established browser diagnostic retains its original source/code family. */
-    const failure = (): void =>
-      this.#failure(
-        createBrowserTransportError(
-          this.#source.messageError ?? BrowserRpcErrorText.carrierOperationFailed
-        )
-      )
-    this.#source.receiver.addEventListener(BrowserPeerEvent.messageError, failure)
+    /** Listener record whose `failure` identity is shared by add and remove. */
+    const subscription = { failure: (): void => this.#messageError() }
+    this.#source.receiver.addEventListener(BrowserPeerEvent.messageError, subscription.failure)
     return () => {
       if (this.#error === listener) this.#error = undefined
-      this.#source.receiver.removeEventListener(BrowserPeerEvent.messageError, failure)
+      this.#source.receiver.removeEventListener(BrowserPeerEvent.messageError, subscription.failure)
     }
+  }
+  /** Native messageerror: the established browser diagnostic keeps its original source/code family. */
+  #messageError(): void {
+    this.#failure(
+      createBrowserTransportError(
+        this.#source.messageError ?? BrowserRpcErrorText.carrierOperationFailed
+      )
+    )
   }
   /** Logical retirement removes native listeners through SDK; borrowed native objects stay open. */
   close(): void {

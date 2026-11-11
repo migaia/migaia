@@ -68,26 +68,42 @@ class ProviderCommitGate implements IProviderCommitGate {
   /** Each invocation owns only its abort listener and settlement, never other held calls. */
   readonly wait = (signal: IAbortSignal): Promise<void> => {
     if (signal.aborted) return Promise.reject(resolveAbortReason(signal))
-    /** Shared Utils owns Promise settlement while this explicit record owns one abort listener. */
-    const operation = { signal, completion: deferred<void>() }
-    /** Cancellation releases this one invocation's listener before publishing its reason. */
-    function cancel(): void {
-      operation.signal.removeEventListener('abort', cancel)
-      operation.completion.reject(resolveAbortReason(operation.signal))
-    }
+    /** One invocation's abort listener and settlement; never touches other held calls. */
+    const waiter = new GateWaiter(signal)
     try {
-      signal.addEventListener('abort', cancel, { once: true })
-      this.#completion.promise.then((failure) => {
-        operation.signal.removeEventListener('abort', cancel)
-        if (operation.signal.aborted)
-          operation.completion.reject(resolveAbortReason(operation.signal))
-        else if (failure) operation.completion.reject(failure)
-        else operation.completion.resolve()
-      })
+      signal.addEventListener('abort', waiter.cancel, { once: true })
+      this.#completion.promise.then((failure) => waiter.settle(failure))
     } catch (error) {
-      operation.completion.reject(error)
+      waiter.completion.reject(error)
     }
-    return operation.completion.promise
+    return waiter.completion.promise
+  }
+}
+
+/**
+ * One `wait()` invocation on a provider commit gate: owns its abort listener and Promise
+ * settlement. The listener is a class field so add/remove see the same function identity.
+ */
+class GateWaiter {
+  /** Caller signal whose abort cancels only this invocation. */
+  readonly #signal: IAbortSignal
+  /** Shared Utils deferred that this invocation settles exactly once. */
+  readonly completion = deferred<void>()
+  /** Abort listener: releases itself, then rejects with the signal's reason. */
+  readonly cancel = (): void => {
+    this.#signal.removeEventListener('abort', this.cancel)
+    this.completion.reject(resolveAbortReason(this.#signal))
+  }
+  /** Captures the caller signal for this one invocation. */
+  constructor(signal: IAbortSignal) {
+    this.#signal = signal
+  }
+  /** Gate settled: drop the listener, then follow abort, gate failure or success in that order. */
+  settle(failure: unknown): void {
+    this.#signal.removeEventListener('abort', this.cancel)
+    if (this.#signal.aborted) this.completion.reject(resolveAbortReason(this.#signal))
+    else if (failure) this.completion.reject(failure)
+    else this.completion.resolve()
   }
 }
 

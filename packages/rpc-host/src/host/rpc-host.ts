@@ -486,6 +486,15 @@ export class RpcHost {
   }
 
   /** Installation admits namespace names before a transport can acquire any physical resources. */
+  /** Native pre-release close of one namespace: settle its failed commit gate, then close its IO. */
+  async #closeNamespace(
+    gate: ReturnType<typeof createProviderCommitGate>,
+    namespace: Namespace
+  ): Promise<void> {
+    await this.#providers.settleFailedGate(gate)
+    await namespace.close(this.#reason)
+  }
+
   async #installTransport(
     core: IPluginHostCore,
     definition: IRpcTransportDefinition<
@@ -585,12 +594,8 @@ export class RpcHost {
       pipelines
     }
     this.#pendingNamespaces.set(definition.namespace, registration)
-    /** Native pre-release or its failed-install fallback joins held terminals before retiring IO. */
-    const close = async (): Promise<void> => {
-      await this.#providers.settleFailedGate(gate)
-      await namespace.close(this.#reason)
-    }
-    ownRpcTransportClose(core, close)
+    // Native pre-release or its failed-install fallback joins held terminals before retiring IO.
+    ownRpcTransportClose(core, () => this.#closeNamespace(gate, namespace))
     /**
      * Only call-feature instances are interpreted here; media/pool features remain with their
      * transport.

@@ -37,11 +37,6 @@ async function sampleMemberResources(
     const sample = await unit.sampleUsage()
     /** The owner clock timestamps the actual cold completion, without asserting global atomicity. */
     const observedAt = now()
-    /** Missing values are explicit; actual cumulative zero is a valid measured value. */
-    const metric = (value: number | undefined, units: string) =>
-      value === undefined
-        ? rpcMemberUnavailable(RpcMemberQueryReason.native)
-        : rpcMemberMetric(value, kind, units, observedAt)
     /** Both cumulative CPU components must be provided by the exact same native sampler. */
     const cpu =
       sample.cpuUserMicros === undefined || sample.cpuSystemMicros === undefined
@@ -65,15 +60,25 @@ async function sampleMemberResources(
       return Object.freeze({
         scope: kind,
         ...(unit.identity?.pid === undefined ? {} : { pid: unit.identity.pid }),
-        rssBytes: metric(sample.rssBytes, RpcMemberMetricUnit.bytes),
+        rssBytes: optionalMetric(sample.rssBytes, kind, RpcMemberMetricUnit.bytes, observedAt),
         cpu
       })
     return Object.freeze({
       scope: kind,
       ...(sample.sharedPid === undefined ? {} : { sharedPid: sample.sharedPid }),
       ...(unit.identity?.threadId === undefined ? {} : { threadId: unit.identity.threadId }),
-      heapUsedBytes: metric(sample.heapUsedBytes, RpcMemberMetricUnit.bytes),
-      heapTotalBytes: metric(sample.heapTotalBytes, RpcMemberMetricUnit.bytes),
+      heapUsedBytes: optionalMetric(
+        sample.heapUsedBytes,
+        kind,
+        RpcMemberMetricUnit.bytes,
+        observedAt
+      ),
+      heapTotalBytes: optionalMetric(
+        sample.heapTotalBytes,
+        kind,
+        RpcMemberMetricUnit.bytes,
+        observedAt
+      ),
       cpu,
       ...(sample.elu
         ? {
@@ -118,4 +123,16 @@ export async function rpcMemberResources(
   /** Both success and reported sampler failure retain the same source-owner retirement check. */
   const sampled = await sampleMemberResources(unit, kind, now, report)
   return unit && !isCurrent() ? rpcMemberUnavailable(RpcMemberQueryReason.retired) : sampled
+}
+
+/** One optional sampled value: missing is explicit "unavailable"; cumulative zero is a real value. */
+function optionalMetric(
+  value: number | undefined,
+  kind: Parameters<typeof rpcMemberMetric>[1],
+  units: string,
+  observedAt: number
+) {
+  return value === undefined
+    ? rpcMemberUnavailable(RpcMemberQueryReason.native)
+    : rpcMemberMetric(value, kind, units, observedAt)
 }

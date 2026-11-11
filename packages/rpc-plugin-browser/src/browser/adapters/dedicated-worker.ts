@@ -63,25 +63,29 @@ export function subscribeWorkerErrors(
   listener: (error: unknown) => void,
   report: (error: unknown) => void
 ): () => void {
-  /** Each original native event keeps its own fallback diagnostic reason. */
-  const error = (event: unknown): void =>
-    reportWorkerFailure(event, BrowserRpcErrorText.workerFailedReason, listener)
-  /** Deserialization failure uses the original native event without payload decoding. */
-  const messageError = (event: unknown): void =>
-    reportWorkerFailure(event, BrowserRpcErrorText.workerMessageErrorReason, listener)
-  port.addEventListener(BrowserPeerEvent.error, error)
+  /**
+   * Exact acquired callbacks and their native owner form one explicit cleanup operation. Each
+   * native event keeps its own fallback diagnostic reason; deserialization failure uses the
+   * original native event without payload decoding.
+   */
+  const operation = {
+    port,
+    error: (event: unknown): void =>
+      reportWorkerFailure(event, BrowserRpcErrorText.workerFailedReason, listener),
+    messageError: (event: unknown): void =>
+      reportWorkerFailure(event, BrowserRpcErrorText.workerMessageErrorReason, listener)
+  }
+  port.addEventListener(BrowserPeerEvent.error, operation.error)
   try {
-    port.addEventListener(BrowserPeerEvent.messageError, messageError)
+    port.addEventListener(BrowserPeerEvent.messageError, operation.messageError)
   } catch (primary) {
     try {
-      port.removeEventListener(BrowserPeerEvent.error, error)
+      port.removeEventListener(BrowserPeerEvent.error, operation.error)
     } catch (cleanup) {
       report(cleanup)
     }
     throw primary
   }
-  /** Exact acquired callbacks and their native owner form one explicit cleanup operation. */
-  const operation = { port, error, messageError }
   return () => {
     /** Attempt both exact native removers; a first failure cannot retain its sibling. */
     const errors: unknown[] = []

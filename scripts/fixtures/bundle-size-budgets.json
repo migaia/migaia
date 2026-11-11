@@ -24,7 +24,7 @@
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/createRpcHost.ts",
-    "gzip": 116914,
+    "gzip": 116923,
     "owner": "rpc-host",
     "forbidden": [
       "packages/plugin-host/src/modules/enablement/**",

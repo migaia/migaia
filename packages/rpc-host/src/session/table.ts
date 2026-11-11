@@ -178,9 +178,13 @@ class SessionTransportContext implements IRpcTransportContext {
       connection
     )
     this.#ports.resources.own(handle, { force: () => handle.close(this.#ports.closeReason()) })
-    /** Session owns its cleanup rejection; this observer reports only a new release failure. */
-    const release = () => this.#ports.resources.release(handle)
-    void handle.closed.then(release, release).catch(this.report)
+    // Session owns its cleanup rejection; this observer reports only a new release failure.
+    void handle.closed
+      .then(
+        () => this.#ports.resources.release(handle),
+        () => this.#ports.resources.release(handle)
+      )
+      .catch(this.report)
     return handle
   }
   /** The original SDK candidate remains the sole owner of each private pool Session. */

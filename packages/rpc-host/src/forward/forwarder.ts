@@ -378,15 +378,11 @@ export class Forwarder {
       description,
       supportedModes: description.supportedModes
     })
-    /** The local capability and forwarded provider share this same compact binding. */
-    const context = { owner: this, entry }
-    /** Scalar capability errors keep their rejected Promise; stream capabilities return iterators. */
-    const invoke: IProviderMethodCallable = (payload, options) =>
-      context.owner.#direct(context.entry, payload, options)
+    // Scalar capability errors keep their rejected Promise; stream capabilities return iterators.
     return retainProviderForwardMethod(
       description.supportedModes.every((mode) => mode === RpcCallMode.stream)
-        ? invoke
-        : async (payload, options) => invoke(payload, options),
+        ? (payload, options) => this.#direct(entry, payload, options)
+        : async (payload, options) => this.#direct(entry, payload, options),
       entry
     )
   }

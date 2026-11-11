@@ -147,12 +147,10 @@ export class RpcChunkFlow {
     /** Only the compact source id is retained, never a whole per-call context. */
     const id = context.carrierId
     /** Physical retirement removes its existing indexes before timer cancellation can reenter. */
-    const abort = (): void => {
-      this.#retire(id)
-    }
-    this.#sources.set(id, { signal: context.signal, abort })
-    context.signal.addEventListener('abort', abort, { once: true })
-    if (context.signal.aborted) abort()
+    const source = { signal: context.signal, abort: (): void => this.#retire(id) }
+    this.#sources.set(id, source)
+    context.signal.addEventListener('abort', source.abort, { once: true })
+    if (context.signal.aborted) source.abort()
   }
   /** Retire one source through only its owned maps, without scanning another peer's frames. */
   #retire(id: string): void {

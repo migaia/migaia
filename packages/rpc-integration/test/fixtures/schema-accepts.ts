@@ -69,13 +69,7 @@ export function acceptsSchema(
     if (typeof rule.exclusiveMinimum === 'number' && value <= rule.exclusiveMinimum) return false
   }
   if (Array.isArray(value)) {
-    if (
-      rule.uniqueItems === true &&
-      value.some((entry, index) =>
-        value.slice(0, index).some((previous) => isDeepStrictEqual(previous, entry))
-      )
-    )
-      return false
+    if (rule.uniqueItems === true && hasDuplicateItem(value)) return false
     if (typeof rule.minItems === 'number' && value.length < rule.minItems) return false
     if (typeof rule.maxItems === 'number' && value.length > rule.maxItems) return false
     if (Array.isArray(rule.prefixItems)) {
@@ -107,4 +101,58 @@ export function acceptsSchema(
     }
   }
   return true
+}
+
+/**
+ * True when two entries of `items` are deeply equal. Entries are bucketed by an order-insensitive
+ * fingerprint in one pass; full `isDeepStrictEqual` runs only inside a bucket, so distinct items
+ * cost O(total size) instead of a pairwise scan.
+ */
+function hasDuplicateItem(items: readonly unknown[]): boolean {
+  /** Entries already seen, grouped by fingerprint. */
+  const buckets = new Map<string, unknown[]>()
+  for (const entry of items) {
+    /** Fingerprint shared by every value deeply equal to `entry`. */
+    const key = fingerprint(entry)
+    /** Earlier entries with the same fingerprint. */
+    const bucket = buckets.get(key)
+    if (!bucket) {
+      buckets.set(key, [entry])
+      continue
+    }
+    for (const previous of bucket) if (isDeepStrictEqual(previous, entry)) return true
+    bucket.push(entry)
+  }
+  return false
+}
+
+/**
+ * Fingerprint equal for deeply equal JSON values. Object members are combined with a commutative
+ * sum of per-member hashes, so key order does not matter and no key sorting is needed.
+ */
+function fingerprint(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(fingerprint).join(',')}]`
+  if (value !== null && typeof value === 'object') {
+    /** Commutative combination of member hashes; equal members in any order give the same sum. */
+    let sum = 0
+    /** Member count disambiguates objects whose hashes happen to sum alike. */
+    let count = 0
+    for (const [key, member] of Object.entries(value)) {
+      sum = (sum + hashText(`${key}:${fingerprint(member)}`)) >>> 0
+      count += 1
+    }
+    return `{${count}:${sum}}`
+  }
+  return `${typeof value}:${String(value)}`
+}
+
+/** 32-bit FNV-1a hash of `text`; collisions only cost an extra deep comparison. */
+function hashText(text: string): number {
+  /** Running FNV-1a state. */
+  let hash = 0x811c9dc5
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash
 }

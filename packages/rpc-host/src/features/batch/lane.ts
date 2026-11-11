@@ -79,20 +79,26 @@ export class RpcBatchLane {
     const releaseAdmission = write?.admission?.guard?.((reason) => {
       if (this.#withdraw(entry)) entry.reject(reason)
     })
-    /** CallRecord already owns CANCELLED; this member's stage ends without rejecting its siblings. */
-    const abort = (): void => {
-      if (this.#withdraw(entry)) entry.resolve()
+    /**
+     * One explicit cleanup receipt retains the original listener and native admission release.
+     * CallRecord already owns CANCELLED, so `abort` ends this member's stage without rejecting its
+     * siblings.
+     */
+    const removal = {
+      signal,
+      releaseAdmission,
+      abort: (): void => {
+        if (this.#withdraw(entry)) entry.resolve()
+      }
     }
-    /** One explicit cleanup receipt retains the original listener and native admission release. */
-    const removal = { signal, abort, releaseAdmission }
     Object.assign(entry, {
       remove: () => {
         removal.signal.removeEventListener('abort', removal.abort)
         removal.releaseAdmission?.()
       }
     })
-    signal.addEventListener('abort', abort, { once: true })
-    if (signal.aborted) abort()
+    signal.addEventListener('abort', removal.abort, { once: true })
+    if (signal.aborted) removal.abort()
     if (!entry.cancelled) {
       if (this.#writing) this.#queued.add(entry)
       else {

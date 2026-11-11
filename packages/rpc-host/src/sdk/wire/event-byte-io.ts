@@ -45,6 +45,15 @@ export type IRpcEventByteIO = IRpcByteIO &
   }>
 
 /** One native emitter pair owns byte delivery, callback settlement and terminal replay. */
+/** Facts of one backpressured write whose drain is observed for diagnostics. */
+type IDrainObservation = Readonly<{
+  observer: (chunk: Uint8Array, drainMs: number) => void
+  chunk: Uint8Array
+  generation: number
+  started: number
+  drained: () => void
+}>
+
 export class RpcEventByteIO {
   /** Acquired native resources and the caller's error policy remain with this single owner. */
   readonly #ports
@@ -254,20 +263,19 @@ export class RpcEventByteIO {
         this.#observeWrite(observer, chunk, 0)
         return completion.promise
       }
-      /** One observed drain retains its own small native-write facts, never the caller's options. */
-      const operation = { owner: this, observer, chunk, generation, started }
-      /** Backpressure alone allocates this diagnostic native listener. */
-      function drained(): void {
-        operation.owner.#pendingDrains.delete(drained)
-        if (!operation.owner.#closed && operation.generation === operation.owner.#writeGeneration)
-          operation.owner.#observeWrite(
-            operation.observer,
-            operation.chunk,
-            performance.now() - operation.started
-          )
+      /**
+       * One observed drain retains its own small native-write facts, never the caller's options.
+       * Backpressure alone allocates this diagnostic native listener.
+       */
+      const operation: IDrainObservation = {
+        observer,
+        chunk,
+        generation,
+        started,
+        drained: (): void => this.#onDrained(operation)
       }
-      this.#pendingDrains.add(drained)
-      this.#ports.writer.once('drain', drained)
+      this.#pendingDrains.add(operation.drained)
+      this.#ports.writer.once('drain', operation.drained)
     } catch (error) {
       completion.reject(error)
     }
@@ -309,6 +317,13 @@ export class RpcEventByteIO {
   }
 
   /** Diagnostic callbacks cannot change the native writer's own completion result. */
+  /** One observed drain fired: forget its listener and report drain time if still current. */
+  #onDrained(operation: IDrainObservation): void {
+    this.#pendingDrains.delete(operation.drained)
+    if (!this.#closed && operation.generation === this.#writeGeneration)
+      this.#observeWrite(operation.observer, operation.chunk, performance.now() - operation.started)
+  }
+
   #observeWrite(
     observer: (chunk: Uint8Array, drainMs: number) => void,
     chunk: Uint8Array,

@@ -112,7 +112,10 @@ function classify(error: unknown, seen = new WeakSet<object>()): unknown {
   }
 }
 
-/** Read each exact dist file once outside timing; O(n log n) sorting only orders the report. */
+/**
+ * Read each exact dist file once outside timing. Entries keep filesystem traversal order; reports
+ * are compared by `path`, so no sorting of the growable file list is needed.
+ */
 function distProvenance(directory: string): { path: string; sha256: string }[] {
   /** The report includes all files so a dependency output change cannot hide behind one barrel. */
   const files: { path: string; sha256: string }[] = []
@@ -123,7 +126,7 @@ function distProvenance(directory: string): { path: string; sha256: string }[] {
     else if (entry.isFile())
       files.push({ path, sha256: createHash('sha256').update(readFileSync(path)).digest('hex') })
   }
-  return files.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))
+  return files
 }
 
 /** One owner holds host resources, business counters and authentication state for a single cell. */
@@ -356,7 +359,7 @@ async function measure(scenario: IScenario, enhanced: boolean): Promise<unknown>
     await cell.open(enhanced)
     for (let index = 0; index < warmup; index++) await cell.exchange()
     cell.reset()
-    /** Every operation has its own duration; sorting happens only after the measurement ends. */
+    /** Every operation has its own duration, kept in measurement order. */
     const durations: number[] = []
     if (profiler) {
       profiler.connect()
@@ -372,7 +375,7 @@ async function measure(scenario: IScenario, enhanced: boolean): Promise<unknown>
       await cell.exchange()
       durations.push(performance.now() - start)
     }
-    /** Capture timing before any sorting, JSON reporting or provenance work. */
+    /** Capture timing before percentile selection, JSON reporting or provenance work. */
     const elapsedMs = performance.now() - beginning
     if (profiler) {
       /** Stop after capturing elapsed time; file output stays outside the measured workload. */
@@ -382,7 +385,6 @@ async function measure(scenario: IScenario, enhanced: boolean): Promise<unknown>
         JSON.stringify(profile)
       )
     }
-    durations.sort((left, right) => left - right)
     if (
       cell.counters.settled !== samples ||
       cell.counters.providerCompleted !== samples ||
@@ -396,8 +398,8 @@ async function measure(scenario: IScenario, enhanced: boolean): Promise<unknown>
       samples,
       warmup,
       elapsedMs,
-      p50Ms: durations[Math.ceil(samples * 0.5) - 1],
-      p99Ms: durations[Math.ceil(samples * 0.99) - 1],
+      p50Ms: selectRank(durations, Math.ceil(samples * 0.5) - 1),
+      p99Ms: selectRank(durations, Math.ceil(samples * 0.99) - 1),
       operationsPerSecond: (samples * 1000) / elapsedMs,
       bytesPerSecond: (samples * scenario.bytes * scenario.chunks * 1000) / elapsedMs,
       counters: { ...cell.counters },
@@ -456,3 +458,35 @@ async function main(): Promise<void> {
 }
 
 await main()
+
+/**
+ * Value at zero-based `rank` of `values` in ascending order, found by iterative quickselect on a
+ * copy in expected O(n), so the raw measurement order is preserved and nothing is sorted.
+ */
+function selectRank(values: readonly number[], rank: number): number {
+  /** Working copy partitioned in place. */
+  const work = [...values]
+  /** Inclusive window still containing `rank`. */
+  let low = 0
+  let high = work.length - 1
+  while (low < high) {
+    /** Middle element as pivot; benchmark durations are not adversarial. */
+    const pivot = work[(low + high) >>> 1]!
+    /** Hoare partition cursors. */
+    let left = low
+    let right = high
+    while (left <= right) {
+      while (work[left]! < pivot) left += 1
+      while (work[right]! > pivot) right -= 1
+      if (left <= right) {
+        ;[work[left], work[right]] = [work[right]!, work[left]!]
+        left += 1
+        right -= 1
+      }
+    }
+    if (rank <= right) high = right
+    else if (rank >= left) low = left
+    else return work[rank]!
+  }
+  return work[rank]!
+}

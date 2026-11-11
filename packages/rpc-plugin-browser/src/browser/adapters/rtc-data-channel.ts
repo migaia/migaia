@@ -136,28 +136,32 @@ class RtcMessageIO implements IRpcMessageIO {
     emitBrowserObservation(this.observation, this.#metadata, RpcProbeDirection.outbound, frame.data)
     this.#channel.send(frame.data)
   }
+  /** Getter failure is a physical failure; no fabricated data reaches Session. */
+  #receive(listener: (value: unknown) => void, event: unknown): void {
+    try {
+      /** Read the actual native data getter once for both observation and codec delivery. */
+      const data = Reflect.get(event as object, 'data')
+      emitBrowserObservation(this.observation, this.#metadata, RpcProbeDirection.inbound, data)
+      listener({ kind: RpcCarrierFrameKind.message, data })
+    } catch (cause) {
+      this.#failure(createBrowserTransportError(BrowserRpcErrorText.rtcMessageReadFailed, cause))
+    }
+  }
   /** Acquire native terminal listeners before message delivery; rollback preserves original errors. */
   onMessage(listener: (value: unknown) => void): () => void {
     /** Exact acquired native callbacks are the entire rollback receipt. */
     const admitted: Array<() => void> = []
-    /** Getter failure is a physical failure; no fabricated data reaches Session. */
-    const receive = (event: unknown): void => {
-      try {
-        /** Read the actual native data getter once for both observation and codec delivery. */
-        const data = Reflect.get(event as object, 'data')
-        emitBrowserObservation(this.observation, this.#metadata, RpcProbeDirection.inbound, data)
-        listener({ kind: RpcCarrierFrameKind.message, data })
-      } catch (cause) {
-        this.#failure(createBrowserTransportError(BrowserRpcErrorText.rtcMessageReadFailed, cause))
-      }
-    }
+    /** Listener record whose `receive` identity is shared by add and remove. */
+    const subscription = { receive: (event: unknown): void => this.#receive(listener, event) }
     try {
       for (const type of terminalEvents) {
         this.#channel.addEventListener(type, this.#terminal)
         admitted.push(() => this.#channel.removeEventListener(type, this.#terminal))
       }
-      this.#channel.addEventListener(BrowserPeerEvent.message, receive)
-      admitted.push(() => this.#channel.removeEventListener(BrowserPeerEvent.message, receive))
+      this.#channel.addEventListener(BrowserPeerEvent.message, subscription.receive)
+      admitted.push(() =>
+        this.#channel.removeEventListener(BrowserPeerEvent.message, subscription.receive)
+      )
     } catch (primary) {
       for (const remove of admitted.reverse())
         try {

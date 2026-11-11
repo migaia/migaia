@@ -120,6 +120,18 @@ function isSessionReply(frame: IRpcSemanticFrame): boolean {
 }
 
 /** Stateful media work remains here, outside the pure contract and outside business work tables. */
+/**
+ * One encoded write's borrowed options, message and bootstrap/close boundary for its physical
+ * handoff.
+ */
+type ISessionWriteContext = Readonly<{
+  options: IRpcFrameWriteOptions
+  message: IRpcSemanticFrame
+  bootstrap: boolean
+  continuing: boolean
+  final: boolean
+}>
+
 export class Session {
   /** Explicit collaborators own identity, indexing and actual business execution elsewhere. */
   readonly #options: IRpcSessionOptions
@@ -209,25 +221,31 @@ export class Session {
     this.#credentials = { value: connection?.credentials, retain: connection?.retain }
     bindSessionCredentials(this.#handshakeResult, this.#credentials)
     this.#handshakeResult.authentication = connection?.authentication
-    /** The readonly handle getter borrows only this Session's actual readiness-failure fact. */
-    const handshakeFailure = () => this.#handshakeFailure
-    this.handle = Object.freeze({
-      get handshakeFailure() {
-        return handshakeFailure()
-      },
-      carrierId: options.carrier.id,
-      ready: this.#ready.promise,
-      closed: this.#closed.promise,
-      close: this.close,
-      canKeepalive: () => this.canKeepalive(),
-      current: () => this.current(),
-      send: (frame, writeOptions) => this.send(frame, writeOptions),
-      assertTransfer: (writeOptions) => this.assertTransfer(writeOptions),
-      ping: (pingOptions) => this.ping(pingOptions),
-      drain: this.#drainTracked,
-      announceDirectory: () => this.announceDirectory(),
-      track: options.track
-    })
+    // The readonly handle getter reads only this Session's actual readiness-failure fact; it is
+    // defined first so the handle keeps its original key order and accessor descriptor.
+    this.handle = Object.freeze(
+      Object.assign(
+        Object.defineProperty({} as { readonly handshakeFailure: unknown }, 'handshakeFailure', {
+          configurable: true,
+          enumerable: true,
+          get: () => this.#handshakeFailure
+        }),
+        {
+          carrierId: options.carrier.id,
+          ready: this.#ready.promise,
+          closed: this.#closed.promise,
+          close: this.close,
+          canKeepalive: () => this.canKeepalive(),
+          current: () => this.current(),
+          send: (frame, writeOptions) => this.send(frame, writeOptions),
+          assertTransfer: (writeOptions) => this.assertTransfer(writeOptions),
+          ping: (pingOptions) => this.ping(pingOptions),
+          drain: this.#drainTracked,
+          announceDirectory: () => this.announceDirectory(),
+          track: options.track
+        } satisfies Omit<IRpcPrivateSession, 'handshakeFailure'>
+      )
+    ) as IRpcPrivateSession
     // Mark internally owned promises handled while preserving their original public rejection.
     void this.#ready.promise.catch(() => undefined)
     void this.#closed.promise.catch(() => undefined)
@@ -1125,6 +1143,37 @@ export class Session {
   }
 
   /** Prepare/encode remain on the actual carrier, with hooks at the specified metadata/frame seams. */
+  /**
+   * Sole physical handoff point of one encoded write, including chunk/batch descendants.
+   * Replacement payloads carry their own physical options; a batch may clear only its first logical
+   * signal, never the held Session's terminal fence.
+   */
+  async #writePhysical(
+    writeContext: ISessionWriteContext,
+    payload: IRpcFramePayload
+  ): Promise<void> {
+    /** Replacement frame payloads carry the matching physical options through every branch. */
+    const { frame, write: physical = writeContext.options } = payload
+    this.#assertOpen(writeContext.continuing, writeContext.final)
+    /** Effective signal: a cleared batch signal falls back to the Session controller. */
+    const signal = physical?.signal === false ? this.#controller.signal : physical?.signal
+    this.#observation.media(S.frame, D.outbound, frame, writeContext.message, physical?.transfer)
+    this.#assertOpen(writeContext.continuing, writeContext.final)
+    if (signal?.aborted) throw signal.reason
+    await this.#write(
+      frame,
+      {
+        sendClass: physical?.sendClass ?? writeContext.options?.sendClass,
+        trace: physical?.trace ?? writeContext.options?.trace,
+        signal: signal ?? this.#controller.signal,
+        transfer: physical?.transfer,
+        onWriteStart: physical?.onWriteStart,
+        admission: physical?.admission
+      },
+      writeContext.bootstrap
+    )
+  }
+
   async #encode(
     message: IRpcSemanticFrame,
     options: IRpcSessionWriteOptions | undefined,
@@ -1188,29 +1237,6 @@ export class Session {
       continuing,
       final
     }
-    /** The continuation is the sole physical handoff point, including optional chunk/batch output. */
-    const write = async (payload: IRpcFramePayload): Promise<void> => {
-      /** Replacement frame payloads carry the matching physical options through every branch. */
-      const { frame, write: physical = writeContext.options } = payload
-      this.#assertOpen(writeContext.continuing, writeContext.final)
-      /** A batch may clear only its first logical signal, never the held Session's terminal fence. */
-      const signal = physical?.signal === false ? this.#controller.signal : physical?.signal
-      this.#observation.media(S.frame, D.outbound, frame, writeContext.message, physical?.transfer)
-      this.#assertOpen(writeContext.continuing, writeContext.final)
-      if (signal?.aborted) throw signal.reason
-      await this.#write(
-        frame,
-        {
-          sendClass: physical?.sendClass ?? writeContext.options?.sendClass,
-          trace: physical?.trace ?? writeContext.options?.trace,
-          signal: signal ?? this.#controller.signal,
-          transfer: physical?.transfer,
-          onWriteStart: physical?.onWriteStart,
-          admission: physical?.admission
-        },
-        writeContext.bootstrap
-      )
-    }
     try {
       /** Each physical descendant borrows the same reservation without releasing it early. */
       const physical: IRpcFrameWriteOptions = writeContext.options
@@ -1222,12 +1248,12 @@ export class Session {
         },
         write: physical
       }
-      if (bootstrap) await write(payload)
+      if (bootstrap) await this.#writePhysical(writeContext, payload)
       else
         await this.#options
           .pipelines()
           .pipeline(RpcFlowPoint.frameOutbound, this.#options.namespace)
-          .run(payload, write)
+          .run(payload, (next) => this.#writePhysical(writeContext, next))
     } finally {
       admission?.release()
     }
