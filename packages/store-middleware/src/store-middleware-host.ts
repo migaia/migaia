@@ -223,9 +223,9 @@ function createStoreMiddlewareHostCore<S>(
     modules: [syncPipelineModule],
     host: settled,
     surface,
-    domainCore: () => controller.domainCore(),
+    domainCore: controller.domainCore,
     // Store 绑定先释放，再委托 plugin-host 清理；`next()` 由句柄保证恰好执行一次。
-    dispose: (next) => controller.dispose(next)
+    dispose: controller.dispose
   })
   controller.host = host
   return host
@@ -428,8 +428,8 @@ class StoreMiddlewareController<S> {
     } else this.#bindingDisposers.push(disposer)
   }
 
-  /** Domain core handed to middleware plugins. */
-  domainCore() {
+  /** Domain core handed to middleware plugins; an arrow field so the host takes it directly. */
+  readonly domainCore = () => {
     return {
       runtime: this.#runtime,
       getState: () => this.#getState(),
@@ -446,10 +446,13 @@ class StoreMiddlewareController<S> {
     }
   }
 
-  /** Releases store bindings LIFO, then delegates to plugin-host cleanup and merges failures. */
-  async dispose(
+  /**
+   * Releases store bindings LIFO, then delegates to plugin-host cleanup and merges failures. An
+   * arrow field so the host takes it directly, without a forwarding frame.
+   */
+  readonly dispose = async (
     next: () => Promise<IPluginHostDisposalResult>
-  ): Promise<IPluginHostDisposalResult> {
+  ): Promise<IPluginHostDisposalResult> => {
     /** Binding cleanup failures. */
     const errors: unknown[] = []
     /** Close admission before any disposer can reenter registration. */

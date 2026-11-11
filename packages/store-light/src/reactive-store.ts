@@ -487,11 +487,6 @@ class StoreCore<S extends Record<string, unknown>> {
       )
   }
 
-  /** Delegates write admission to the mutation policy, if any. */
-  #assertMutationAllowed(operation: string): void {
-    this.#mutationPolicy?.assertMutationAllowed(operation)
-  }
-
   /** Batches `fn`, inside an admitted action when a mutation policy exists. */
   #runMutation<T>(fn: () => T): T {
     return this.#mutationPolicy
@@ -628,9 +623,13 @@ class StoreCore<S extends Record<string, unknown>> {
         this.#assertNotDisposed()
         return node.value
       },
+      // Hot write path: checks read the fields directly, and the operation label is built only
+      // when a mutation policy exists to receive it.
       set: (v: unknown) => {
-        this.#assertNotDisposed()
-        this.#assertMutationAllowed(`set(${key})`)
+        if (this.#disposed) this.#assertNotDisposed()
+        /** Write admission policy, read once per write. */
+        const policy = this.#mutationPolicy
+        if (policy) policy.assertMutationAllowed(`set(${key})`)
         node.value = v
       }
     })
