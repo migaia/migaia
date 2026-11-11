@@ -22,7 +22,9 @@ export type IMutationPolicyMode = 'off' | 'actions-only'
  * itself, and an asynchronous continuation does not retain the action scope.
  */
 export class MutationPolicy implements IMutationGuard {
+  /** Nesting depth of synchronous `runInAction` scopes; writes are admitted while it is above 0. */
   #actionDepth = 0
+  /** Admission mode: `off` admits every write, `actions-only` requires a current action scope. */
   #mode: IMutationPolicyMode
 
   /** Select off for unrestricted admission, or actions-only to require a current action scope. */

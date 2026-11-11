@@ -162,6 +162,17 @@ export function createStoreResource<T>(
   factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>,
   options?: IStoreResourceOptions<T>
 ): IStoreResource<T> {
+  /** Loader and merged options, read once. */
+  const { load, config } = readStoreResourceConfig(factory, options)
+  return new StoreResource(load, config)
+}
+
+/** Reads the factory and options once: a function or `{ load }` config, plus explicit options. */
+function readStoreResourceConfig<T>(
+  factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>,
+  options: IStoreResourceOptions<T> | undefined
+): { load: IStoreResourceFactory<T>; config: IStoreResourceOptions<T> } {
+  /** Whether the factory is the loader itself. */
   const factoryIsFunction = typeof factory === 'function'
   try {
     if (!factoryIsFunction && (factory === null || typeof factory !== 'object')) {
@@ -184,6 +195,7 @@ export function createStoreResource<T>(
       StoreLightErrorText.optionsObject
     )
   }
+  /** Explicit options, snapshotted once. */
   let explicitOptions: IStoreResourceOptions<T> = {}
   if (options !== undefined) {
     try {
@@ -196,9 +208,12 @@ export function createStoreResource<T>(
       )
     }
   }
+  /** Loader. */
   let load: IStoreResourceFactory<T>
+  /** Factory options overridden by explicit options. */
   let config: IStoreResourceOptions<T>
   try {
+    /** Loader candidate read once from the factory. */
     const loadCandidate = factoryIsFunction
       ? factory
       : Reflect.get(factory as object, 'load', factory as object)
@@ -209,6 +224,7 @@ export function createStoreResource<T>(
       )
     }
     load = loadCandidate as IStoreResourceFactory<T>
+    /** Options carried on a config object. */
     const factoryOptions = factoryIsFunction ? {} : snapshotResourceOptions<T>(factory as object)
     config = { ...factoryOptions, ...explicitOptions }
   } catch (error) {
@@ -229,108 +245,217 @@ export function createStoreResource<T>(
       StoreLightErrorText.optionsInvalid
     )
   }
-  /** Validate one real Runtime and capture the timer scheduler before creating resource state. */
-  const runtime = config.runtime ?? getDefaultRuntime()
-  internalRuntimeOf(runtime)
-  const scheduler = resolveSchedulerOption(config, systemScheduler)
-  const cachePolicy = new ResourceCachePolicy(config.keepAliveMs ?? 1000, scheduler)
-  /** Value ownership may close while the canonical request finishes for its resource lease. */
-  const terminal = createTerminalController()
-  /** Closing retains an owned version, not an independent fetch/data state. */
-  let closingVersion: IResourceVersion<T> | undefined
-  /** Identity of the canonical request used only to bind render captures. */
-  let activeContext!: IResourceFetchContext
-  /** Resource alone owns pending/data/error/Promise and generation cancellation. */
-  const core = new Resource<T>(
-    (context) => {
-      activeContext = context
-      return Promise.resolve()
-        .then(() => load(context))
-        .then((next) => {
-          assertDisposableValue(next)
-          if (context.signal.aborted || terminal.lifecycle === LifecycleState.terminal) {
-            if (currentState().kind === StoreResourceKind.loading) versions.addSuperseded(next)
-            else cleanupUnique([next])
-            return next
-          }
-          if (ownership.isDisposed(next))
-            throw createStoreLightError(
-              StoreLightErrorCode.resourceDisposed,
-              StoreLightErrorText.disposedResourceValue
-            )
-          versions.addSuperseded(next)
-          return next
-        })
-    },
-    runtime,
-    { autoStart: false, keepAlive: true, ttl: Infinity, scheduler }
+  return { load, config }
+}
+
+/** Throws RESOURCE_DISPOSED. */
+function resourceDisposedError(): Error {
+  return createStoreLightError(
+    StoreLightErrorCode.resourceDisposed,
+    StoreLightErrorText.resourceDisposed
   )
+}
+
+/** Throws UNKNOWN_VERSION. */
+function unknownVersionError(): Error {
+  return createStoreLightError(
+    StoreLightErrorCode.unknownVersion,
+    StoreLightErrorText.unknownResourceVersion
+  )
+}
+
+/** One version lease; its release function is the lease token and runs once. */
+class VersionLease {
+  /** Live lease tokens and their versions, shared with the resource. */
+  readonly #activeLeaseTokens: WeakMap<object, number>
+  /** Releases the ownership retained for this lease. */
+  #releaseOwnership: (() => void) | undefined
+  /** True until released. */
+  #active = true
+  /** Binds the resource's lease-token table. */
+  constructor(activeLeaseTokens: WeakMap<object, number>) {
+    this.#activeLeaseTokens = activeLeaseTokens
+  }
+  /** Records the ownership release and registers this lease's token for `id`. */
+  attach(releaseOwnership: () => void, id: number): () => void {
+    this.#releaseOwnership = releaseOwnership
+    this.#activeLeaseTokens.set(this.release, id)
+    return this.release
+  }
+  /** Releases once and forgets the token. */
+  readonly release = (): void => {
+    if (!this.#active) return
+    this.#active = false
+    this.#activeLeaseTokens.delete(this.release)
+    this.#releaseOwnership?.()
+  }
+}
+
+/**
+ * Readable async value with separate resource and rendered-version leases. The Resource core owns
+ * pending/data/error/Promise and generation cancellation; this owner adds versions, leases, render
+ * captures, eviction and value disposal. Only the public API members are visible.
+ */
+class StoreResource<T> implements IStoreResource<T> {
+  /** Loader. */
+  readonly #load: IStoreResourceFactory<T>
+  /** Merged options. */
+  readonly #config: IStoreResourceOptions<T>
+  /** Owning runtime. */
+  readonly #runtime: IRuntime
+  /** Idle eviction timer policy. */
+  readonly #cachePolicy: ResourceCachePolicy
+  /** Value ownership may close while the canonical request finishes for its resource lease. */
+  readonly #terminal = createTerminalController()
+  /** Closing retains an owned version, not an independent fetch/data state. */
+  #closingVersion: IResourceVersion<T> | undefined
+  /** Identity of the canonical request used only to bind render captures. */
+  #activeContext!: IResourceFetchContext
+  /** Resource alone owns pending/data/error/Promise and generation cancellation. */
+  readonly #core: Resource<T>
+  /** Physical cleanup completion is tracked separately from logical terminal state. */
+  #physicalTerminal = Promise.resolve()
+  /** Resource and version leases. */
+  readonly #ownership = new ResourceOwnershipRegistry<T>()
+  /** Stale, retired, closing and superseded versions. */
+  readonly #versions = new ResourceVersionRegistry<T>()
+  /** Render captures bridging render to layout. */
+  readonly #captures: ResourceCaptureRegistry
+  /** Last produced version id. */
+  #version = 0
+  /** Token minted per version id. */
+  readonly #versionTokens = new Map<number, IVersionToken>()
+  /** Version id of each token. */
+  readonly #tokenVersions = new WeakMap<object, number>()
+  /** Revision for `useSyncExternalStore`. */
+  #revision = 0
+  /** Owns transient revision notifications while preserving the legacy Set dedupe contract. */
+  readonly #listenerChannel: ReturnType<typeof createEventChannel<void>>
+  /** Maps each legacy listener identity to its event-subscriber registration. */
+  readonly #listenerRegistrations = new Map<() => void, () => void>()
+  /** Live lease tokens and their version ids. */
+  readonly #activeLeaseTokens = new WeakMap<object, number>()
+
+  /** Validates the runtime, captures the scheduler, and creates the core and registries. */
+  constructor(load: IStoreResourceFactory<T>, config: IStoreResourceOptions<T>) {
+    this.#load = load
+    this.#config = config
+    /** Validate one real Runtime and capture the timer scheduler before creating resource state. */
+    this.#runtime = config.runtime ?? getDefaultRuntime()
+    internalRuntimeOf(this.#runtime)
+    /** Timer scheduler shared by the core, eviction and captures. */
+    const scheduler = resolveSchedulerOption(config, systemScheduler)
+    this.#cachePolicy = new ResourceCachePolicy(config.keepAliveMs ?? 1000, scheduler)
+    this.#core = new Resource<T>((context) => this.#runLoad(context), this.#runtime, {
+      autoStart: false,
+      keepAlive: true,
+      ttl: Infinity,
+      scheduler
+    })
+    this.#captures = new ResourceCaptureRegistry(() => this.#onCapturesChanged(), scheduler)
+    this.#listenerChannel = createEventChannel<void>({
+      report: ({ error }) => this.#report(error, StoreResourceErrorPhase.listener)
+    })
+  }
+
+  /** Canonical load: run the loader, then classify the value against cancellation and disposal. */
+  #runLoad(context: IResourceFetchContext): Promise<T> {
+    this.#activeContext = context
+    return Promise.resolve()
+      .then(() => this.#load(context))
+      .then((next) => this.#acceptLoaded(context, next))
+  }
+
+  /** A late value is released (or kept as superseded while loading); a disposed value is rejected. */
+  #acceptLoaded(context: IResourceFetchContext, next: T): T {
+    this.#assertDisposableValue(next)
+    if (context.signal.aborted || this.#terminal.lifecycle === LifecycleState.terminal) {
+      if (this.#currentState().kind === StoreResourceKind.loading)
+        this.#versions.addSuperseded(next)
+      else this.#cleanupUnique([next])
+      return next
+    }
+    if (this.#ownership.isDisposed(next))
+      throw createStoreLightError(
+        StoreLightErrorCode.resourceDisposed,
+        StoreLightErrorText.disposedResourceValue
+      )
+    this.#versions.addSuperseded(next)
+    return next
+  }
+
+  /** Capture changes are reconciled after the current commit turn. */
+  #onCapturesChanged(): void {
+    deferRuntimeCleanup(this.#runtime, () => this.#reconcileCaptures())
+  }
+
+  /** Releases retired versions no capture needs anymore, then rechecks ownership. */
+  #reconcileCaptures(): void {
+    for (const id of this.#versions.retiredIds()) this.#releaseRetired(id)
+    this.#onOwnersChanged()
+  }
+
   /** Derives the facade vocabulary; stores no parallel request or data discriminant. */
-  const currentState = (): IResourceCoreState<T> => {
-    if (terminal.lifecycle === LifecycleState.terminal) return { kind: StoreResourceKind.disposed }
-    if (terminal.lifecycle === LifecycleState.closing)
+  #currentState(): IResourceCoreState<T> {
+    if (this.#terminal.lifecycle === LifecycleState.terminal)
+      return { kind: StoreResourceKind.disposed }
+    if (this.#terminal.lifecycle === LifecycleState.closing)
       return {
         kind: StoreResourceKind.closing,
-        ...(closingVersion ? { current: closingVersion } : {})
+        ...(this.#closingVersion ? { current: this.#closingVersion } : {})
       }
-    const state = core.peekState()
-    if (core.fetchStatus === ResourceFetchStatus.fetching)
+    /** Core state. */
+    const state = this.#core.peekState()
+    if (this.#core.fetchStatus === ResourceFetchStatus.fetching)
       return {
         kind: StoreResourceKind.loading,
-        operation: core.promise,
-        ...(versions.stale ? { previous: versions.stale } : {})
+        operation: this.#core.promise,
+        ...(this.#versions.stale ? { previous: this.#versions.stale } : {})
       }
     if (state.status === ResourceStatus.success)
       return {
         kind: StoreResourceKind.ready,
-        current: { id: version, token: versionToken(version), value: state.data }
+        current: { id: this.#version, token: this.#versionToken(this.#version), value: state.data }
       }
     if (state.status === ResourceStatus.error || state.status === ResourceStatus.cancelled)
       return { kind: StoreResourceKind.failed, error: state.error }
     return { kind: StoreResourceKind.idle }
   }
+
+  /** Whether the resource is disposed or closing. */
+  #isEnding(): boolean {
+    /** Current kind. */
+    const kind = this.#currentState().kind
+    return kind === StoreResourceKind.disposed || kind === StoreResourceKind.closing
+  }
+
   /** Closes value ownership while allowing an already leased request to finish. */
-  const closeOwnership = (current?: IResourceVersion<T>): void => {
-    closingVersion = current
-    terminal.close()
+  #closeOwnership(current?: IResourceVersion<T>): void {
+    this.#closingVersion = current
+    this.#terminal.close()
   }
+
   /** Terminal ownership hides data before any value disposer or observer can reenter. */
-  const terminateOwnership = (): void => {
-    terminal.forceTerminal()
-    closingVersion = undefined
+  #terminateOwnership(): void {
+    this.#terminal.forceTerminal()
+    this.#closingVersion = undefined
   }
-  /** Physical cleanup completion is tracked separately from logical terminal state. */
-  let physicalTerminal = Promise.resolve()
-  const ownership = new ResourceOwnershipRegistry<T>()
-  const versions = new ResourceVersionRegistry<T>()
-  const captures = new ResourceCaptureRegistry(() => {
-    deferRuntimeCleanup(runtime, () => {
-      for (const id of versions.retiredIds()) releaseRetired(id)
-      onOwnersChanged()
-    })
-  }, scheduler)
-  let version = 0
-  const versionTokens = new Map<number, IVersionToken>()
-  const tokenVersions = new WeakMap<object, number>()
-  const versionToken = (id: number): IVersionToken => {
-    let token = versionTokens.get(id)
+
+  /** Token of a version id, minted on first use. */
+  #versionToken(id: number): IVersionToken {
+    /** Existing token. */
+    let token = this.#versionTokens.get(id)
     if (!token) {
       token = {}
-      versionTokens.set(id, token)
-      tokenVersions.set(token, id)
+      this.#versionTokens.set(id, token)
+      this.#tokenVersions.set(token, id)
     }
     return token
   }
-  let revision = 0
-  /** Owns transient revision notifications while preserving the legacy Set dedupe contract. */
-  const listenerChannel = createEventChannel<void>({
-    report: ({ error }) => report(error, StoreResourceErrorPhase.listener)
-  })
-  /** Maps each legacy listener identity to its event-subscriber registration. */
-  const listenerRegistrations = new Map<() => void, () => void>()
-  const activeLeaseTokens = new WeakMap<object, number>()
+
   /** Preserve the primary when a diagnostic callback fails, without falling back to host globals. */
-  const report = (error: unknown, phase: IStoreResourceErrorPhase) => {
+  readonly #report = (error: unknown, phase: IStoreResourceErrorPhase): void => {
+    /** Runtime error phase of this resource phase. */
     const context: Parameters<IRuntime['reportError']>[1] = {
       phase:
         phase === StoreResourceErrorPhase.dispose
@@ -339,46 +464,61 @@ export function createStoreResource<T>(
             ? ReactiveErrorPhase.subscriptionListener
             : ReactiveErrorPhase.asyncFlush
     }
-    const reportFailure = (reporterError: unknown): void => {
-      runtime.reportError(error, context)
-      runtime.reportError(reporterError, { phase: ReactiveErrorPhase.asyncFlush })
-    }
-    if (config.onError === undefined) {
-      runtime.reportError(error, context)
+    if (this.#config.onError === undefined) {
+      this.#runtime.reportError(error, context)
       return
     }
     try {
-      const result: unknown = config.onError(error, phase)
+      /** Reporter result; a thenable is observed for rejection. */
+      const result: unknown = this.#config.onError(error, phase)
       const probe = probeThenable(result)
-      if (probe.kind === ThenableProbeKind.failed) reportFailure(probe.error)
+      if (probe.kind === ThenableProbeKind.failed)
+        this.#reportReporterFailure(error, context, probe.error)
       else if (probe.kind === ThenableProbeKind.thenable)
-        void assimilateCapturedThen(probe.thenFn, result).catch(reportFailure)
+        void assimilateCapturedThen(probe.thenFn, result).catch((reporterError: unknown) =>
+          this.#reportReporterFailure(error, context, reporterError)
+        )
     } catch (reporterError) {
-      reportFailure(reporterError)
+      this.#reportReporterFailure(error, context, reporterError)
     }
   }
-  const notify = () => {
-    revision++
+
+  /** The reporter failed: report the original, then the reporter's own failure. */
+  #reportReporterFailure(
+    error: unknown,
+    context: Parameters<IRuntime['reportError']>[1],
+    reporterError: unknown
+  ): void {
+    this.#runtime.reportError(error, context)
+    this.#runtime.reportError(reporterError, { phase: ReactiveErrorPhase.asyncFlush })
+  }
+
+  /** Bumps the revision and notifies listeners; listener failures are reported one by one. */
+  #notify(): void {
+    this.#revision++
     try {
-      listenerChannel.publish(undefined)
+      this.#listenerChannel.publish(undefined)
     } catch (error) {
       if (error instanceof AggregateError) {
-        for (const failure of error.errors) report(failure, StoreResourceErrorPhase.listener)
+        for (const failure of error.errors) this.#report(failure, StoreResourceErrorPhase.listener)
       } else {
-        report(error, StoreResourceErrorPhase.listener)
+        this.#report(error, StoreResourceErrorPhase.listener)
       }
     }
   }
-  // Pending observations are excluded by ResourceCaptureRegistry.hasAny();
-  // only a resolved version reservation can bridge render → layout. This keeps
-  // initial Suspense renders safe without letting a never-settling operation
-  // keep a closing resource alive forever.
-  const hasOwners = () => ownership.hasOwners || captures.hasAny()
-  const hasCommittedOwners = () => ownership.hasOwners
-  const hasVersionReservations = () => captures.hasAny()
-  const assertDisposableValue = (value: T) => {
+
+  // Pending observations are excluded by ResourceCaptureRegistry.hasAny(); only a resolved version
+  // reservation can bridge render → layout. This keeps initial Suspense renders safe without
+  // letting a never-settling operation keep a closing resource alive forever.
+  /** Any committed owner or version reservation. */
+  #hasOwners(): boolean {
+    return this.#ownership.hasOwners || this.#captures.hasAny()
+  }
+
+  /** A value-disposing resource requires object identity for every value. */
+  #assertDisposableValue(value: T): void {
     if (
-      config.dispose &&
+      this.#config.dispose &&
       (value == null || (typeof value !== 'object' && typeof value !== 'function'))
     )
       throw createStoreLightTypeError(
@@ -386,34 +526,43 @@ export function createStoreResource<T>(
         StoreLightErrorText.disposableIdentity
       )
   }
-  const resolveDisposer = (value: T): (() => void | PromiseLike<void>) | undefined => {
-    if (config.dispose) return () => config.dispose?.(value)
+
+  /** Disposer of one value: the configured `dispose`, or the value's own `$dispose`. */
+  #resolveDisposer(value: T): (() => void | PromiseLike<void>) | undefined {
+    if (this.#config.dispose) return () => this.#config.dispose?.(value)
     if (value == null || (typeof value !== 'object' && typeof value !== 'function'))
       return undefined
     try {
+      /** Value carrying an optional `$dispose`. */
       const candidate = value as { $dispose?: () => void | PromiseLike<void> }
+      /** Its `$dispose`, read once. */
       const dispose = candidate.$dispose
       return typeof dispose === 'function' ? () => Reflect.apply(dispose, candidate, []) : undefined
     } catch (error) {
-      report(error, StoreResourceErrorPhase.dispose)
+      this.#report(error, StoreResourceErrorPhase.dispose)
       return undefined
     }
   }
+
   /** A value held by any visible or retired version cannot be released yet. */
-  const heldElsewhere = (value: T): boolean => {
-    const current = currentState()
+  #heldElsewhere(value: T): boolean {
+    /** Current state. */
+    const current = this.#currentState()
     return (
-      versions.holds(value) ||
+      this.#versions.holds(value) ||
       ((current.kind === StoreResourceKind.ready || current.kind === StoreResourceKind.closing) &&
         current.current !== undefined &&
         Object.is(current.current.value, value))
     )
   }
-  const cleanupOnce = (value: T, ledger?: ISyncStartedDisposalLedger) => {
-    if (ownership.isDisposed(value)) return
-    const disposer = resolveDisposer(value)
+
+  /** Disposes one value once; with a ledger the start is recorded for physical completion. */
+  #cleanupOnce(value: T, ledger?: ISyncStartedDisposalLedger): void {
+    if (this.#ownership.isDisposed(value)) return
+    /** Disposer of this value. */
+    const disposer = this.#resolveDisposer(value)
     if (!disposer) return
-    ownership.markDisposed(value)
+    this.#ownership.markDisposed(value)
     if (ledger) {
       ledger.start('store-resource', disposer)
       return
@@ -423,315 +572,372 @@ export function createStoreResource<T>(
       const result = disposer()
       const probe = probeThenable(result)
       if (probe.kind === ThenableProbeKind.failed)
-        report(probe.error, StoreResourceErrorPhase.dispose)
+        this.#report(probe.error, StoreResourceErrorPhase.dispose)
       else if (probe.kind === ThenableProbeKind.thenable)
         void assimilateCapturedThen(probe.thenFn, result).catch((error: unknown) =>
-          report(error, StoreResourceErrorPhase.dispose)
+          this.#report(error, StoreResourceErrorPhase.dispose)
         )
     } catch (error) {
-      report(error, StoreResourceErrorPhase.dispose)
+      this.#report(error, StoreResourceErrorPhase.dispose)
     }
   }
-  const cleanupUnique = (values: T[], ledger?: ISyncStartedDisposalLedger) => {
-    const seen: T[] = []
+
+  /** Disposes each distinct value not still held elsewhere. */
+  #cleanupUnique(values: T[], ledger?: ISyncStartedDisposalLedger): void {
+    /** Values already handled, with Object.is identity (a Set alone would merge -0 and +0). */
+    const seen = new SameValueSet<T>()
     for (const value of values) {
-      if (seen.some((item) => Object.is(item, value)) || heldElsewhere(value)) continue
-      seen.push(value)
-      cleanupOnce(value, ledger)
+      if (seen.has(value) || this.#heldElsewhere(value)) continue
+      seen.add(value)
+      this.#cleanupOnce(value, ledger)
     }
   }
-  const cancelEviction = () => cachePolicy.cancelEviction()
-  const releaseRetired = (id: number) => {
-    // Peek, don't mint: `versionToken(id)` creates one on a miss, which would
-    // silently revive an already-pruned entry just to ask whether it has
-    // owners (it never does, having just been minted) — self-correcting but
-    // pointless, and it defeats the point of asking in the first place.
-    const existingToken = versionTokens.get(id)
+
+  /**
+   * Releases one retired version unless a lease or capture still needs it. Peek, don't mint:
+   * `versionToken(id)` creates one on a miss, which would silently revive an already-pruned entry
+   * just to ask whether it has owners.
+   */
+  #releaseRetired(id: number): void {
+    /** Existing token, if any. */
+    const existingToken = this.#versionTokens.get(id)
     if (
-      (existingToken && ownership.versionOwnerCountToken(existingToken) !== 0) ||
-      captures.has(id)
+      (existingToken && this.#ownership.versionOwnerCountToken(existingToken) !== 0) ||
+      this.#captures.has(id)
     )
       return
-    const retired = versions.takeRetired(id) ?? versions.takeClosing(id)
-    if (retired) cleanupUnique([retired.value])
-    pruneVersionToken(id)
+    /** Retired or closing version to release. */
+    const retired = this.#versions.takeRetired(id) ?? this.#versions.takeClosing(id)
+    if (retired) this.#cleanupUnique([retired.value])
+    this.#pruneVersionToken(id)
   }
+
   /**
-   * Release the token minted for a version once nothing can reach it anymore.
-   *
-   * `version` (the monotonic counter) only tracks the _last produced_ id, not the _currently
-   * visible_ one — after the ready value at that id is evicted to idle, `version` still equals it,
-   * so a plain `id !== version` guard would refuse to prune the very token that just became
-   * unreachable. Check the actual current state instead, plus the version registry (stale/
-   * retired/closing) and any live ownership lease. `.get` only peeks: `versionToken(id)` itself
-   * mints on miss, which would be wrong inside a "can we forget this" check.
+   * Release the token minted for a version once nothing can reach it anymore. `version` (the
+   * monotonic counter) only tracks the _last produced_ id, not the _currently visible_ one, so
+   * check the actual current state, the version registry and any live ownership lease. `.get` only
+   * peeks.
    */
-  const pruneVersionToken = (id: number) => {
-    const current = currentState()
+  #pruneVersionToken(id: number): void {
+    /** Current state. */
+    const current = this.#currentState()
+    /** Whether `id` is still the visible ready version. */
     const stillVisible = current.kind === StoreResourceKind.ready && current.current.id === id
-    if (stillVisible || versions.has(id)) return
-    const token = versionTokens.get(id)
-    if (token && ownership.versionOwnerCountToken(token) > 0) return
-    versionTokens.delete(id)
+    if (stillVisible || this.#versions.has(id)) return
+    /** Token of `id`, if minted. */
+    const token = this.#versionTokens.get(id)
+    if (token && this.#ownership.versionOwnerCountToken(token) > 0) return
+    this.#versionTokens.delete(id)
   }
-  const retire = (retiredVersion: number, value: T) => {
-    versions.retire({ id: retiredVersion, token: versionToken(retiredVersion), value })
-    releaseRetired(retiredVersion)
-  }
-  const scheduleEviction = () =>
-    cachePolicy.scheduleEviction(() => {
-      if (hasOwners()) return
-      // A first-load dispose can leave a value in `closing` after its
-      // provisional resource owner releases before settlement. That value has
-      // no version lease, so TTL must terminate the closing resource too.
-      if (currentState().kind === StoreResourceKind.closing) {
-        forceDisposeResource()
-        return
-      }
-      const stale = versions.takeStale()
-      if (stale) {
-        cleanupUnique([stale.value])
-        pruneVersionToken(stale.id)
-      }
-      const current = currentState()
-      if (current.kind === StoreResourceKind.ready) {
-        const evicted = current.current
-        core.reset()
-        notify()
-        cleanupUnique([evicted.value])
-        pruneVersionToken(evicted.id)
-      }
+
+  /** Retires one version and releases it if nothing needs it. */
+  #retire(retiredVersion: number, value: T): void {
+    this.#versions.retire({
+      id: retiredVersion,
+      token: this.#versionToken(retiredVersion),
+      value
     })
-  const forceDisposeResource = () => {
-    const wasDisposed = currentState().kind === StoreResourceKind.disposed
-    cachePolicy.dispose()
-    ownership.forceReset()
-    captures.clear()
-    const visible = currentState()
-    core.dispose()
+    this.#releaseRetired(retiredVersion)
+  }
+
+  /** Schedules idle eviction. */
+  #scheduleEviction(): void {
+    this.#cachePolicy.scheduleEviction(() => this.#evict())
+  }
+
+  /**
+   * Idle eviction. A first-load dispose can leave a value in `closing` after its provisional
+   * resource owner releases before settlement; that value has no version lease, so TTL must
+   * terminate the closing resource too.
+   */
+  #evict(): void {
+    if (this.#hasOwners()) return
+    if (this.#currentState().kind === StoreResourceKind.closing) {
+      this.#forceDisposeResource()
+      return
+    }
+    /** Stale version to release. */
+    const stale = this.#versions.takeStale()
+    if (stale) {
+      this.#cleanupUnique([stale.value])
+      this.#pruneVersionToken(stale.id)
+    }
+    /** State after releasing stale. */
+    const current = this.#currentState()
+    if (current.kind === StoreResourceKind.ready) {
+      /** Evicted visible version. */
+      const evicted = current.current
+      this.#core.reset()
+      this.#notify()
+      this.#cleanupUnique([evicted.value])
+      this.#pruneVersionToken(evicted.id)
+    }
+  }
+
+  /** Terminates now: drops leases and captures, disposes every value and reports cleanup failures. */
+  #forceDisposeResource(): void {
+    /** Whether the resource was already terminal. */
+    const wasDisposed = this.#currentState().kind === StoreResourceKind.disposed
+    this.#cachePolicy.dispose()
+    this.#ownership.forceReset()
+    this.#captures.clear()
+    /** State before the core is disposed. */
+    const visible = this.#currentState()
+    this.#core.dispose()
+    /** Every value still owned. */
     const values = [
-      ...versions.clear(),
+      ...this.#versions.clear(),
       ...(visible.kind === StoreResourceKind.ready ? [visible.current.value] : []),
       ...(visible.kind === StoreResourceKind.closing && visible.current
         ? [visible.current.value]
         : [])
     ]
-    terminateOwnership()
-    if (!wasDisposed) notify()
-    listenerChannel.clear()
-    listenerRegistrations.clear()
+    this.#terminateOwnership()
+    if (!wasDisposed) this.#notify()
+    this.#listenerChannel.clear()
+    this.#listenerRegistrations.clear()
+    /** Ledger recording physical cleanup starts. */
     const physicalLedger = createSyncStartedDisposalLedger()
-    cleanupUnique(values, physicalLedger)
+    this.#cleanupUnique(values, physicalLedger)
+    /** Sealed physical outcome. */
     const physicalOutcome = physicalLedger.seal()
-    physicalTerminal = physicalOutcome.physicalCompletion.then(({ cleanupErrors }) => {
-      for (const item of cleanupErrors) {
-        report(item.error, StoreResourceErrorPhase.dispose)
-      }
+    this.#physicalTerminal = physicalOutcome.physicalCompletion.then(({ cleanupErrors }) => {
+      for (const item of cleanupErrors) this.#report(item.error, StoreResourceErrorPhase.dispose)
     })
     for (const item of physicalOutcome.cleanupErrors)
-      report(item.error, StoreResourceErrorPhase.dispose)
-    versionTokens.clear()
+      this.#report(item.error, StoreResourceErrorPhase.dispose)
+    this.#versionTokens.clear()
     try {
-      config.onTerminal?.()
+      this.#config.onTerminal?.()
     } catch (error) {
-      report(error, StoreResourceErrorPhase.dispose)
+      this.#report(error, StoreResourceErrorPhase.dispose)
     }
   }
-  const finalizeClosingFailure = (error: unknown, superseded: T[], stale?: IResourceVersion<T>) => {
-    // Closing has no legal failed state. Transition to terminal first so
-    // observers cannot see a half-closed resource, then report the original
-    // load failure and release every value that was waiting on settlement.
-    // Never call failed()/ready() here: both reject a closing controller. Keep
-    // cleanup/report in finally-style guards so a notification or disposer
-    // failure cannot strand the resource in an empty closing state.
+
+  /**
+   * Closing has no legal failed state. Transition to terminal first so observers cannot see a
+   * half-closed resource, then report the original load failure and release every value that was
+   * waiting on settlement. Never call failed()/ready() here: both reject a closing controller. Keep
+   * cleanup/report in finally-style guards so a notification or disposer failure cannot strand the
+   * resource in an empty closing state.
+   */
+  #finalizeClosingFailure(error: unknown, superseded: T[], stale?: IResourceVersion<T>): void {
     try {
-      terminateOwnership()
-      notify()
+      this.#terminateOwnership()
+      this.#notify()
     } catch (transitionError) {
-      report(transitionError, StoreResourceErrorPhase.load)
+      this.#report(transitionError, StoreResourceErrorPhase.load)
     }
     try {
-      cleanupUnique([...superseded, ...(stale ? [stale.value] : [])])
+      this.#cleanupUnique([...superseded, ...(stale ? [stale.value] : [])])
     } finally {
-      report(error, StoreResourceErrorPhase.load)
-      forceDisposeResource()
+      this.#report(error, StoreResourceErrorPhase.load)
+      this.#forceDisposeResource()
     }
   }
-  const onOwnersChanged = () => {
-    if (hasCommittedOwners()) return
+
+  /** Owner count changed: terminate an abandoned closing resource or schedule idle eviction. */
+  #onOwnersChanged(): void {
+    if (this.#ownership.hasOwners) return
     if (
-      (currentState().kind === StoreResourceKind.closing && !hasVersionReservations()) ||
-      (currentState().kind === StoreResourceKind.disposed && versions.hasPending)
+      (this.#currentState().kind === StoreResourceKind.closing && !this.#captures.hasAny()) ||
+      (this.#currentState().kind === StoreResourceKind.disposed && this.#versions.hasPending)
     ) {
-      forceDisposeResource()
+      this.#forceDisposeResource()
       return
     }
-    if (currentState().kind === StoreResourceKind.ready) scheduleEviction()
+    if (this.#currentState().kind === StoreResourceKind.ready) this.#scheduleEviction()
   }
-  const start = () => {
-    if (
-      currentState().kind === StoreResourceKind.disposed ||
-      currentState().kind === StoreResourceKind.closing
-    )
-      throw createStoreLightError(
-        StoreLightErrorCode.resourceDisposed,
-        StoreLightErrorText.resourceDisposed
-      )
-    if (currentState().kind !== StoreResourceKind.idle) return
-    const operation = core.refetch()
-    const context = activeContext
-    captures.bind(context.generation, operation)
+
+  /** Starts the canonical load when idle; ended resources reject. */
+  #start(): void {
+    if (this.#isEnding()) throw resourceDisposedError()
+    if (this.#currentState().kind !== StoreResourceKind.idle) return
+    /** Canonical load operation. */
+    const operation = this.#core.refetch()
+    /** Its request context. */
+    const context = this.#activeContext
+    this.#captures.bind(context.generation, operation)
     void operation
       .then(
-        (next) => {
-          if (context.signal.aborted || terminal.lifecycle === LifecycleState.terminal) return
-          const stale = versions.takeStale()
-          const sameIdentity = stale !== undefined && Object.is(next, stale.value)
-          if (!sameIdentity) version++
-          if (stale && !sameIdentity) retire(stale.id, stale.value)
-          try {
-            captures.resolve(context.generation, version)
-          } catch (error) {
-            // Capture housekeeping cannot replace a successfully loaded canonical value.
-            report(error, StoreResourceErrorPhase.dispose)
-          }
-          if (terminal.lifecycle === LifecycleState.closing)
-            closeOwnership({ id: version, token: versionToken(version), value: next })
-          notify()
-          cleanupUnique(versions.takeSuperseded())
-          if (!hasOwners()) scheduleEviction()
-        },
-        (error: unknown) => {
-          captures.discard(context.generation)
-          if (context.signal.aborted || terminal.lifecycle === LifecycleState.terminal) return
-          const superseded = versions.takeSuperseded()
-          const stale = versions.takeStale()
-          if (terminal.lifecycle === LifecycleState.closing) {
-            finalizeClosingFailure(error, superseded, stale)
-            return
-          }
-          if (stale) core.hydrate({ version: 2, data: stale.value, ageMs: 0, remainingTtlMs: null })
-          notify()
-          cleanupUnique(superseded)
-          if (stale && !hasOwners()) scheduleEviction()
-          report(error, StoreResourceErrorPhase.load)
-        }
+        (next) => this.#onLoaded(context, next),
+        (error: unknown) => this.#onLoadFailed(context, error)
       )
-      .catch((error: unknown) => report(error, StoreResourceErrorPhase.load))
+      .catch((error: unknown) => this.#report(error, StoreResourceErrorPhase.load))
   }
-  const snapshot = (value: T, id: number): IStoreResourceSnapshot<T> => ({
-    value,
-    version: id,
-    token: versionToken(id)
-  })
-  const readSnapshot = (): IStoreResourceSnapshot<T> => {
-    const current = currentState()
+
+  /** Publishes a loaded value as a new version (same identity keeps the stale version id). */
+  #onLoaded(context: IResourceFetchContext, next: T): void {
+    if (context.signal.aborted || this.#terminal.lifecycle === LifecycleState.terminal) return
+    /** Previous visible version kept while loading. */
+    const stale = this.#versions.takeStale()
+    /** Whether the loaded value is the stale value itself. */
+    const sameIdentity = stale !== undefined && Object.is(next, stale.value)
+    if (!sameIdentity) this.#version++
+    if (stale && !sameIdentity) this.#retire(stale.id, stale.value)
+    try {
+      this.#captures.resolve(context.generation, this.#version)
+    } catch (error) {
+      // Capture housekeeping cannot replace a successfully loaded canonical value.
+      this.#report(error, StoreResourceErrorPhase.dispose)
+    }
+    if (this.#terminal.lifecycle === LifecycleState.closing)
+      this.#closeOwnership({
+        id: this.#version,
+        token: this.#versionToken(this.#version),
+        value: next
+      })
+    this.#notify()
+    this.#cleanupUnique(this.#versions.takeSuperseded())
+    if (!this.#hasOwners()) this.#scheduleEviction()
+  }
+
+  /** A failed load restores the stale value, or finishes closing, and reports the failure. */
+  #onLoadFailed(context: IResourceFetchContext, error: unknown): void {
+    this.#captures.discard(context.generation)
+    if (context.signal.aborted || this.#terminal.lifecycle === LifecycleState.terminal) return
+    /** Values produced by superseded loads. */
+    const superseded = this.#versions.takeSuperseded()
+    /** Previous visible version. */
+    const stale = this.#versions.takeStale()
+    if (this.#terminal.lifecycle === LifecycleState.closing) {
+      this.#finalizeClosingFailure(error, superseded, stale)
+      return
+    }
+    if (stale) this.#core.hydrate({ version: 2, data: stale.value, ageMs: 0, remainingTtlMs: null })
+    this.#notify()
+    this.#cleanupUnique(superseded)
+    if (stale && !this.#hasOwners()) this.#scheduleEviction()
+    this.#report(error, StoreResourceErrorPhase.load)
+  }
+
+  /** Snapshot of one value and version. */
+  #snapshot(value: T, id: number): IStoreResourceSnapshot<T> {
+    return { value, version: id, token: this.#versionToken(id) }
+  }
+
+  /** Throws the pending operation, or RESOURCE_DISPOSED when loading did not start. */
+  #throwLoading(): never {
+    /** State after starting. */
+    const loading = this.#currentState()
+    if (loading.kind === StoreResourceKind.loading) throw loading.operation
+    throw resourceDisposedError()
+  }
+
+  /** Like `read()`, but also returns the version and its token. */
+  readonly readSnapshot = (): IStoreResourceSnapshot<T> => {
+    /** Current state. */
+    const current = this.#currentState()
     if (current.kind === StoreResourceKind.ready)
-      return snapshot(current.current.value, current.current.id)
+      return this.#snapshot(current.current.value, current.current.id)
     if (current.kind === StoreResourceKind.closing) {
-      if (current.current && ownership.hasResourceOwners)
-        return snapshot(current.current.value, current.current.id)
-      throw createStoreLightError(
-        StoreLightErrorCode.resourceDisposed,
-        StoreLightErrorText.resourceDisposed
-      )
+      if (current.current && this.#ownership.hasResourceOwners)
+        return this.#snapshot(current.current.value, current.current.id)
+      throw resourceDisposedError()
     }
     if (current.kind === StoreResourceKind.failed) throw current.error
     if (current.kind === StoreResourceKind.loading && current.previous)
-      return snapshot(current.previous.value, current.previous.id)
-    start()
-    const loading = currentState()
-    if (loading.kind === StoreResourceKind.loading) throw loading.operation
-    throw createStoreLightError(
-      StoreLightErrorCode.resourceDisposed,
-      StoreLightErrorText.resourceDisposed
-    )
+      return this.#snapshot(current.previous.value, current.previous.id)
+    this.#start()
+    return this.#throwLoading()
   }
-  const captureSnapshot = (existingLease?: object) => {
-    const current = currentState()
-    if (current.kind === StoreResourceKind.ready) {
-      const rendered = snapshot(current.current.value, current.current.id)
-      if (
-        existingLease !== undefined &&
-        activeLeaseTokens.get(existingLease) === current.current.id
-      )
-        return { snapshot: rendered, capture: undefined }
-      return {
-        snapshot: rendered,
-        capture: captures.capture(current.current.id) as IResourceCapture
-      }
-    }
+
+  /** Snapshot of a version plus a render capture, unless `existingLease` already holds it. */
+  #capturedVersion(
+    value: T,
+    id: number,
+    existingLease: object | undefined
+  ): { snapshot: IStoreResourceSnapshot<T>; capture?: IResourceCapture } {
+    /** Rendered snapshot. */
+    const rendered = this.#snapshot(value, id)
+    if (existingLease !== undefined && this.#activeLeaseTokens.get(existingLease) === id)
+      return { snapshot: rendered, capture: undefined }
+    return { snapshot: rendered, capture: this.#captures.capture(id) as IResourceCapture }
+  }
+
+  /** Reads a snapshot and captures its version for render; reuses `existingLease` when given. */
+  readonly captureSnapshot = (
+    existingLease?: object
+  ): { snapshot: IStoreResourceSnapshot<T>; capture?: IResourceCapture } => {
+    /** Current state. */
+    const current = this.#currentState()
+    if (current.kind === StoreResourceKind.ready)
+      return this.#capturedVersion(current.current.value, current.current.id, existingLease)
     if (current.kind === StoreResourceKind.closing && current.current) {
       if (
         existingLease === undefined ||
-        activeLeaseTokens.get(existingLease) !== current.current.id
+        this.#activeLeaseTokens.get(existingLease) !== current.current.id
       )
-        throw createStoreLightError(
-          StoreLightErrorCode.resourceDisposed,
-          StoreLightErrorText.resourceDisposed
-        )
-      return { snapshot: snapshot(current.current.value, current.current.id), capture: undefined }
+        throw resourceDisposedError()
+      return {
+        snapshot: this.#snapshot(current.current.value, current.current.id),
+        capture: undefined
+      }
     }
     if (current.kind === StoreResourceKind.failed) throw current.error
     if (current.kind === StoreResourceKind.loading) {
-      if (current.previous) {
-        const rendered = snapshot(current.previous.value, current.previous.id)
-        if (
-          existingLease !== undefined &&
-          activeLeaseTokens.get(existingLease) === current.previous.id
-        )
-          return { snapshot: rendered, capture: undefined }
-        return {
-          snapshot: rendered,
-          capture: captures.capture(current.previous.id) as IResourceCapture
-        }
-      }
-      captures.capturePending(activeContext.generation, current.operation)
+      if (current.previous)
+        return this.#capturedVersion(current.previous.value, current.previous.id, existingLease)
+      this.#captures.capturePending(this.#activeContext.generation, current.operation)
       throw current.operation
     }
-    captures.capture()
-    start()
-    const loading = currentState()
-    if (loading.kind === StoreResourceKind.loading) throw loading.operation
-    throw createStoreLightError(
-      StoreLightErrorCode.resourceDisposed,
-      StoreLightErrorText.resourceDisposed
+    this.#captures.capture()
+    this.#start()
+    return this.#throwLoading()
+  }
+
+  /** Returns the value; throws the pending Promise while loading and the error after a failure. */
+  readonly read = (): T => this.readSnapshot().value
+
+  /** Starts loading if it has not started; takes no lease. */
+  readonly preload = (): void => {
+    if (this.#currentState().kind === StoreResourceKind.closing) throw resourceDisposedError()
+    this.#start()
+  }
+
+  /** Loads again, keeping the current value readable until the new one is published. */
+  readonly retry = (): void => {
+    /** State before retrying. */
+    const previous = this.#currentState()
+    if (previous.kind === StoreResourceKind.disposed || previous.kind === StoreResourceKind.closing)
+      throw resourceDisposedError()
+    this.#cachePolicy.cancelEviction()
+    if (previous.kind === StoreResourceKind.ready) this.#versions.setStale(previous.current)
+    this.#core.reset()
+    this.#notify()
+    this.#start()
+  }
+
+  /** Holds the resource until the returned function is called. */
+  readonly retainResource = (): (() => void) => {
+    if (this.#isEnding()) throw resourceDisposedError()
+    this.#cachePolicy.cancelEviction()
+    this.#start()
+    return this.#ownership.retainResource(() => this.#onOwnersChanged())
+  }
+
+  /** A released version lease releases its retired version and rechecks ownership. */
+  #releaseVersionLease(id: number): void {
+    this.#releaseRetired(id)
+    this.#onOwnersChanged()
+  }
+
+  /** Creates one version lease whose token is its release function. */
+  #createVersionLease(id: number): () => void {
+    /** The new lease. */
+    const lease = new VersionLease(this.#activeLeaseTokens)
+    return lease.attach(
+      this.#ownership.retainVersionToken(this.#versionToken(id), () =>
+        this.#releaseVersionLease(id)
+      ),
+      id
     )
   }
-  const retainResourceLease = () => {
-    if (
-      currentState().kind === StoreResourceKind.disposed ||
-      currentState().kind === StoreResourceKind.closing
-    )
-      throw createStoreLightError(
-        StoreLightErrorCode.resourceDisposed,
-        StoreLightErrorText.resourceDisposed
-      )
-    cancelEviction()
-    start()
-    return ownership.retainResource(() => onOwnersChanged())
-  }
-  const releaseVersionLease = (id: number) => {
-    releaseRetired(id)
-    onOwnersChanged()
-  }
-  const createVersionLease = (id: number) => {
-    const releaseOwnership = ownership.retainVersionToken(versionToken(id), () =>
-      releaseVersionLease(id)
-    )
-    let active = true
-    const token = () => {
-      if (!active) return
-      active = false
-      activeLeaseTokens.delete(token)
-      releaseOwnership()
-    }
-    activeLeaseTokens.set(token, id)
-    return token
-  }
+
   /** The generation counter survives eviction; only a visible or owned value can accept a lease. */
-  const hasVisibleVersion = (id: number): boolean => {
-    const state = currentState()
+  #hasVisibleVersion(id: number): boolean {
+    /** Current state. */
+    const state = this.#currentState()
     return (
       ((state.kind === StoreResourceKind.ready || state.kind === StoreResourceKind.closing) &&
         state.current?.id === id) ||
@@ -739,167 +945,142 @@ export function createStoreResource<T>(
         state.previous?.id === id)
     )
   }
-  const retainVersionLease = (versionInput: number | IVersionToken) => {
-    const id = typeof versionInput === 'number' ? versionInput : tokenVersions.get(versionInput)
-    if (id === undefined)
-      throw createStoreLightError(
-        StoreLightErrorCode.unknownVersion,
-        StoreLightErrorText.unknownResourceVersion
-      )
-    if (
-      currentState().kind === StoreResourceKind.disposed ||
-      currentState().kind === StoreResourceKind.closing
+
+  /** Whether `id` is visible, retired or stale. */
+  #isKnownVersion(id: number): boolean {
+    return (
+      this.#hasVisibleVersion(id) ||
+      this.#versions.hasRetired(id) ||
+      this.#versions.stale?.id === id
     )
-      throw createStoreLightError(
-        StoreLightErrorCode.resourceDisposed,
-        StoreLightErrorText.resourceDisposed
-      )
-    if (!hasVisibleVersion(id) && !versions.hasRetired(id) && versions.stale?.id !== id)
-      throw createStoreLightError(
-        StoreLightErrorCode.unknownVersion,
-        StoreLightErrorText.unknownResourceVersion
-      )
-    cancelEviction()
-    start()
-    return createVersionLease(id)
   }
-  const captureVersion = (id: number) => {
+
+  /** Keeps one version from being released until the returned function is called. */
+  readonly retainVersion = (versionInput: number | IVersionToken): (() => void) => {
+    /** Version id of the input. */
+    const id =
+      typeof versionInput === 'number' ? versionInput : this.#tokenVersions.get(versionInput)
+    if (id === undefined) throw unknownVersionError()
+    if (this.#isEnding()) throw resourceDisposedError()
+    if (!this.#isKnownVersion(id)) throw unknownVersionError()
+    this.#cachePolicy.cancelEviction()
+    this.#start()
+    return this.#createVersionLease(id)
+  }
+
+  /** Internal React bridge: protect a version during render. */
+  readonly captureVersion = (id: number): IResourceCapture => {
+    if (this.#isEnding()) throw resourceDisposedError()
+    if (!this.#isKnownVersion(id)) throw unknownVersionError()
+    return this.#captures.capture(id) as IResourceCapture
+  }
+
+  /** Internal React bridge: commit a render capture in layout as a version lease. */
+  readonly commitCapture = (capture: IResourceCapture): (() => void) => {
+    /** Captured version id. */
+    const id = this.#captures.inspect(capture)
+    if (this.#currentState().kind === StoreResourceKind.disposed) throw resourceDisposedError()
+    if (!this.#isKnownVersion(id) && !this.#versions.hasClosing(id)) throw unknownVersionError()
+    this.#captures.commit(capture)
+    this.#cachePolicy.cancelEviction()
+    return this.#createVersionLease(id)
+  }
+
+  /** Releases the resource once no holder remains; with holders left it waits in `closing`. */
+  readonly dispose = (): void => {
+    /** State before disposal. */
+    const previous = this.#currentState()
+    if (previous.kind === StoreResourceKind.disposed || previous.kind === StoreResourceKind.closing)
+      return
+    this.#cachePolicy.cancelEviction()
+    /** Whether a pending load continues for its resource owners. */
+    const keepPendingLoad =
+      previous.kind === StoreResourceKind.loading && this.#ownership.hasResourceOwners
+    if (!keepPendingLoad) this.#core.cancel()
+    /** Versions moved to closing. */
+    const moved = this.#versions.moveToClosing()
+    if (previous.kind === StoreResourceKind.ready) moved.versions.push(previous.current)
+    this.#versions.beginClosing(moved.versions)
+    this.#cleanupUnique(moved.superseded)
     if (
-      currentState().kind === StoreResourceKind.disposed ||
-      currentState().kind === StoreResourceKind.closing
-    )
-      throw createStoreLightError(
-        StoreLightErrorCode.resourceDisposed,
-        StoreLightErrorText.resourceDisposed
-      )
-    if (!hasVisibleVersion(id) && !versions.hasRetired(id) && versions.stale?.id !== id)
-      throw createStoreLightError(
-        StoreLightErrorCode.unknownVersion,
-        StoreLightErrorText.unknownResourceVersion
-      )
-    return captures.capture(id)
-  }
-  const commitCapture = (capture: IResourceCapture) => {
-    const id = captures.inspect(capture)
-    if (currentState().kind === StoreResourceKind.disposed)
-      throw createStoreLightError(
-        StoreLightErrorCode.resourceDisposed,
-        StoreLightErrorText.resourceDisposed
-      )
-    if (
-      !hasVisibleVersion(id) &&
-      !versions.hasRetired(id) &&
-      versions.stale?.id !== id &&
-      !versions.hasClosing(id)
-    )
-      throw createStoreLightError(
-        StoreLightErrorCode.unknownVersion,
-        StoreLightErrorText.unknownResourceVersion
-      )
-    captures.commit(capture)
-    cancelEviction()
-    return createVersionLease(id)
-  }
-  const api: IStoreResource<T> = {
-    read: () => readSnapshot().value,
-    readSnapshot,
-    captureSnapshot,
-    preload() {
-      if (currentState().kind === StoreResourceKind.closing)
-        throw createStoreLightError(
-          StoreLightErrorCode.resourceDisposed,
-          StoreLightErrorText.resourceDisposed
-        )
-      start()
-    },
-    retry() {
-      const previous = currentState()
-      if (
-        previous.kind === StoreResourceKind.disposed ||
-        previous.kind === StoreResourceKind.closing
-      )
-        throw createStoreLightError(
-          StoreLightErrorCode.resourceDisposed,
-          StoreLightErrorText.resourceDisposed
-        )
-      cancelEviction()
-      if (previous.kind === StoreResourceKind.ready) versions.setStale(previous.current)
-      core.reset()
-      notify()
-      start()
-    },
-    retainResource: retainResourceLease,
-    retainVersion: retainVersionLease,
-    captureVersion: (id) => captureVersion(id) as IResourceCapture,
-    commitCapture,
-    dispose() {
-      const previous = currentState()
-      if (
-        previous.kind === StoreResourceKind.disposed ||
-        previous.kind === StoreResourceKind.closing
-      )
-        return
-      cancelEviction()
-      const keepPendingLoad =
-        previous.kind === StoreResourceKind.loading && ownership.hasResourceOwners
-      if (!keepPendingLoad) core.cancel()
-      const moved = versions.moveToClosing()
-      if (previous.kind === StoreResourceKind.ready) moved.versions.push(previous.current)
-      versions.beginClosing(moved.versions)
-      cleanupUnique(moved.superseded)
-      if (
-        previous.kind === StoreResourceKind.ready &&
-        (hasCommittedOwners() || hasVersionReservations())
-      ) {
-        closeOwnership(previous.current)
-        return
-      }
-      if (
-        previous.kind === StoreResourceKind.loading &&
-        previous.previous &&
-        hasCommittedOwners()
-      ) {
-        closeOwnership(previous.previous)
-        return
-      }
-      if (previous.kind === StoreResourceKind.loading && keepPendingLoad) {
-        closeOwnership()
-        return
-      }
-      terminateOwnership()
-      notify()
-      if (!hasOwners() && !ownership.hasVersionOwners) forceDisposeResource()
-    },
-    forceDispose() {
-      if (
-        currentState().kind === StoreResourceKind.disposed &&
-        !hasOwners() &&
-        !versions.hasPending
-      )
-        return
-      forceDisposeResource()
-    },
-    whenTerminal: () => terminal.whenTerminal().then(() => physicalTerminal),
-    getSnapshot: () => revision,
-    subscribe(listener) {
-      if (currentState().kind === StoreResourceKind.disposed) return () => {}
-      const existing = listenerRegistrations.get(listener)
-      if (existing) {
-        return () => {
-          if (listenerRegistrations.get(listener) !== existing) return
-          listenerRegistrations.delete(listener)
-          existing()
-        }
-      }
-      const registration = listenerChannel.subscribe(() => listener())
-      listenerRegistrations.set(listener, registration)
-      return () => {
-        const current = listenerRegistrations.get(listener)
-        if (current !== registration) return
-        listenerRegistrations.delete(listener)
-        registration()
-      }
+      previous.kind === StoreResourceKind.ready &&
+      (this.#ownership.hasOwners || this.#captures.hasAny())
+    ) {
+      this.#closeOwnership(previous.current)
+      return
     }
+    if (
+      previous.kind === StoreResourceKind.loading &&
+      previous.previous &&
+      this.#ownership.hasOwners
+    ) {
+      this.#closeOwnership(previous.previous)
+      return
+    }
+    if (previous.kind === StoreResourceKind.loading && keepPendingLoad) {
+      this.#closeOwnership()
+      return
+    }
+    this.#terminateOwnership()
+    this.#notify()
+    if (!this.#hasOwners() && !this.#ownership.hasVersionOwners) this.#forceDisposeResource()
   }
-  return api
+
+  /** Releases the resource now, ignoring holders. */
+  readonly forceDispose = (): void => {
+    if (
+      this.#currentState().kind === StoreResourceKind.disposed &&
+      !this.#hasOwners() &&
+      !this.#versions.hasPending
+    )
+      return
+    this.#forceDisposeResource()
+  }
+
+  /** Resolves once this resource reaches its terminal state and physical cleanup finished. */
+  readonly whenTerminal = (): Promise<void> => this.#whenTerminal()
+
+  /** Logical terminal, then physical cleanup completion. */
+  #whenTerminal(): Promise<void> {
+    return this.#terminal.whenTerminal().then(() => this.#physicalTerminal)
+  }
+
+  /** Revision number that increases on every state change. */
+  readonly getSnapshot = (): number => this.#revision
+
+  /** Calls `listener` after every state change; a repeated listener shares one registration. */
+  readonly subscribe = (listener: () => void): (() => void) => {
+    if (this.#currentState().kind === StoreResourceKind.disposed) return () => {}
+    /** Existing registration of this listener. */
+    const existing = this.#listenerRegistrations.get(listener)
+    if (existing) return () => this.#unsubscribe(listener, existing)
+    /** New registration. */
+    const registration = this.#listenerChannel.subscribe(() => listener())
+    this.#listenerRegistrations.set(listener, registration)
+    return () => this.#unsubscribe(listener, registration)
+  }
+
+  /** Removes one listener registration if it is still the current one. */
+  #unsubscribe(listener: () => void, registration: () => void): void {
+    if (this.#listenerRegistrations.get(listener) !== registration) return
+    this.#listenerRegistrations.delete(listener)
+    registration()
+  }
+}
+
+/** Set with `Object.is` membership: like `Set` (SameValueZero) but keeps -0 apart from +0. */
+class SameValueSet<T> {
+  /** Members other than -0. */
+  readonly #values = new Set<T>()
+  /** Whether -0 is a member. */
+  #negativeZero = false
+  /** Membership by `Object.is`. */
+  has(value: T): boolean {
+    return Object.is(value, -0) ? this.#negativeZero : this.#values.has(value)
+  }
+  /** Adds one member. */
+  add(value: T): void {
+    if (Object.is(value, -0)) this.#negativeZero = true
+    else this.#values.add(value)
+  }
 }

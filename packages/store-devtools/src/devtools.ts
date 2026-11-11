@@ -353,12 +353,27 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
   store: IReactiveStore<S>,
   options: IStoreDevToolsOptions = {}
 ): IStoreDevTools {
+  return new StoreDevToolsSession(store, readDevtoolsOptions(options))
+}
+
+/** Validated devtools options with defaults applied. */
+type IResolvedDevtoolsOptions = Readonly<{
+  maxHistory: number
+  maxTrace: number
+  now: () => number
+  clone: (state: Record<string, unknown>) => Record<string, unknown>
+  captureRuntimeTrace: boolean
+}>
+
+/** Reads every option once (a throwing getter is INVALID_OPTION) and applies the defaults. */
+function readDevtoolsOptions(options: IStoreDevToolsOptions): IResolvedDevtoolsOptions {
   if (options === null || typeof options !== 'object') {
     throw createStoreDevtoolsError(
       StoreDevtoolsErrorCode.invalidOption,
       StoreDevtoolsErrorText.optionsObject
     )
   }
+  /** Raw option values, read once. */
   let optionValues: {
     maxHistory?: number
     maxTrace?: number
@@ -382,15 +397,7 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
       { cause: error }
     )
   }
-  const validateLimit = (value: number | undefined, fallback: number, name: string): number => {
-    const resolved = value ?? fallback
-    if (!Number.isSafeInteger(resolved) || resolved < 1)
-      throw createStoreDevtoolsError(
-        StoreDevtoolsErrorCode.invalidOption,
-        StoreDevtoolsErrorText.invalidLimit(name)
-      )
-    return resolved
-  }
+  /** Validated bounds, read before callbacks so error order is unchanged. */
   const maxHistory = validateLimit(optionValues.maxHistory, 100, 'maxHistory')
   const maxTrace = validateLimit(optionValues.maxTrace, 1_000, 'maxTrace')
   if (optionValues.now !== undefined && typeof optionValues.now !== 'function') {
@@ -405,106 +412,136 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
       StoreDevtoolsErrorText.callbackOption('clone')
     )
   }
-  const now = optionValues.now ?? Date.now
-  const clone = optionValues.clone ?? ClonePolicy.diagnostic
-  const history = new BoundedQueue<IStoreHistoryEntry>(maxHistory)
-  const actions = new BoundedQueue<IActionTrace>(maxTrace)
-  const trace = new BoundedQueue<IRuntimeTraceEvent>(maxTrace)
-  let nextId = 1
-  // 计数而非布尔：回放期间监听器再次 jumpTo 时，内层的 finally 不能提前解除外层的回放屏蔽，
-  // 否则外层剩余的通知会被当成用户操作记进历史。
-  let replayDepth = 0
-  let disposed = false
+  return {
+    maxHistory,
+    maxTrace,
+    now: optionValues.now ?? Date.now,
+    clone: optionValues.clone ?? ClonePolicy.diagnostic,
+    captureRuntimeTrace: optionValues.captureRuntimeTrace !== false
+  }
+}
 
-  const assertActive = () => {
-    if (disposed)
+/** A queue limit: the value or its fallback must be a positive safe integer. */
+function validateLimit(value: number | undefined, fallback: number, name: string): number {
+  /** Value after applying the fallback. */
+  const resolved = value ?? fallback
+  if (!Number.isSafeInteger(resolved) || resolved < 1)
+    throw createStoreDevtoolsError(
+      StoreDevtoolsErrorCode.invalidOption,
+      StoreDevtoolsErrorText.invalidLimit(name)
+    )
+  return resolved
+}
+
+/**
+ * One devtools session over a store: bounded state history, action and runtime-trace queues, and
+ * time-travel replay. Members are arrow fields so the session stays destructurable.
+ */
+class StoreDevToolsSession<S extends Record<string, unknown>> implements IStoreDevTools {
+  /** Inspected store. */
+  readonly #store: IReactiveStore<S>
+  /** Clock for entries and actions. */
+  readonly #now: () => number
+  /** Snapshot cloner for history and replay. */
+  readonly #clone: (state: Record<string, unknown>) => Record<string, unknown>
+  /** Bounded state snapshots. */
+  readonly #history: BoundedQueue<IStoreHistoryEntry>
+  /** Bounded action traces. */
+  readonly #actions: BoundedQueue<IActionTrace>
+  /** Bounded runtime trace events. */
+  readonly #trace: BoundedQueue<IRuntimeTraceEvent>
+  /** Next history id. */
+  #nextId = 1
+  /**
+   * Replay nesting depth. 计数而非布尔：回放期间监听器再次 jumpTo 时，内层的 finally 不能提前解除外层的
+   * 回放屏蔽，否则外层剩余的通知会被当成用户操作记进历史。
+   */
+  #replayDepth = 0
+  /** Set once disposed; every operation then fails with SESSION_DISPOSED. */
+  #disposed = false
+  /** Store subscription. */
+  #unsubscribe: (() => void) | undefined
+  /** Runtime trace subscription. */
+  #unsubscribeTrace: (() => void) | undefined
+
+  /** Records the initial snapshot, then subscribes; a failed subscribe rolls back the other. */
+  constructor(store: IReactiveStore<S>, options: IResolvedDevtoolsOptions) {
+    this.#store = store
+    this.#now = options.now
+    this.#clone = options.clone
+    this.#history = new BoundedQueue<IStoreHistoryEntry>(options.maxHistory)
+    this.#actions = new BoundedQueue<IActionTrace>(options.maxTrace)
+    this.#trace = new BoundedQueue<IRuntimeTraceEvent>(options.maxTrace)
+    this.record(StoreDevtoolsLabel.initial)
+    try {
+      this.#unsubscribe = store.$subscribe(() => this.#onStoreChange())
+      this.#unsubscribeTrace = options.captureRuntimeTrace
+        ? store.$runtime.subscribeTrace((event) => this.#onTrace(event))
+        : () => {}
+    } catch (error) {
+      this.#rollbackSubscriptions(error)
+    }
+  }
+
+  /** Throws SESSION_DISPOSED after dispose. */
+  #assertActive(): void {
+    if (this.#disposed)
       throw createStoreDevtoolsError(
         StoreDevtoolsErrorCode.sessionDisposed,
         StoreDevtoolsErrorText.sessionDisposed
       )
   }
-  const createEntry = (label: string): IStoreHistoryEntry => {
+
+  /** Prepares one history entry fully before reserving an id, so a failure changes nothing. */
+  #createEntry(label: string): IStoreHistoryEntry {
     try {
       /** Timestamp is evaluated before reserving an id so a failing clock leaves queues unchanged. */
-      const timestamp = now()
+      const timestamp = this.#now()
       /** Snapshot is fully cloned before reserving an id or mutating any diagnostic queue. */
-      const state = Object.freeze(clone(store.$plain()))
-      assertActive()
+      const state = Object.freeze(this.#clone(this.#store.$plain()))
+      this.#assertActive()
       /** Fully prepared history entry ready for atomic publication. */
-      const entry: IStoreHistoryEntry = Object.freeze({ id: nextId, timestamp, label, state })
-      nextId++
+      const entry: IStoreHistoryEntry = Object.freeze({ id: this.#nextId, timestamp, label, state })
+      this.#nextId++
       return entry
     } catch (error) {
       throw identifyDevtoolsFailure(error, StoreDevtoolsErrorText.preparationFailed)
     }
   }
-  const record = (label: string = StoreDevtoolsLabel.stateChange): IStoreHistoryEntry => {
-    assertActive()
-    const entry = createEntry(label)
-    history.push(entry)
-    return entry
-  }
-  const recordAction = (action: Omit<IActionTrace, 'timestamp'>): void => {
-    assertActive()
-    if (action === null || typeof action !== 'object')
-      throw createStoreDevtoolsError(
-        StoreDevtoolsErrorCode.invalidOption,
-        StoreDevtoolsErrorText.actionInvalid
-      )
-    /** Caller-owned properties and the clock, each read once before publishing to the queue. */
-    let entry: IActionTrace
+
+  /** Store change: record a snapshot unless replaying; failures are reported, never thrown. */
+  #onStoreChange(): void {
+    if (this.#replayDepth > 0) return
     try {
-      entry = { ...action, timestamp: now() }
+      this.record()
     } catch (error) {
-      throw identifyDevtoolsFailure(error, StoreDevtoolsErrorText.preparationFailed)
+      // 诊断工具坏掉不能让业务写入跟着失败：快照/克隆异常在这里就地上报，绝不冒泡进 store 的 flush。
+      reportDevtoolsFailure(this.#store.$runtime, error)
     }
-    // Validate the copied name, so a getter runs once and its failure keeps its classification.
-    if (typeof entry.name !== 'string')
-      throw createStoreDevtoolsError(
-        StoreDevtoolsErrorCode.invalidOption,
-        StoreDevtoolsErrorText.actionInvalid
-      )
-    assertActive()
-    actions.push(entry)
   }
-  record(StoreDevtoolsLabel.initial)
-  let unsubscribe: (() => void) | undefined
-  let unsubscribeTrace: (() => void) | undefined
-  try {
-    unsubscribe = store.$subscribe(() => {
-      if (replayDepth > 0) return
-      try {
-        record()
-      } catch (error) {
-        // 诊断工具坏掉不能让业务写入跟着失败：快照/克隆异常在这里就地上报，
-        // 绝不冒泡进 store 的 flush（那会让一次普通赋值抛错）。
-        reportDevtoolsFailure(store.$runtime, error)
+
+  /** Runtime trace event: queue it and turn finished actions into action traces. */
+  #onTrace(event: IRuntimeTraceEvent): void {
+    if (this.#disposed) return
+    try {
+      this.#trace.push(event)
+      if (event.type === ReactiveTraceType.action && event.phase !== ReactiveTracePhase.start) {
+        this.recordAction({
+          name: event.name,
+          durationMs: event.durationMs,
+          error: event.phase === ReactiveTracePhase.error ? event.error : undefined
+        })
       }
-    })
-    unsubscribeTrace =
-      optionValues.captureRuntimeTrace === false
-        ? () => {}
-        : store.$runtime.subscribeTrace((event) => {
-            if (disposed) return
-            try {
-              trace.push(event)
-              if (
-                event.type === ReactiveTraceType.action &&
-                event.phase !== ReactiveTracePhase.start
-              ) {
-                recordAction({
-                  name: event.name,
-                  durationMs: event.durationMs,
-                  error: event.phase === ReactiveTracePhase.error ? event.error : undefined
-                })
-              }
-            } catch (error) {
-              reportDevtoolsFailure(store.$runtime, error)
-            }
-          })
-  } catch (error) {
+    } catch (error) {
+      reportDevtoolsFailure(this.#store.$runtime, error)
+    }
+  }
+
+  /** Undoes whichever subscriptions succeeded, then rethrows (aggregated with cleanup failures). */
+  #rollbackSubscriptions(error: unknown): never {
+    /** Cleanup failures behind the primary error. */
     const cleanupErrors: unknown[] = []
-    for (const cleanup of [unsubscribeTrace, unsubscribe]) {
+    for (const cleanup of [this.#unsubscribeTrace, this.#unsubscribe]) {
       try {
         cleanup?.()
       } catch (cleanupError) {
@@ -521,67 +558,110 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
     throw error
   }
 
-  return {
-    get history() {
-      return Object.freeze(history.values())
-    },
-    get actions() {
-      return Object.freeze(actions.values())
-    },
-    get trace() {
-      return Object.freeze(trace.values())
-    },
-    record,
-    recordAction,
-    jumpTo(id) {
-      assertActive()
-      const entry = history.find((candidate) => candidate.id === id)
-      if (!entry)
-        throw createStoreDevtoolsRangeError(
-          StoreDevtoolsErrorCode.unknownHistoryEntry,
-          StoreDevtoolsErrorText.unknownHistoryEntry(id)
-        )
-      replayDepth++
-      try {
-        /** Replay cloning uses the same diagnostic error boundary as snapshot recording. */
-        let state: Record<string, unknown>
-        try {
-          state = clone(entry.state)
-        } catch (error) {
-          throw identifyDevtoolsFailure(error, StoreDevtoolsErrorText.preparationFailed)
-        }
-        store.$hydrate(state)
-      } finally {
-        replayDepth--
-      }
-    },
-    clear() {
-      assertActive()
-      /** Replacement snapshot prepared before any existing queue is truncated. */
-      const initial = createEntry(StoreDevtoolsLabel.initial)
-      history.clear()
-      actions.clear()
-      trace.clear()
-      history.push(initial)
-    },
-    dispose() {
-      if (disposed) return
-      disposed = true
-      const errors: unknown[] = []
-      for (const cleanup of [unsubscribe, unsubscribeTrace]) {
-        try {
-          cleanup?.()
-        } catch (error) {
-          errors.push(error)
-        }
-      }
-      if (errors.length === 1) throw errors[0]
-      if (errors.length > 1)
-        throw createStoreDevtoolsAggregateError(
-          StoreDevtoolsErrorCode.cleanupFailed,
-          errors,
-          StoreDevtoolsErrorText.cleanupFailed
-        )
+  /** Frozen copy of the state history. */
+  get history() {
+    return Object.freeze(this.#history.values())
+  }
+
+  /** Frozen copy of the action traces. */
+  get actions() {
+    return Object.freeze(this.#actions.values())
+  }
+
+  /** Frozen copy of the runtime trace. */
+  get trace() {
+    return Object.freeze(this.#trace.values())
+  }
+
+  /** Records one state snapshot. */
+  readonly record = (label: string = StoreDevtoolsLabel.stateChange): IStoreHistoryEntry => {
+    this.#assertActive()
+    /** Prepared entry. */
+    const entry = this.#createEntry(label)
+    this.#history.push(entry)
+    return entry
+  }
+
+  /** Records one action trace; caller properties and the clock are each read once. */
+  readonly recordAction = (action: Omit<IActionTrace, 'timestamp'>): void => {
+    this.#assertActive()
+    if (action === null || typeof action !== 'object')
+      throw createStoreDevtoolsError(
+        StoreDevtoolsErrorCode.invalidOption,
+        StoreDevtoolsErrorText.actionInvalid
+      )
+    /** Caller-owned properties and the clock, each read once before publishing to the queue. */
+    let entry: IActionTrace
+    try {
+      entry = { ...action, timestamp: this.#now() }
+    } catch (error) {
+      throw identifyDevtoolsFailure(error, StoreDevtoolsErrorText.preparationFailed)
     }
+    // Validate the copied name, so a getter runs once and its failure keeps its classification.
+    if (typeof entry.name !== 'string')
+      throw createStoreDevtoolsError(
+        StoreDevtoolsErrorCode.invalidOption,
+        StoreDevtoolsErrorText.actionInvalid
+      )
+    this.#assertActive()
+    this.#actions.push(entry)
+  }
+
+  /** Replays one recorded snapshot into the store without recording it again. */
+  readonly jumpTo = (id: number): void => {
+    this.#assertActive()
+    /** Recorded entry with this id. */
+    const entry = this.#history.find((candidate) => candidate.id === id)
+    if (!entry)
+      throw createStoreDevtoolsRangeError(
+        StoreDevtoolsErrorCode.unknownHistoryEntry,
+        StoreDevtoolsErrorText.unknownHistoryEntry(id)
+      )
+    this.#replayDepth++
+    try {
+      /** Replay cloning uses the same diagnostic error boundary as snapshot recording. */
+      let state: Record<string, unknown>
+      try {
+        state = this.#clone(entry.state)
+      } catch (error) {
+        throw identifyDevtoolsFailure(error, StoreDevtoolsErrorText.preparationFailed)
+      }
+      this.#store.$hydrate(state as never)
+    } finally {
+      this.#replayDepth--
+    }
+  }
+
+  /** Clears every queue and starts over from a fresh initial snapshot. */
+  readonly clear = (): void => {
+    this.#assertActive()
+    /** Replacement snapshot prepared before any existing queue is truncated. */
+    const initial = this.#createEntry(StoreDevtoolsLabel.initial)
+    this.#history.clear()
+    this.#actions.clear()
+    this.#trace.clear()
+    this.#history.push(initial)
+  }
+
+  /** Unsubscribes both sources once; failures are thrown (aggregated when more than one). */
+  readonly dispose = (): void => {
+    if (this.#disposed) return
+    this.#disposed = true
+    /** Unsubscribe failures. */
+    const errors: unknown[] = []
+    for (const cleanup of [this.#unsubscribe, this.#unsubscribeTrace]) {
+      try {
+        cleanup?.()
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1)
+      throw createStoreDevtoolsAggregateError(
+        StoreDevtoolsErrorCode.cleanupFailed,
+        errors,
+        StoreDevtoolsErrorText.cleanupFailed
+      )
   }
 }

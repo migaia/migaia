@@ -29,21 +29,7 @@ export function useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled
   // 订阅只依赖 node 与 runtime——两者都稳定，所以这个闭包也稳定，
   // React 不会因为它变化而反复退订重订。
   const subscribe = useCallback(
-    (onChange: () => void): IDisposer => {
-      if (!enabled) return () => {}
-      let first = true
-      /** The runtime-created observer owns this subscription and releases it on React cleanup. */
-      const effect = runtime.effect(() => {
-        // 读 .value 才会建立依赖边；首跑只为登记，不通知
-        void node.value
-        if (first) {
-          first = false
-          return
-        }
-        notifyReact(runtime, onChange)
-      })
-      return () => effect.dispose()
-    },
+    (onChange: () => void): IDisposer => subscribeNode(node, runtime, enabled, onChange),
     [node, runtime, enabled]
   )
 
@@ -51,4 +37,50 @@ export function useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled
   const getSnapshot = useCallback(() => node.peek(), [node])
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
+
+/**
+ * Subscribes React to one node through a runtime effect. The effect's first run only registers the
+ * dependency (reading `.value` creates the edge); later runs notify React. Disabled subscriptions
+ * register nothing.
+ */
+function subscribeNode<T>(
+  node: IStableNode<T>,
+  runtime: IRuntime,
+  enabled: boolean,
+  onChange: () => void
+): IDisposer {
+  if (!enabled) return () => {}
+  /** Run state of this subscription's effect. */
+  const watcher = new NodeWatcher(node, runtime, onChange)
+  /** The runtime-created observer owns this subscription and releases it on React cleanup. */
+  const effect = runtime.effect(() => watcher.run())
+  return () => effect.dispose()
+}
+
+/** One node subscription's effect body; skips the notification on its registering first run. */
+class NodeWatcher<T> {
+  /** Node whose value is tracked. */
+  readonly #node: IStableNode<T>
+  /** Runtime used to notify React without tracking. */
+  readonly #runtime: IRuntime
+  /** React's store-change callback. */
+  readonly #onChange: () => void
+  /** True until the first (registering) run finishes. */
+  #first = true
+  /** Binds one subscription. */
+  constructor(node: IStableNode<T>, runtime: IRuntime, onChange: () => void) {
+    this.#node = node
+    this.#runtime = runtime
+    this.#onChange = onChange
+  }
+  /** Effect body: track `.value`; notify React on every run after the first. */
+  run(): void {
+    void this.#node.value
+    if (this.#first) {
+      this.#first = false
+      return
+    }
+    notifyReact(this.#runtime, this.#onChange)
+  }
 }

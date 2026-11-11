@@ -165,10 +165,10 @@ export async function persistTransaction<const TStore extends IPersistTransactio
     admitted.store,
     (options as ITransactionOptions).concurrency
   )
+  /** One coordinated transaction; owns the disposal controller and the attempt body. */
+  const transaction = new PersistTransactionRun(store, admitted.store, ordered, run)
   /** Disposal only cancels this coordination; the backend signal owns actual native rollback. */
-  const controller: IAbortController = createAbortController()
-  /** A private cancellation reason distinguishes disposal from an arbitrary outside signal reason. */
-  let disposalReason: unknown
+  const controller = transaction.controller
   /** This borrowed listener relays external abort; the contract loop alone owns deadline and waits. */
   let externalAbort: IObservedAbortSubscription | undefined
   try {
@@ -190,23 +190,56 @@ export async function persistTransaction<const TStore extends IPersistTransactio
     }
     return await runWithConcurrency<Awaited<TResult>>(
       { store: admitted.store, options: { ...options, signal: controller.signal }, policy },
-      { attempt: execute }
+      { attempt: (context) => transaction.execute(context) }
     )
   } catch (cause) {
     if (
-      disposalReason !== undefined &&
+      transaction.disposalReason !== undefined &&
       cause instanceof Error &&
       (cause as { readonly code?: unknown }).code === StorageContractErrorCode.aborted &&
-      cause.cause === disposalReason
+      cause.cause === transaction.disposalReason
     )
-      throw disposalReason
+      throw transaction.disposalReason
     throw cause
   } finally {
     externalAbort?.unsubscribe()
   }
+}
+
+/**
+ * One coordinated persist transaction: pauses every participant's background writes in a fixed
+ * order, runs the store's own transaction, then resumes them. `controller` lets a participant's
+ * disposal cancel this coordination; `disposalReason` tells that cancellation apart.
+ */
+class PersistTransactionRun<TStore extends IPersistTransactionStore, TResult> {
+  /** Caller's store; its own `transaction` method runs the callback. */
+  readonly #store: TStore
+  /** Admitted record store participants bind to. */
+  readonly #admittedStore: NonNullable<ReturnType<typeof snapshotRecordStore>>['store']
+  /** Participants in global slot order. */
+  readonly #ordered: readonly IRegisteredParticipant[]
+  /** Caller's transaction body. */
+  readonly #run: (tx: ITransactionScopeOf<TStore>) => TResult
+  /** Disposal only cancels this coordination; the backend signal owns actual native rollback. */
+  readonly controller: IAbortController = createAbortController()
+  /** A private cancellation reason distinguishes disposal from an arbitrary outside signal reason. */
+  disposalReason: unknown
+
+  /** Captures one transaction's inputs. */
+  constructor(
+    store: TStore,
+    admittedStore: NonNullable<ReturnType<typeof snapshotRecordStore>>['store'],
+    ordered: readonly IRegisteredParticipant[],
+    run: (tx: ITransactionScopeOf<TStore>) => TResult
+  ) {
+    this.#store = store
+    this.#admittedStore = admittedStore
+    this.#ordered = ordered
+    this.#run = run
+  }
 
   /** Slots and attachment state remain owned until the delegated transaction actually ends. */
-  async function execute(
+  async execute(
     context: IConcurrencyAttemptContext
   ): Promise<IConcurrencyAttempt<Awaited<TResult>>> {
     /** The original loop always receives the disposal signal, including when no deadline exists. */
@@ -231,7 +264,7 @@ export async function persistTransaction<const TStore extends IPersistTransactio
     /** The actual failure is passed through unchanged after restoring normal scheduling. */
     let failure: unknown
     try {
-      for (const participant of ordered) {
+      for (const participant of this.#ordered) {
         /** Free slots start immediately; only an actual conflict enters the original policy loop. */
         const busy = participant.limiter.activeCount !== 0
         if (busy && context.admission === 'try')
@@ -263,24 +296,24 @@ export async function persistTransaction<const TStore extends IPersistTransactio
         if (busy) await context.wait(acquired.promise)
         else await acquired.promise
         if (admissionFailure !== undefined) throw admissionFailure.cause
-        assertNotAborted()
+        assertSignalLive(signal)
         paused.push(participant)
         await participant.pause({
           signal,
           abort: (reason) => {
-            disposalReason = reason
-            controller.abort(reason)
+            this.disposalReason = reason
+            this.controller.abort(reason)
           },
           completion: completion.promise
         })
       }
-      assertNotAborted()
+      assertSignalLive(signal)
       /** The existing store method owns callback execution, transaction views, commit and rollback. */
-      const result = (await Reflect.apply(store.transaction, store, [
+      const result = (await Reflect.apply(this.#store.transaction, this.#store, [
         (scope: ITransactionScopeOf<TStore>) => {
-          assertNotAborted()
-          for (const participant of paused) participant.bind(scope as object, admitted!.store)
-          return run(scope)
+          assertSignalLive(signal)
+          for (const participant of paused) participant.bind(scope as object, this.#admittedStore)
+          return this.#run(scope)
         },
         context
       ])) as Awaited<TResult>
@@ -311,11 +344,11 @@ export async function persistTransaction<const TStore extends IPersistTransactio
         }
       }
     }
-
-    /** Cancellation before native admission retains the same original reason on a coded boundary. */
-    function assertNotAborted(): void {
-      if (signal.aborted)
-        throw new StorageContractError(StorageContractErrorCode.aborted, { cause: signal.reason })
-    }
   }
+}
+
+/** Cancellation before native admission retains the same original reason on a coded boundary. */
+function assertSignalLive(signal: IAbortSignal): void {
+  if (signal.aborted)
+    throw new StorageContractError(StorageContractErrorCode.aborted, { cause: signal.reason })
 }

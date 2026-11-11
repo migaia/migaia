@@ -286,98 +286,136 @@ function watchSlot(
       StoreSharedErrorText.waitAsyncUnavailable
     )
   }
-  const waitAsync = (
-    Atomics as unknown as {
-      waitAsync: (
-        typedArray: Int32Array | BigInt64Array,
-        index: number,
-        value: number | bigint
-      ) => IWaitAsyncResult
-    }
-  ).waitAsync
-  /** Capture one admitted scheduler before any waiter starts. */
-  const scheduler = resolveSchedulerOption({ scheduler: schedulerOption }, systemScheduler)
-  let stopped = false
-  let timer: IScheduledTask | undefined
+  /** One wake loop over this slot. */
+  const watcher = new SlotWatcher(
+    view,
+    slot,
+    onWake,
+    onError,
+    resolveSchedulerOption({ scheduler: schedulerOption }, systemScheduler)
+  )
+  return { start: watcher.loop, stop: watcher.stop }
+}
+
+/** Native `Atomics.waitAsync`, typed for both shared view kinds. */
+type IWaitAsync = (
+  typedArray: Int32Array | BigInt64Array,
+  index: number,
+  value: number | bigint
+) => IWaitAsyncResult
+
+/**
+ * WaitAsync wake loop over one slot: each round captures the slot value, pulls missed writes, then
+ * waits for the next change. Between rounds it yields one scheduler task so no native waiter is
+ * retained across the yield.
+ */
+class SlotWatcher {
+  /** Shared view the slot lives in. */
+  readonly #view: BigInt64Array
+  /** Watched slot index. */
+  readonly #slot: number
+  /** Pulls remote writes into local state. */
+  readonly #onWake: () => void
+  /** Reports loop failures; the loop stops after one. */
+  readonly #onError: (error: unknown) => void
+  /** Admitted scheduler, captured before any waiter starts. */
+  readonly #scheduler: IScheduler
+  /** Native waitAsync. */
+  readonly #waitAsync = (Atomics as unknown as { waitAsync: IWaitAsync }).waitAsync
+  /** Set once stopped; every later step returns immediately. */
+  #stopped = false
+  /** Pending yield task, cancelled on stop. */
+  #timer: IScheduledTask | undefined
+
+  /** Binds one slot and its callbacks. */
+  constructor(
+    view: BigInt64Array,
+    slot: number,
+    onWake: () => void,
+    onError: (error: unknown) => void,
+    scheduler: IScheduler
+  ) {
+    this.#view = view
+    this.#slot = slot
+    this.#onWake = onWake
+    this.#onError = onError
+    this.#scheduler = scheduler
+  }
 
   /** Schedule another wait without retaining a live timer after disposal. */
-  const schedule = (): void => {
-    if (stopped) return
+  #schedule(): void {
+    if (this.#stopped) return
     try {
-      timer = scheduler.schedule(() => {
-        timer = undefined
-        loop()
-      }, 0)
+      this.#timer = this.#scheduler.schedule(() => this.#resume(), 0)
     } catch (error) {
-      stopped = true
-      onError(error)
+      this.#stopped = true
+      this.#onError(error)
     }
   }
 
-  const loop = (): void => {
-    if (stopped) return
+  /** Yield task body: forget the timer and start the next round. */
+  #resume(): void {
+    this.#timer = undefined
+    this.loop()
+  }
+
+  /** Runs onWake once and schedules the next round; a throwing onWake ends the loop. */
+  #wakeAndContinue(): void {
+    if (this.#stopped) return
+    try {
+      this.#onWake()
+    } catch (error) {
+      this.#onError(error)
+      return
+    }
+    this.#schedule()
+  }
+
+  /** One round: capture, pull missed writes, then wait asynchronously for the next change. */
+  readonly loop = (): void => {
+    if (this.#stopped) return
+    /** Native wait result of this round. */
     let result: IWaitAsyncResult
     try {
-      /**
-       * Capture before reconciliation so a write during publication cannot become an unseen
-       * baseline.
-       */
-      const expected = Atomics.load(view, slot)
+      // Capture before reconciliation so a write during publication cannot become an unseen
+      // baseline.
+      const expected = Atomics.load(this.#view, this.#slot)
       // The yielding task has no native waiter. Pull its missed writes before waiting again.
-      onWake()
-      if (stopped) return
-      result = waitAsync(view as never, slot, expected)
+      this.#onWake()
+      if (this.#stopped) return
+      result = this.#waitAsync(this.#view as never, this.#slot, expected)
     } catch (error) {
-      onError(error)
+      this.#onError(error)
       return
     }
     if (!result.async) {
       // 值在挂起前就变了（'not-equal'）：立刻处理并继续，不要错过这一次
-      if (!stopped) {
-        try {
-          onWake()
-        } catch (error) {
-          onError(error)
-          return
-        }
-        schedule()
-      }
+      this.#wakeAndContinue()
       return
     }
     void (result.value as Promise<'ok' | 'timed-out'>).then(
-      () => {
-        if (stopped) return
-        try {
-          onWake()
-        } catch (error) {
-          onError(error)
-          return
-        }
-        schedule()
-      },
-      (error: unknown) => onError(error)
+      () => this.#wakeAndContinue(),
+      (error: unknown) => this.#onError(error)
     )
   }
 
   /** Stop is published by the owner before start can synchronously publish graph changes. */
-  const stop = (): void => {
-    if (stopped) return
-    stopped = true
-    if (timer !== undefined) {
-      timer.cancel()
-      timer = undefined
+  readonly stop = (): void => {
+    if (this.#stopped) return
+    this.#stopped = true
+    if (this.#timer !== undefined) {
+      this.#timer.cancel()
+      this.#timer = undefined
     }
-    // Wake a pending waitAsync so its promise/callback can release the
-    // captured SharedArrayBuffer view promptly instead of waiting for a
-    // future remote write.
+    // Wake a pending waitAsync so its promise/callback can release the captured SharedArrayBuffer
+    // view promptly instead of waiting for a future remote write.
     try {
-      Atomics.notify(view as never, slot)
+      Atomics.notify(this.#view as never, this.#slot)
     } catch {
-      // The loop is already logically stopped; a host teardown may make the
-      // view unavailable, so disposal must remain best-effort and idempotent.
+      // The loop is already logically stopped; a host teardown may make the view unavailable, so
+      // disposal must remain best-effort and idempotent.
     }
   }
-  return { start: loop, stop }
 }
 
 /**
@@ -1140,19 +1178,23 @@ export class SharedInt32Array implements IDisposable {
     this.#assertIndex(index)
     let cell = this.#cells.get(index)
     if (!cell) {
-      /** Both committed and abandoned observations release only this exact private cell. */
-      const releaseDormant = (): void => {
-        if (this.#disposed || created.subs.size !== 0 || this.#cells.get(index) !== created) return
-        this.#cells.delete(index)
-        created.dispose()
-      }
-      const created = new SharedInt32ArrayCell(this, index, releaseDormant)
+      /** New private cell; both committed and abandoned observations release only this cell. */
+      const created: SharedInt32ArrayCell = new SharedInt32ArrayCell(this, index, () =>
+        this.#releaseDormant(index, created)
+      )
       cell = created
       this.#cells.set(index, created)
       // Abandoned speculative reads never reach an onUnobserved transition.
-      deferRuntimeCleanup(this.runtime, releaseDormant)
+      deferRuntimeCleanup(this.runtime, () => this.#releaseDormant(index, created))
     }
     return cell
+  }
+
+  /** Drops a dormant cell: only while active, unsubscribed and still the cell at `index`. */
+  #releaseDormant(index: number, created: SharedInt32ArrayCell): void {
+    if (this.#disposed || created.subs.size !== 0 || this.#cells.get(index) !== created) return
+    this.#cells.delete(index)
+    created.dispose()
   }
 
   #assertIndex(index: number): void {

@@ -3,12 +3,19 @@ import { createObjectLeaseRegistry, type ILeaseRegistry } from '@migaia/lifecycl
 /** Opaque object identity used as a version's lease key; never round-tripped through reactive. */
 export type IVersionToken = object
 
+/** Tracks who owns a resource and each of its versions, so unowned versions can be released. */
 export class ResourceOwnershipRegistry<T> {
+  /** Leases held on each version token. */
   #versionOwners: ILeaseRegistry<object> = createObjectLeaseRegistry<object>()
+  /** Version number to its lease token. */
   #versionKeys = new Map<number, object>()
+  /** Number of owners of the resource as a whole. */
   #resourceOwners = 0
+  /** Sum of leases across all versions, for an O(1) "any version owned" check. */
   #versionOwnerTotal = 0
+  /** Incremented by forceReset so release callbacks issued before the reset are ignored. */
   #epoch = 0
+  /** Resource values already disposed, so the same object is never disposed twice. */
   #disposedIdentities = new WeakSet<object>()
 
   get hasOwners(): boolean {

@@ -131,15 +131,6 @@ export function normalizeStoreConfig(
     })
   }
   const experimental = freezeExperimental(experimentalInput)
-  const validBarrier = (barrier: unknown): boolean => {
-    if (typeof barrier === 'function') return true
-    if (barrier === null || typeof barrier !== 'object') return false
-    try {
-      return typeof (barrier as { then?: unknown }).then === 'function'
-    } catch {
-      return false
-    }
-  }
   /** Package-owned copy of the barriers; the caller's array methods are never invoked. */
   const normalizedBarriers: IStoreReadyBarrier[] = []
   if (barriers !== undefined) {
@@ -231,6 +222,17 @@ function getReadyPromise(
 
 const READY_TRACK = new WeakMap<Promise<void>, { status: IReadyStatus; error: unknown }>()
 const READY_OBJECTS = new WeakMap<Promise<void>, ITrackedReady>()
+
+/** A ready barrier is a function or a thenable; a throwing `then` getter makes it invalid. */
+function validBarrier(barrier: unknown): boolean {
+  if (typeof barrier === 'function') return true
+  if (barrier === null || typeof barrier !== 'object') return false
+  try {
+    return typeof (barrier as { then?: unknown }).then === 'function'
+  } catch {
+    return false
+  }
+}
 
 function trackReady(promise: Promise<void>): ITrackedReady {
   const tracked = READY_OBJECTS.get(promise)

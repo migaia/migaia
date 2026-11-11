@@ -3,6 +3,7 @@ import { deferRuntimeCleanup } from '@migaia/reactive/extension'
 
 /** Small keyed container shared by collection-like reactive nodes. */
 export class KeyedCellRegistry<K, C> {
+  /** Reactive cell per key, created on first access and removed when the key is cleaned up. */
   #cells = new Map<K, C>()
 
   get(key: K): C | undefined {

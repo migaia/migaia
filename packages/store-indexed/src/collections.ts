@@ -19,6 +19,10 @@ import { StoreIndexedErrorText } from './error-text.ts'
 import { runCollectionCallback } from './collection-callback.ts'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
+/**
+ * Sentinel for "no stored entry" in collection cells, distinct from a stored `undefined`; never
+ * exposed to callers.
+ */
 const ABSENT = Symbol('observable-collection-absent')
 
 /** Rejects JavaScript values that bypass the typed collection input contracts. */

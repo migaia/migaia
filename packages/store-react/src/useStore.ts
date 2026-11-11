@@ -150,79 +150,16 @@ export function useTracked<T>(
   const subscriptionState = tracking.subscriptionState
 
   const subscribe = useCallback(
-    (onChange: () => void): IDisposer => {
-      tracking.onChange = onChange
-      let initialRun = true
-      const stopObserving = binding.observe(() => {
-        const activeRead = tracking.read
-        const next = activeRead() // 追踪依赖，同时缓存候选值供 getSnapshot 复用
-        const hadLatestTracked = tracking.hasLatestTracked
-        const previousTracked = tracking.latestTracked
-        tracking.hasLatestTracked = true
-        tracking.latestTracked = next
-        if (!tracking.suppress) {
-          const previous = tracking.committedSnapshot
-          const changed =
-            initialRun || !hadLatestTracked || !tracking.isEqual(previousTracked as T, next)
-          if (changed) {
-            subscriptionState.externalRevision++
-            const candidate =
-              previous && tracking.isEqual(previous.value, next) ? previous : { value: next }
-            // `activeRead` 已提交，Effect 的结果就是当前 external-store
-            // snapshot。立即发布它，稳定 selector 的 React commit 因而不再
-            // 需要额外跑一次 layout effect 只为复制同一个引用。
-            tracking.committedSnapshot = candidate
-            subscriptionState.candidate = candidate
-            subscriptionState.candidateRead = activeRead
-            subscriptionState.candidateEqual = tracking.isEqual
-            subscriptionState.candidateRevision = subscriptionState.externalRevision
-            if (!initialRun) notifyReact(runtime, tracking.onChange)
-          }
-        }
-        initialRun = false
-      })
-      return () => {
-        stopObserving()
-      }
-    },
+    (onChange: () => void): IDisposer => subscribeTracked(tracking, binding, runtime, onChange),
     [binding, runtime, subscriptionState, tracking]
   )
 
   // selector/equality 身份变化时创建隔离 reader，避免 concurrent render 泄漏新闭包；
   // 身份稳定时保留 reader 的 revision cache，让 React 的重复 getSnapshot 成为 O(1)。
-  const renderSnapshot = useMemo<IRenderSnapshotState<T>>(() => {
-    let evaluatedRevision = -1
-    let snapshot: ISnapshot<T> | undefined
-    const state: IRenderSnapshotState<T> = {
-      captureGeneration: 0,
-      getSnapshot: () => {
-        if (snapshot && evaluatedRevision === subscriptionState.externalRevision) {
-          return snapshot
-        }
-        const candidate =
-          subscriptionState.candidateRevision === subscriptionState.externalRevision &&
-          subscriptionState.candidateRead === read &&
-          subscriptionState.candidateEqual === isEqual
-            ? (subscriptionState.candidate as ISnapshot<T>)
-            : undefined
-        const captured = candidate ? undefined : binding.capture(read)
-        const next = candidate ? candidate.value : captured!.result
-        const previous = snapshot ?? tracking.committedSnapshot
-        snapshot =
-          previous && isEqual(previous.value, next) ? previous : (candidate ?? { value: next })
-        state.snapshot = snapshot
-        // Do not retain an abandoned render capture in the hook-local
-        // snapshot state. Only the current render may bridge into layout;
-        // committed tokens are tracked by the resource registry itself.
-        state.capture = captured
-        state.capturedRead = captured ? read : undefined
-        if (captured) state.captureGeneration++
-        evaluatedRevision = subscriptionState.externalRevision
-        return snapshot
-      }
-    }
-    return state
-  }, [binding, isEqual, read, subscriptionState, tracking])
+  const renderSnapshot = useMemo<IRenderSnapshotState<T>>(
+    () => new RenderSnapshotReader(binding, isEqual, read, tracking),
+    [binding, isEqual, read, subscriptionState, tracking]
+  )
 
   const snapshot = useSyncExternalStore(
     subscribe,
@@ -232,67 +169,22 @@ export function useTracked<T>(
   const captureGeneration = renderSnapshot.captureGeneration
 
   // 只在提交后发布当前 selector/snapshot，并重追踪依赖；被丢弃的 render 不改变共享订阅语义。
-  useLayoutEffect(() => {
-    const currentSnapshot = renderSnapshot.snapshot
-    if (!currentSnapshot) return
-    const selectorChanged = tracking.read !== read
-    tracking.read = read
-    tracking.isEqual = isEqual
-    tracking.committedSnapshot = currentSnapshot
-    const captured = renderSnapshot.capturedRead === read ? renderSnapshot.capture : undefined
-    if (captured) {
-      renderSnapshot.capture = undefined
-      renderSnapshot.capturedRead = undefined
-      const commit = binding.commit(captured)
-      if (commit === 'committed') {
-        tracking.hasLatestTracked = true
-        tracking.latestTracked = captured.result
-        return
-      }
-      if (commit === 'no-observer') return
-      // 不在 commit/layout 阶段 pull 脏 Computed；使 snapshot 失效，让用户求值错误回到 render/Error Boundary。
-      subscriptionState.externalRevision++
-      subscriptionState.candidate = undefined
-      subscriptionState.candidateRead = undefined
-      subscriptionState.candidateEqual = undefined
-      subscriptionState.candidateRevision = -1
-      notifyReact(runtime, tracking.onChange)
-      return
-    }
-    if (!selectorChanged) return
-    tracking.suppress = true
-    let retracked: ReturnType<typeof binding.retrack>
-    try {
-      retracked = binding.retrack()
-    } finally {
-      tracking.suppress = false
-    }
-    if (retracked === 'no-observer') return
-    const dependenciesChanged = retracked === 'changed'
-    // selector 切换依赖时，新依赖可能在 render 与本 layout effect 之间变化。
-    // 重追踪已读到最新值；若当前提交快照过期，绘制前同步使 snapshot 失效并通知 React。
-    const latest = tracking.latestTracked as T
-    if (dependenciesChanged && !isEqual(currentSnapshot.value, latest)) {
-      subscriptionState.externalRevision++
-      subscriptionState.candidate = { value: latest }
-      subscriptionState.candidateRead = read
-      subscriptionState.candidateEqual = isEqual
-      subscriptionState.candidateRevision = subscriptionState.externalRevision
-      notifyReact(runtime, tracking.onChange)
-    }
-  }, [
-    captureGeneration,
-    isEqual,
-    read,
-    renderSnapshot,
-    // runtime 必须在依赖里：失效路径要用它 untracked 地通知 React。
-    // 漏掉的话 runtime 切换后会拿旧 runtime 去 untracked，正确那个的追踪
-    // 上下文就没被抑制，通知期间的读可能被记成一条假依赖。
-    runtime,
-    binding,
-    subscriptionState,
-    tracking
-  ])
+  useLayoutEffect(
+    () => commitTrackedSnapshot(tracking, binding, renderSnapshot, read, isEqual, runtime),
+    [
+      captureGeneration,
+      isEqual,
+      read,
+      renderSnapshot,
+      // runtime 必须在依赖里：失效路径要用它 untracked 地通知 React。
+      // 漏掉的话 runtime 切换后会拿旧 runtime 去 untracked，正确那个的追踪
+      // 上下文就没被抑制，通知期间的读可能被记成一条假依赖。
+      runtime,
+      binding,
+      subscriptionState,
+      tracking
+    ]
+  )
 
   return snapshot.value
 }
@@ -339,4 +231,197 @@ export function useResource<T>(res: Resource<T>): IResourceState<T> {
   // selector stable so each state transition can reuse the Effect candidate.
   const read = useCallback(() => res.state, [res])
   return useTracked(read, Object.is, res.runtime)
+}
+
+/** Binding type produced by `createObserverBinding`. */
+type IObserverBinding = ReturnType<typeof createObserverBinding>
+
+/**
+ * Subscribes one tracking instance: observes `read` through the public binding, publishes each
+ * changed value as the current external-store snapshot and notifies React after the first run.
+ */
+function subscribeTracked<T>(
+  tracking: ITrackingInstance<T>,
+  binding: IObserverBinding,
+  runtime: IRuntime,
+  onChange: () => void
+): IDisposer {
+  tracking.onChange = onChange
+  /** Observer state for this subscription; its first run only seeds the snapshot. */
+  const observer = new TrackedObserver(tracking, runtime)
+  /** Stops the binding's observation. */
+  const stopObserving = binding.observe(() => observer.run())
+  return () => {
+    stopObserving()
+  }
+}
+
+/** One subscription's observer: tracks dependencies and publishes changed snapshots. */
+class TrackedObserver<T> {
+  /** Tracking instance shared with render and layout. */
+  readonly #tracking: ITrackingInstance<T>
+  /** Runtime used to notify React without tracking. */
+  readonly #runtime: IRuntime
+  /** True until the first observation run finishes. */
+  #initialRun = true
+  /** Binds one tracking instance and runtime. */
+  constructor(tracking: ITrackingInstance<T>, runtime: IRuntime) {
+    this.#tracking = tracking
+    this.#runtime = runtime
+  }
+  /** One observation run: re-read, record the latest value and publish it if it changed. */
+  run(): void {
+    const tracking = this.#tracking
+    const subscriptionState = tracking.subscriptionState
+    const activeRead = tracking.read
+    const next = activeRead() // 追踪依赖，同时缓存候选值供 getSnapshot 复用
+    const hadLatestTracked = tracking.hasLatestTracked
+    const previousTracked = tracking.latestTracked
+    tracking.hasLatestTracked = true
+    tracking.latestTracked = next
+    if (!tracking.suppress) {
+      const previous = tracking.committedSnapshot
+      const changed =
+        this.#initialRun || !hadLatestTracked || !tracking.isEqual(previousTracked as T, next)
+      if (changed) {
+        subscriptionState.externalRevision++
+        const candidate =
+          previous && tracking.isEqual(previous.value, next) ? previous : { value: next }
+        // `activeRead` 已提交，Effect 的结果就是当前 external-store snapshot。立即发布它，稳定
+        // selector 的 React commit 因而不再需要额外跑一次 layout effect 只为复制同一个引用。
+        tracking.committedSnapshot = candidate
+        subscriptionState.candidate = candidate
+        subscriptionState.candidateRead = activeRead
+        subscriptionState.candidateEqual = tracking.isEqual
+        subscriptionState.candidateRevision = subscriptionState.externalRevision
+        if (!this.#initialRun) notifyReact(this.#runtime, tracking.onChange)
+      }
+    }
+    this.#initialRun = false
+  }
+}
+
+/**
+ * Isolated snapshot reader for one selector/equality identity. Keeps a revision cache so React's
+ * repeated getSnapshot calls are O(1) while the identity is stable.
+ */
+class RenderSnapshotReader<T> implements IRenderSnapshotState<T> {
+  /** Public observer binding used to capture a render read. */
+  readonly #binding: IObserverBinding
+  /** Equality used to keep snapshot identity. */
+  readonly #isEqual: (a: T, b: T) => boolean
+  /** Selector of this render identity. */
+  readonly #read: () => T
+  /** Shared tracking instance. */
+  readonly #tracking: ITrackingInstance<T>
+  /** External revision the cached snapshot was computed at; -1 before the first read. */
+  #evaluatedRevision = -1
+  /** Cached snapshot of this reader. */
+  #cached: ISnapshot<T> | undefined
+  /** Snapshot published to the layout effect. */
+  snapshot?: ISnapshot<T>
+  /** Render capture awaiting commit in layout; abandoned renders never keep one. */
+  capture?: ICapture<T>
+  /** Selector the pending capture belongs to. */
+  capturedRead?: () => T
+  /** Incremented per new render capture so the layout effect re-runs. */
+  captureGeneration = 0
+  /** Binds one selector identity. */
+  constructor(
+    binding: IObserverBinding,
+    isEqual: (a: T, b: T) => boolean,
+    read: () => T,
+    tracking: ITrackingInstance<T>
+  ) {
+    this.#binding = binding
+    this.#isEqual = isEqual
+    this.#read = read
+    this.#tracking = tracking
+  }
+  /** React getSnapshot: reuses the subscription candidate or captures a fresh render read. */
+  readonly getSnapshot = (): ISnapshot<T> => {
+    const subscriptionState = this.#tracking.subscriptionState
+    if (this.#cached && this.#evaluatedRevision === subscriptionState.externalRevision)
+      return this.#cached
+    const candidate =
+      subscriptionState.candidateRevision === subscriptionState.externalRevision &&
+      subscriptionState.candidateRead === this.#read &&
+      subscriptionState.candidateEqual === this.#isEqual
+        ? (subscriptionState.candidate as ISnapshot<T>)
+        : undefined
+    const captured = candidate ? undefined : this.#binding.capture(this.#read)
+    const next = candidate ? candidate.value : captured!.result
+    const previous = this.#cached ?? this.#tracking.committedSnapshot
+    this.#cached =
+      previous && this.#isEqual(previous.value, next) ? previous : (candidate ?? { value: next })
+    this.snapshot = this.#cached
+    // Do not retain an abandoned render capture in the hook-local snapshot state. Only the
+    // current render may bridge into layout; committed tokens are tracked by the resource registry.
+    this.capture = captured
+    this.capturedRead = captured ? this.#read : undefined
+    if (captured) this.captureGeneration++
+    this.#evaluatedRevision = subscriptionState.externalRevision
+    return this.#cached
+  }
+}
+
+/**
+ * Layout-phase commit: publishes the current selector/snapshot and re-tracks dependencies only
+ * after commit, so abandoned renders never change shared subscription semantics.
+ */
+function commitTrackedSnapshot<T>(
+  tracking: ITrackingInstance<T>,
+  binding: IObserverBinding,
+  renderSnapshot: IRenderSnapshotState<T>,
+  read: () => T,
+  isEqual: (a: T, b: T) => boolean,
+  runtime: IRuntime
+): void {
+  const currentSnapshot = renderSnapshot.snapshot
+  if (!currentSnapshot) return
+  const selectorChanged = tracking.read !== read
+  tracking.read = read
+  tracking.isEqual = isEqual
+  tracking.committedSnapshot = currentSnapshot
+  const captured = renderSnapshot.capturedRead === read ? renderSnapshot.capture : undefined
+  if (captured) {
+    renderSnapshot.capture = undefined
+    renderSnapshot.capturedRead = undefined
+    const commit = binding.commit(captured)
+    if (commit === 'committed') {
+      tracking.hasLatestTracked = true
+      tracking.latestTracked = captured.result
+      return
+    }
+    if (commit === 'no-observer') return
+    // 不在 commit/layout 阶段 pull 脏 Computed；使 snapshot 失效，让用户求值错误回到 render/Error Boundary。
+    tracking.subscriptionState.externalRevision++
+    tracking.subscriptionState.candidate = undefined
+    tracking.subscriptionState.candidateRead = undefined
+    tracking.subscriptionState.candidateEqual = undefined
+    tracking.subscriptionState.candidateRevision = -1
+    notifyReact(runtime, tracking.onChange)
+    return
+  }
+  if (!selectorChanged) return
+  tracking.suppress = true
+  let retracked: ReturnType<typeof binding.retrack>
+  try {
+    retracked = binding.retrack()
+  } finally {
+    tracking.suppress = false
+  }
+  if (retracked === 'no-observer') return
+  const dependenciesChanged = retracked === 'changed'
+  // selector 切换依赖时，新依赖可能在 render 与本 layout effect 之间变化。
+  // 重追踪已读到最新值；若当前提交快照过期，绘制前同步使 snapshot 失效并通知 React。
+  const latest = tracking.latestTracked as T
+  if (dependenciesChanged && !isEqual(currentSnapshot.value, latest)) {
+    tracking.subscriptionState.externalRevision++
+    tracking.subscriptionState.candidate = { value: latest }
+    tracking.subscriptionState.candidateRead = read
+    tracking.subscriptionState.candidateEqual = isEqual
+    tracking.subscriptionState.candidateRevision = tracking.subscriptionState.externalRevision
+    notifyReact(runtime, tracking.onChange)
+  }
 }

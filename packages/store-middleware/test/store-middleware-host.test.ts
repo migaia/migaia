@@ -502,32 +502,12 @@ describe('IStoreMiddlewareHost.connectDevTools', () => {
     })
     await host.dispose()
   })
-  function makeAdapter(_getState: () => IState) {
-    const initCalls: IState[] = []
-    const sendCalls: Array<{ event: IMiddlewareEvent<IState>; state: IState }> = []
-    let listener: ((command: IDevToolsCommand<IState>) => void) | undefined
-    return {
-      adapter: {
-        init: (state: IState) => initCalls.push(state),
-        send: (event: IMiddlewareEvent<IState>, state: IState) => sendCalls.push({ event, state }),
-        subscribe: (l: (command: IDevToolsCommand<IState>) => void) => {
-          listener = l
-          return () => {
-            listener = undefined
-          }
-        }
-      },
-      initCalls,
-      sendCalls,
-      emit: (command: IDevToolsCommand<IState>) => listener?.(command)
-    }
-  }
 
   it('calls adapter.init(getState()) at install time, then adapter.send() for every event', async () => {
     const { runtime } = makeRuntime()
     let state: IState = { value: 5 }
     const host = createStoreMiddlewareHost<IState>({ execution, runtime, getState: () => state })
-    const { adapter, initCalls, sendCalls } = makeAdapter(() => state)
+    const { adapter, initCalls, sendCalls } = new FakeDevToolsAdapter()
     await host.connectDevTools(adapter)
     expect(initCalls).toEqual([{ value: 5 }])
     host.recordState('name', { value: 4 }, { value: 5 })
@@ -540,7 +520,7 @@ describe('IStoreMiddlewareHost.connectDevTools', () => {
     const { runtime } = makeRuntime()
     let state: IState = { value: 1 }
     const host = createStoreMiddlewareHost<IState>({ execution, runtime, getState: () => state })
-    const { adapter, initCalls, emit } = makeAdapter(() => state)
+    const { adapter, initCalls, emit } = new FakeDevToolsAdapter()
     await host.connectDevTools(adapter)
     state = { value: 2 }
     emit({ type: 'commit' })
@@ -559,7 +539,7 @@ describe('IStoreMiddlewareHost.connectDevTools', () => {
         state = s
       }
     })
-    const { adapter, sendCalls, emit } = makeAdapter(() => state)
+    const { adapter, sendCalls, emit } = new FakeDevToolsAdapter()
     await host.connectDevTools(adapter)
     sendCalls.length = 0
     emit({ type: 'jump', state: { value: 42 } })
@@ -577,7 +557,7 @@ describe('IStoreMiddlewareHost.connectDevTools', () => {
       runtime,
       getState: () => ({ value: 1 })
     })
-    const { adapter, emit } = makeAdapter(() => ({ value: 1 }))
+    const { adapter, emit } = new FakeDevToolsAdapter()
     await host.connectDevTools(adapter)
     expect(() => emit({ type: 'reset', state: { value: 0 } })).toThrow(
       '[store] DevTools state command requires applyState'
@@ -585,3 +565,28 @@ describe('IStoreMiddlewareHost.connectDevTools', () => {
     await host.dispose()
   })
 })
+
+/** Devtools adapter double recording init/send calls and exposing the subscribed command listener. */
+class FakeDevToolsAdapter {
+  /** States passed to `init`. */
+  readonly initCalls: IState[] = []
+  /** Events and states passed to `send`. */
+  readonly sendCalls: Array<{ event: IMiddlewareEvent<IState>; state: IState }> = []
+  /** Listener registered through `subscribe`, cleared by its unsubscribe. */
+  #listener: ((command: IDevToolsCommand<IState>) => void) | undefined
+  /** Adapter object handed to `connectDevTools`. */
+  readonly adapter = {
+    init: (state: IState) => this.initCalls.push(state),
+    send: (event: IMiddlewareEvent<IState>, state: IState) => this.sendCalls.push({ event, state }),
+    subscribe: (listener: (command: IDevToolsCommand<IState>) => void) => this.#subscribe(listener)
+  }
+  /** Stores the listener and returns its unsubscribe. */
+  #subscribe(listener: (command: IDevToolsCommand<IState>) => void): () => void {
+    this.#listener = listener
+    return () => {
+      this.#listener = undefined
+    }
+  }
+  /** Sends one devtools command to the subscribed listener, if any. */
+  readonly emit = (command: IDevToolsCommand<IState>) => this.#listener?.(command)
+}

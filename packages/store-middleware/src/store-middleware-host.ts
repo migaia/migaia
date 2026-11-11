@@ -196,27 +196,83 @@ function createStoreMiddlewareHostCore<S>(
   options: IStoreMiddlewareHostOptions<S>,
   bindingStore?: object
 ): IStoreMiddlewareHost<S> {
+  /** Validated host options, read once. */
   const settled = snapshotHostOptions(options)
-  const runtime = settled.runtime
-  const getState = settled.getState
-  const applyState = settled.applyState
-  const mutationPolicy = settled.mutationPolicy ?? createMutationPolicy('off')
+  /** Middleware state and behavior; the plugin host is attached right after creation. */
+  const controller = new StoreMiddlewareController<S>(settled)
+  /** Domain descriptors join the single canonical handle before identity publication and freezing. */
+  const surface: IStoreMiddlewareSurface<S> & { readonly store?: object } = {
+    ...(bindingStore === undefined ? {} : { store: bindingStore }),
+    mutationPolicy: controller.mutationPolicy,
+    emit: controller.emit,
+    runAction: controller.runAction,
+    recordState: controller.recordState,
+    recordError: controller.recordError,
+    connectDevTools: controller.connectDevTools,
+    attachBindingDisposer: controller.attachBindingDisposer
+  }
+  /** The plugin host carrying the sync middleware pipeline. */
+  const host = defineHost<
+    IStoreMiddlewareCore<S>,
+    IMiddlewareEvent<S>,
+    readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule],
+    'sync',
+    readonly [],
+    typeof surface
+  >({
+    modules: [syncPipelineModule],
+    host: settled,
+    surface,
+    domainCore: () => controller.domainCore(),
+    // Store 绑定先释放，再委托 plugin-host 清理；`next()` 由句柄保证恰好执行一次。
+    dispose: (next) => controller.dispose(next)
+  })
+  controller.host = host
+  return host
+}
+
+/**
+ * State and behavior behind one middleware host: event emission through the host pipeline,
+ * action/state/error recording, devtools bridging and store-binding cleanup. Surface members are
+ * arrow fields so the handle stays destructurable.
+ */
+class StoreMiddlewareController<S> {
+  /** Reactive runtime batching actions and receiving failure reports. */
+  readonly #runtime: IRuntime
+  /** Reads the current store state. */
+  readonly #getState: () => S
+  /** Replaces the store state; absent when the store cannot be written by devtools. */
+  readonly #applyState: ((state: S) => void) | undefined
+  /** Action admission policy. */
+  readonly mutationPolicy: MutationPolicy
   /**
    * Binding cleanup is LIFO while open; undefined means the owner is closed and new cleanup runs
    * now.
    */
-  let bindingDisposers: IDisposer[] | undefined = []
+  #bindingDisposers: IDisposer[] | undefined = []
   /** 防止 recordError 在上报自身失败时递归。 */
-  let reportingError = false
+  #reportingError = false
+  /** Plugin host this controller drives; set right after defineHost returns. */
+  host!: IStoreMiddlewareHost<S>
 
-  const emit = (event: IMiddlewareEvent<S>): void => {
-    let completed = false
-    host.runPipeline(event, () => {
-      completed = true
+  /** Binds the validated options. */
+  constructor(settled: ReturnType<typeof snapshotHostOptions<S>>) {
+    this.#runtime = settled.runtime
+    this.#getState = settled.getState
+    this.#applyState = settled.applyState
+    this.mutationPolicy = settled.mutationPolicy ?? createMutationPolicy('off')
+  }
+
+  /** Runs one event through the pipeline; a middleware that never calls next is reported. */
+  readonly emit = (event: IMiddlewareEvent<S>): void => {
+    /** Whether the pipeline reached its terminal step. */
+    const state = { completed: false }
+    this.host.runPipeline(event, () => {
+      state.completed = true
     })
-    if (!completed)
+    if (!state.completed)
       reportMiddlewareFailure(
-        runtime,
+        this.#runtime,
         createStoreMiddlewareError(
           StoreMiddlewareErrorCode.middlewareNotChained,
           StoreMiddlewareErrorText.missingNext
@@ -224,22 +280,25 @@ function createStoreMiddlewareHostCore<S>(
         ReactiveErrorPhase.traceListener
       )
   }
+
   /** 事件发射永不向业务路径抛出；失败经 runtime 上报。 */
-  const emitIsolated = (event: IMiddlewareEvent<S>): void => {
+  #emitIsolated(event: IMiddlewareEvent<S>): void {
     try {
-      emit(event)
+      this.emit(event)
     } catch (error) {
-      reportMiddlewareFailure(runtime, error, ReactiveErrorPhase.traceListener)
+      reportMiddlewareFailure(this.#runtime, error, ReactiveErrorPhase.traceListener)
     }
   }
 
-  const runAction = <T>(
+  /** Runs `fn` as a batched action, emitting start and end/error events around it. */
+  readonly runAction = <T>(
     name: string,
     fn: () => T,
     metadata?: Readonly<Record<string, unknown>>
   ): T => {
+    /** Start time for the duration. */
     const startedAt = globalThis.performance?.now() ?? Date.now()
-    emitIsolated({
+    this.#emitIsolated({
       type: MiddlewareEventType.action,
       phase: MiddlewareEventPhase.start,
       name,
@@ -247,8 +306,9 @@ function createStoreMiddlewareHostCore<S>(
       metadata
     })
     try {
-      const result = mutationPolicy.runInAction(() => runtime.batch(fn))
-      emitIsolated({
+      /** Action result. */
+      const result = this.mutationPolicy.runInAction(() => this.#runtime.batch(fn))
+      this.#emitIsolated({
         type: MiddlewareEventType.action,
         phase: MiddlewareEventPhase.end,
         name,
@@ -258,7 +318,7 @@ function createStoreMiddlewareHostCore<S>(
       })
       return result
     } catch (error) {
-      emitIsolated({
+      this.#emitIsolated({
         type: MiddlewareEventType.action,
         phase: MiddlewareEventPhase.error,
         name,
@@ -271,159 +331,185 @@ function createStoreMiddlewareHostCore<S>(
     }
   }
 
-  /** Domain descriptors join the single canonical handle before identity publication and freezing. */
-  const surface: IStoreMiddlewareSurface<S> & { readonly store?: object } = {
-    ...(bindingStore === undefined ? {} : { store: bindingStore }),
-    mutationPolicy,
-    emit,
-    runAction,
-    recordState: (
-      name: string,
-      previous: S,
-      next: S,
-      metadata?: Readonly<Record<string, unknown>>
-    ) => {
-      emitIsolated({
-        type: MiddlewareEventType.state,
-        name,
+  /** Emits one state transition event. */
+  readonly recordState = (
+    name: string,
+    previous: S,
+    next: S,
+    metadata?: Readonly<Record<string, unknown>>
+  ): void => {
+    this.#emitIsolated({
+      type: MiddlewareEventType.state,
+      name,
+      timestamp: Date.now(),
+      previous,
+      next,
+      metadata
+    })
+  }
+
+  /** Emits one error event; an error raised while reporting is reported directly instead. */
+  readonly recordError = (
+    phase: string,
+    error: unknown,
+    metadata?: Readonly<Record<string, unknown>>
+  ): void => {
+    if (this.#reportingError) {
+      reportMiddlewareFailure(this.#runtime, error, ReactiveErrorPhase.traceListener)
+      return
+    }
+    this.#reportingError = true
+    try {
+      this.#emitIsolated({
+        type: MiddlewareEventType.error,
+        phase,
         timestamp: Date.now(),
-        previous,
-        next,
+        error,
         metadata
       })
-    },
-    recordError: (phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>) => {
-      if (reportingError) {
-        reportMiddlewareFailure(runtime, error, ReactiveErrorPhase.traceListener)
-        return
-      }
-      reportingError = true
-      try {
-        emitIsolated({
-          type: MiddlewareEventType.error,
-          phase,
-          timestamp: Date.now(),
-          error,
-          metadata
-        })
-      } finally {
-        reportingError = false
-      }
-    },
-    connectDevTools: async (adapter: IDevToolsAdapter<S>, name = 'store-devtools') => {
-      try {
-        if (
-          adapter === null ||
-          typeof adapter !== 'object' ||
-          typeof adapter.init !== 'function' ||
-          typeof adapter.send !== 'function' ||
-          (adapter.subscribe !== undefined && typeof adapter.subscribe !== 'function')
-        )
-          throw createStoreMiddlewareError(
-            StoreMiddlewareErrorCode.invalidOption,
-            StoreMiddlewareErrorText.adapterInvalid
-          )
-      } catch (error) {
-        // Only a complete own source/code identity passes through unchanged.
-        if (
-          error !== null &&
-          typeof error === 'object' &&
-          typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
-          typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
-        )
-          throw error
-        throw createStoreMiddlewareError(
-          StoreMiddlewareErrorCode.invalidOption,
-          StoreMiddlewareErrorText.adapterInvalid,
-          { cause: error }
-        )
-      }
-      const plugin: IStoreMiddlewarePlugin<S> = {
-        name,
-        install: (core) => {
-          adapter.init(core.getState())
-          core.usePipeline((event, next) => {
-            next(event)
-            adapter.send(event, core.getState())
-          })
-          core.onDispose(
-            adapter.subscribe?.((command) => {
-              if (command.type === 'commit') adapter.init(core.getState())
-              else runAction(`devtools:${command.type}`, () => core.applyState(command.state))
-            }) ?? (() => undefined)
-          )
-          return {}
-        }
-      }
-      await host.use(plugin as never)
-    },
-    attachBindingDisposer: (disposer: IDisposer) => {
-      if (bindingDisposers === undefined) {
-        try {
-          disposer()
-        } catch (error) {
-          throw identifyMiddlewareFailure(error)
-        }
-      } else bindingDisposers.push(disposer)
+    } finally {
+      this.#reportingError = false
     }
   }
-  const host = defineHost<
-    IStoreMiddlewareCore<S>,
-    IMiddlewareEvent<S>,
-    readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule],
-    'sync',
-    readonly [],
-    typeof surface
-  >({
-    modules: [syncPipelineModule],
-    host: settled,
-    surface,
-    domainCore: () => ({
-      runtime,
-      getState: () => getState(),
-      applyState: (state) => {
-        if (!applyState)
+
+  /** Validates a devtools adapter and installs it as a plugin on the host. */
+  readonly connectDevTools = async (
+    adapter: IDevToolsAdapter<S>,
+    name = 'store-devtools'
+  ): Promise<void> => {
+    assertDevToolsAdapter(adapter)
+    /** Plugin bridging the pipeline to the adapter. */
+    const plugin: IStoreMiddlewarePlugin<S> = {
+      name,
+      install: (core) => this.#installDevTools(adapter, core)
+    }
+    await this.host.use(plugin as never)
+  }
+
+  /** Plugin install: initial state, forward every event, and route adapter commands back. */
+  #installDevTools(
+    adapter: IDevToolsAdapter<S>,
+    core: Parameters<IStoreMiddlewarePlugin<S>['install']>[0]
+  ): Record<string, never> {
+    adapter.init(core.getState())
+    core.usePipeline((event, next) => {
+      next(event)
+      adapter.send(event, core.getState())
+    })
+    core.onDispose(
+      adapter.subscribe?.((command) => this.#onDevToolsCommand(adapter, core, command)) ??
+        (() => undefined)
+    )
+    return {}
+  }
+
+  /** Adapter command: `commit` re-inits the adapter; jumps replay state as a devtools action. */
+  #onDevToolsCommand(
+    adapter: IDevToolsAdapter<S>,
+    core: Parameters<IStoreMiddlewarePlugin<S>['install']>[0],
+    command: Parameters<NonNullable<IDevToolsAdapter<S>['subscribe']>>[0] extends (
+      command: infer C
+    ) => unknown
+      ? C
+      : never
+  ): void {
+    if (command.type === 'commit') adapter.init(core.getState())
+    else this.runAction(`devtools:${command.type}`, () => core.applyState(command.state))
+  }
+
+  /** Registers store-binding cleanup; after close it runs the disposer immediately. */
+  readonly attachBindingDisposer = (disposer: IDisposer): void => {
+    if (this.#bindingDisposers === undefined) {
+      try {
+        disposer()
+      } catch (error) {
+        throw identifyMiddlewareFailure(error)
+      }
+    } else this.#bindingDisposers.push(disposer)
+  }
+
+  /** Domain core handed to middleware plugins. */
+  domainCore() {
+    return {
+      runtime: this.#runtime,
+      getState: () => this.#getState(),
+      applyState: (state: S) => {
+        if (!this.#applyState)
           throw createStoreMiddlewareError(
             StoreMiddlewareErrorCode.devtoolsCapability,
             StoreMiddlewareErrorText.applyState
           )
-        applyState(state)
+        this.#applyState(state)
       },
-      reportError: (error, phase) =>
-        reportMiddlewareFailure(runtime, error, phase as IRuntimeErrorContext['phase'])
-    }),
-    // Store 绑定先释放，再委托 plugin-host 清理；`next()` 由句柄保证恰好执行一次。
-    dispose: async (next) => {
-      const errors: unknown[] = []
-      /** Close admission before any disposer can reenter registration. */
-      const disposers = bindingDisposers ?? []
-      bindingDisposers = undefined
-      for (const disposer of disposers.reverse()) {
-        try {
-          disposer()
-        } catch (error) {
-          errors.push(identifyMiddlewareFailure(error))
-        }
-      }
-      let pluginResult: IPluginHostDisposalResult
-      try {
-        pluginResult = await next()
-      } catch (error) {
-        pluginResult = {
-          logicalTerminal: true,
-          cleanupComplete: false,
-          cleanupErrors: Object.freeze([error])
-        }
-      }
-      return Object.freeze({
-        ...pluginResult,
-        // 同步的绑定失败是已落定的观测，不是未完成的物理清理。
-        cleanupComplete: pluginResult.cleanupComplete,
-        cleanupErrors: Object.freeze([...errors, ...pluginResult.cleanupErrors])
-      })
+      reportError: (error: unknown, phase: string) =>
+        reportMiddlewareFailure(this.#runtime, error, phase as IRuntimeErrorContext['phase'])
     }
-  })
-  return host
+  }
+
+  /** Releases store bindings LIFO, then delegates to plugin-host cleanup and merges failures. */
+  async dispose(
+    next: () => Promise<IPluginHostDisposalResult>
+  ): Promise<IPluginHostDisposalResult> {
+    /** Binding cleanup failures. */
+    const errors: unknown[] = []
+    /** Close admission before any disposer can reenter registration. */
+    const disposers = this.#bindingDisposers ?? []
+    this.#bindingDisposers = undefined
+    for (const disposer of disposers.reverse()) {
+      try {
+        disposer()
+      } catch (error) {
+        errors.push(identifyMiddlewareFailure(error))
+      }
+    }
+    /** Plugin-host disposal result. */
+    let pluginResult: IPluginHostDisposalResult
+    try {
+      pluginResult = await next()
+    } catch (error) {
+      pluginResult = {
+        logicalTerminal: true,
+        cleanupComplete: false,
+        cleanupErrors: Object.freeze([error])
+      }
+    }
+    return Object.freeze({
+      ...pluginResult,
+      // 同步的绑定失败是已落定的观测，不是未完成的物理清理。
+      cleanupComplete: pluginResult.cleanupComplete,
+      cleanupErrors: Object.freeze([...errors, ...pluginResult.cleanupErrors])
+    })
+  }
+}
+
+/** Rejects an invalid adapter; only a complete own source/code identity passes through unchanged. */
+function assertDevToolsAdapter<S>(adapter: IDevToolsAdapter<S>): void {
+  try {
+    if (
+      adapter === null ||
+      typeof adapter !== 'object' ||
+      typeof adapter.init !== 'function' ||
+      typeof adapter.send !== 'function' ||
+      (adapter.subscribe !== undefined && typeof adapter.subscribe !== 'function')
+    )
+      throw createStoreMiddlewareError(
+        StoreMiddlewareErrorCode.invalidOption,
+        StoreMiddlewareErrorText.adapterInvalid
+      )
+  } catch (error) {
+    if (
+      error !== null &&
+      typeof error === 'object' &&
+      typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
+      typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
+    )
+      throw error
+    throw createStoreMiddlewareError(
+      StoreMiddlewareErrorCode.invalidOption,
+      StoreMiddlewareErrorText.adapterInvalid,
+      { cause: error }
+    )
+  }
 }
 
 /**
@@ -497,7 +583,7 @@ export function bindStoreMiddleware<S extends Record<string, unknown>>(
   options: IStoreMiddlewareBindingOptions
 ): IStoreMiddlewareBinding<S> {
   /** Select the application's synchronous snapshot function or the diagnostic default once. */
-  const clone = options.clone ?? ((state) => ClonePolicy.diagnostic(state))
+  const clone = options.clone ?? diagnosticClone
   /** Establish the first snapshot before acquiring subscriptions, retaining callback failures. */
   let previous: Record<string, unknown>
   try {
@@ -583,4 +669,9 @@ export function bindStoreMiddleware<S extends Record<string, unknown>>(
   }
   // The Store reference was installed before this same canonical handle was frozen and registered.
   return host as IStoreMiddlewareBinding<S>
+}
+
+/** Default binding snapshot: the tolerant diagnostic clone. */
+function diagnosticClone<S extends Record<string, unknown>>(state: S): S {
+  return ClonePolicy.diagnostic(state) as S
 }

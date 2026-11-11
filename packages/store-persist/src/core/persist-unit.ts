@@ -3,7 +3,7 @@ import { createAbortController, type IAbortController } from '@migaia/lifecycle'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IDisposer } from '@migaia/reactive'
+import type { IDisposer, IReactiveComputed, IReactiveSignal } from '@migaia/reactive'
 import {
   readEnvelopeWithStages,
   removeEnvelope,
@@ -155,6 +155,35 @@ export function persistUnit<TState>(
   unit: IPersistUnit<TState>,
   options: IPersistUnitOptions<TState>
 ): IPersistHandle {
+  return new PersistUnitAttachment(unit, readPersistUnitOptions(options)).handle
+}
+
+/** Validated persist options with defaults applied and the migration plan built once. */
+type IResolvedPersistUnitOptions<TState> = Readonly<{
+  key: string
+  runtime: IPersistUnitOptions<TState>['runtime']
+  storage: IPersistUnitOptions<TState>['storage']
+  codec: NonNullable<IPersistUnitOptions<TState>['codec']>
+  version: number
+  codecStages: IPersistUnitOptions<TState>['codecStages']
+  transactionStages: IPersistUnitOptions<TState>['transactionStages']
+  partialize: (state: TState) => Partial<TState>
+  merge: (persisted: Partial<TState>, current: TState) => TState
+  /** True when the caller supplied `merge`; otherwise hydration uses the plain-state merge. */
+  customMerge: boolean
+  debounceMs: number
+  maxWaitMs: number | undefined
+  /** One frozen plan is shared by every hydration attempt and never rebuilt during reads. */
+  migrationPlan: ReturnType<typeof createPersistMigrationPlan>
+  /** Own the debounce clock and timer through the same admitted scheduler snapshot. */
+  scheduler: ReturnType<typeof resolveScheduler>
+}>
+
+/** Reads every option once, then validates codec, storage, callbacks, timings and stages. */
+function readPersistUnitOptions<TState>(
+  options: IPersistUnitOptions<TState>
+): IResolvedPersistUnitOptions<TState> {
+  /** Raw option values, read once; a throwing getter is INVALID_OPTION. */
   let extracted: {
     key: string
     runtime: IPersistUnitOptions<TState>['runtime']
@@ -202,26 +231,8 @@ export function persistUnit<TState>(
     migrations,
     codecStages,
     transactionStages,
-    partialize = (state: TState) => state as Partial<TState>,
-    // Plain-object snapshots use a shallow current-first merge so a startup
-    // mutation is not lost while storage is loading. Collection/array shapes
-    // remain replacement-based; callers can provide a shape-specific merge.
-    merge = (persisted: Partial<TState>, current: TState) => {
-      if (
-        persisted !== null &&
-        typeof persisted === 'object' &&
-        current !== null &&
-        typeof current === 'object' &&
-        !Array.isArray(persisted) &&
-        !Array.isArray(current) &&
-        (Object.getPrototypeOf(persisted) === Object.prototype ||
-          Object.getPrototypeOf(persisted) === null) &&
-        (Object.getPrototypeOf(current) === Object.prototype ||
-          Object.getPrototypeOf(current) === null)
-      )
-        return { ...(current as object), ...(persisted as object) } as TState
-      return persisted as TState
-    },
+    partialize = defaultPartialize as (state: TState) => Partial<TState>,
+    merge = defaultPersistMerge as (persisted: Partial<TState>, current: TState) => TState,
     debounceMs = 0,
     maxWaitMs
   } = extracted
@@ -232,6 +243,7 @@ export function persistUnit<TState>(
       StorePersistErrorCode.codecNotResolved,
       StorePersistErrorText.noCodec(key)
     )
+  /** Whether the codec exposes callable encode/decode; a throwing getter is INVALID_OPTION. */
   let codecShapeValid = false
   try {
     codecShapeValid =
@@ -294,7 +306,6 @@ export function persistUnit<TState>(
       StorePersistErrorText.debounce(key)
     )
   }
-
   if (
     maxWaitMs !== undefined &&
     (!Number.isFinite(maxWaitMs) || maxWaitMs < 0 || maxWaitMs > MAX_TIMER_DELAY_MS)
@@ -316,25 +327,186 @@ export function persistUnit<TState>(
     StorageStageKind.transaction,
     StorePersistErrorText.transactionStagesInvalid
   )
-  /** Own the debounce clock and timer through the same admitted scheduler snapshot. */
-  const scheduler = resolveSchedulerOption(extracted) ?? resolveScheduler(systemScheduler)
+  return {
+    key,
+    runtime,
+    storage,
+    codec,
+    version,
+    codecStages,
+    transactionStages,
+    partialize,
+    merge,
+    customMerge: extracted.merge !== undefined,
+    debounceMs,
+    maxWaitMs,
+    migrationPlan,
+    scheduler: resolveSchedulerOption(extracted) ?? resolveScheduler(systemScheduler)
+  }
+}
 
-  const hydrationStatus = runtime.signal<IHydrationStatus>(PersistState.loading)
-  const hydrationError = runtime.signal<unknown>(undefined)
-  const writeStatus = runtime.signal<IWriteStatus>(PersistState.idle)
-  const writeError = runtime.signal<unknown>(undefined)
+/** Default partialize: persist the whole snapshot. */
+function defaultPartialize<TState>(state: TState): Partial<TState> {
+  return state as Partial<TState>
+}
+
+/**
+ * Default merge. Plain-object snapshots use a shallow current-first merge so a startup mutation is
+ * not lost while storage is loading. Collection/array shapes remain replacement-based; callers can
+ * provide a shape-specific merge.
+ */
+function defaultPersistMerge<TState>(persisted: Partial<TState>, current: TState): TState {
+  if (
+    persisted !== null &&
+    typeof persisted === 'object' &&
+    current !== null &&
+    typeof current === 'object' &&
+    !Array.isArray(persisted) &&
+    !Array.isArray(current) &&
+    (Object.getPrototypeOf(persisted) === Object.prototype ||
+      Object.getPrototypeOf(persisted) === null) &&
+    (Object.getPrototypeOf(current) === Object.prototype || Object.getPrototypeOf(current) === null)
+  )
+    return { ...(current as object), ...(persisted as object) } as TState
+  return persisted as TState
+}
+
+/** A live coordination owns admission until its actual transaction finishes. */
+type IPersistParticipation = {
+  readonly control: IPersistParticipationControl
+  transactionId?: string
+  store?: IStorageBase
+  flushChain: Promise<void>
+  flushed: boolean
+  lastFlushedRevision: number
+}
+
+/**
+ * One persistence attachment of a unit to storage: hydration, debounced serialized writes,
+ * transaction participation and disposal. The public handle forwards to this owner.
+ */
+class PersistUnitAttachment<TState> {
+  /** Persisted unit; borrowed, never disposed here. */
+  readonly #unit: IPersistUnit<TState>
+  /** Validated options. */
+  readonly #options: IResolvedPersistUnitOptions<TState>
+  /** Hydration progress. */
+  readonly hydrationStatus: IReactiveSignal<IHydrationStatus>
+  /** Last hydration failure. */
+  readonly hydrationError: IReactiveSignal<unknown>
+  /** Write progress. */
+  readonly writeStatus: IReactiveSignal<IWriteStatus>
+  /** Last write failure. */
+  readonly writeError: IReactiveSignal<unknown>
   /** Reactive terminal projection only; the internal open marker is not a public status value. */
-  const lifecycleDisposed = runtime.signal<boolean>(false)
-  const status = runtime.computed<IPersistStatus>(() => {
-    if (lifecycleDisposed.value) return PersistState.disposed
-    if (hydrationStatus.value === PersistState.loading) return PersistState.loading
-    if (hydrationStatus.value === PersistState.error || writeStatus.value === PersistState.error)
+  readonly #lifecycleDisposed: IReactiveSignal<boolean>
+  /** Combined public status. */
+  readonly status: IReactiveComputed<IPersistStatus>
+  /** Combined hydration/write error. */
+  readonly error: IReactiveComputed<unknown>
+  /** Whether hydration succeeded. */
+  readonly hydrated: IReactiveComputed<boolean>
+  /** Stops the unit subscription. */
+  #stopSubscription: IDisposer | undefined
+  /** At most one timer owns the current quiet/max-wait window. */
+  #timer: IScheduledTask | undefined
+  /** First-change deadline remains stable while later changes extend the quiet interval. */
+  #writeDeadline: number | undefined
+  /** Set by dispose; stops all admission. */
+  #disposed = false
+  /** The one cleanup outcome survives a prior synchronous dispose call. */
+  #disposalFailure: unknown
+  /** A thrown undefined is still a cleanup failure and must reject asynchronous disposal. */
+  #disposalFailed = false
+  /** Bumped by dispose so late write outcomes from an earlier generation are ignored. */
+  #generationEpoch = 0
+  /** Abort controllers of in-flight adapter operations. */
+  readonly #activeOperations = new Set<IAbortController>()
+  /** Whether the current hydration attempt finished (success or failure). */
+  #hydrationSettled = false
+  /** Whether the current hydration attempt failed. */
+  #hydrationFailed = false
+  /** True while restoring a hydrated snapshot; such restores are not application changes. */
+  #hydrating = false
+  /** A change arrived before hydration settled; write once hydration succeeds. */
+  #dirtyDuringHydrate = false
+  /** Shares a recovery read so concurrent callers cannot restore two snapshots out of order. */
+  #retryPromise: Promise<void> | undefined
+  /** Unit snapshot at attachment, used by the default plain-state merge. */
+  readonly #hydrationStartSnapshot: TState
+  /** 串行写队列：所有写入排成一条链，避免异步存储下"慢的旧写入后完成、覆盖新写入"的乱序问题。 */
+  #writeChain: Promise<void> = Promise.resolve()
+  /**
+   * Actual unsettled write result shared by strict flush and background callers; recovery is
+   * separate.
+   */
+  #writeDrain: Promise<void> | undefined
+  /** Another write was requested while the drain loop runs. */
+  #writeRequested = false
+  /** Only unsettled existing mutations are retained, so participation sees their real outcomes. */
+  readonly #pendingWrites = new Set<Promise<void>>()
+  /** Application notifications identify changes made after the last successful snapshot. */
+  #changeRevision = 0
+  /** Each successful native write records the notification revision captured with that snapshot. */
+  #persistedRevision = 0
+  /** A live coordination owns admission until its actual transaction finishes. */
+  #participation: IPersistParticipation | undefined
+  /** Closing only this handle's private utility queue rejects its not-yet-started coordinations. */
+  readonly #closeParticipationQueue: (reason: unknown) => void
+  /** Explicit and symbol callers share cleanup but retain separate stable Promise identities. */
+  #disposalPromise: Promise<void> | undefined
+  /** Symbol disposal reports primary failure without rejecting a language-managed cleanup. */
+  #symbolDisposalPromise: Promise<void> | undefined
+  /** The original attempt owns readiness success/rejection, including disposal cancellation. */
+  readonly ready: Promise<void>
+  /** Background barriers may always settle without changing the public attempt result. */
+  readonly settled: Promise<void>
+  /** Original public handle; it alone receives private enlistment authority. */
+  readonly handle: IPersistHandle
+
+  /** Creates signals, subscribes, starts hydration and registers transaction participation. */
+  constructor(unit: IPersistUnit<TState>, options: IResolvedPersistUnitOptions<TState>) {
+    this.#unit = unit
+    this.#options = options
+    const runtime = options.runtime
+    this.hydrationStatus = runtime.signal<IHydrationStatus>(PersistState.loading)
+    this.hydrationError = runtime.signal<unknown>(undefined)
+    this.writeStatus = runtime.signal<IWriteStatus>(PersistState.idle)
+    this.writeError = runtime.signal<unknown>(undefined)
+    this.#lifecycleDisposed = runtime.signal<boolean>(false)
+    this.status = runtime.computed<IPersistStatus>(() => this.#readStatus())
+    this.error = runtime.computed<unknown>(() => this.#readError())
+    this.hydrated = runtime.computed(() => this.hydrationStatus.value === PersistState.success)
+    this.#hydrationStartSnapshot = unit.snapshot()
+    this.#stopSubscription = unit.subscribe(this.scheduleWrite)
+    this.ready = this.#hydrateAttempt()
+    this.settled = this.ready.catch(() => undefined)
+    this.handle = createPersistHandle(this)
+    this.#closeParticipationQueue = registerPersistTransactionParticipant(this.handle, {
+      storage: options.storage,
+      disposed: () => this.#disposed,
+      pause: (control) => this.#pause(control),
+      bind: (scope, owner) => this.#bind(scope, owner),
+      finish: (committed, failure) => this.#finish(committed, failure)
+    })
+  }
+
+  /** Public status: disposed, loading, error, or ready. */
+  #readStatus(): IPersistStatus {
+    if (this.#lifecycleDisposed.value) return PersistState.disposed
+    if (this.hydrationStatus.value === PersistState.loading) return PersistState.loading
+    if (
+      this.hydrationStatus.value === PersistState.error ||
+      this.writeStatus.value === PersistState.error
+    )
       return PersistState.error
     return PersistState.ready
-  })
-  const error = runtime.computed<unknown>(() => {
-    const hydration = hydrationError.value
-    const write = writeError.value
+  }
+
+  /** Public error: both failures aggregated, or whichever one exists. */
+  #readError(): unknown {
+    const hydration = this.hydrationError.value
+    const write = this.writeError.value
     if (hydration !== undefined && write !== undefined) {
       return createStorePersistAggregateError(
         StorePersistErrorCode.hydrateAndWriteFailed,
@@ -343,196 +515,195 @@ export function persistUnit<TState>(
       )
     }
     return hydration ?? write ?? undefined
-  })
-  const hydrated = runtime.computed(() => hydrationStatus.value === PersistState.success)
+  }
 
-  let stopSubscription: IDisposer | undefined
-  /** At most one timer owns the current quiet/max-wait window. */
-  let timer: IScheduledTask | undefined
-  /** First-change deadline remains stable while later changes extend the quiet interval. */
-  let writeDeadline: number | undefined
-  let disposed = false
-  /** The one cleanup outcome survives a prior synchronous dispose call. */
-  let disposalFailure: unknown
-  /** A thrown undefined is still a cleanup failure and must reject asynchronous disposal. */
-  let disposalFailed = false
-  let generationEpoch = 0
-  const activeOperations = new Set<IAbortController>()
-  let hydrationSettled = false
-  let hydrationFailed = false
-  let hydrating = false
-  let dirtyDuringHydrate = false
-  /** Shares a recovery read so concurrent callers cannot restore two snapshots out of order. */
-  let retryPromise: Promise<void> | undefined
-  const hydrationStartSnapshot = unit.snapshot()
-  // 串行写队列：所有写入排成一条链，避免异步存储下"慢的旧写入后完成、覆盖新写入"的乱序问题。
-  let writeChain: Promise<void> = Promise.resolve()
-  /**
-   * Actual unsettled write result shared by strict flush and background callers; recovery is
-   * separate.
-   */
-  let writeDrain: Promise<void> | undefined
-  let writeRequested = false
-  /** Only unsettled existing mutations are retained, so this participation sees their real outcomes. */
-  const pendingWrites = new Set<Promise<void>>()
-  /** Application notifications identify changes made after the last successful snapshot. */
-  let changeRevision = 0
-  /** Each successful native write records the notification revision captured with that snapshot. */
-  let persistedRevision = 0
-  /** A live coordination owns admission until its actual transaction finishes. */
-  let participation:
-    | {
-        readonly control: IPersistParticipationControl
-        transactionId?: string
-        store?: IStorageBase
-        flushChain: Promise<void>
-        flushed: boolean
-        lastFlushedRevision: number
-      }
-    | undefined
-  /** Closing only this handle's private utility queue rejects its not-yet-started coordinations. */
-  let closeParticipationQueue: ((reason: unknown) => void) | undefined
+  /** Whether dispose ran. */
+  get disposed(): boolean {
+    return this.#disposed
+  }
 
   /** Pending mutation failures remain visible to a coordinator that admitted before they settled. */
-  function trackPendingWrite(operation: Promise<void>): Promise<void> {
-    pendingWrites.add(operation)
+  #trackPendingWrite(operation: Promise<void>): Promise<void> {
+    this.#pendingWrites.add(operation)
     void operation.then(
-      () => pendingWrites.delete(operation),
-      () => pendingWrites.delete(operation)
+      () => this.#pendingWrites.delete(operation),
+      () => this.#pendingWrites.delete(operation)
     )
     return operation
   }
 
   /** Direct calls cannot wait behind their own active transaction or bypass its snapshot. */
-  function assertDirectOperation(): void {
-    if (participation !== undefined)
+  #assertDirectOperation(): void {
+    if (this.#participation !== undefined)
       throw createStorePersistTypeError(
         StorePersistErrorCode.invalidOption,
         StorePersistErrorText.transactionDirectOperation
       )
   }
 
-  function assertActive(): void {
-    if (disposed) throw disposedError()
+  /** Throws the disposed error after dispose. */
+  readonly #assertActive = (): void => {
+    if (this.#disposed) throw disposedError()
   }
 
-  async function runAdapterOperation<T>(
-    operation: (signal: IAbortSignal) => T | Promise<T>
-  ): Promise<T> {
-    assertActive()
+  /** Runs one cancellable adapter operation; disposal aborts it and rewrites its failure. */
+  async #runAdapterOperation<T>(operation: (signal: IAbortSignal) => T | Promise<T>): Promise<T> {
+    this.#assertActive()
+    /** Cancels this operation on dispose. */
     const controller = createAbortController()
-    activeOperations.add(controller)
+    this.#activeOperations.add(controller)
     try {
       const result = await operation(controller.signal)
-      assertActive()
+      this.#assertActive()
       return result
     } catch (caught) {
-      if (disposed) throw disposedError(caught)
+      if (this.#disposed) throw disposedError(caught)
       throw caught
     } finally {
-      activeOperations.delete(controller)
+      this.#activeOperations.delete(controller)
     }
   }
 
-  async function runWriteOperation(operation: () => void | Promise<void>): Promise<void> {
-    const operationGeneration = generationEpoch
-    writeStatus.value = PersistState.writing
+  /** Publishes write status around one write; a stale generation leaves status untouched. */
+  async #runWriteOperation(operation: () => void | Promise<void>): Promise<void> {
+    /** Generation this write belongs to. */
+    const operationGeneration = this.#generationEpoch
+    this.writeStatus.value = PersistState.writing
     try {
       await operation()
-      if (disposed || operationGeneration !== generationEpoch) return
-      writeStatus.value = PersistState.idle
-      writeError.value = undefined
+      if (this.#disposed || operationGeneration !== this.#generationEpoch) return
+      this.writeStatus.value = PersistState.idle
+      this.writeError.value = undefined
     } catch (operationError) {
-      if (disposed || operationGeneration !== generationEpoch) throw operationError
-      writeStatus.value = PersistState.error
-      writeError.value = operationError
+      if (this.#disposed || operationGeneration !== this.#generationEpoch) throw operationError
+      this.writeStatus.value = PersistState.error
+      this.writeError.value = operationError
       throw operationError
     }
   }
 
-  /** Coalesces requests under one observable drain, including its original rejection. */
-  function enqueueWrite(): Promise<void> {
-    writeRequested = true
-    // A strict flush must observe the currently running debounced write itself;
-    // chaining after writeChain would only see its error-swallowing recovery promise.
-    if (writeDrain) return writeDrain
-
-    const operation = trackPendingWrite(
-      writeChain.then(async () => {
-        while (!disposed && writeRequested) {
-          writeRequested = false
-          await runWriteOperation(() =>
-            runAdapterOperation(async (signal) => {
-              /** The persisted revision belongs to the snapshot taken before awaiting the codec. */
-              const snapshotRevision = changeRevision
-              const envelope: IVersionedEnvelope<Partial<TState>> = {
-                version,
-                state: runPersistCallback(
-                  StorePersistErrorCode.encodeFailed,
-                  StorePersistErrorText.partializeFailed,
-                  () =>
-                    assertSynchronousCallbackResult(key, 'partialize', partialize(unit.snapshot()))
-                )
-              }
-              await writeEnvelopeWithStages(storage, key, codec, envelope, { signal }, codecStages)
-              persistedRevision = snapshotRevision
-            })
-          )
-        }
-      })
+  /** The current partialized snapshot. */
+  #partializedSnapshot(): Partial<TState> {
+    return assertSynchronousCallbackResult(
+      this.#options.key,
+      'partialize',
+      this.#options.partialize(this.#unit.snapshot())
     )
-    writeChain = operation.catch(() => undefined)
-    writeDrain = operation
+  }
+
+  /** Adapter operation writing the current snapshot and recording its revision. */
+  readonly #writeOperation = async (signal: IAbortSignal): Promise<void> => {
+    /** The persisted revision belongs to the snapshot taken before awaiting the codec. */
+    const snapshotRevision = this.#changeRevision
+    const envelope: IVersionedEnvelope<Partial<TState>> = {
+      version: this.#options.version,
+      state: runPersistCallback(
+        StorePersistErrorCode.encodeFailed,
+        StorePersistErrorText.partializeFailed,
+        () => this.#partializedSnapshot()
+      )
+    }
+    await writeEnvelopeWithStages(
+      this.#options.storage,
+      this.#options.key,
+      this.#options.codec,
+      envelope,
+      { signal },
+      this.#options.codecStages
+    )
+    this.#persistedRevision = snapshotRevision
+  }
+
+  /** Adapter operation removing the stored envelope. */
+  readonly #removeOperation = (signal: IAbortSignal) =>
+    removeEnvelope(this.#options.storage, this.#options.key, { signal }, this.#options.codec)
+
+  /** Adapter operation reading the stored envelope. */
+  readonly #readOperation = (signal: IAbortSignal) =>
+    readEnvelopeWithStages(
+      this.#options.storage,
+      this.#options.key,
+      this.#options.codec,
+      { signal },
+      this.#options.codecStages
+    )
+
+  /** Writes until no further write was requested while one ran. */
+  async #drainWrites(): Promise<void> {
+    while (!this.#disposed && this.#writeRequested) {
+      this.#writeRequested = false
+      await this.#runWriteOperation(() => this.#runAdapterOperation(this.#writeOperation))
+    }
+  }
+
+  /** Coalesces requests under one observable drain, including its original rejection. */
+  #enqueueWrite(): Promise<void> {
+    this.#writeRequested = true
+    // A strict flush must observe the currently running debounced write itself; chaining after
+    // writeChain would only see its error-swallowing recovery promise.
+    if (this.#writeDrain) return this.#writeDrain
+    /** The drain this request joins. */
+    const operation = this.#trackPendingWrite(this.#writeChain.then(() => this.#drainWrites()))
+    this.#writeChain = operation.catch(() => undefined)
+    this.#writeDrain = operation
     void operation.then(
-      () => {
-        if (writeDrain === operation) writeDrain = undefined
-      },
-      () => {
-        if (writeDrain === operation) writeDrain = undefined
-      }
+      () => this.#releaseDrain(operation),
+      () => this.#releaseDrain(operation)
     )
     return operation
   }
 
+  /** Forgets a settled drain unless a newer one replaced it. */
+  #releaseDrain(operation: Promise<void>): void {
+    if (this.#writeDrain === operation) this.#writeDrain = undefined
+  }
+
   /** Cancels a whole debounce window; final disposal uses the result to retain its last snapshot. */
-  function clearWriteTimer(): boolean {
+  #clearWriteTimer(): boolean {
     /** Clear ownership before cancellation so another operation cannot cancel this handle twice. */
-    const scheduled = timer
-    timer = undefined
-    writeDeadline = undefined
+    const scheduled = this.#timer
+    this.#timer = undefined
+    this.#writeDeadline = undefined
     scheduled?.cancel()
     return scheduled !== undefined
   }
 
   /** Coalesces changes until quiet time or the first change's optional maximum deadline. */
-  function scheduleWrite(): void {
-    if (disposed) return
+  readonly scheduleWrite = (): void => {
+    if (this.#disposed) return
     // Restoring an archive is not an application mutation and must not write that archive back.
-    if (hydrating) return
-    changeRevision++
-    if (participation !== undefined) return
-    if (hydrationFailed || !hydrationSettled) {
-      dirtyDuringHydrate = true
+    if (this.#hydrating) return
+    this.#changeRevision++
+    if (this.#participation !== undefined) return
+    if (this.#hydrationFailed || !this.#hydrationSettled) {
+      this.#dirtyDuringHydrate = true
       return
     }
-    if (debounceMs <= 0) {
-      void enqueueWrite().catch(() => undefined)
+    if (this.#options.debounceMs <= 0) {
+      void this.#enqueueWrite().catch(() => undefined)
       return
     }
     /** One clock read determines both the next quiet interval and the unchanged maximum window. */
-    const now = scheduler.now()
+    const now = this.#options.scheduler.now()
     /** Retain the original deadline while cancelling the old quiet timer. */
-    const deadline = writeDeadline ?? (maxWaitMs === undefined ? undefined : now + maxWaitMs)
-    clearWriteTimer()
-    writeDeadline = deadline
-    timer = scheduler.schedule(
-      () => {
-        timer = undefined
-        writeDeadline = undefined
-        void enqueueWrite().catch(() => undefined)
-      },
-      deadline === undefined ? debounceMs : Math.min(debounceMs, Math.max(0, deadline - now))
+    const deadline =
+      this.#writeDeadline ??
+      (this.#options.maxWaitMs === undefined ? undefined : now + this.#options.maxWaitMs)
+    this.#clearWriteTimer()
+    this.#writeDeadline = deadline
+    this.#timer = this.#options.scheduler.schedule(
+      () => this.#onWriteTimer(),
+      deadline === undefined
+        ? this.#options.debounceMs
+        : Math.min(this.#options.debounceMs, Math.max(0, deadline - now))
     )
+  }
+
+  /** Debounce window ended: start the write. */
+  #onWriteTimer(): void {
+    this.#timer = undefined
+    this.#writeDeadline = undefined
+    void this.#enqueueWrite().catch(() => undefined)
   }
 
   /**
@@ -540,233 +711,240 @@ export function persistUnit<TState>(
    * the unit is still intact; the write runs after the write chain and is not awaited. Its failure
    * is published on `writeError`, because the handle no longer reports write status.
    */
-  function startFinalWrite(): void {
+  #startFinalWrite(): void {
     /** Envelope built from the snapshot at dispose time. */
     let envelope: IVersionedEnvelope<Partial<TState>>
     try {
-      envelope = {
-        version,
-        state: assertSynchronousCallbackResult(key, 'partialize', partialize(unit.snapshot()))
-      }
+      envelope = { version: this.#options.version, state: this.#partializedSnapshot() }
     } catch (caught) {
-      writeError.value = caught
+      this.writeError.value = caught
       return
     }
-    writeChain = writeChain
-      .then(() => writeEnvelopeWithStages(storage, key, codec, envelope, {}, codecStages))
+    this.#writeChain = this.#writeChain
+      .then(() =>
+        writeEnvelopeWithStages(
+          this.#options.storage,
+          this.#options.key,
+          this.#options.codec,
+          envelope,
+          {},
+          this.#options.codecStages
+        )
+      )
       .catch((caught: unknown) => {
-        writeError.value = caught
+        this.writeError.value = caught
       })
   }
 
-  stopSubscription = unit.subscribe(scheduleWrite)
-
-  const hydrateAttempt = async (): Promise<void> => {
-    hydrationSettled = false
-    hydrationFailed = false
-    hydrationStatus.value = PersistState.loading
-    hydrationError.value = undefined
+  /** One hydration attempt: read, migrate, merge with the live snapshot and restore. */
+  async #hydrateAttempt(): Promise<void> {
+    this.#hydrationSettled = false
+    this.#hydrationFailed = false
+    this.hydrationStatus.value = PersistState.loading
+    this.hydrationError.value = undefined
     try {
-      const raw = await runAdapterOperation((signal) =>
-        readEnvelopeWithStages(storage, key, codec, { signal }, codecStages)
-      )
-      assertActive()
-      if (raw !== undefined) {
-        const envelope = assertVersionedEnvelope(raw)
-        const state = migrateEnvelopeSync(migrationPlan, envelope) as Partial<TState>
-        // Always reconcile the persisted snapshot with the current snapshot. The
-        // default object merge preserves fields initialized or mutated while the
-        // async read was in flight; custom store shapes can provide their own merge.
-        hydrating = true
-        try {
-          const current = unit.snapshot()
-          const reconciled =
-            extracted.merge === undefined
-              ? mergePersistedPlainState(state, current, hydrationStartSnapshot)
-              : runPersistCallback(
-                  StorePersistErrorCode.mergeFailed,
-                  StorePersistErrorText.mergeFailed,
-                  () => assertSynchronousCallbackResult(key, 'merge', merge(state, current))
-                )
-          unit.restore(reconciled)
-        } finally {
-          hydrating = false
-        }
-      }
-      assertActive()
-      hydrationStatus.value = PersistState.success
-      hydrationError.value = undefined
-      hydrationSettled = true
-      const shouldWriteAfterHydrate = dirtyDuringHydrate
-      dirtyDuringHydrate = false
-      if (shouldWriteAfterHydrate) scheduleWrite()
+      /** Stored envelope, if any. */
+      const raw = await this.#runAdapterOperation(this.#readOperation)
+      this.#assertActive()
+      if (raw !== undefined) this.#restoreEnvelope(raw)
+      this.#assertActive()
+      this.hydrationStatus.value = PersistState.success
+      this.hydrationError.value = undefined
+      this.#hydrationSettled = true
+      /** Whether a change arrived while hydrating. */
+      const shouldWriteAfterHydrate = this.#dirtyDuringHydrate
+      this.#dirtyDuringHydrate = false
+      if (shouldWriteAfterHydrate) this.scheduleWrite()
     } catch (caught) {
-      if (disposed) throw caught
-      hydrationError.value = caught
-      hydrationStatus.value = PersistState.error
-      hydrationSettled = true
-      hydrationFailed = true
+      if (this.#disposed) throw caught
+      this.hydrationError.value = caught
+      this.hydrationStatus.value = PersistState.error
+      this.#hydrationSettled = true
+      this.#hydrationFailed = true
       throw caught
     }
   }
 
-  /** The original attempt owns readiness success/rejection, including disposal cancellation. */
-  const ready = hydrateAttempt()
-  /** Background barriers may always settle without changing the public attempt result. */
-  const settled = ready.catch(() => undefined)
+  /**
+   * Restores one stored envelope. Always reconciles the persisted snapshot with the current one:
+   * the default object merge preserves fields initialized or mutated while the async read was in
+   * flight; custom store shapes can provide their own merge.
+   */
+  #restoreEnvelope(raw: unknown): void {
+    /** Validated envelope. */
+    const envelope = assertVersionedEnvelope(raw)
+    /** Migrated persisted state. */
+    const state = migrateEnvelopeSync(this.#options.migrationPlan, envelope) as Partial<TState>
+    this.#hydrating = true
+    try {
+      /** Live snapshot at restore time. */
+      const current = this.#unit.snapshot()
+      /** State actually restored. */
+      const reconciled = this.#options.customMerge
+        ? runPersistCallback(
+            StorePersistErrorCode.mergeFailed,
+            StorePersistErrorText.mergeFailed,
+            () =>
+              assertSynchronousCallbackResult(
+                this.#options.key,
+                'merge',
+                this.#options.merge(state, current)
+              )
+          )
+        : mergePersistedPlainState(state, current, this.#hydrationStartSnapshot)
+      this.#unit.restore(reconciled)
+    } finally {
+      this.#hydrating = false
+    }
+  }
 
   /** Stops admission immediately and queues the final snapshot before releasing the subscription. */
-  const dispose = (): void => {
-    if (disposed) return
+  readonly dispose = (): void => {
+    if (this.#disposed) return
     try {
-      disposed = true
+      this.#disposed = true
       /** The same cancellation reaches an active native transaction before its callback returns. */
       const cancellation = disposedError()
-      participation?.control.abort(cancellation)
-      closeParticipationQueue?.(cancellation)
-      generationEpoch++
-      for (const controller of activeOperations) controller.abort()
-      activeOperations.clear()
-      writeStatus.value = PersistState.disposed
-      lifecycleDisposed.value = true
+      this.#participation?.control.abort(cancellation)
+      this.#closeParticipationQueue(cancellation)
+      this.#generationEpoch++
+      for (const controller of this.#activeOperations) controller.abort()
+      this.#activeOperations.clear()
+      this.writeStatus.value = PersistState.disposed
+      this.#lifecycleDisposed.value = true
       /** An admitted write is aborted below or never starts, because its loop stops on `disposed`. */
-      const writeAdmitted = writeDrain !== undefined
-      if ((clearWriteTimer() || writeAdmitted) && participation === undefined) {
+      const writeAdmitted = this.#writeDrain !== undefined
+      if ((this.#clearWriteTimer() || writeAdmitted) && this.#participation === undefined) {
         // A pending debounce window or an admitted write still owes storage the latest state.
-        startFinalWrite()
+        this.#startFinalWrite()
       }
-      stopSubscription?.()
+      this.#stopSubscription?.()
     } catch (cause) {
-      disposalFailed = true
-      disposalFailure = cause
+      this.#disposalFailed = true
+      this.#disposalFailure = cause
       throw cause
     }
   }
 
-  /** Explicit and symbol callers share cleanup but retain separate stable Promise identities. */
-  let disposalPromise: Promise<void> | undefined
-  /** Symbol disposal reports primary failure without rejecting a language-managed cleanup. */
-  let symbolDisposalPromise: Promise<void> | undefined
   /** Synchronous admission stops first; the Promise still waits for all admitted writes. */
-  const disposeAsync = (): Promise<void> => {
-    if (disposalPromise !== undefined) return disposalPromise
+  readonly disposeAsync = (): Promise<void> => {
+    if (this.#disposalPromise !== undefined) return this.#disposalPromise
     /** Retain actual transaction completion before disposal can change attachment state. */
-    const transactionCompletion = participation?.control.completion
+    const transactionCompletion = this.#participation?.control.completion
     // Cache before unsubscribe can reenter disposal, while stopping admission synchronously.
-    disposalPromise = Promise.resolve()
-      .then(() => writeChain)
+    this.#disposalPromise = Promise.resolve()
+      .then(() => this.#writeChain)
       .then(() => transactionCompletion)
-      .then(() => {
-        if (disposalFailed) throw disposalFailure
-      })
+      .then(() => this.#rethrowDisposalFailure())
     try {
-      dispose()
+      this.dispose()
     } catch (cause) {
-      disposalFailed = true
-      disposalFailure = cause
+      this.#disposalFailed = true
+      this.#disposalFailure = cause
     }
-    return disposalPromise
-  }
-  /** Runtime reporting uses the observer's owning reporter when one was supplied. */
-  const reportDisposalFailure = (cause: unknown): void => {
-    observeThenableRejection(undefined, { error: cause }, (error) => {
-      if (codecStages === undefined) throw error
-      codecStages.report(error)
-    })
+    return this.#disposalPromise
   }
 
-  /** All adapters return this original handle, which alone receives private enlistment authority. */
-  const handle: IPersistHandle = {
-    status,
-    error,
-    hydrated,
-    hydrationStatus,
-    hydrationError,
-    writeStatus,
-    writeError,
-    ready,
-    settled,
-    async retryHydrate() {
-      assertActive()
-      assertDirectOperation()
-      if (!hydrationFailed) {
-        await settled
-        if (hydrationFailed) throw hydrationError.value
-        return
-      }
-      if (retryPromise !== undefined) return retryPromise
-      retryPromise = hydrateAttempt()
-      try {
-        await retryPromise
-      } finally {
-        retryPromise = undefined
-      }
-    },
-    flush(tx) {
-      if (tx !== undefined) {
-        try {
-          return flushTransaction(tx)
-        } catch (cause) {
-          return Promise.reject(cause)
-        }
-      }
-      return flushDirect()
-    },
-    async clear() {
-      assertActive()
-      assertDirectOperation()
-      clearWriteTimer()
-      await settled
-      if (hydrationFailed) throw hydrationError.value
-      assertActive()
-      assertDirectOperation()
-      /** Existing queued removals remain observable until their real completion. */
-      const operation = trackPendingWrite(
-        writeChain.then(async () => {
-          assertActive()
-          await runWriteOperation(() =>
-            runAdapterOperation((signal) => removeEnvelope(storage, key, { signal }, codec))
-          )
-        })
-      )
-      writeChain = operation.catch(() => undefined)
-      await operation
-      assertActive()
-    },
-    get disposed() {
-      return disposed
-    },
-    dispose,
-    disposeAsync,
-    [asyncDisposeKey]() {
-      symbolDisposalPromise ??= disposeAsync().catch(reportDisposalFailure)
-      return symbolDisposalPromise
+  /** Rejects asynchronous disposal with the recorded cleanup failure, if any. */
+  #rethrowDisposalFailure(): void {
+    if (this.#disposalFailed) throw this.#disposalFailure
+  }
+
+  /** Symbol disposal: shared cleanup that only reports a failure. */
+  readonly symbolDispose = (): Promise<void> => {
+    this.#symbolDisposalPromise ??= this.disposeAsync().catch(this.#reportDisposalFailure)
+    return this.#symbolDisposalPromise
+  }
+
+  /** Runtime reporting uses the observer's owning reporter when one was supplied. */
+  readonly #reportDisposalFailure = (cause: unknown): void => {
+    observeThenableRejection(undefined, { error: cause }, (error) =>
+      this.#reportCodecStageFailure(error)
+    )
+  }
+
+  /** Reports through the codec stages, or rethrows to the default reporter when there are none. */
+  #reportCodecStageFailure(error: unknown): void {
+    if (this.#options.codecStages === undefined) throw error
+    this.#options.codecStages.report(error)
+  }
+
+  /** Retries a failed hydration; otherwise waits for the current one. */
+  readonly retryHydrate = async (): Promise<void> => {
+    this.#assertActive()
+    this.#assertDirectOperation()
+    if (!this.#hydrationFailed) {
+      await this.settled
+      if (this.#hydrationFailed) throw this.hydrationError.value
+      return
     }
+    if (this.#retryPromise !== undefined) return this.#retryPromise
+    this.#retryPromise = this.#hydrateAttempt()
+    try {
+      await this.#retryPromise
+    } finally {
+      this.#retryPromise = undefined
+    }
+  }
+
+  /** Flushes directly, or inside the given transaction scope. */
+  readonly flush = (tx?: Omit<ITransactionScope, 'use'>): Promise<void> => {
+    if (tx !== undefined) {
+      try {
+        return this.#flushTransaction(tx)
+      } catch (cause) {
+        return Promise.reject(cause)
+      }
+    }
+    return this.#flushDirect()
+  }
+
+  /** Removes the stored envelope after hydration settles, behind any queued write. */
+  readonly clear = async (): Promise<void> => {
+    this.#assertActive()
+    this.#assertDirectOperation()
+    this.#clearWriteTimer()
+    await this.settled
+    if (this.#hydrationFailed) throw this.hydrationError.value
+    this.#assertActive()
+    this.#assertDirectOperation()
+    /** Existing queued removals remain observable until their real completion. */
+    const operation = this.#trackPendingWrite(this.#writeChain.then(() => this.#removeStored()))
+    this.#writeChain = operation.catch(() => undefined)
+    await operation
+    this.#assertActive()
+  }
+
+  /** Queued removal body. */
+  async #removeStored(): Promise<void> {
+    this.#assertActive()
+    await this.#runWriteOperation(() => this.#runAdapterOperation(this.#removeOperation))
   }
 
   /** Direct flushing retains the original queue, hydration and cancellation behavior. */
-  async function flushDirect(): Promise<void> {
-    assertActive()
-    assertDirectOperation()
-    const pendingWrite = writeDrain
-    clearWriteTimer()
-    await settled
-    if (hydrationFailed) throw hydrationError.value
-    // Capture the write already observed by this flush before checking the
-    // lifecycle again. If dispose wins while the adapter ignores abort, its
-    // late storage failure must remain reachable as the AbortError cause.
+  async #flushDirect(): Promise<void> {
+    this.#assertActive()
+    this.#assertDirectOperation()
+    /** Write already running when the flush started. */
+    const pendingWrite = this.#writeDrain
+    this.#clearWriteTimer()
+    await this.settled
+    if (this.#hydrationFailed) throw this.hydrationError.value
+    // Capture the write already observed by this flush before checking the lifecycle again. If
+    // dispose wins while the adapter ignores abort, its late storage failure must remain reachable
+    // as the AbortError cause.
     if (pendingWrite) await pendingWrite
-    assertActive()
-    assertDirectOperation()
-    await enqueueWrite()
-    assertActive()
+    this.#assertActive()
+    this.#assertDirectOperation()
+    await this.#enqueueWrite()
+    this.#assertActive()
   }
 
   /** Captures and starts conversion inside the canonical operation owner before queuing requests. */
-  function flushTransaction(tx: Omit<ITransactionScope, 'use'>): Promise<void> {
-    assertActive()
+  #flushTransaction(tx: Omit<ITransactionScope, 'use'>): Promise<void> {
+    this.#assertActive()
     /** Only a handle enlisted in this active original transaction may use any derived view. */
-    const active = participation
+    const active = this.#participation
     if (active === undefined || active.transactionId === undefined || active.store === undefined)
       throw createStorePersistTypeError(
         StorePersistErrorCode.invalidOption,
@@ -788,136 +966,162 @@ export function persistUnit<TState>(
         StorePersistErrorCode.invalidOption,
         StorePersistErrorText.transactionParticipation
       )
-    return runTransactionOperation(tx, (scope) => {
-      active.flushed = true
-      writeStatus.value = PersistState.writing
-      /** Snapshot failures belong to encoding and are registered before the first native request. */
-      let envelope: IVersionedEnvelope<unknown>
-      /** The notification revision is read in the same synchronous call as the state snapshot. */
-      const snapshotRevision = changeRevision
-      try {
-        /** Async identity byte codecs must receive this call's bytes, not a later mutable view. */
-        const state = assertSynchronousCallbackResult(
-          key,
-          'partialize',
-          partialize(unit.snapshot())
-        )
-        envelope = {
-          version,
-          state:
-            codec.output === PersistCodecOutput.binary && isUint8Array(state)
-              ? new Uint8Array(state)
-              : state
-        }
-      } catch (cause) {
-        throw normalizeTransactionEncodingFailure(cause)
-      }
-      /** Observation binds the authentic operation view, without keeping a root-store fallback. */
-      const selectedCodecStages = bindPersistStages(codecStages, scope)
-      /** The transaction owner remains responsible for mode, identity and view expiration. */
-      const selectedTransactionStages = bindPersistStages(transactionStages, scope)
-      observePersistFlush(selectedTransactionStages, 'beforePersistFlush')
-      /** Retain this predecessor without observing a rejected ordering Promise before conversion. */
-      const previousFlush = active.flushChain
-      /** Conversion sees this call's state immediately; native writes retain the original order. */
-      const operation = writeEnvelopeWithStages(
-        {
-          capabilities: storage.capabilities,
-          set: (archiveKey, text) => scope.set(archiveKey, text, { conflictPolicy: 'replace' }),
-          getBytes: (archiveKey) => scope.getBytes(archiveKey),
-          setBytes: (archiveKey, bytes) =>
-            scope.setBytes(archiveKey, bytes, { conflictPolicy: 'replace' })
-        },
-        key,
-        codec,
-        envelope,
-        {},
-        selectedCodecStages,
-        normalizeTransactionEncodingFailure,
-        () => previousFlush.then(assertActive)
-      ).then(() => {
-        active.lastFlushedRevision = snapshotRevision
-        observePersistFlush(selectedTransactionStages, 'afterPersistFlush')
-      })
-      active.flushChain = operation
-      return operation
-    })
+    return runTransactionOperation(tx, (scope) => this.#flushInScope(active, scope))
   }
 
-  /** Public transaction observations cannot wait, veto conversion, or replace its failure. */
-  function observePersistFlush(
-    observer: ITransactionStageObserver | undefined,
-    stage: 'beforePersistFlush' | 'afterPersistFlush'
-  ): void {
-    if (observer === undefined) return
+  /** One transactional flush: snapshot now, write through the scope after the previous flush. */
+  #flushInScope(
+    active: IPersistParticipation,
+    scope: Omit<ITransactionScope, 'use'>
+  ): Promise<void> {
+    active.flushed = true
+    this.writeStatus.value = PersistState.writing
+    /** Snapshot failures belong to encoding and are registered before the first native request. */
+    let envelope: IVersionedEnvelope<unknown>
+    /** The notification revision is read in the same synchronous call as the state snapshot. */
+    const snapshotRevision = this.#changeRevision
     try {
-      /** Dynamic callback getters belong to the same report-only observation boundary. */
-      const callback = observer[stage]
-      if (callback === undefined) return
-      /** No business state or encoded value enters this observation. */
-      const result = Reflect.apply(callback, observer, [])
-      observeThenableRejection(result, inspectThenable(result), (error) => observer.report(error))
-    } catch (error) {
-      observeThenableRejection(undefined, { error }, (failure) => observer.report(failure))
+      /** Async identity byte codecs must receive this call's bytes, not a later mutable view. */
+      const state = this.#partializedSnapshot()
+      envelope = {
+        version: this.#options.version,
+        state:
+          this.#options.codec.output === PersistCodecOutput.binary && isUint8Array(state)
+            ? new Uint8Array(state)
+            : state
+      }
+    } catch (cause) {
+      throw normalizeTransactionEncodingFailure(cause)
     }
+    /** Observation binds the authentic operation view, without keeping a root-store fallback. */
+    const selectedCodecStages = bindPersistStages(this.#options.codecStages, scope)
+    /** The transaction owner remains responsible for mode, identity and view expiration. */
+    const selectedTransactionStages = bindPersistStages(this.#options.transactionStages, scope)
+    observePersistFlush(selectedTransactionStages, 'beforePersistFlush')
+    /** Retain this predecessor without observing a rejected ordering Promise before conversion. */
+    const previousFlush = active.flushChain
+    /** Conversion sees this call's state immediately; native writes retain the original order. */
+    const operation = writeEnvelopeWithStages(
+      {
+        capabilities: this.#options.storage.capabilities,
+        set: (archiveKey, text) => scope.set(archiveKey, text, { conflictPolicy: 'replace' }),
+        getBytes: (archiveKey) => scope.getBytes(archiveKey),
+        setBytes: (archiveKey, bytes) =>
+          scope.setBytes(archiveKey, bytes, { conflictPolicy: 'replace' })
+      },
+      this.#options.key,
+      this.#options.codec,
+      envelope,
+      {},
+      selectedCodecStages,
+      normalizeTransactionEncodingFailure,
+      () => previousFlush.then(this.#assertActive)
+    ).then(() => {
+      active.lastFlushedRevision = snapshotRevision
+      observePersistFlush(selectedTransactionStages, 'afterPersistFlush')
+    })
+    active.flushChain = operation
+    return operation
   }
 
-  closeParticipationQueue = registerPersistTransactionParticipant(handle, {
-    storage,
-    disposed: () => disposed,
-    async pause(control) {
-      assertActive()
-      participation = {
-        control,
-        flushChain: Promise.resolve(),
-        flushed: false,
-        lastFlushedRevision: persistedRevision
-      }
-      clearWriteTimer()
-      /** Snapshot every already-admitted outcome before new direct mutations are closed out. */
-      const pending = [...pendingWrites]
-      await settled
-      if (retryPromise !== undefined) await retryPromise
-      if (hydrationFailed) throw hydrationError.value
-      /** Wait all old work before examining failure, so another handle can never overtake it. */
-      const outcomes = await Promise.allSettled(pending)
-      for (const outcome of outcomes) if (outcome.status === 'rejected') throw outcome.reason
-      await writeChain
-      assertActive()
-    },
-    bind(scope, owner) {
-      assertActive()
-      if (participation === undefined)
-        throw createStorePersistTypeError(
-          StorePersistErrorCode.invalidOption,
-          StorePersistErrorText.transactionParticipation
-        )
-      participation.store = owner
-      participation.transactionId = assertTransactionOwner(owner, scope).id
-      participation.flushChain = Promise.resolve()
-      participation.flushed = false
-    },
-    finish(committed, failure) {
-      /** Stop retaining native identity as soon as its owner has actually settled. */
-      const completed = participation
-      participation = undefined
-      if (completed === undefined || disposed) return
-      if (committed && completed.flushed) persistedRevision = completed.lastFlushedRevision
-      if (completed.flushed) {
-        writeStatus.value = committed ? PersistState.idle : PersistState.error
-        writeError.value = committed ? undefined : failure
-      }
-      if (changeRevision !== persistedRevision) {
-        try {
-          scheduleWrite()
-        } catch (cause) {
-          // A committed transaction stays committed; failed mirroring remains an ordinary write outcome.
-          writeError.value = cause
-          writeStatus.value = PersistState.error
-          throw cause
-        }
+  /** Transaction admission: hold admission and wait for every already-admitted write. */
+  async #pause(control: IPersistParticipationControl): Promise<void> {
+    this.#assertActive()
+    this.#participation = {
+      control,
+      flushChain: Promise.resolve(),
+      flushed: false,
+      lastFlushedRevision: this.#persistedRevision
+    }
+    this.#clearWriteTimer()
+    /** Snapshot every already-admitted outcome before new direct mutations are closed out. */
+    const pending = [...this.#pendingWrites]
+    await this.settled
+    if (this.#retryPromise !== undefined) await this.#retryPromise
+    if (this.#hydrationFailed) throw this.hydrationError.value
+    /** Wait all old work before examining failure, so another handle can never overtake it. */
+    const outcomes = await Promise.allSettled(pending)
+    for (const outcome of outcomes) if (outcome.status === 'rejected') throw outcome.reason
+    await this.#writeChain
+    this.#assertActive()
+  }
+
+  /** Binds the admitted participation to its native transaction scope. */
+  #bind(scope: object, owner: IStorageBase): void {
+    this.#assertActive()
+    if (this.#participation === undefined)
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.invalidOption,
+        StorePersistErrorText.transactionParticipation
+      )
+    this.#participation.store = owner
+    this.#participation.transactionId = assertTransactionOwner(owner, scope as never).id
+    this.#participation.flushChain = Promise.resolve()
+    this.#participation.flushed = false
+  }
+
+  /** Transaction ended: publish its outcome and resume normal writes if changes remain. */
+  #finish(committed: boolean, failure: unknown): void {
+    /** Stop retaining native identity as soon as its owner has actually settled. */
+    const completed = this.#participation
+    this.#participation = undefined
+    if (completed === undefined || this.#disposed) return
+    if (committed && completed.flushed) this.#persistedRevision = completed.lastFlushedRevision
+    if (completed.flushed) {
+      this.writeStatus.value = committed ? PersistState.idle : PersistState.error
+      this.writeError.value = committed ? undefined : failure
+    }
+    if (this.#changeRevision !== this.#persistedRevision) {
+      try {
+        this.scheduleWrite()
+      } catch (cause) {
+        // A committed transaction stays committed; failed mirroring remains an ordinary write outcome.
+        this.writeError.value = cause
+        this.writeStatus.value = PersistState.error
+        throw cause
       }
     }
-  })
-  return handle
+  }
+}
+
+/** The public handle; every member forwards to its attachment. */
+function createPersistHandle<TState>(attachment: PersistUnitAttachment<TState>): IPersistHandle {
+  return {
+    status: attachment.status,
+    error: attachment.error,
+    hydrated: attachment.hydrated,
+    hydrationStatus: attachment.hydrationStatus,
+    hydrationError: attachment.hydrationError,
+    writeStatus: attachment.writeStatus,
+    writeError: attachment.writeError,
+    ready: attachment.ready,
+    settled: attachment.settled,
+    retryHydrate: attachment.retryHydrate,
+    flush: attachment.flush,
+    clear: attachment.clear,
+    get disposed() {
+      return attachment.disposed
+    },
+    dispose: attachment.dispose,
+    disposeAsync: attachment.disposeAsync,
+    [asyncDisposeKey]: attachment.symbolDispose
+  }
+}
+
+/** Public transaction observations cannot wait, veto conversion, or replace its failure. */
+function observePersistFlush(
+  observer: ITransactionStageObserver | undefined,
+  stage: 'beforePersistFlush' | 'afterPersistFlush'
+): void {
+  if (observer === undefined) return
+  try {
+    /** Dynamic callback getters belong to the same report-only observation boundary. */
+    const callback = observer[stage]
+    if (callback === undefined) return
+    /** No business state or encoded value enters this observation. */
+    const result = Reflect.apply(callback, observer, [])
+    observeThenableRejection(result, inspectThenable(result), (error) => observer.report(error))
+  } catch (error) {
+    observeThenableRejection(undefined, { error }, (failure) => observer.report(failure))
+  }
 }

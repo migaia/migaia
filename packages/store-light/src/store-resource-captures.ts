@@ -53,12 +53,19 @@ type ICapturableOperation = Promise<unknown> & { [CAPTURES]?: Set<ICaptureToken>
  * distinction.
  */
 export class ResourceCaptureRegistry {
+  /** Provisional capture tokens not yet bound to a resource version. */
   #unbound = new Set<ICaptureToken>()
+  /** Bound tokens per version that have not been committed or expired yet. */
   #pending = new Map<number, Set<ICaptureToken>>()
+  /** Every capture object issued by this registry, for identity checks. */
   #captures = new WeakSet<object>()
+  /** Captures whose ownership was committed; they no longer expire provisionally. */
   #committed = new WeakSet<object>()
+  /** Weak references to committed captures per version, used to recheck ownership. */
   #byVersion = new Map<number, Array<WeakRef<object>>>()
+  /** Notifies the owning version when a committed capture is garbage-collected. */
   #finalizer: FinalizationRegistry<number>
+  /** Owner callback: recheck ownership of `version` now. */
   #onChanged: (version: number) => void
   /** One admitted scheduler preserves cancellation and optional native unref. */
   readonly #scheduler: IScheduler

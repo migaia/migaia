@@ -263,32 +263,36 @@ export class StoreRegistry implements IDisposable {
     this.#assertActive()
     this.#retainCount++
     this.#lifecycleGeneration++
-    let retained = true
-    return () => {
-      if (!retained) return
-      retained = false
-      this.#retainCount--
-      const generation = ++this.#lifecycleGeneration
-      if (!disposeOnRelease || this.#retainCount !== 0) return
-      // React StrictMode may replay passive effects across a microtask
-      // boundary. Defer disposal to a task so the replacement setup can
-      // retain the registry before the zero-owner check runs.
-      const dispose = () => {
-        if (
-          this.#disposalLedger.lifecycle === LifecycleState.open &&
-          this.#retainCount === 0 &&
-          this.#lifecycleGeneration === generation
-        ) {
-          try {
-            this.dispose()
-          } catch (error) {
-            reportRegistryFailure(this.runtime, error)
-          }
-        }
+    /** This retain's own release state; releasing twice is a no-op. */
+    const lease = { retained: true, disposeOnRelease }
+    return () => this.#release(lease)
+  }
+
+  /** Ends one retain; the last release of a disposing registry schedules disposal on a task. */
+  #release(lease: { retained: boolean; readonly disposeOnRelease: boolean }): void {
+    if (!lease.retained) return
+    lease.retained = false
+    this.#retainCount--
+    /** Generation this release belongs to; a later retain makes the scheduled disposal a no-op. */
+    const generation = ++this.#lifecycleGeneration
+    if (!lease.disposeOnRelease || this.#retainCount !== 0) return
+    // React StrictMode may replay passive effects across a microtask boundary; always yield to a
+    // task before reclaiming the zero-owner registry, so the replacement setup can retain it first.
+    setTimeout(() => this.#disposeIfIdle(generation), 0)
+  }
+
+  /** Disposes only if still open, unowned and no retain/release happened since `generation`. */
+  #disposeIfIdle(generation: number): void {
+    if (
+      this.#disposalLedger.lifecycle === LifecycleState.open &&
+      this.#retainCount === 0 &&
+      this.#lifecycleGeneration === generation
+    ) {
+      try {
+        this.dispose()
+      } catch (error) {
+        reportRegistryFailure(this.runtime, error)
       }
-      // React StrictMode may replay passive effects across a microtask boundary;
-      // always yield to a task before reclaiming the zero-owner registry.
-      setTimeout(dispose, 0)
     }
   }
 

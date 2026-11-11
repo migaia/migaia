@@ -120,7 +120,11 @@ export function disposeWasmField(
   sources: readonly { dispose(): void }[]
 ): void {
   block.unregister(field)
-  disposeAllWasm([...sources.map((source) => () => source.dispose()), () => block.dispose()])
+  /** Source disposers in ownership order, then the native block. */
+  const disposers: Array<() => void> = []
+  for (const source of sources) disposers.push(() => source.dispose())
+  disposers.push(() => block.dispose())
+  disposeAllWasm(disposers)
 }
 
 /**

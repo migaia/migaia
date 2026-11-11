@@ -2,10 +2,13 @@ import type { IResourceVersion } from './store-resource-state.ts'
 
 /** Owns all non-visible versions until they are adopted or released. */
 export class ResourceVersionRegistry<T> {
+  /** Previous visible version kept while a reload is pending (stale-while-revalidate). */
   #stale: IResourceVersion<T> | undefined
+  /** Replaced versions still owned by someone, by version number. */
   #retired = new Map<number, IResourceVersion<T>>()
   /** Loaded values awaiting canonical settlement, including ignored-abort late results. */
   #superseded: T[] = []
+  /** Versions whose disposal has started but not finished, by version number. */
   #closing = new Map<number, IResourceVersion<T>>()
 
   get stale(): IResourceVersion<T> | undefined {

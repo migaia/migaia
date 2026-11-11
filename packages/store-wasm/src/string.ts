@@ -58,15 +58,6 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWas
         source = createSource('WasmString')
         let disposed = false
         let disposing = false
-        const readValue = () => {
-          const len = memoryView(memory).getUint32(ptr, true)
-          if (len > maxBytes)
-            throw createStoreWasmError(
-              StoreWasmErrorCode.allocationFailed,
-              StoreWasmErrorText.corruptedLength
-            )
-          return decoder.decode(new Uint8Array(memory.buffer, ptr + 4, len))
-        }
 
         const field: IWasmStringField = {
           get observed() {
@@ -79,7 +70,7 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWas
                 StoreWasmErrorText.fieldDisposed
               )
             source!.track()
-            return readValue()
+            return readWasmString(memory, ptr, maxBytes)
           },
           set value(v) {
             if (disposed)
@@ -99,7 +90,7 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWas
                 StoreWasmErrorText.valueTooLarge(bytes.length, maxBytes)
               )
             }
-            if (readValue() === v) return
+            if (readWasmString(memory, ptr, maxBytes) === v) return
             source!.commit(() => {
               memoryView(memory).setUint32(ptr, bytes.length, true)
               new Uint8Array(memory.buffer, ptr + 4, bytes.length).set(bytes)
@@ -132,4 +123,16 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWas
       }
     }
   }
+}
+
+/** Decodes the length-prefixed UTF-8 string of one block; a length above capacity is corruption. */
+function readWasmString(memory: WebAssembly.Memory, ptr: number, maxBytes: number): string {
+  /** Stored byte length in the 4-byte little-endian prefix. */
+  const len = memoryView(memory).getUint32(ptr, true)
+  if (len > maxBytes)
+    throw createStoreWasmError(
+      StoreWasmErrorCode.allocationFailed,
+      StoreWasmErrorText.corruptedLength
+    )
+  return decoder.decode(new Uint8Array(memory.buffer, ptr + 4, len))
 }

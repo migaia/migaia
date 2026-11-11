@@ -253,10 +253,33 @@ function createStoreCore<S extends Record<string, unknown>>(
   /** Field builder modes already read once by a strict entry; reused instead of a second read. */
   _modes?: ReadonlyMap<string, unknown>
 ): IReactiveStore<S> {
-  /** Resolve an explicit owner first; cold imports and custom runtimes never request the default. */
+  /** Store state and behavior; the returned plain store object forwards to it. */
+  const core = new StoreCore<S>(readStoreOptions(options), _modes)
+  core.defineFields(core.readDescriptors(shape, _descriptors))
+  core.installApi()
+  // 登记归属：Registry 与 SSR scope 据此校验，不再靠 $runtime 字段名
+  claimOwnership(core.store, core.runtime)
+  STORE_READY.set(core.store, core.ready)
+  return core.store as IReactiveStore<S>
+}
+
+/** Validated store options. */
+type IResolvedStoreOptions = Readonly<{
+  runtime: IRuntime
+  warnAsyncActions: boolean
+  mutationPolicy: IMutationPolicy | undefined
+  debugName: string
+}>
+
+/** Resolves an explicit owner first; cold imports and custom runtimes never request the default. */
+function readStoreOptions(options: ICreateStoreOptions | undefined): IResolvedStoreOptions {
+  /** Owning runtime. */
   let runtime: IRuntime
+  /** Whether async actions are reported once. */
   let warnAsyncActions = false
+  /** Optional action admission policy. */
   let mutationPolicy: IMutationPolicy | undefined
+  /** Debug name prefix of every node. */
   let debugName = 'Store'
   try {
     runtime = options?.runtime ?? getDefaultRuntime()
@@ -284,62 +307,136 @@ function createStoreCore<S extends Record<string, unknown>>(
       StoreLightErrorText.optionsInvalid
     )
   }
-  const nodeRuntime = internalRuntimeOf(runtime)
+  return { runtime, warnAsyncActions, mutationPolicy, debugName }
+}
+
+/** Native nodes contain their lifecycle callbacks and release synchronously in registration LIFO. */
+function releasePureNodes(nodes: IDisposable[]): void {
+  for (let index = nodes.length - 1; index >= 0; index--) nodes[index].dispose()
+  nodes.length = 0
+}
+
+/** Per-action mutable state: whether the async-action warning was already reported. */
+type IActionState = { warnedAsync: boolean }
+
+/** Holder for one action invocation's return value, written inside the untracked step. */
+type IActionResult = { value: unknown }
+
+/** One `$subscribe` registration: its listener, options and first-run marker. */
+type IStoreSubscription = {
+  readonly fn: () => unknown
+  readonly fireImmediately: boolean
+  initialRun: boolean
+}
+
+/**
+ * State and behavior behind one light store: field nodes, owned resources, initialization and the
+ * `$`-API. The public store is a plain object whose properties forward here.
+ */
+class StoreCore<S extends Record<string, unknown>> {
+  /** Owning runtime. */
+  readonly runtime: IRuntime
+  /** Internal node factory of the runtime. */
+  readonly #nodeRuntime: ReturnType<typeof internalRuntimeOf>
+  /** Whether async actions are reported once. */
+  readonly #warnAsyncActions: boolean
+  /** Optional action admission policy. */
+  readonly #mutationPolicy: IMutationPolicy | undefined
+  /** Debug name prefix of every node. */
+  readonly #debugName: string
+  /** Field builder modes already read once by a strict entry. */
+  readonly #modes: ReadonlyMap<string, unknown> | undefined
   /** Generic release machinery exists only once a field, subscription or external owner needs it. */
-  let scope: ILifecycleScope | undefined
+  #scope: ILifecycleScope | undefined
   /** Consecutive native nodes share one synchronous release entry, preserving mixed-owner order. */
-  let pureNodes: IDisposable[] = []
-  /** Native nodes contain their lifecycle callbacks and release synchronously in registration LIFO. */
-  const releasePureNodes = (nodes: IDisposable[]): void => {
-    for (let index = nodes.length - 1; index >= 0; index--) nodes[index].dispose()
-    nodes.length = 0
+  #pureNodes: IDisposable[] = []
+  /** Cancellation is required only by builders, never by plain reactive fields. */
+  #initAbort: ReturnType<typeof createAbortController> | undefined
+  /** Public store object. */
+  readonly store = {} as Record<string, unknown>
+  /** Symbol-keyed getter/action slots on the store, removed on dispose. */
+  readonly #contextMembers = new Set<PropertyKey>()
+  /** Store-owned writable nodes retain graph relationships for field subscription and disposal. */
+  readonly #signals = new Map<string, IReactiveSignal<unknown> & IObservable>()
+  /** Derived fields retain observer operations while their public values remain read-only. */
+  readonly #computeds = new Map<string, IReactiveComputed<unknown> & IObservable & IObserver>()
+  /** Builder-produced fields by key. */
+  readonly #wasmFields = new Map<string, unknown>()
+  /** Every field Source handed to builders. */
+  readonly #fieldSources = new Set<ReturnType<typeof createFieldSource>>()
+  /** Async builder completions. */
+  readonly #readyList: Promise<void>[] = []
+  /** Initialization status. */
+  #status: (typeof StoreInitializationStatus)[keyof typeof StoreInitializationStatus] =
+    StoreInitializationStatus.pending
+  /** Set by dispose or a failed initialization. */
+  #disposed = false
+  /** Stable completion shared by every `$dispose()` caller, including after rejection. */
+  #disposePromise: Promise<void> | undefined
+  /** Set when initialization failed; late async fields are released instead of adopted. */
+  #initializationFailed = false
+  /** Readiness of every async field. */
+  ready!: Promise<void>
+
+  /** Binds the validated options. */
+  constructor(options: IResolvedStoreOptions, modes: ReadonlyMap<string, unknown> | undefined) {
+    this.runtime = options.runtime
+    this.#nodeRuntime = internalRuntimeOf(options.runtime)
+    this.#warnAsyncActions = options.warnAsyncActions
+    this.#mutationPolicy = options.mutationPolicy
+    this.#debugName = options.debugName
+    this.#modes = modes
   }
+
   /** Fields acquire their scope before starting initialization so late registration stays closed. */
-  const ensureScope = (): ILifecycleScope => (scope ??= createLifecycleScope())
-  /** Seals the previous pure segment before a different kind of resource is registered. */
-  const flushPureNodes = (): void => {
-    if (pureNodes.length === 0) return
-    const nodes = pureNodes
-    ensureScope().own(nodes, { syncSafe: true, force: () => releasePureNodes(nodes) })
-    pureNodes = []
+  #ensureScope(): ILifecycleScope {
+    return (this.#scope ??= createLifecycleScope())
   }
+
+  /** Seals the previous pure segment before a different kind of resource is registered. */
+  #flushPureNodes(): void {
+    if (this.#pureNodes.length === 0) return
+    /** Segment being sealed. */
+    const nodes = this.#pureNodes
+    this.#ensureScope().own(nodes, { syncSafe: true, force: () => releasePureNodes(nodes) })
+    this.#pureNodes = []
+  }
+
   /** Only library-owned Signal/Computed nodes belong in a pure segment. */
-  const ownPureNode = <T extends IDisposable>(resource: T): T => {
-    pureNodes.push(resource)
+  #ownPureNode<T extends IDisposable>(resource: T): T {
+    this.#pureNodes.push(resource)
     return resource
   }
+
   /** Capabilities and subscriptions retain individually releasable canonical scope ownership. */
-  const ownReactiveNode = <T extends IDisposable>(resource: T): T => {
-    flushPureNodes()
-    return ensureScope().own(resource, { syncSafe: true, force: () => resource.dispose() })
+  #ownReactiveNode<T extends IDisposable>(resource: T): T {
+    this.#flushPureNodes()
+    return this.#ensureScope().own(resource, { syncSafe: true, force: () => resource.dispose() })
   }
+
   /** Pure stores release directly; mixed stores drain the original interleaved registration order. */
-  const disposeOwned = (): ReturnType<ILifecycleScope['dispose']> | Promise<void> => {
-    if (scope === undefined) {
-      releasePureNodes(pureNodes)
+  #disposeOwned(): ReturnType<ILifecycleScope['dispose']> | Promise<void> {
+    if (this.#scope === undefined) {
+      releasePureNodes(this.#pureNodes)
       return Promise.resolve()
     }
-    flushPureNodes()
-    return scope.dispose()
+    this.#flushPureNodes()
+    return this.#scope.dispose()
   }
-  /** Cancellation is required only by builders, never by plain reactive fields. */
-  let initAbort: ReturnType<typeof createAbortController> | undefined
-  /** The shared native signal belongs to this Store's one initialization generation. */
-  const initSignal = () => (initAbort ??= createAbortController()).signal
-  const store = {} as Record<string, unknown>
-  const contextMembers = new Set<PropertyKey>()
 
-  /** Store-owned writable nodes retain graph relationships for field subscription and disposal. */
-  const signals = new Map<string, IReactiveSignal<unknown> & IObservable>()
-  /** Derived fields retain observer operations while their public values remain read-only. */
-  const computeds = new Map<string, IReactiveComputed<unknown> & IObservable & IObserver>()
-  const wasmFields = new Map<string, unknown>()
-  const fieldSources = new Set<ReturnType<typeof createFieldSource>>()
-  const createTrackedFieldSource = (debugName?: string) => {
-    const source = ownReactiveNode(createFieldSource(runtime, debugName))
-    fieldSources.add(source)
+  /** The shared native signal belongs to this Store's one initialization generation. */
+  #initSignal(): ReturnType<typeof createAbortController>['signal'] {
+    return (this.#initAbort ??= createAbortController()).signal
+  }
+
+  /** Creates a field Source owned by the store and tracked for `$subscribe`. */
+  readonly #createTrackedFieldSource = (debugName?: string) => {
+    /** Store-owned Source. */
+    const source = this.#ownReactiveNode(createFieldSource(this.runtime, debugName))
+    this.#fieldSources.add(source)
     return source
   }
+
   /**
    * Claim ownership of a Builder-produced field and hand it to the scope, as one transaction. A
    * Builder can return a value that's already owned by a foreign Runtime (a shared singleton, a
@@ -351,9 +448,9 @@ function createStoreCore<S extends Record<string, unknown>>(
    * Roll back by disposing the field directly instead of routing through the scope, which never got
    * to adopt it either way.
    */
-  const adoptField = <F extends IDisposable>(field: F): F => {
+  #adoptField<F extends IDisposable>(field: F): F {
     try {
-      claimOwnership(field, runtime)
+      claimOwnership(field, this.runtime)
     } catch (error) {
       try {
         field.dispose()
@@ -364,8 +461,12 @@ function createStoreCore<S extends Record<string, unknown>>(
     }
     try {
       // wasm 字段持有真实外部资源，不是纯 reactive 节点：syncSafe: false + gcFallback。
-      flushPureNodes()
-      ensureScope().own(field, { syncSafe: false, gcFallback: true, force: () => field.dispose() })
+      this.#flushPureNodes()
+      this.#ensureScope().own(field, {
+        syncSafe: false,
+        gcFallback: true,
+        force: () => field.dispose()
+      })
     } catch (error) {
       try {
         field.dispose()
@@ -376,557 +477,670 @@ function createStoreCore<S extends Record<string, unknown>>(
     }
     return field
   }
-  const readyList: Promise<void>[] = []
-  let status: (typeof StoreInitializationStatus)[keyof typeof StoreInitializationStatus] =
-    StoreInitializationStatus.pending
-  let disposed = false
-  /** Stable completion shared by every `$dispose()` caller, including after rejection. */
-  let disposePromise: Promise<void> | undefined
-  let initializationFailed = false
 
-  function assertNotDisposed() {
-    if (disposed)
+  /** Throws STORE_DISPOSED after dispose. */
+  #assertNotDisposed(): void {
+    if (this.#disposed)
       throw createStoreLightError(
         StoreLightErrorCode.storeDisposed,
         StoreLightErrorText.storeDisposed
       )
   }
 
-  function assertMutationAllowed(operation: string) {
-    mutationPolicy?.assertMutationAllowed(operation)
+  /** Delegates write admission to the mutation policy, if any. */
+  #assertMutationAllowed(operation: string): void {
+    this.#mutationPolicy?.assertMutationAllowed(operation)
   }
 
-  function runMutation<T>(fn: () => T): T {
-    return mutationPolicy ? mutationPolicy.runInAction(() => runtime.batch(fn)) : runtime.batch(fn)
+  /** Batches `fn`, inside an admitted action when a mutation policy exists. */
+  #runMutation<T>(fn: () => T): T {
+    return this.#mutationPolicy
+      ? this.#mutationPolicy.runInAction(() => this.runtime.batch(fn))
+      : this.runtime.batch(fn)
   }
 
-  let descriptors: Record<string, PropertyDescriptor>
-  try {
-    if (_descriptors !== undefined) descriptors = _descriptors
-    else {
+  /** Clears every field map and removes the symbol slots from the store. */
+  #clearFields(): void {
+    this.#signals.clear()
+    this.#computeds.clear()
+    this.#wasmFields.clear()
+    this.#fieldSources.clear()
+    for (const key of this.#contextMembers) delete (this.store as Record<PropertyKey, unknown>)[key]
+    this.#contextMembers.clear()
+  }
+
+  /** Snapshots the shape's own descriptors once; an unreadable shape is INVALID_OPTION. */
+  readDescriptors(
+    shape: IStoreDefinition<S>,
+    descriptors: Record<string, PropertyDescriptor> | undefined
+  ): Record<string, PropertyDescriptor> {
+    try {
+      if (descriptors !== undefined) return descriptors
+      /** Own-descriptor snapshot of the shape. */
       const descriptorSnapshot = snapshotOwnDescriptors(shape)
       if (!descriptorSnapshot.ok) throw descriptorSnapshot.error
-      descriptors = descriptorSnapshot.descriptors as Record<string, PropertyDescriptor>
+      return descriptorSnapshot.descriptors as Record<string, PropertyDescriptor>
+    } catch (error) {
+      this.#disposed = true
+      this.#initAbort?.abort()
+      void this.#disposeOwned().catch((cleanupError: unknown) =>
+        reportCleanupFailure(this.runtime, cleanupError)
+      )
+      throw createStoreLightError(
+        StoreLightErrorCode.invalidOption,
+        StoreLightErrorText.shapeInvalid,
+        { cause: error }
+      )
     }
-  } catch (error) {
-    disposed = true
-    initAbort?.abort()
-    void disposeOwned().catch((cleanupError: unknown) =>
-      reportCleanupFailure(runtime, cleanupError)
-    )
-    throw createStoreLightError(
-      StoreLightErrorCode.invalidOption,
-      StoreLightErrorText.shapeInvalid,
-      { cause: error }
-    )
   }
+
   /** Roll back the same owned resources for every synchronous construction failure. */
-  const failConstruction = (error: unknown): never => {
-    // A synchronous builder failure is terminal too: async builders that are still
-    // resolving must see both guards before attempting to adopt their field.
-    initializationFailed = true
-    disposed = true
-    status = StoreInitializationStatus.failed
-    initAbort?.abort()
-    // `createStoreCore()` itself is synchronous (LifecycleScope has no sync dispose()), so
-    // this cleanup cannot be awaited here — it runs fire-and-forget and any failure goes through
-    // `runtime.reportError()`, the same diagnostic channel used elsewhere in this module, instead
-    // of being attached as `error.cause` (which required a *synchronous* cleanup failure).
-    void disposeOwned().catch((cleanupError: unknown) =>
-      reportCleanupFailure(runtime, cleanupError)
+  #failConstruction(error: unknown): never {
+    // A synchronous builder failure is terminal too: async builders that are still resolving must
+    // see both guards before attempting to adopt their field.
+    this.#initializationFailed = true
+    this.#disposed = true
+    this.#status = StoreInitializationStatus.failed
+    this.#initAbort?.abort()
+    // `createStoreCore()` itself is synchronous (LifecycleScope has no sync dispose()), so this
+    // cleanup cannot be awaited here — it runs fire-and-forget and any failure goes through
+    // `runtime.reportError()`, the same diagnostic channel used elsewhere in this module, instead of
+    // being attached as `error.cause` (which required a *synchronous* cleanup failure).
+    void this.#disposeOwned().catch((cleanupError: unknown) =>
+      reportCleanupFailure(this.runtime, cleanupError)
     )
-    signals.clear()
-    computeds.clear()
-    wasmFields.clear()
-    fieldSources.clear()
-    for (const key of contextMembers) delete (store as Record<PropertyKey, unknown>)[key]
-    contextMembers.clear()
+    this.#clearFields()
     throw identifyStoreLightFailure(
       error,
       StoreLightErrorCode.initializationFailed,
       StoreLightErrorText.initializationFailed
     )
   }
-  try {
-    for (const key of Object.keys(descriptors)) {
-      const desc = descriptors[key]
 
-      // get 访问器 → Computed。getter 里的 this 绑到 store，读到的都是响应式字段。
-      if (typeof desc.get === 'function') {
-        const getter = desc.get
-        const contextKey = Symbol(key)
-        Object.defineProperty(store, contextKey, { configurable: true, get: getter })
-        contextMembers.add(contextKey)
-        const node = ownPureNode(
-          nodeRuntime.computed(() => (store as Record<PropertyKey, unknown>)[contextKey], {
-            debugName: `${debugName}.${key}`
-          })
-        )
-        computeds.set(key, node)
-        Object.defineProperty(store, key, {
-          enumerable: true,
-          get: () => {
-            assertNotDisposed() // 统一：释放后读任何字段都抛 'store is disposed'
-            return node.value
-          } // 派生值只读，不给 set
-        })
-        continue
+  /** Defines every field of the shape, then starts readiness tracking. */
+  defineFields(descriptors: Record<string, PropertyDescriptor>): void {
+    this.#descriptors = descriptors
+    try {
+      for (const key of Object.keys(descriptors)) this.#defineField(key, descriptors[key]!)
+    } catch (error) {
+      this.#failConstruction(error)
+    }
+    if (this.#readyList.length === 0) this.#status = StoreInitializationStatus.ready
+    this.ready = Promise.all(this.#readyList).then(
+      () => {
+        this.#status = StoreInitializationStatus.ready
+      },
+      (error: unknown) => this.#failInitialization(error)
+    )
+  }
+
+  /** Shape descriptors, kept for the reserved-name check of the `$`-API. */
+  #descriptors: Record<string, PropertyDescriptor> = {}
+
+  /** Defines one field by kind: getter, raw value, action, field builder, or plain value. */
+  #defineField(key: string, desc: PropertyDescriptor): void {
+    // get 访问器 → Computed。getter 里的 this 绑到 store，读到的都是响应式字段。
+    if (typeof desc.get === 'function') return this.#defineComputed(key, desc.get)
+    /** Data value of the field. */
+    const value = desc.value
+    // raw(x) → 普通值字段（即使 x 是函数也不当 action）。必须在方法检查之前解包。
+    if (isRaw(value)) return this.#defineSignal(key, value.value)
+    if (typeof value === 'function')
+      return this.#defineAction(key, value as (...args: unknown[]) => unknown)
+    if (isFieldBuilder(value)) return this.#defineBuilderField(key, value)
+    // 普通值 → Signal：读订阅、写触发。Store 的纯节点段在 dispose 时同步断开所有边。
+    this.#defineSignal(key, value)
+  }
+
+  /** Getter field: a Computed over the getter called with the store as `this`. */
+  #defineComputed(key: string, getter: () => unknown): void {
+    /** Symbol slot holding the original getter on the store. */
+    const contextKey = Symbol(key)
+    Object.defineProperty(this.store, contextKey, { configurable: true, get: getter })
+    this.#contextMembers.add(contextKey)
+    /** Derived node. */
+    const node = this.#ownPureNode(
+      this.#nodeRuntime.computed(() => (this.store as Record<PropertyKey, unknown>)[contextKey], {
+        debugName: `${this.#debugName}.${key}`
+      })
+    )
+    this.#computeds.set(key, node)
+    Object.defineProperty(this.store, key, {
+      enumerable: true,
+      // 统一：释放后读任何字段都抛 'store is disposed'；派生值只读，不给 set
+      get: () => {
+        this.#assertNotDisposed()
+        return node.value
       }
+    })
+  }
 
-      const value = desc.value
-
-      // raw(x) → 普通值字段（即使 x 是函数也不当 action）。必须在方法检查之前解包。
-      if (isRaw(value)) {
-        const node = ownPureNode(
-          nodeRuntime.signal(value.value, {
-            debugName: `${debugName}.${key}`
-          })
-        )
-        signals.set(key, node)
-        Object.defineProperty(store, key, {
-          enumerable: true,
-          get: () => {
-            assertNotDisposed()
-            return node.value
-          },
-          set: (v: unknown) => {
-            assertNotDisposed()
-            assertMutationAllowed(`set(${key})`)
-            node.value = v
-          }
-        })
-        continue
+  /** Plain or raw value field: a writable Signal. */
+  #defineSignal(key: string, value: unknown): void {
+    /** Source node. */
+    const node = this.#ownPureNode(
+      this.#nodeRuntime.signal(value, { debugName: `${this.#debugName}.${key}` })
+    )
+    this.#signals.set(key, node)
+    Object.defineProperty(this.store, key, {
+      enumerable: true,
+      get: () => {
+        this.#assertNotDisposed()
+        return node.value
+      },
+      set: (v: unknown) => {
+        this.#assertNotDisposed()
+        this.#assertMutationAllowed(`set(${key})`)
+        node.value = v
       }
+    })
+  }
 
-      if (typeof value === 'function') {
-        // 方法 → Action：只自动 batch 同步执行片段 + untracked。async 方法跨过首个 await 后已离开 batch；
-        // 需要合并后续写入时，调用方应在续体里显式使用 $batch。
-        const fn = value as (...args: unknown[]) => unknown
-        const contextKey = Symbol(key)
-        Object.defineProperty(store, contextKey, { configurable: true, value: fn })
-        contextMembers.add(contextKey)
-        /** Stable diagnostic identity belongs to the action definition, not each invocation. */
-        const actionName = `${debugName}.${key}`
-        let warnedAsync = false
-        Object.assign(store, {
-          [key]: (...args: unknown[]) => {
-            assertNotDisposed()
-            /** The Action owns its return value; synchronous mutation callbacks return void. */
-            let result: unknown
-            runtime.runTracedAction(actionName, () =>
-              runMutation(() =>
-                runtime.untracked(() => {
-                  result = (store as Record<PropertyKey, (...values: unknown[]) => unknown>)[
-                    contextKey
-                  ](...args)
-                })
-              )
-            )
-            if (warnAsyncActions && !warnedAsync) {
-              /** Inspect once without consuming or replacing the action's returned thenable. */
-              const probe = probeThenable(result)
-              if (probe.kind === ThenableProbeKind.failed)
-                runtime.reportError(probe.error, { phase: ReactiveErrorPhase.asyncFlush })
-              else if (probe.kind === ThenableProbeKind.thenable) {
-                warnedAsync = true
-                runtime.reportError(
-                  createStoreLightError(
-                    StoreLightErrorCode.actionBatchBoundary,
-                    StoreLightErrorText.asyncAction(key)
-                  ),
-                  { phase: ReactiveErrorPhase.asyncFlush }
-                )
-              }
-            }
-            return result
-          }
-        })
-        continue
-      }
+  /**
+   * 方法 → Action：只自动 batch 同步执行片段 + untracked。async 方法跨过首个 await 后已离开 batch；需要合并后续写入时，调用方应在续体里显式使用
+   * $batch。
+   */
+  #defineAction(key: string, fn: (...args: unknown[]) => unknown): void {
+    /** Symbol slot holding the original method, called with the store as `this`. */
+    const contextKey = Symbol(key)
+    Object.defineProperty(this.store, contextKey, { configurable: true, value: fn })
+    this.#contextMembers.add(contextKey)
+    /** Stable diagnostic identity belongs to the action definition, not each invocation. */
+    const actionName = `${this.#debugName}.${key}`
+    /** Per-action warning state. */
+    const state: IActionState = { warnedAsync: false }
+    Object.assign(this.store, {
+      [key]: (...args: unknown[]) => this.#invokeAction(key, contextKey, actionName, state, args)
+    })
+  }
 
-      if (isFieldBuilder(value)) {
-        ensureScope()
-        /** Capture before later siblings can fail and abort this generation. */
-        const signal = initSignal()
-        /** Capture the public discriminant once; pre-discriminant builders are no longer supported. */
-        const mode = _modes?.has(key) ? _modes.get(key) : value.mode
-        if (mode !== StoreFieldMode.sync && mode !== StoreFieldMode.async)
-          throw createStoreLightTypeError(
-            StoreLightErrorCode.invalidOption,
-            StoreLightErrorText.fieldBuilderMode
-          )
-        if (mode === StoreFieldMode.sync) {
-          // `mode` came from the strict entry's single read; this branch is the sync builder.
-          const field = adoptField(
-            value.create({
-              runtime,
-              signal,
-              createSource: createTrackedFieldSource
-            }) as IDisposable
-          )
-          wasmFields.set(key, field)
-          Object.defineProperty(store, key, {
-            enumerable: true,
-            get: () => {
-              assertNotDisposed()
-              return wasmFields.get(key)
-            }
-          })
-          continue
-        }
-        // 异步字段（wasm 等）：Store 负责所有权登记（不让 Builder 自己 own）。传 AbortSignal，$dispose 可中止初始化。
-        // 若在初始化完成前 store 已 dispose，立即释放刚创建的字段，避免泄漏。
-        readyList.push(
-          Promise.resolve()
-            .then(() =>
-              value.create({
-                runtime,
-                signal,
-                createSource: (debugName) =>
-                  // Store owns every capability it signs, not only
-                  // the final Field object. A rejected builder or a
-                  // third-party Field that forgets to dispose its
-                  // source therefore cannot leak graph edges.
-                  createTrackedFieldSource(debugName)
-              })
-            )
-            .then((field) => {
-              if (disposed || initializationFailed) {
-                /** Late cleanup has no awaiting factory caller, so its Runtime owns diagnostics. */
-                const reportFailure = (error: unknown): void =>
-                  reportCleanupFailure(
-                    runtime,
-                    identifyStoreLightFailure(
-                      error,
-                      StoreLightErrorCode.fieldDisposeFailed,
-                      StoreLightErrorText.fieldDisposeFailed
-                    )
-                  )
-                try {
-                  return Promise.resolve(field.dispose()).catch(reportFailure)
-                } catch (error) {
-                  reportFailure(error)
-                  return
-                }
-              }
-              adoptField(field)
-              wasmFields.set(key, field)
-            })
-            .catch((error: unknown) => {
-              // A disposed or synchronously failed store no longer has a caller
-              // waiting for this builder. Observe cancellation rejections here so
-              // a late abort cannot become an unhandled rejection.
-              if (disposed || initializationFailed || initAbort?.signal.aborted) return
-              throw error
-            })
-        )
-        Object.defineProperty(store, key, {
-          enumerable: true,
-          get: () => {
-            assertNotDisposed()
-            assertReady()
-            return wasmFields.get(key)
-          }
-        })
-        continue
-      }
+  /** Runs one action call traced, batched and untracked; warns once about an async result. */
+  #invokeAction(
+    key: string,
+    contextKey: symbol,
+    actionName: string,
+    state: IActionState,
+    args: unknown[]
+  ): unknown {
+    this.#assertNotDisposed()
+    /** The Action owns its return value; synchronous mutation callbacks return void. */
+    const result: IActionResult = { value: undefined }
+    this.runtime.runTracedAction(actionName, () =>
+      this.#runMutation(() => this.#untrackedAction(contextKey, args, result))
+    )
+    if (this.#warnAsyncActions && !state.warnedAsync)
+      this.#warnAsyncAction(key, state, result.value)
+    return result.value
+  }
 
-      // 普通值 → Signal：读订阅、写触发。Store 的纯节点段在 dispose 时同步断开所有边。
-      const node = ownPureNode(
-        nodeRuntime.signal(value, {
-          debugName: `${debugName}.${key}`
-        })
+  /** Calls the original method untracked and records its return value. */
+  #untrackedAction(contextKey: symbol, args: unknown[], result: IActionResult): void {
+    this.runtime.untracked(() => {
+      result.value = (this.store as Record<PropertyKey, (...values: unknown[]) => unknown>)[
+        contextKey
+      ](...args)
+    })
+  }
+
+  /** Inspects the result once without consuming or replacing the action's returned thenable. */
+  #warnAsyncAction(key: string, state: IActionState, result: unknown): void {
+    /** Thenable probe of the result. */
+    const probe = probeThenable(result)
+    if (probe.kind === ThenableProbeKind.failed)
+      this.runtime.reportError(probe.error, { phase: ReactiveErrorPhase.asyncFlush })
+    else if (probe.kind === ThenableProbeKind.thenable) {
+      state.warnedAsync = true
+      this.runtime.reportError(
+        createStoreLightError(
+          StoreLightErrorCode.actionBatchBoundary,
+          StoreLightErrorText.asyncAction(key)
+        ),
+        { phase: ReactiveErrorPhase.asyncFlush }
       )
-      signals.set(key, node)
-      Object.defineProperty(store, key, {
+    }
+  }
+
+  /** Field builder: sync builders create now; async ones are tracked by readiness. */
+  #defineBuilderField(key: string, builder: IFieldBuilder<IDisposable>): void {
+    this.#ensureScope()
+    /** Capture before later siblings can fail and abort this generation. */
+    const signal = this.#initSignal()
+    /** Capture the public discriminant once; pre-discriminant builders are no longer supported. */
+    const mode = this.#modes?.has(key) ? this.#modes.get(key) : builder.mode
+    if (mode !== StoreFieldMode.sync && mode !== StoreFieldMode.async)
+      throw createStoreLightTypeError(
+        StoreLightErrorCode.invalidOption,
+        StoreLightErrorText.fieldBuilderMode
+      )
+    if (mode === StoreFieldMode.sync) {
+      // `mode` came from the strict entry's single read; this branch is the sync builder.
+      /** Adopted sync field. */
+      const field = this.#adoptField(
+        builder.create({
+          runtime: this.runtime,
+          signal,
+          createSource: this.#createTrackedFieldSource
+        }) as IDisposable
+      )
+      this.#wasmFields.set(key, field)
+      Object.defineProperty(this.store, key, {
         enumerable: true,
         get: () => {
-          assertNotDisposed()
-          return node.value
-        },
-        set: (v: unknown) => {
-          assertNotDisposed()
-          assertMutationAllowed(`set(${key})`)
-          node.value = v
+          this.#assertNotDisposed()
+          return this.#wasmFields.get(key)
         }
       })
+      return
     }
-  } catch (error) {
-    failConstruction(error)
+    // 异步字段（wasm 等）：Store 负责所有权登记（不让 Builder 自己 own）。传 AbortSignal，$dispose 可中止初始化。
+    // 若在初始化完成前 store 已 dispose，立即释放刚创建的字段，避免泄漏。Store owns every capability it signs, not
+    // only the final Field object, so a rejected builder or a third-party Field that forgets to
+    // dispose its source cannot leak graph edges.
+    this.#readyList.push(
+      Promise.resolve()
+        .then(() =>
+          builder.create({
+            runtime: this.runtime,
+            signal,
+            createSource: this.#createTrackedFieldSource
+          })
+        )
+        .then((field) => this.#settleAsyncField(key, field as IDisposable))
+        .catch((error: unknown) => this.#observeAsyncFieldFailure(error))
+    )
+    Object.defineProperty(this.store, key, {
+      enumerable: true,
+      get: () => {
+        this.#assertNotDisposed()
+        this.#assertReady()
+        return this.#wasmFields.get(key)
+      }
+    })
   }
 
-  if (readyList.length === 0) status = StoreInitializationStatus.ready
-  const ready = Promise.all(readyList).then(
-    () => {
-      status = StoreInitializationStatus.ready
-    },
-    async (error: unknown) => {
-      status = StoreInitializationStatus.failed
-      initializationFailed = true
-      disposed = true
-      initAbort?.abort()
-      // 初始化失败即回收已创建资源。清理错误不能替换原始初始化错误。这里已经在异步延续里，可以
-      // 真正 await disposeOwned()（LifecycleScope 没有同步 dispose()），因此仍能像迁移前
-      // 一样把 cleanup 失败原样附加到原始错误的 cause 上，不需要退化成 fire-and-forget。
+  /** Adopts a resolved async field, or releases it when the store already ended. */
+  #settleAsyncField(key: string, field: IDisposable): Promise<void> | void {
+    if (this.#disposed || this.#initializationFailed) {
       try {
-        await disposeOwned()
-      } catch (cleanupError) {
-        // 保留原始初始化 Error 身份，同时附加清理失败用于诊断。
-        if (error instanceof Error) {
-          try {
-            error.cause =
-              error.cause === undefined
-                ? cleanupError
-                : createStoreLightAggregateError(
-                    StoreLightErrorCode.initAndCleanupFailed,
-                    [error.cause, cleanupError],
-                    StoreLightErrorText.cleanupFailed
-                  )
-          } catch {
-            // A frozen/non-configurable Error cannot carry cause; promote both values
-            // into a tagged aggregate instead of silently losing cleanup diagnostics.
-            throw createStoreLightAggregateError(
-              StoreLightErrorCode.initAndCleanupFailed,
-              [error, cleanupError],
-              StoreLightErrorText.cleanupFailed
-            )
-          }
-        } else {
-          throw createStoreLightAggregateError(
-            StoreLightErrorCode.initAndCleanupFailed,
-            [error, cleanupError],
-            StoreLightErrorText.cleanupFailed
-          )
-        }
+        return Promise.resolve(field.dispose()).catch(this.#reportLateDisposeFailure)
+      } catch (error) {
+        this.#reportLateDisposeFailure(error)
+        return
       }
-      throw identifyStoreLightFailure(
-        error,
-        StoreLightErrorCode.initializationFailed,
-        StoreLightErrorText.initializationFailed
-      )
     }
-  )
+    this.#adoptField(field)
+    this.#wasmFields.set(key, field)
+  }
 
-  function assertReady() {
-    if (status !== StoreInitializationStatus.ready)
+  /** Late cleanup has no awaiting factory caller, so its Runtime owns diagnostics. */
+  readonly #reportLateDisposeFailure = (error: unknown): void =>
+    reportCleanupFailure(
+      this.runtime,
+      identifyStoreLightFailure(
+        error,
+        StoreLightErrorCode.fieldDisposeFailed,
+        StoreLightErrorText.fieldDisposeFailed
+      )
+    )
+
+  /**
+   * A disposed or synchronously failed store no longer has a caller waiting for this builder.
+   * Observe cancellation rejections here so a late abort cannot become an unhandled rejection.
+   */
+  #observeAsyncFieldFailure(error: unknown): void {
+    if (this.#disposed || this.#initializationFailed || this.#initAbort?.signal.aborted) return
+    throw error
+  }
+
+  /**
+   * 初始化失败即回收已创建资源。清理错误不能替换原始初始化错误。这里已经在异步延续里，可以真正 await disposeOwned()（LifecycleScope 没有同步
+   * dispose()），因此仍能像迁移前一样把 cleanup 失败原样附加到原始错误的 cause 上，不需要退化成 fire-and-forget。
+   */
+  async #failInitialization(error: unknown): Promise<never> {
+    this.#status = StoreInitializationStatus.failed
+    this.#initializationFailed = true
+    this.#disposed = true
+    this.#initAbort?.abort()
+    try {
+      await this.#disposeOwned()
+    } catch (cleanupError) {
+      attachInitializationCleanupFailure(error, cleanupError)
+    }
+    throw identifyStoreLightFailure(
+      error,
+      StoreLightErrorCode.initializationFailed,
+      StoreLightErrorText.initializationFailed
+    )
+  }
+
+  /** Throws STORE_NOT_READY until every async field is ready. */
+  #assertReady(): void {
+    if (this.#status !== StoreInitializationStatus.ready)
       throw createStoreLightError(
         StoreLightErrorCode.storeNotReady,
-        StoreLightErrorText.asyncStore(status)
+        StoreLightErrorText.asyncStore(this.#status)
       )
   }
 
-  const api: IReactiveStoreApi<S> = {
-    $runtime: runtime,
-    $async: readyList.length > 0,
-    $snapshot() {
-      assertNotDisposed()
-      // 异步字段未就绪时不能返回「缺字段的假完整对象」——先 assertReady，类型与运行时一致
-      assertReady()
-      return runtime.untracked(() => {
-        const out = Object.create(null) as Record<string, unknown>
-        for (const [k, n] of signals) out[k] = n.value
-        for (const [k, n] of computeds) out[k] = n.value
-        for (const [k, f] of wasmFields) out[k] = f
-        return out
-      }) as IStoreShape<S>
-    },
-    $subscribe(fn, options) {
-      assertNotDisposed()
-      assertStoreInput(fn, '$subscribe listener', 'function')
-      let initialRun = true
-      // The public subscription observes every store-owned reactive field. Reading Computed
-      // nodes here is required for complete external-store semantics when a computed has no
-      // direct source signal in this store.
-      const e = ownReactiveNode(
-        runtime.effect(
-          () => {
-            for (const n of signals.values()) void n.value
-            for (const n of computeds.values()) void n.value
-            for (const source of fieldSources) source.track()
-            if (!initialRun || options?.fireImmediately === true) {
-              try {
-                const result = runtime.untracked(() => (fn as () => unknown)())
-                if (result && typeof (result as { then?: unknown }).then === 'function') {
-                  void Promise.resolve(result).catch((error: unknown) =>
-                    runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener })
-                  )
-                }
-              } catch (error) {
-                runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener })
-              }
-            }
-            initialRun = false
-          },
-          { debugName: `${debugName}.$subscribe` }
+  /**
+   * Installs the `$`-API as non-enumerable properties, so `$snapshot` never lists them. Copying
+   * descriptors keeps `$disposed` a live getter rather than a static snapshot.
+   */
+  installApi(): void {
+    /** `$`-API descriptors in their public order. */
+    const api: Array<readonly [string, PropertyDescriptor]> = [
+      ['$runtime', apiValue(this.runtime)],
+      ['$async', apiValue(this.#readyList.length > 0)],
+      ['$snapshot', apiValue(() => this.#snapshot())],
+      [
+        '$subscribe',
+        apiValue((fn: () => unknown, options?: { fireImmediately?: boolean }) =>
+          this.#subscribe(fn, options)
         )
-      )
-      // 单独退订同时从 scope 解除登记，避免反复订阅/退订造成 scope 滞留泄漏
-      return () => {
-        e.dispose()
-        scope!.release(e)
-      }
-    },
-    $batch(recipe) {
-      assertNotDisposed()
-      assertStoreInput(recipe, '$batch recipe', 'function')
-      // batch（非事务，不回滚）；draft = store 本身，写只读 computed 字段会自然抛错。
-      runMutation(() => recipe(store as unknown as IStoreShape<S>))
-    },
-    $set(patch) {
-      assertNotDisposed()
-      assertStoreInput(patch, '$set patch', 'object')
-      let entries: Array<readonly [string, unknown]>
-      try {
-        entries = Object.entries(patch)
-      } catch (error) {
-        throw createStoreLightError(
-          StoreLightErrorCode.invalidOption,
-          StoreLightErrorText.patchInvalid,
-          { cause: error }
+      ],
+      ['$batch', apiValue((recipe: (draft: IStoreShape<S>) => void) => this.#batch(recipe))],
+      ['$set', apiValue((patch: Record<string, unknown>) => this.#set(patch))],
+      ['$plain', apiValue(() => this.#plain())],
+      [
+        '$hydrate',
+        apiValue((partial: Record<string, unknown>, options?: IHydrateOptions) =>
+          this.#hydrate(partial, options)
         )
+      ],
+      ['$disposed', { configurable: true, enumerable: true, get: () => this.#disposed }],
+      ['$own', apiValue((resource: IDisposable) => this.#own(resource))],
+      ['$dispose', apiValue(() => this.#dispose())]
+    ]
+    try {
+      for (const [k, desc] of api) {
+        if (Object.hasOwn(this.#descriptors, k))
+          throw createStoreLightTypeError(
+            StoreLightErrorCode.invalidOption,
+            StoreLightErrorText.reservedField(k)
+          )
+        Object.defineProperty(this.store, k, { ...desc, enumerable: false })
       }
-      runMutation(() => {
-        const prepared = entries.map(([key, value]) => {
-          const node = signals.get(key)
-          if (!node)
-            throw createStoreLightError(
-              StoreLightErrorCode.invalidOption,
-              StoreLightErrorText.fieldNotSettable(key)
-            )
-          return [node, value] as const
-        })
-        for (const [node, value] of prepared) node.value = value
-      })
-    },
-    $plain() {
-      assertNotDisposed()
-      return runtime.untracked(() => {
-        const out = Object.create(null) as Record<string, unknown>
-        for (const [k, n] of signals) out[k] = n.value
-        return out
-      })
-    },
-    $hydrate(partial, options = {}) {
-      assertNotDisposed()
-      assertStoreInput(partial, '$hydrate partial', 'object')
-      if (options === null || typeof options !== 'object')
-        throw createStoreLightError(
-          StoreLightErrorCode.invalidOption,
-          StoreLightErrorText.optionsObject
-        )
-      const descriptorSnapshot = snapshotOwnDescriptors(options)
-      if (!descriptorSnapshot.ok) {
-        throw createStoreLightError(
-          StoreLightErrorCode.invalidOption,
-          StoreLightErrorText.optionsObject,
-          { cause: descriptorSnapshot.error }
-        )
-      }
-      /** Capture each public option once, preserving inherited accessors and their receiver. */
-      let unknownPolicy: IHydrateOptions['unknown']
-      /** Every unknown field uses the same callback observed at admission. */
-      let onUnknown: IHydrateOptions['onUnknown']
-      try {
-        unknownPolicy = options.unknown
-        onUnknown = options.onUnknown
-      } catch (error) {
-        throw createStoreLightError(
-          StoreLightErrorCode.invalidOption,
-          StoreLightErrorText.optionsObject,
-          { cause: error }
-        )
-      }
-      let entries: Array<[string, unknown]>
-      try {
-        entries = Object.entries(partial)
-      } catch (error) {
-        throw createStoreLightError(
-          StoreLightErrorCode.invalidOption,
-          StoreLightErrorText.patchInvalid,
-          { cause: error }
-        )
-      }
-      let firstUnknown: string | undefined
-      if (unknownPolicy === 'strict' || unknownPolicy === 'report') {
-        for (const [key] of entries) {
-          if (signals.has(key)) continue
-          if (unknownPolicy === 'strict') {
-            firstUnknown = key
-            break
-          }
-          if (onUnknown) Reflect.apply(onUnknown, options, [key])
-        }
-      }
-      if (firstUnknown !== undefined) {
-        throw createStoreLightError(
-          StoreLightErrorCode.invalidOption,
-          StoreLightErrorText.unknownHydrationField(firstUnknown)
-        )
-      }
-      runMutation(() => {
-        for (const [k, v] of entries) {
-          const node = signals.get(k)
-          if (node) node.value = v
-        }
-      })
-    },
-    get $disposed() {
-      return disposed
-    },
-    $own(resource) {
-      assertNotDisposed()
-      assertOwnedBy(resource, runtime, 'resource')
-      if (!ownerOf(resource)) claimOwnership(resource, runtime)
-      // 外部资源（典型：collections），来源不明，保守按 syncSafe: false 处理。
-      flushPureNodes()
-      return ensureScope().own(resource, { syncSafe: false, force: () => resource.dispose() })
-    },
-    $dispose() {
-      if (disposePromise) return disposePromise
-      /** Publish completion before abort listeners or owned disposers can synchronously reenter. */
-      const completion = deferred<void>()
-      disposePromise = completion.promise
-      void (async () => {
-        disposed = true
-        initAbort?.abort() // 中止在途异步字段初始化
-        // Pure nodes release synchronously; mixed entries retain canonical scope ordering and
-        // failure policy. The public completion remains one stable Promise in both cases.
-        try {
-          await disposeOwned()
-        } finally {
-          // 丢掉强引用，避免「已 dispose 仍被 store 地图钉住」的假性常驻
-          signals.clear()
-          computeds.clear()
-          wasmFields.clear()
-          fieldSources.clear()
-          for (const key of contextMembers) delete (store as Record<PropertyKey, unknown>)[key]
-          contextMembers.clear()
-        }
-      })().then(() => completion.resolve(), completion.reject)
-      return disposePromise
+    } catch (error) {
+      this.#failConstruction(error)
     }
   }
 
-  // $-API 挂成不可枚举，$snapshot 遍历用户字段时不会把它们也带出去。
-  // 用 getOwnPropertyDescriptor 复制：保留 $disposed 这类 getter 的「实时」语义（不被求值成静态快照）。
+  /** `$snapshot`: every field value, after readiness. */
+  #snapshot(): IStoreShape<S> {
+    this.#assertNotDisposed()
+    // 异步字段未就绪时不能返回「缺字段的假完整对象」——先 assertReady，类型与运行时一致
+    this.#assertReady()
+    return this.runtime.untracked(() => this.#collectSnapshot()) as IStoreShape<S>
+  }
+
+  /** Reads every signal, computed and builder field into a null-prototype record. */
+  #collectSnapshot(): Record<string, unknown> {
+    /** Snapshot record. */
+    const out = Object.create(null) as Record<string, unknown>
+    for (const [k, n] of this.#signals) out[k] = n.value
+    for (const [k, n] of this.#computeds) out[k] = n.value
+    for (const [k, f] of this.#wasmFields) out[k] = f
+    return out
+  }
+
+  /**
+   * `$subscribe`. The public subscription observes every store-owned reactive field. Reading
+   * Computed nodes here is required for complete external-store semantics when a computed has no
+   * direct source signal in this store.
+   */
+  #subscribe(fn: () => unknown, options?: { fireImmediately?: boolean }): () => void {
+    this.#assertNotDisposed()
+    assertStoreInput(fn, '$subscribe listener', 'function')
+    /** This subscription's run state. */
+    const subscription: IStoreSubscription = {
+      fn,
+      fireImmediately: options?.fireImmediately === true,
+      initialRun: true
+    }
+    /** Store-owned effect tracking every field. */
+    const e = this.#ownReactiveNode(
+      this.runtime.effect(() => this.#runSubscription(subscription), {
+        debugName: `${this.#debugName}.$subscribe`
+      })
+    )
+    // 单独退订同时从 scope 解除登记，避免反复订阅/退订造成 scope 滞留泄漏
+    return () => this.#unsubscribe(e)
+  }
+
+  /** Effect body: track every field; call the listener after the first run (or immediately). */
+  #runSubscription(subscription: IStoreSubscription): void {
+    for (const n of this.#signals.values()) void n.value
+    for (const n of this.#computeds.values()) void n.value
+    for (const source of this.#fieldSources) source.track()
+    if (!subscription.initialRun || subscription.fireImmediately) this.#notify(subscription.fn)
+    subscription.initialRun = false
+  }
+
+  /** Calls one listener untracked; sync throws and async rejections are reported. */
+  #notify(fn: () => unknown): void {
+    try {
+      /** Listener result. */
+      const result = this.runtime.untracked(() => fn())
+      if (result && typeof (result as { then?: unknown }).then === 'function') {
+        void Promise.resolve(result).catch((error: unknown) =>
+          this.runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener })
+        )
+      }
+    } catch (error) {
+      this.runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener })
+    }
+  }
+
+  /** Disposes one subscription effect and drops it from the scope. */
+  #unsubscribe(effect: IDisposable): void {
+    effect.dispose()
+    this.#scope!.release(effect)
+  }
+
+  /** `$batch`: batch（非事务，不回滚）；draft = store 本身，写只读 computed 字段会自然抛错。 */
+  #batch(recipe: (draft: IStoreShape<S>) => void): void {
+    this.#assertNotDisposed()
+    assertStoreInput(recipe, '$batch recipe', 'function')
+    this.#runMutation(() => recipe(this.store as unknown as IStoreShape<S>))
+  }
+
+  /** `$set`: writes known signal fields in one batch; an unknown key fails before any write. */
+  #set(patch: Record<string, unknown>): void {
+    this.#assertNotDisposed()
+    assertStoreInput(patch, '$set patch', 'object')
+    /** Patch entries, read once. */
+    let entries: Array<readonly [string, unknown]>
+    try {
+      entries = Object.entries(patch)
+    } catch (error) {
+      throw createStoreLightError(
+        StoreLightErrorCode.invalidOption,
+        StoreLightErrorText.patchInvalid,
+        { cause: error }
+      )
+    }
+    this.#runMutation(() => this.#applyPatch(entries))
+  }
+
+  /** Resolves every patch node first, then writes. */
+  #applyPatch(entries: ReadonlyArray<readonly [string, unknown]>): void {
+    /** Target nodes paired with their values. */
+    const prepared: Array<readonly [IReactiveSignal<unknown> & IObservable, unknown]> = []
+    for (const [key, value] of entries) {
+      /** Signal of this key. */
+      const node = this.#signals.get(key)
+      if (!node)
+        throw createStoreLightError(
+          StoreLightErrorCode.invalidOption,
+          StoreLightErrorText.fieldNotSettable(key)
+        )
+      prepared.push([node, value])
+    }
+    for (const [node, value] of prepared) node.value = value
+  }
+
+  /** `$plain`: signal fields only. */
+  #plain(): Record<string, unknown> {
+    this.#assertNotDisposed()
+    return this.runtime.untracked(() => this.#collectPlain())
+  }
+
+  /** Reads every signal field into a null-prototype record. */
+  #collectPlain(): Record<string, unknown> {
+    /** Plain record. */
+    const out = Object.create(null) as Record<string, unknown>
+    for (const [k, n] of this.#signals) out[k] = n.value
+    return out
+  }
+
+  /** `$hydrate`: writes known signal fields; unknown keys follow the `unknown` policy. */
+  #hydrate(partial: Record<string, unknown>, options: IHydrateOptions = {}): void {
+    this.#assertNotDisposed()
+    assertStoreInput(partial, '$hydrate partial', 'object')
+    /** Unknown-field policy and callback, each read once. */
+    const { unknownPolicy, onUnknown } = readHydrateOptions(options)
+    /** Partial entries, read once. */
+    let entries: Array<[string, unknown]>
+    try {
+      entries = Object.entries(partial)
+    } catch (error) {
+      throw createStoreLightError(
+        StoreLightErrorCode.invalidOption,
+        StoreLightErrorText.patchInvalid,
+        { cause: error }
+      )
+    }
+    /** First unknown key under the strict policy. */
+    let firstUnknown: string | undefined
+    if (unknownPolicy === 'strict' || unknownPolicy === 'report') {
+      for (const [key] of entries) {
+        if (this.#signals.has(key)) continue
+        if (unknownPolicy === 'strict') {
+          firstUnknown = key
+          break
+        }
+        if (onUnknown) Reflect.apply(onUnknown, options, [key])
+      }
+    }
+    if (firstUnknown !== undefined) {
+      throw createStoreLightError(
+        StoreLightErrorCode.invalidOption,
+        StoreLightErrorText.unknownHydrationField(firstUnknown)
+      )
+    }
+    this.#runMutation(() => this.#applyHydration(entries))
+  }
+
+  /** Writes every known signal field of the hydration entries. */
+  #applyHydration(entries: ReadonlyArray<readonly [string, unknown]>): void {
+    for (const [k, v] of entries) {
+      /** Signal of this key, if any. */
+      const node = this.#signals.get(k)
+      if (node) node.value = v
+    }
+  }
+
+  /** `$own`: 外部资源（典型：collections），来源不明，保守按 syncSafe: false 处理。 */
+  #own<R extends IDisposable>(resource: R): R {
+    this.#assertNotDisposed()
+    assertOwnedBy(resource, this.runtime, 'resource')
+    if (!ownerOf(resource)) claimOwnership(resource, this.runtime)
+    this.#flushPureNodes()
+    return this.#ensureScope().own(resource, { syncSafe: false, force: () => resource.dispose() })
+  }
+
+  /** `$dispose`: one stable completion shared by every caller. */
+  #dispose(): Promise<void> {
+    if (this.#disposePromise) return this.#disposePromise
+    /** Publish completion before abort listeners or owned disposers can synchronously reenter. */
+    const completion = deferred<void>()
+    this.#disposePromise = completion.promise
+    void this.#disposeNow().then(() => completion.resolve(), completion.reject)
+    return this.#disposePromise
+  }
+
+  /** Marks disposed, aborts in-flight builders, releases resources and drops field references. */
+  async #disposeNow(): Promise<void> {
+    this.#disposed = true
+    this.#initAbort?.abort() // 中止在途异步字段初始化
+    // Pure nodes release synchronously; mixed entries retain canonical scope ordering and failure
+    // policy. The public completion remains one stable Promise in both cases.
+    try {
+      await this.#disposeOwned()
+    } finally {
+      // 丢掉强引用，避免「已 dispose 仍被 store 地图钉住」的假性常驻
+      this.#clearFields()
+    }
+  }
+}
+
+/** Data descriptor of one `$`-API member, as an object-literal method would have. */
+function apiValue(value: unknown): PropertyDescriptor {
+  return { configurable: true, enumerable: true, writable: true, value }
+}
+
+/**
+ * Attaches a cleanup failure to the original initialization error without replacing it: as its
+ * `cause` (aggregated with an existing cause), or — when the error cannot carry one — by throwing a
+ * tagged aggregate of both.
+ */
+function attachInitializationCleanupFailure(error: unknown, cleanupError: unknown): void {
+  if (!(error instanceof Error)) {
+    throw createStoreLightAggregateError(
+      StoreLightErrorCode.initAndCleanupFailed,
+      [error, cleanupError],
+      StoreLightErrorText.cleanupFailed
+    )
+  }
   try {
-    for (const k of Object.keys(api)) {
-      if (Object.hasOwn(descriptors, k))
-        throw createStoreLightTypeError(
-          StoreLightErrorCode.invalidOption,
-          StoreLightErrorText.reservedField(k)
-        )
-      const desc = Object.getOwnPropertyDescriptor(api, k)!
-      Object.defineProperty(store, k, { ...desc, enumerable: false })
-    }
-  } catch (error) {
-    failConstruction(error)
+    error.cause =
+      error.cause === undefined
+        ? cleanupError
+        : createStoreLightAggregateError(
+            StoreLightErrorCode.initAndCleanupFailed,
+            [error.cause, cleanupError],
+            StoreLightErrorText.cleanupFailed
+          )
+  } catch {
+    // A frozen/non-configurable Error cannot carry cause; promote both values into a tagged
+    // aggregate instead of silently losing cleanup diagnostics.
+    throw createStoreLightAggregateError(
+      StoreLightErrorCode.initAndCleanupFailed,
+      [error, cleanupError],
+      StoreLightErrorText.cleanupFailed
+    )
   }
+}
 
-  // 登记归属：Registry 与 SSR scope 据此校验，不再靠 $runtime 字段名
-  claimOwnership(store, runtime)
-  STORE_READY.set(store, ready)
-  return store as IReactiveStore<S>
+/** Reads `$hydrate` options once, preserving inherited accessors and their receiver. */
+function readHydrateOptions(options: IHydrateOptions): {
+  unknownPolicy: IHydrateOptions['unknown']
+  onUnknown: IHydrateOptions['onUnknown']
+} {
+  if (options === null || typeof options !== 'object')
+    throw createStoreLightError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.optionsObject
+    )
+  /** Own-descriptor snapshot proving the options object is readable. */
+  const descriptorSnapshot = snapshotOwnDescriptors(options)
+  if (!descriptorSnapshot.ok) {
+    throw createStoreLightError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.optionsObject,
+      { cause: descriptorSnapshot.error }
+    )
+  }
+  try {
+    // Every unknown field uses the same callback observed at admission.
+    return { unknownPolicy: options.unknown, onUnknown: options.onUnknown }
+  } catch (error) {
+    throw createStoreLightError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.optionsObject,
+      { cause: error }
+    )
+  }
 }
 
 /**
