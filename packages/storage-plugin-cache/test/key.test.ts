@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cacheKey, CacheWriteMode } from '../src/index.ts'
-import { CacheErrorCode, STORAGE_CACHE_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
+import { CacheErrorCode, ERROR_SOURCE as STORAGE_CACHE_ERROR_SOURCE } from '../src/error-code.ts'
 import { cacheError } from '../src/errors.ts'
 import type { ICodecValue } from '@migaia/serialize/codec'
 

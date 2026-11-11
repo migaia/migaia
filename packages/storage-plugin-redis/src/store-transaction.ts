@@ -15,7 +15,7 @@ import {
   type IConcurrencyAttemptContext,
   type IConcurrencyAttempt
 } from '@migaia/storage-contract'
-import { RedisErrorCode } from '@migaia/storage-contract/error-code'
+import { RedisErrorCode } from './error-code.ts'
 import { RedisDraft } from './transaction.ts'
 import { decodeRedisValue, replyOptionalString, type IRedisChannel } from './layout.ts'
 import { normalizeRedisTransactionFailure, redisError } from './errors.ts'

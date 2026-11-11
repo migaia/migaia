@@ -1,9 +1,20 @@
-/**
- * Storage error codes are declared by storage-contract (`@migaia/storage-contract/error-code`);
- * this package owns no local codes.
- */
-export const PostgresLocalErrorCode = {} as const
+/** Registered error domain of storage-plugin-postgres; never names the package or a path. */
+export const ERROR_SOURCE = 'storage.backend.postgres'
 
-/** No package-local semantic values exist; the code union comes from storage-contract. */
-export type IPostgresLocalErrorCode =
-  (typeof PostgresLocalErrorCode)[keyof typeof PostgresLocalErrorCode]
+/**
+ * Each code identifies one native or transaction boundary; original failures remain reachable.
+ *
+ * @error-source storage.backend.postgres
+ */
+export const PostgresErrorCode = {
+  /** An uncategorized native query or connection failed; inspect its original cause. */
+  sqlFailed: 'SQL_FAILED',
+  /** A persisted canonical key, value or metadata row could not be decoded. */
+  decodeFailed: 'DECODE_FAILED',
+  /** A callback, accepted operation or transaction lifecycle failed and rolled back. */
+  transactionFailed: 'TRANSACTION_FAILED',
+  /** A known standard-channel write found the same key in an incompatible channel. */
+  duplicateKey: 'DUPLICATE_KEY'
+} as const
+/** Public semantic codes belong to this domain rather than a driver SQLSTATE. */
+export type IPostgresErrorCode = (typeof PostgresErrorCode)[keyof typeof PostgresErrorCode]

@@ -15,7 +15,7 @@ import {
   type ICounterApi,
   type ITtlTarget
 } from '@migaia/storage-contract'
-import { RedisErrorCode } from '@migaia/storage-contract/error-code'
+import { RedisErrorCode } from './error-code.ts'
 import { decodeRedisValue, replyOptionalString, replyInteger } from './layout.ts'
 import { unsupported, redisError } from './errors.ts'
 import { RedisText } from './constants.ts'

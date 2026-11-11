@@ -7,7 +7,7 @@ import { readNativeFeaturePort } from '../native-feature.ts'
 import { featureName, featureInteger, featureMember, readFeatureMember } from '../feature-input.ts'
 import { RedisSuffix, replyInteger, replyString } from '../layout.ts'
 import { invalidArgument, redisError } from '../errors.ts'
-import { RedisErrorCode } from '@migaia/storage-contract/error-code'
+import { RedisErrorCode } from '../error-code.ts'
 /** Native equal-score ordering follows the original canonical UTF-16 member encoding. */
 export type IRedisSortedSetsApi = {
   readonly sortedSets: {

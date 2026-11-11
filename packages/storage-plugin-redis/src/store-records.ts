@@ -19,7 +19,7 @@ import type {
   IRecordQueryMutation,
   ITtlTarget
 } from '@migaia/storage-contract'
-import { RedisErrorCode } from '@migaia/storage-contract/error-code'
+import { RedisErrorCode } from './error-code.ts'
 import { RedisDraft } from './transaction.ts'
 import { encodeRedisValue, decodeRedisValue, replyOptionalString, replyInteger } from './layout.ts'
 import { invalidArgument, unsupported, redisError } from './errors.ts'

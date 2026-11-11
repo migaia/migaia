@@ -12,7 +12,7 @@ import {
 import { RedisCommand } from './constants.ts'
 import { kv, records, ttl, counter, implement } from '@migaia/storage-contract'
 import type { IStoragePluginCore } from '@migaia/storage-host'
-import { RedisErrorCode } from '@migaia/storage-contract/error-code'
+import { RedisErrorCode } from './error-code.ts'
 import { RedisDraft } from './transaction.ts'
 import { createRedisJournalBinding } from './journal.ts'
 import { createRedisLayout } from './layout.ts'

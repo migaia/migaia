@@ -21,7 +21,7 @@ import type { IPgConnection } from './types.ts'
 import { pgTextKey } from './codec.ts'
 import { PgNames } from './constants.ts'
 import { normalizeTransactionFailure, postgresError } from './errors.ts'
-import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
+import { PostgresErrorCode } from './error-code.ts'
 import { PostgresErrorText } from './error-text.ts'
 /** A backend-created lock conflict is consumed before it can leave the original attempt. */
 export class PgLockConflict extends Error {

@@ -8,7 +8,7 @@ import { assertStringStorageKey } from '@migaia/storage-contract'
 import { base64ToBytes, bytesToBase64 } from '@migaia/serialize/core'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { invalidArgument, redisError } from './errors.ts'
-import { RedisErrorCode } from '@migaia/storage-contract/error-code'
+import { RedisErrorCode } from './error-code.ts'
 import { RedisText } from './constants.ts'
 import { redisHex, redisUnhex, replyString } from './layout.ts'
 /** Feature names follow the same logical string domain as standard text keys. */

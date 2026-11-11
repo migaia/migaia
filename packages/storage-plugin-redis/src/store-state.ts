@@ -27,10 +27,8 @@ import {
   type IStorageOrgBinding,
   type IStorageJournalBackendBinding
 } from '@migaia/storage-host'
-import {
-  StorageHostErrorCode,
-  STORAGE_REDIS_ERROR_SOURCE
-} from '@migaia/storage-contract/error-code'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
+import { ERROR_SOURCE as STORAGE_REDIS_ERROR_SOURCE } from './error-code.ts'
 import { RedisDraft } from './transaction.ts'
 import { createRedisLayout } from './layout.ts'
 import { RedisText } from './constants.ts'

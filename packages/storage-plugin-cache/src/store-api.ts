@@ -9,7 +9,7 @@ import {
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { CacheText, CacheOperation } from './constants.ts'
 import { cacheError, invalidArgument, missingCapability } from './errors.ts'
-import { CacheErrorCode } from '@migaia/storage-contract/error-code'
+import { CacheErrorCode } from './error-code.ts'
 import { snapshotCachePolicy, type ICachePolicy } from './policy.ts'
 import { encodeEntry, type ICacheEntry } from './entry.ts'
 import type { ICacheEntryInfo } from './types.ts'

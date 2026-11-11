@@ -15,3 +15,6 @@ import './hooks.ts'
 export type { ICacheTierHookPayload } from './hooks.ts'
 
 export { cachePlugin } from './plugin.ts'
+
+export { CacheErrorCode, ERROR_SOURCE as STORAGE_CACHE_ERROR_SOURCE } from './error-code.ts'
+export type { ICacheErrorCode } from './error-code.ts'

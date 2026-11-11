@@ -29,3 +29,6 @@ export type {
   IPostgresStore,
   IPostgresOptions
 } from './types.ts'
+
+export { PostgresErrorCode, ERROR_SOURCE as STORAGE_POSTGRES_ERROR_SOURCE } from './error-code.ts'
+export type { IPostgresErrorCode } from './error-code.ts'

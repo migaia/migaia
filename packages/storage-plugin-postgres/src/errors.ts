@@ -2,11 +2,8 @@ import { PgNames } from './constants.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizeError, isStorageErrorFamily } from '@migaia/storage-host/sdk'
-import {
-  STORAGE_POSTGRES_ERROR_SOURCE,
-  PostgresErrorCode
-} from '@migaia/storage-contract/error-code'
-import type { IPostgresErrorCode } from '@migaia/storage-contract/error-code'
+import { ERROR_SOURCE as STORAGE_POSTGRES_ERROR_SOURCE, PostgresErrorCode } from './error-code.ts'
+import type { IPostgresErrorCode } from './error-code.ts'
 import { PostgresErrorText } from './error-text.ts'
 /** Add the registered package identity while retaining the untouched native failure on cause. */
 export function postgresError(

@@ -15,7 +15,7 @@ import type {
 import { quotePgIdentifier } from './copy-command.ts'
 import { pgVectorCondition, pgVectorFilter } from './vector-filter.ts'
 import { invalidArgument, postgresError } from './errors.ts'
-import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
+import { PostgresErrorCode } from './error-code.ts'
 import { PgNames } from './constants.ts'
 /** Validate and encode the caller table target before native execution can await. */
 function preparePgNativeVector(

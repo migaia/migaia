@@ -4,7 +4,7 @@ import type { IPgQuantizedOptions } from './features/quantized.ts'
 import type { IStorageVectorConfiguration, IOperationContext } from '@migaia/storage-contract'
 import { quotePgIdentifier } from './copy-command.ts'
 import { invalidArgument, postgresError } from './errors.ts'
-import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
+import { PostgresErrorCode } from './error-code.ts'
 import { PostgresErrorText } from './error-text.ts'
 /** Fixed deployment metadata remains stable while installation probes and DDL await. */
 export type IPgConfiguration = {

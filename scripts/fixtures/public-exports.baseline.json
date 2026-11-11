@@ -966,19 +966,13 @@
       ],
       "./error-code": [
         "ArchiveErrorCode",
-        "CacheErrorCode",
         "ObjectErrorCode",
-        "PostgresErrorCode",
         "QdrantErrorCode",
-        "RedisErrorCode",
         "STORAGE_ARCHIVE_ERROR_SOURCE",
         "STORAGE_BROWSER_ERROR_SOURCE",
-        "STORAGE_CACHE_ERROR_SOURCE",
         "STORAGE_HOST_ERROR_SOURCE",
         "STORAGE_OBJECT_ERROR_SOURCE",
-        "STORAGE_POSTGRES_ERROR_SOURCE",
         "STORAGE_QDRANT_ERROR_SOURCE",
-        "STORAGE_REDIS_ERROR_SOURCE",
         "STORAGE_SPARQL_ERROR_SOURCE",
         "STORAGE_SQLITE_ERROR_SOURCE",
         "SparqlErrorCode",
@@ -1178,7 +1172,14 @@
       "./features/indexed-db-keyset": ["indexedDbKeysetFeature"]
     },
     "@migaia/storage-plugin-cache": {
-      ".": ["CacheWriteMode", "cacheBackendKind", "cacheKey", "cachePlugin"],
+      ".": [
+        "CacheErrorCode",
+        "CacheWriteMode",
+        "STORAGE_CACHE_ERROR_SOURCE",
+        "cacheBackendKind",
+        "cacheKey",
+        "cachePlugin"
+      ],
       "./features/semantic": ["semanticCacheFeature"]
     },
     "@migaia/storage-plugin-object": {
@@ -1188,7 +1189,12 @@
       "./features/presign": ["objectPresignFeature"]
     },
     "@migaia/storage-plugin-postgres": {
-      ".": ["postgresBackendKind", "postgresBackendPlugin"],
+      ".": [
+        "PostgresErrorCode",
+        "STORAGE_POSTGRES_ERROR_SOURCE",
+        "postgresBackendKind",
+        "postgresBackendPlugin"
+      ],
       "./pg": ["pgDriver"],
       "./postgres-js": ["postgresJsDriver"],
       "./bun": ["bunSqlDriver"],
@@ -1209,7 +1215,12 @@
       "./features/rescore": ["qdrantRescoreFeature"]
     },
     "@migaia/storage-plugin-redis": {
-      ".": ["redisBackendKind", "redisBackendPlugin"],
+      ".": [
+        "RedisErrorCode",
+        "STORAGE_REDIS_ERROR_SOURCE",
+        "redisBackendKind",
+        "redisBackendPlugin"
+      ],
       "./ioredis": ["ioredisDriver"],
       "./node-redis": ["nodeRedisDriver"],
       "./bun": ["bunRedisDriver"],

@@ -17,7 +17,7 @@ import type { IPgConnection, IPgNativeParameter } from './types.ts'
 import type { IPgTables } from './schema.ts'
 import { pgKey, pgKeyHex, pgRecordKey, pgTextKey } from './codec.ts'
 import { postgresError } from './errors.ts'
-import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
+import { PostgresErrorCode } from './error-code.ts'
 import { PgNames } from './constants.ts'
 /** These channels are real physical tables, rather than a second public data model. */
 export type IPgChannel = 'text' | 'bytes' | 'record' | 'metadata'

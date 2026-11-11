@@ -31,3 +31,6 @@ export type {
 export type { IRedisChangeStreamOutput } from './features/change-stream.ts'
 
 export type { IRedisVectorFeatureOutput } from './features/search.ts'
+
+export { RedisErrorCode, ERROR_SOURCE as STORAGE_REDIS_ERROR_SOURCE } from './error-code.ts'
+export type { IRedisErrorCode } from './error-code.ts'

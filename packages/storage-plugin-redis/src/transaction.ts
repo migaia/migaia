@@ -21,7 +21,7 @@ import type { IStorageJournalAttempt } from '@migaia/storage-host'
 import { captureRedisJournalStage, redisJournalTarget, type IRedisJournalStage } from './journal.ts'
 import type { IRedisConnection, IRedisExecEntry } from './driver.ts'
 import { redisError, invalidArgument } from './errors.ts'
-import { RedisErrorCode } from '@migaia/storage-contract/error-code'
+import { RedisErrorCode } from './error-code.ts'
 import { RedisText, redisExecCause } from './constants.ts'
 import {
   createRedisLayout,

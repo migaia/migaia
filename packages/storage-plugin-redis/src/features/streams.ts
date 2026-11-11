@@ -15,7 +15,7 @@ import {
 } from '../feature-input.ts'
 import { RedisSuffix, replyInteger, replyString } from '../layout.ts'
 import { invalidArgument, redisError } from '../errors.ts'
-import { RedisErrorCode } from '@migaia/storage-contract/error-code'
+import { RedisErrorCode } from '../error-code.ts'
 /** Stream fields are independent byte values reconstructed from the canonical text wire. */
 export type IRedisStreamEntry = {
   readonly id: string

@@ -1,8 +1,8 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { normalizeError } from '@migaia/storage-host/sdk'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { STORAGE_REDIS_ERROR_SOURCE, RedisErrorCode } from '@migaia/storage-contract/error-code'
-import type { IRedisErrorCode } from '@migaia/storage-contract/error-code'
+import { ERROR_SOURCE as STORAGE_REDIS_ERROR_SOURCE, RedisErrorCode } from './error-code.ts'
+import type { IRedisErrorCode } from './error-code.ts'
 import { RedisText } from './constants.ts'
 /** The normalization boundary always returns an actual registered identity. */
 export type IRedisFailure = Error & { readonly source: string; readonly code: string }

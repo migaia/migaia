@@ -11,7 +11,7 @@ import {
   type IConcurrencyAttempt
 } from '@migaia/storage-contract'
 import { sleep } from '@migaia/utils/promise'
-import { RedisErrorCode } from '@migaia/storage-contract/error-code'
+import { RedisErrorCode } from './error-code.ts'
 import { RedisDraft, validateRedisExec } from './transaction.ts'
 import { createRedisLocks, RedisLockConflict } from './locks.ts'
 import { replyRevision, RedisSuffix } from './layout.ts'

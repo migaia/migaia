@@ -338,27 +338,6 @@ export const ArchiveErrorCode = {
 } as const
 export type IArchiveErrorCode = (typeof ArchiveErrorCode)[keyof typeof ArchiveErrorCode]
 
-/** Registered error domain of storage-plugin-cache; never names the package or a path. */
-export const STORAGE_CACHE_ERROR_SOURCE = 'storage.backend.cache'
-
-/**
- * Configuration and callback failures remain distinct from errors owned by borrowed backends.
- *
- * @error-source storage.backend.cache
- */
-export const CacheErrorCode = {
-  /**
-   * Invalid tier, policy or propagation configuration; correct the configuration before
-   * installation.
-   */
-  tierInvalid: 'CACHE_TIER_INVALID',
-  /** The caller's loader or value encoding failed; inspect the original cause and retry explicitly. */
-  loadFailed: 'CACHE_LOAD_FAILED',
-  /** The caller's embedding function failed; inspect its cause without treating it as a cache miss. */
-  embedFailed: 'CACHE_EMBED_FAILED'
-} as const
-export type ICacheErrorCode = (typeof CacheErrorCode)[keyof typeof CacheErrorCode]
-
 /** Registered error domain of storage-plugin-object; never names the package or a path. */
 export const STORAGE_OBJECT_ERROR_SOURCE = 'storage.backend.object'
 
@@ -378,27 +357,6 @@ export const ObjectErrorCode = {
 /** Stable union used by every native error constructor. */
 export type IObjectErrorCode = (typeof ObjectErrorCode)[keyof typeof ObjectErrorCode]
 
-/** Registered error domain of storage-plugin-postgres; never names the package or a path. */
-export const STORAGE_POSTGRES_ERROR_SOURCE = 'storage.backend.postgres'
-
-/**
- * Each code identifies one native or transaction boundary; original failures remain reachable.
- *
- * @error-source storage.backend.postgres
- */
-export const PostgresErrorCode = {
-  /** An uncategorized native query or connection failed; inspect its original cause. */
-  sqlFailed: 'SQL_FAILED',
-  /** A persisted canonical key, value or metadata row could not be decoded. */
-  decodeFailed: 'DECODE_FAILED',
-  /** A callback, accepted operation or transaction lifecycle failed and rolled back. */
-  transactionFailed: 'TRANSACTION_FAILED',
-  /** A known standard-channel write found the same key in an incompatible channel. */
-  duplicateKey: 'DUPLICATE_KEY'
-} as const
-/** Public semantic codes belong to this domain rather than a driver SQLSTATE. */
-export type IPostgresErrorCode = (typeof PostgresErrorCode)[keyof typeof PostgresErrorCode]
-
 /** Registered error domain of storage-plugin-qdrant; never names the package or a path. */
 export const STORAGE_QDRANT_ERROR_SOURCE = 'storage.backend.qdrant'
 
@@ -416,27 +374,6 @@ export const QdrantErrorCode = {
   responseInvalid: 'QDRANT_RESPONSE_INVALID'
 } as const
 export type IQdrantErrorCode = (typeof QdrantErrorCode)[keyof typeof QdrantErrorCode]
-
-/** Registered error domain of storage-plugin-redis; never names the package or a path. */
-export const STORAGE_REDIS_ERROR_SOURCE = 'storage.backend.redis'
-
-/**
- * Each native failure retains its original cause and command execution evidence.
- *
- * @error-source storage.backend.redis
- */
-export const RedisErrorCode = {
-  /** Native command, connection or EXEC failure; unknown writes must never be replayed. */
-  failed: 'REDIS_FAILED',
-  /** Fixed protocol replies or persisted values cannot be decoded; inspect the original cause. */
-  decodeFailed: 'DECODE_FAILED',
-  /**
-   * User callback, draft or finalizer failed without a native protocol failure; inspect the
-   * original error.
-   */
-  transactionFailed: 'TRANSACTION_FAILED'
-} as const
-export type IRedisErrorCode = (typeof RedisErrorCode)[keyof typeof RedisErrorCode]
 
 /** Registered error domain of storage-plugin-sparql; never names the package or a path. */
 export const STORAGE_SPARQL_ERROR_SOURCE = 'storage.backend.sparql'

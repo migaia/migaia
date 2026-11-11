@@ -1,8 +1,8 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { CacheText } from './constants.ts'
-import { CacheErrorCode, STORAGE_CACHE_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
-import type { ICacheErrorCode } from '@migaia/storage-contract/error-code'
+import { CacheErrorCode, ERROR_SOURCE as STORAGE_CACHE_ERROR_SOURCE } from './error-code.ts'
+import type { ICacheErrorCode } from './error-code.ts'
 
 /**
  * Cache callback failures retain their native class and expose their original failure as first

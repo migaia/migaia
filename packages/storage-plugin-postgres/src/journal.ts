@@ -37,7 +37,7 @@ import {
 } from './native.ts'
 import type { IPgConfiguration, IPgTables } from './schema.ts'
 import { invalidArgument, postgresError } from './errors.ts'
-import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
+import { PostgresErrorCode } from './error-code.ts'
 import { PgNames } from './constants.ts'
 import { deferred } from '@migaia/utils/promise'
 import { base64ToBytes, bytesToBase64 } from '@migaia/utils/bytes'
