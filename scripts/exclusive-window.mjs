@@ -283,8 +283,8 @@ function compareWaiters(left, right) {
 }
 
 /**
- * Lists queued runners that are still alive, best first. Unreadable files and dead processes are
- * skipped, so a crashed waiter never blocks the queue.
+ * Lists queued runners that are still alive, in discovery order. Unreadable files and dead
+ * processes are skipped, so a crashed waiter never blocks the queue.
  */
 export function liveWaiters(directory) {
   /** Waiter file names. */
@@ -313,14 +313,17 @@ export function liveWaiters(directory) {
       // A file being renamed or removed right now is skipped; it is re-read on the next poll.
     }
   }
-  return waiters.sort(compareWaiters)
+  return waiters
 }
 
 /** Returns the first live waiter that must be admitted before `self`, or undefined. */
 export function waiterAhead(directory, self) {
-  return liveWaiters(directory).find(
-    (waiter) => waiter.pid !== self.pid && compareWaiters(waiter, self) < 0
-  )
+  /** Highest-priority other waiter, found in one linear pass instead of sorting the queue. */
+  let first
+  for (const waiter of liveWaiters(directory))
+    if (waiter.pid !== self.pid && (first === undefined || compareWaiters(waiter, first) < 0))
+      first = waiter
+  return first !== undefined && compareWaiters(first, self) < 0 ? first : undefined
 }
 
 /** Appends one history entry; history is append-only so no earlier window is rewritten. */

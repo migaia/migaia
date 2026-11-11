@@ -476,20 +476,25 @@ export function authorizeStorageV2LockProvenance(
       throw new Error(`root importer ${name} edge does not match the packed artifact`)
   }
   /** Preserve the original override profile, including a directly installed storage-host pin. */
-  const expectedOverrides = artifacts
-    .filter(({ name }) => name !== '@migaia/storage-plugin-browser')
-    .map(({ name, tarballPath }) => [name, `file:${tarballPath}`])
-    .sort()
-  if (JSON.stringify([...parsed.overrides.entries()].sort()) !== JSON.stringify(expectedOverrides))
+  const expectedOverrides = new Map(
+    artifacts
+      .filter(({ name }) => name !== '@migaia/storage-plugin-browser')
+      .map(({ name, tarballPath }) => [name, `file:${tarballPath}`])
+  )
+  if (!sameEntries(parsed.overrides, expectedOverrides))
     throw new Error('packed artifact override set mismatch')
 
   /** Authorization map records the first exact locator reaching each package. */
   const authorized = new Map()
   /** FIFO traversal covers every packed dependency edge reachable from the root importer. */
   const pending = importerRoots.map((name) => ({ name, locator: instanceLocator(name) }))
-  while (pending.length > 0) {
+  /** Package and snapshot identities grouped by package name once, for per-edge lookups. */
+  const packageIdentitiesByName = groupIdentitiesByName(parsed.packages.keys())
+  const snapshotIdentitiesByName = groupIdentitiesByName(parsed.snapshots.keys())
+  // Queue cursor: each edge is visited once without shifting the array.
+  for (let cursor = 0; cursor < pending.length; cursor++) {
     /** Current edge is an exact parent-to-child resolved locator. */
-    const edge = pending.shift()
+    const edge = pending[cursor]
     /** Previously reached packages must resolve through the same locator on every path. */
     const prior = authorized.get(edge.name)
     if (prior !== undefined) {
@@ -509,9 +514,7 @@ export function authorizeStorageV2LockProvenance(
     /** Package identity binds the independently packed tarball without the instance peer suffix. */
     const packageIdentity = `${edge.name}@${expectedLocator}`
     /** Same-name package rows cannot introduce alternate or orphan identities. */
-    const packageIdentities = [...parsed.packages.keys()].filter((identity) =>
-      identity.startsWith(`${edge.name}@`)
-    )
+    const packageIdentities = packageIdentitiesByName.get(edge.name) ?? []
     if (packageIdentities.length !== 1 || packageIdentities[0] !== packageIdentity)
       throw new Error(`${edge.name} package identity set mismatch`)
     /** Package metadata binds exact version and optional explicit name. */
@@ -552,9 +555,7 @@ export function authorizeStorageV2LockProvenance(
       expectedDependencies.set(peerName, instanceLocator(peerName))
     }
     /** Snapshot identity must be absent for a leaf or exact for a dependency-bearing package. */
-    const snapshotIdentities = [...parsed.snapshots.keys()].filter((identity) =>
-      identity.startsWith(`${edge.name}@`)
-    )
+    const snapshotIdentities = snapshotIdentitiesByName.get(edge.name) ?? []
     const snapshotDependencies = parsed.snapshots.get(lockIdentity)
     if (expectedDependencies.size === 0) {
       if (
@@ -590,27 +591,22 @@ export function authorizeStorageV2LockProvenance(
     })
   }
   /** Entire independently packed release graph must be importer reachable. */
-  if (
-    JSON.stringify([...authorized.keys()].sort()) !==
-    JSON.stringify([...artifactByName.keys()].sort())
-  )
+  if (!sameKeys(authorized.keys(), artifactByName))
     throw new Error('importer-reachable package set mismatch')
   /** Every package row must belong to the exact reachable identity set. */
-  const reachablePackageIdentities = [...authorized.entries()]
-    .map(([name, { tarballLocator }]) => `${name}@${tarballLocator}`)
-    .sort()
-  if (
-    JSON.stringify([...parsed.packages.keys()].sort()) !==
-    JSON.stringify(reachablePackageIdentities)
+  const reachablePackageIdentities = new Map(
+    [...authorized.entries()].map(([name, { tarballLocator }]) => [
+      `${name}@${tarballLocator}`,
+      true
+    ])
   )
+  if (!sameKeys(parsed.packages.keys(), reachablePackageIdentities))
     throw new Error('orphan package rows are forbidden')
   /** Every snapshot row must also belong to the reachable identity set. */
-  const reachableSnapshotIdentities = [...authorized.values()].map(
-    ({ lockIdentity }) => lockIdentity
+  const reachableSnapshotIdentities = new Set(
+    [...authorized.values()].map(({ lockIdentity }) => lockIdentity)
   )
-  if (
-    [...parsed.snapshots.keys()].some((identity) => !reachableSnapshotIdentities.includes(identity))
-  )
+  if ([...parsed.snapshots.keys()].some((identity) => !reachableSnapshotIdentities.has(identity)))
     throw new Error('orphan snapshot rows are forbidden')
   return authorized
 }
@@ -853,4 +849,54 @@ function unquoteYamlScalar(value) {
   if (value.startsWith("'") && value.endsWith("'")) return value.slice(1, -1).replaceAll("''", "'")
   if (value.startsWith('"') && value.endsWith('"')) return JSON.parse(value)
   return value
+}
+
+/**
+ * Groups lock identities (`name@locator`, scoped names included) by package name in one pass.
+ *
+ * @param {Iterable<string>} identities Lock identities.
+ * @returns {Map<string, string[]>} Package name to its identities in input order.
+ */
+function groupIdentitiesByName(identities) {
+  /** Identities per package name. */
+  const grouped = new Map()
+  for (const identity of identities) {
+    /** Package name: everything before the first `@` after a possible scope `@`. */
+    const name = identity.slice(0, identity.indexOf('@', 1))
+    /** Identities already grouped under this name. */
+    const bucket = grouped.get(name)
+    if (bucket) bucket.push(identity)
+    else grouped.set(name, [identity])
+  }
+  return grouped
+}
+
+/**
+ * True when `keys` lists exactly the keys of `expected`, each once.
+ *
+ * @param {Iterable<string>} keys Keys to check.
+ * @param {ReadonlyMap<string, unknown>} expected Expected key set.
+ * @returns {boolean} Set equality.
+ */
+function sameKeys(keys, expected) {
+  /** Distinct keys seen. */
+  const seen = new Set()
+  for (const key of keys) {
+    if (!expected.has(key) || seen.has(key)) return false
+    seen.add(key)
+  }
+  return seen.size === expected.size
+}
+
+/**
+ * True when two maps hold the same keys with equal (===) values.
+ *
+ * @param {ReadonlyMap<string, unknown>} actual Map to check.
+ * @param {ReadonlyMap<string, unknown>} expected Expected entries.
+ * @returns {boolean} Entry-set equality.
+ */
+function sameEntries(actual, expected) {
+  if (actual.size !== expected.size) return false
+  for (const [key, value] of actual) if (expected.get(key) !== value) return false
+  return true
 }

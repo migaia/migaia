@@ -20,13 +20,15 @@ export function releasePatchPrefix(packageNames, versions, subjectsNewestFirst, 
   const expected = packageNames.map(
     (packageName) => `chore(release): ${packageName} v${versions.get(packageName)}`
   )
+  /** Expected subjects indexed once for membership checks. */
+  const expectedSubjects = new Set(expected)
   /** The newest first-package commit anchors this run and excludes older same-version releases. */
   const runAnchor = subjectsNewestFirst.indexOf(expected[0])
   if (runAnchor === -1) return []
   /** Repair commits may sit above a partial release; only this run's release subjects matter. */
   const releaseSubjects = subjectsNewestFirst
     .slice(0, runAnchor + 1)
-    .filter((subject) => expected.includes(subject))
+    .filter((subject) => expectedSubjects.has(subject))
   /** Chronological order must still be the exact dependency prefix, preventing skipped packages. */
   const chronological = releaseSubjects.toReversed()
   const prefixLength = chronological.findIndex((subject, index) => subject !== expected[index])

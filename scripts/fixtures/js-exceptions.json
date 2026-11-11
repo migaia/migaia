@@ -537,5 +537,19 @@
       "path": "scripts/test/js-exceptions.test.mjs",
       "reason": "Repository tooling test run directly with node --test."
     }
+  ],
+  "foreignLanguageRoots": [
+    {
+      "path": "packages/rpc-integration/test/process/peers/",
+      "reason": "Cross-language conformance peers and checkers (Python, Go, Rust, shell) required by the rpc foreign-peer interop matrix; they must be written in the peer's own language."
+    },
+    {
+      "path": "packages/rpc-integration/bench/native-pid-observer.py",
+      "reason": "Native process observer used by the IPC bench to sample real endpoint PIDs from outside the Node runtime."
+    },
+    {
+      "path": "packages/wasm/rust/",
+      "reason": "Rust source of the @migaia/wasm crate compiled to WebAssembly."
+    }
   ]
 }

@@ -184,25 +184,63 @@ export const inputDigests = (directories, root = repositoryRoot) => {
     .split('\0')
     .filter(Boolean)
   /** Deduplicated because `--cached --others` can list a path twice around index edges. */
-  const files = [...new Set(listed)].sort()
-  /** Per-package running hashes, keyed by absolute directory. */
-  const hashes = new Map(directories.map((directory) => [directory, createHash('sha256')]))
+  const files = new Set(listed)
+  /** Requested package directories, indexed once for owner lookup by path prefix. */
+  const owners = new Set(directories)
+  /**
+   * Per-package order-independent accumulator: file count and the sum (mod 2^256) of per-file
+   * digests. Git lists cached and untracked files in two runs, so a sum avoids sorting the list.
+   */
+  const sums = new Map(directories.map((directory) => [directory, { count: 0, sum: 0n }]))
   for (const file of files) {
     const absolute = join(root, file)
-    const owner = directories.find((directory) => absolute.startsWith(directory + sep))
+    /** Nearest requested package directory containing this file. */
+    const owner = ownerDirectory(owners, root, file)
     if (!owner) continue
     const path = relative(owner, absolute).split(sep).join('/')
     if (!isBuildInput(owner, path)) continue
     // A tracked file deleted in the worktree is simply absent from the input: its absence changes
     // the digest exactly as a content edit would.
     if (!existsSync(absolute)) continue
-    const hash = hashes.get(owner)
-    hash.update(path)
-    hash.update('\0')
-    hash.update(readFileSync(absolute))
-    hash.update('\0')
+    /** Digest of this file's package-relative path and content. */
+    const digest = createHash('sha256')
+      .update(path)
+      .update('\0')
+      .update(readFileSync(absolute))
+      .digest('hex')
+    const entry = sums.get(owner)
+    entry.count += 1
+    entry.sum = (entry.sum + BigInt('0x' + digest)) & DIGEST_MASK
   }
-  return new Map([...hashes].map(([directory, hash]) => [directory, hash.digest('hex')]))
+  return new Map(
+    [...sums].map(([directory, { count, sum }]) => [
+      directory,
+      createHash('sha256')
+        .update(`${count}:${sum.toString(16)}`)
+        .digest('hex')
+    ])
+  )
+}
+
+/** 256-bit mask for the order-independent per-package digest sum. */
+const DIGEST_MASK = (1n << 256n) - 1n
+
+/**
+ * Finds the requested package directory that owns a repository-relative file by testing each
+ * ancestor path once, so lookup costs the path depth rather than the package count.
+ *
+ * @param {ReadonlySet<string>} owners Absolute package directories
+ * @param {string} root Repository root
+ * @param {string} file Repository-relative, forward-slash path
+ * @returns {string | undefined} Owning absolute directory
+ */
+const ownerDirectory = (owners, root, file) => {
+  for (let index = file.lastIndexOf('/'); index > 0; index = file.lastIndexOf('/', index - 1)) {
+    /** Absolute candidate directory for this ancestor. */
+    const candidate = join(root, file.slice(0, index))
+    if (owners.has(candidate)) return candidate
+  }
+  return undefined
 }
 
 /**

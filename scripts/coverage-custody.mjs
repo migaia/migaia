@@ -265,13 +265,19 @@ export const assertMonotonic = (current, baseline, packageName) => {
 }
 
 /** Return repository-relative tracked and untracked TypeScript runtime files. */
-export const changedRuntimeFiles = (names, excludedPackages = []) =>
-  names
-    .filter((name) => /^packages\/[^/]+\/src\/.*\.(ts|tsx)$/.test(name))
-    .map((name) => name.replaceAll('\\', '/'))
-    .filter((name) => !excludedPackages.includes(name.split('/')[1]))
-    .filter((name, index, all) => all.indexOf(name) === index)
-    .sort()
+export const changedRuntimeFiles = (names, excludedPackages = []) => {
+  /** Excluded package names, indexed once. */
+  const excluded = new Set(excludedPackages)
+  /** Insertion-ordered unique paths; callers that need a stable order sort the small report. */
+  const unique = new Set()
+  for (const name of names) {
+    if (!/^packages\/[^/]+\/src\/.*\.(ts|tsx)$/.test(name)) continue
+    /** Forward-slash form of the path. */
+    const normalized = name.replaceAll('\\', '/')
+    if (!excluded.has(normalized.split('/')[1])) unique.add(normalized)
+  }
+  return [...unique]
+}
 
 /** Assert every changed runtime file has a V8 file record and branch map. */
 export const assertChangedFilesPresent = (changedFiles, detail) => {

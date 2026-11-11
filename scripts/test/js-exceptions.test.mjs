@@ -53,3 +53,45 @@ test('every registered exception is unique and states a reason', () => {
       `${entry.path} has no reason`
     )
 })
+
+/** Directory or file prefixes where non-TypeScript source in another language is required. */
+const foreignRoots = (registry.foreignLanguageRoots ?? []).map((entry) => entry.path)
+
+/**
+ * Lists tracked Python, Go, Rust and shell files.
+ *
+ * @returns {string[]} Repository-relative paths.
+ */
+function listTrackedForeign() {
+  return execFileSync('git', ['ls-files', '-z', '--', '*.py', '*.go', '*.rs', '*.sh'], {
+    cwd: root,
+    encoding: 'utf8'
+  })
+    .split('\0')
+    .filter(Boolean)
+}
+
+test('every tracked foreign-language file lives under a registered root', () => {
+  const unregistered = listTrackedForeign().filter(
+    (path) => !foreignRoots.some((prefix) => path.startsWith(prefix))
+  )
+  assert.deepEqual(
+    unregistered,
+    [],
+    'register these roots in scripts/fixtures/js-exceptions.json foreignLanguageRoots with a reason'
+  )
+})
+
+test('every registered foreign-language root still holds a tracked file and states a reason', () => {
+  const tracked = listTrackedForeign()
+  for (const entry of registry.foreignLanguageRoots ?? []) {
+    assert.ok(
+      tracked.some((path) => path.startsWith(entry.path)),
+      `${entry.path} is stale`
+    )
+    assert.ok(
+      typeof entry.reason === 'string' && entry.reason.trim().length > 0,
+      `${entry.path} has no reason`
+    )
+  }
+})

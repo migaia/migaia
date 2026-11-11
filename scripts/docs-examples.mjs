@@ -294,6 +294,8 @@ function linkPackages(scratch, root, packages) {
 function compileExamples(groups, examples, scratch, results) {
   /** Actual scratch modules retain provenance segments for earlier fragment context. */
   const sources = new Map()
+  /** Compilable TypeScript examples grouped by document section once, in input order. */
+  const eligible = indexSectionExamples(examples)
   for (const group of groups) {
     /** Owner-specific installed dependencies take precedence over the root toolchain fallback. */
     const ownerModules = join(repositoryRoot, 'packages', group.examples[0].package, 'node_modules')
@@ -316,14 +318,8 @@ function compileExamples(groups, examples, scratch, results) {
         continue
       }
       /** Explicit check/run modules stay independent even if their complete code has no imports. */
-      const earlier = examples.filter(
-        (previous) =>
-          previous.path === example.path &&
-          previous.sectionLine === example.sectionLine &&
-          previous.line < example.line &&
-          previous.language === 'ts' &&
-          previous.mode !== 'skip' &&
-          !previous.errors.length
+      const earlier = (eligible.get(sectionKey(example)) ?? []).filter(
+        (previous) => previous.line < example.line
       )
       const fragment =
         example.mode === 'fragment' ||
@@ -659,3 +655,35 @@ export async function runDocumentationExamples() {
 /** Imports expose the extraction helpers without executing or creating scratch artifacts. */
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url)
   process.exitCode = await runDocumentationExamples()
+
+/**
+ * Identity of the document section an example belongs to.
+ *
+ * @param {IExample} example Parsed example.
+ * @returns {string} Path and section line joined by a NUL separator.
+ */
+function sectionKey(example) {
+  return `${example.path}\0${example.sectionLine}`
+}
+
+/**
+ * Groups compilable TypeScript examples (not skipped, no parse errors) by section, keeping input
+ * order, so each example only scans its own section for earlier fragments.
+ *
+ * @param {IExample[]} examples Every parsed example.
+ * @returns {Map<string, IExample[]>} Section key to eligible examples.
+ */
+function indexSectionExamples(examples) {
+  /** Eligible examples per section key. */
+  const index = new Map()
+  for (const example of examples) {
+    if (example.language !== 'ts' || example.mode === 'skip' || example.errors.length) continue
+    /** Section bucket of this example. */
+    const key = sectionKey(example)
+    /** Examples already grouped under this section. */
+    const bucket = index.get(key)
+    if (bucket) bucket.push(example)
+    else index.set(key, [example])
+  }
+  return index
+}
