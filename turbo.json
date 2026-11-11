@@ -10,7 +10,7 @@
     },
     "@migaia/wasm#build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "src/wasm_provider*"]
+      "outputs": ["dist/**", "src/wasm_provider*", "src/.input-digest.json"]
     },
     "typecheck": {
       "dependsOn": ["^build"],
