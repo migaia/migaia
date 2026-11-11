@@ -54,6 +54,48 @@
     "@migaia/rpc-contract#typecheck:test": {
       "dependsOn": ["build", "@migaia/rpc-host#build", "@migaia/rpc-plugin-process#build"],
       "outputs": []
+    },
+    "@migaia/log-host#typecheck:test": {
+      "dependsOn": [
+        "build",
+        "@migaia/log-plugin-console#build",
+        "@migaia/log-plugin-durable#build",
+        "@migaia/log-plugin-file#build",
+        "@migaia/log-plugin-http#build",
+        "@migaia/log-plugin-process#build",
+        "@migaia/storage-host#build"
+      ],
+      "outputs": []
+    },
+    "@migaia/log-host#test": {
+      "dependsOn": [
+        "build",
+        "@migaia/log-plugin-console#build",
+        "@migaia/log-plugin-durable#build",
+        "@migaia/log-plugin-file#build",
+        "@migaia/log-plugin-http#build",
+        "@migaia/log-plugin-process#build",
+        "@migaia/storage-host#build"
+      ],
+      "cache": false
+    },
+    "@migaia/log-plugin-console#typecheck:test": {
+      "dependsOn": [
+        "build",
+        "@migaia/log-plugin-http#build",
+        "@migaia/log-plugin-process#build",
+        "@migaia/log-plugin-reasoning#build"
+      ],
+      "outputs": []
+    },
+    "@migaia/log-plugin-console#test": {
+      "dependsOn": [
+        "build",
+        "@migaia/log-plugin-http#build",
+        "@migaia/log-plugin-process#build",
+        "@migaia/log-plugin-reasoning#build"
+      ],
+      "cache": false
     }
   }
 }
