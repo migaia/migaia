@@ -21,7 +21,8 @@ const ARENA_EXHAUSTED: &str = "arena exhausted";
 const JSON_TO_MSGPACK_FAILED: &str = "json to msgpack failed";
 /// Prefix for MessagePack-to-JSON failures; the underlying error follows it.
 const MSGPACK_TO_JSON_FAILED: &str = "msgpack to json failed";
-
+/// Suffix for MessagePack input that decodes one value but leaves unread bytes behind.
+const TRAILING_BYTES: &str = "trailing bytes";
 
 /// Backing store for one allocation.
 ///
@@ -280,29 +281,29 @@ struct ArenaWriter<'a> {
 impl Write for ArenaWriter<'_> {
     /// Writes one serializer chunk, growing only the owned output block as needed.
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        let required = self.position.checked_add(bytes.len()).ok_or_else(|| {
-            io::Error::new(io::ErrorKind::WriteZero, OUTPUT_TOO_LARGE)
-        })?;
+        let required = self
+            .position
+            .checked_add(bytes.len())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, OUTPUT_TOO_LARGE))?;
         let block = self
             .arena
             .map
             .get_mut(&self.id)
             .expect("conversion output allocation");
-        let capacity = block.len().checked_mul(8).ok_or_else(|| {
-            io::Error::new(io::ErrorKind::WriteZero, OUTPUT_TOO_LARGE)
-        })?;
+        let capacity = block
+            .len()
+            .checked_mul(8)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, OUTPUT_TOO_LARGE))?;
         if required > capacity {
-            let doubled = capacity.max(8).checked_mul(2).ok_or_else(|| {
-                io::Error::new(io::ErrorKind::WriteZero, OUTPUT_TOO_LARGE)
-            })?;
+            let doubled = capacity
+                .max(8)
+                .checked_mul(2)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::WriteZero, OUTPUT_TOO_LARGE))?;
             let words = doubled.max(required).div_ceil(8);
             // Fallible growth: an aborting `resize` would trap inside the arena
             // borrow, so OOM fails this conversion through `io::Error` instead.
             block.try_reserve_exact(words - block.len()).map_err(|_| {
-                io::Error::new(
-                    io::ErrorKind::OutOfMemory,
-                    OUTPUT_ALLOCATION_FAILED,
-                )
+                io::Error::new(io::ErrorKind::OutOfMemory, OUTPUT_ALLOCATION_FAILED)
             })?;
             block.resize(words, 0);
         }
@@ -415,7 +416,7 @@ fn convert_msgpack_to_json(arena: &mut Arena, input: &[u8]) -> ConversionResult 
         };
         match result {
             Ok(()) if cursor.position() == input.len() as u64 => Ok(writer.position),
-            Ok(()) => Err(format!("{MSGPACK_TO_JSON_FAILED}: trailing bytes")),
+            Ok(()) => Err(format!("{MSGPACK_TO_JSON_FAILED}: {TRAILING_BYTES}")),
             Err(error) => Err(format!("{MSGPACK_TO_JSON_FAILED}: {error}")),
         }
     };

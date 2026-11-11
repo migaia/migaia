@@ -237,15 +237,6 @@ export function defineContract<
       MicroHubErrorText.invalidVersion(name)
     )
   }
-  /** Any value is a valid state initial value; markers other than `keyed` are rejected. */
-  const acceptState = (member: unknown): boolean =>
-    !(
-      isMarker(member, ContractMarker.event) ||
-      isMarker(member, ContractMarker.request) ||
-      isMarker(member, ContractMarker.resource)
-    )
-  /** Functions are the only valid computed and command members. */
-  const acceptFunction = (member: unknown): boolean => typeof member === 'function'
   /** Writers are copied into a frozen array; each entry must be a valid app name. */
   const writers = Object.freeze([...(spec.writers ?? [])])
   for (const writer of writers) assertName(NameKind.app, writer)
@@ -276,4 +267,18 @@ export function defineContract<
       resources: TResources
     }
   >
+}
+
+/** Any value is a valid state initial value; markers other than `keyed` are rejected. */
+function acceptState(member: unknown): boolean {
+  return !(
+    isMarker(member, ContractMarker.event) ||
+    isMarker(member, ContractMarker.request) ||
+    isMarker(member, ContractMarker.resource)
+  )
+}
+
+/** Functions are the only valid computed and command members. */
+function acceptFunction(member: unknown): boolean {
+  return typeof member === 'function'
 }

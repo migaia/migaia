@@ -92,7 +92,8 @@ class DurableRuntime {
   readonly report = (error: unknown): void =>
     this.core.reportFailure({ source: LogFailureSource.sink, error })
   /** Observer failures stay on the host's existing hook failure channel. */
-  readonly reportHook = (error: unknown): void => this.core.reportFailure({ source: 'hook', error })
+  readonly reportHook = (error: unknown): void =>
+    this.core.reportFailure({ source: LogFailureSource.hook, error })
   /** Native listener identity is stable for registration and revocation. */
   readonly stop = (): void => this.#stop()
   /** Every retained nested handle consults this registration, never its replacement. */
