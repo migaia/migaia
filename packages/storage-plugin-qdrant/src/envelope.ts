@@ -29,27 +29,37 @@ export function projectedScalar(value: string | number | boolean): string | numb
 /** Every own path retains its presence and scalar domain, including null and containers. */
 function project(payload: ICodecValue | undefined): Record<string, unknown> {
   const fields: Record<string, unknown> = Object.create(null)
-  const visit = (value: ICodecValue, path: readonly string[]) => {
-    const name = path.length ? projectedPath(path).slice(QdrantText.fields.length + 1) : undefined,
-      kind = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value
-    if (name !== undefined)
-      fields[name] = {
-        kind,
-        ...(typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
-          ? { value: projectedScalar(value) }
-          : Array.isArray(value)
-            ? {
-                value: value
-                  .filter((item) => item !== null && typeof item !== 'object')
-                  .map((item) => projectedScalar(item as string | number | boolean))
-              }
-            : {})
-      }
-    if (value !== null && typeof value === 'object')
-      for (const key of Object.keys(value)) visit(Reflect.get(value, key), [...path, key])
-  }
-  if (payload !== undefined) visit(payload, [])
+  if (payload !== undefined) projectNode(fields, payload, [])
   return fields
+}
+/**
+ * Records one node's kind (and scalar or scalar-array value) under its projected name, then
+ * recurses into its own keys. `path` is one shared stack, pushed and popped per child.
+ */
+function projectNode(fields: Record<string, unknown>, value: ICodecValue, path: string[]): void {
+  /** Projected field name; the payload root itself has none. */
+  const name = path.length ? projectedPath(path).slice(QdrantText.fields.length + 1) : undefined
+  /** Codec kind of this node. */
+  const kind = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value
+  if (name !== undefined)
+    fields[name] = {
+      kind,
+      ...(typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+        ? { value: projectedScalar(value) }
+        : Array.isArray(value)
+          ? {
+              value: value
+                .filter((item) => item !== null && typeof item !== 'object')
+                .map((item) => projectedScalar(item as string | number | boolean))
+            }
+          : {})
+    }
+  if (value !== null && typeof value === 'object')
+    for (const key of Object.keys(value)) {
+      path.push(key)
+      projectNode(fields, Reflect.get(value, key), path)
+      path.pop()
+    }
 }
 /**
  * Reject caller attempts to replace native organization or deadline fields before pipeline

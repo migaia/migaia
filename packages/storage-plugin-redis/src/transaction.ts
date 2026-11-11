@@ -70,29 +70,37 @@ export type IRedisJournalHash = {
 /** Binary protocol text is UTF-8; application strings remain with the original JSON codec. */
 const utf8 = new TextEncoder(),
   text = new TextDecoder('utf-8', { fatal: true })
+/** Adds one decoded HASH field; a non-text field, duplicate field or non-byte value fails decoding. */
+function addHashField(
+  result: Map<string, Uint8Array>,
+  reply: unknown,
+  key: unknown,
+  value: unknown
+): void {
+  /** Field name decoded as strict UTF-8. */
+  let field: string | undefined
+  try {
+    field = typeof key === 'string' ? key : isUint8Array(key) ? text.decode(key) : undefined
+  } catch (cause) {
+    throw redisError(RedisErrorCode.decodeFailed, cause)
+  }
+  if (
+    field === undefined ||
+    result.has(field) ||
+    !(typeof value === 'string' || isUint8Array(value))
+  )
+    throw redisError(RedisErrorCode.decodeFailed, reply)
+  result.set(field, typeof value === 'string' ? utf8.encode(value) : value.slice())
+}
 /** Native HASH fields are fixed protocol strings, with arbitrary bytes preserved as values. */
 export function readRedisHash(reply: unknown): ReadonlyMap<string, Uint8Array> {
   const result = new Map<string, Uint8Array>()
-  const add = (key: unknown, value: unknown): void => {
-    let field: string | undefined
-    try {
-      field = typeof key === 'string' ? key : isUint8Array(key) ? text.decode(key) : undefined
-    } catch (cause) {
-      throw redisError(RedisErrorCode.decodeFailed, cause)
-    }
-    if (
-      field === undefined ||
-      result.has(field) ||
-      !(typeof value === 'string' || isUint8Array(value))
-    )
-      throw redisError(RedisErrorCode.decodeFailed, reply)
-    result.set(field, typeof value === 'string' ? utf8.encode(value) : value.slice())
-  }
   if (Array.isArray(reply)) {
     if (reply.length % 2 !== 0) throw redisError(RedisErrorCode.decodeFailed, reply)
-    for (let index = 0; index < reply.length; index += 2) add(reply[index], reply[index + 1])
+    for (let index = 0; index < reply.length; index += 2)
+      addHashField(result, reply, reply[index], reply[index + 1])
   } else if (reply && typeof reply === 'object') {
-    for (const [key, value] of Object.entries(reply)) add(key, value)
+    for (const [key, value] of Object.entries(reply)) addHashField(result, reply, key, value)
   } else throw redisError(RedisErrorCode.decodeFailed, reply)
   return result
 }
@@ -358,17 +366,15 @@ export class RedisDraft {
     return members
   }
   #changeEntry(entry: IRedisDraftEntry, value: string | undefined, expiry = entry.expiry): void {
-    const deadline = (value: IRedisDraftEntry['expiry']) =>
-      value === 'keep' ? entry.originalExpiry : value === 'persist' ? undefined : value
     this.journalStages?.push(
       captureRedisJournalStage({
         target: redisJournalTarget(entry.channel, entry.key),
         revisionField: this.layout.revision(entry.channel, entry.key),
         channel: entry.channel,
         before: entry.value,
-        beforeExpiry: deadline(entry.expiry),
+        beforeExpiry: resolvedExpiry(entry, entry.expiry),
         after: value,
-        afterExpiry: deadline(expiry)
+        afterExpiry: resolvedExpiry(entry, expiry)
       })
     )
     entry.value = value
@@ -759,4 +765,8 @@ function redisLexRange(lower: string, upper: string): IOrderedRecordRange {
       ? {}
       : { upper: redisMemberBytes(upper.slice(1)), upperOpen: upper[0] === '(' })
   }
+}
+/** Absolute expiry an entry has under `value`: keep → original, persist → none, else the value. */
+function resolvedExpiry(entry: IRedisDraftEntry, value: IRedisDraftEntry['expiry']) {
+  return value === 'keep' ? entry.originalExpiry : value === 'persist' ? undefined : value
 }

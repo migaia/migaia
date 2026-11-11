@@ -90,7 +90,7 @@ export const assertWebStorageOptions: (
 ) => asserts options is IWebStorageOptions = (options) => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
-      cause: new TypeError('web storage options must be an object')
+      cause: new TypeError(StorageErrorText.webStorageOptionsInvalid)
     })
 }
 
@@ -103,7 +103,7 @@ const assertWebStorageInjection: (
   if (typeof storage !== 'object' || storage === null || Array.isArray(storage))
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend,
-      cause: new TypeError('web storage injection must implement the Storage surface')
+      cause: new TypeError(StorageErrorText.webStorageInjectionInvalid)
     })
 
   const { getItem, setItem, removeItem, key, clear, length } = storage
@@ -252,7 +252,7 @@ function configureWebStorageNamespace(webStorageContext: IWebStorageContext): vo
   if (typeof webStorageContext.namespace !== 'string' || webStorageContext.namespace.length === 0)
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: webStorageContext.backend,
-      cause: new TypeError('namespace must be non-empty and namespaceCodec must be callable')
+      cause: new TypeError(StorageErrorText.namespaceOptionsInvalid)
     })
 
   if (webStorageContext.bindOrganizations)
@@ -517,7 +517,7 @@ function createWebStorageSync(webStorageContext: IWebStorageContext): IWebStorag
         throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
           backend: webStorageContext.backend,
           key,
-          cause: new TypeError('storage value must be a string')
+          cause: new TypeError(StorageErrorText.storageValueInvalid)
         })
       try {
         webStorageContext.live.setItem(

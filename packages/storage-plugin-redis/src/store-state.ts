@@ -275,23 +275,30 @@ export function redisOperate<I, R>(
   keys?: () => readonly ILockKey[],
   internal?: true
 ): Promise<R> {
-  const execute = () =>
-    organization.ports.execution.run<I, R>(
-      { operation: name, input, ctx, scope, internal, keys },
-      (actual) =>
-        observeStorageBatch(
-          scope
-            ? redisOperations(organization).forTransaction(scope)
-            : redisOperations(organization),
-          organization.environment.core.featureExpose.getScheduler(),
-          name,
-          count,
-          () => run(actual)
-        )
+  return organization.ports.execution
+    .run<I, R>({ operation: name, input, ctx, scope, internal, keys }, (actual) =>
+      observeRedisOperation(organization, name, scope, count, run, actual)
     )
-  return execute().catch((error) => {
-    throw redisExtensionFailure(organization.environment, error, name)
-  })
+    .catch((error) => {
+      throw redisExtensionFailure(organization.environment, error, name)
+    })
+}
+/** Observes one pipeline-admitted operation as a batch of `count` items and runs it once. */
+function observeRedisOperation<I, R>(
+  organization: IRedisOrganizationContext,
+  name: string,
+  scope: object | undefined,
+  count: number | undefined,
+  run: (input: I) => Promise<R>,
+  actual: I
+): Promise<R> {
+  return observeStorageBatch(
+    scope ? redisOperations(organization).forTransaction(scope) : redisOperations(organization),
+    organization.environment.core.featureExpose.getScheduler(),
+    name,
+    count,
+    () => run(actual)
+  )
 }
 /** A readonly endpoint drains the genuine connection before its original controller lease ends. */
 export function redisRead<I, R>(

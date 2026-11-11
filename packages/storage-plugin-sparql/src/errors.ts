@@ -18,21 +18,6 @@ export function sparqlError(code: ISparqlErrorCode, cause?: unknown): Error {
           : code === SparqlErrorCode.transactionFailed
             ? SparqlErrorText.transactionFailed
             : SparqlErrorText.unavailable
-  /** A conflicting native identity remains reachable as the cause of the coded wrapper. */
-  const wrap = (): Error => {
-    /** Native error classes are preserved because callers distinguish their failure families. */
-    const error =
-      cause instanceof TypeError
-        ? new TypeError(text, { cause })
-        : cause instanceof RangeError
-          ? new RangeError(text, { cause })
-          : typeof DOMException !== 'undefined' && cause instanceof DOMException
-            ? new DOMException(text, cause.name)
-            : new Error(text, { cause })
-    if (typeof DOMException !== 'undefined' && error instanceof DOMException)
-      Object.defineProperty(error, 'cause', { value: cause })
-    return attachErrorIdentity(error, { source: STORAGE_SPARQL_ERROR_SOURCE, code })
-  }
   if (
     cause instanceof TypeError ||
     cause instanceof RangeError ||
@@ -41,9 +26,12 @@ export function sparqlError(code: ISparqlErrorCode, cause?: unknown): Error {
     return attachErrorIdentity<Error>(
       cause,
       { source: STORAGE_SPARQL_ERROR_SOURCE, code },
-      { onConflict: wrap, onFailure: wrap }
+      {
+        onConflict: () => replaceSparqlCause(code, text, cause),
+        onFailure: () => replaceSparqlCause(code, text, cause)
+      }
     )
-  return wrap()
+  return replaceSparqlCause(code, text, cause)
 }
 /** The original family boundary recognizes already-normalized native protocol errors. */
 function isSparqlError(error: unknown): error is Error {
@@ -72,4 +60,24 @@ export function invalidArgument(cause?: unknown): StorageContractError {
     { backend: SparqlText.backend, cause },
     SparqlErrorText.argument
   )
+}
+
+/** A conflicting native identity remains reachable as the cause of the coded wrapper. */
+function replaceSparqlCause(
+  code: Parameters<typeof attachErrorIdentity>[1]['code'],
+  text: string,
+  cause: unknown
+): Error {
+  /** Native error classes are preserved because callers distinguish their failure families. */
+  const error =
+    cause instanceof TypeError
+      ? new TypeError(text, { cause })
+      : cause instanceof RangeError
+        ? new RangeError(text, { cause })
+        : typeof DOMException !== 'undefined' && cause instanceof DOMException
+          ? new DOMException(text, cause.name)
+          : new Error(text, { cause })
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException)
+    Object.defineProperty(error, 'cause', { value: cause })
+  return attachErrorIdentity(error, { source: STORAGE_SPARQL_ERROR_SOURCE, code })
 }

@@ -24,35 +24,11 @@ import type { IObjectErrorCode } from '@migaia/storage-contract/error-code'
 import { invalidArgument, normalizeObjectError, objectError } from '../errors.ts'
 import type { createObjectSender } from './send.ts'
 /**
- * Multipart retains at most concurrency outstanding part buffers and one assembling buffer, plus
- * the current input chunk. The first failure stops admission, drains requests, then aborts once.
+ * One multipart transfer owns its buffers and native upload lifetime. It retains at most
+ * `concurrency` outstanding part buffers and one assembling buffer, plus the current input chunk;
+ * the first failure stops admission, drains requests, then aborts once.
  */
-export async function uploadMultipart(
-  send: ReturnType<typeof createObjectSender>,
-  bucket: string,
-  key: string,
-  body: Parameters<IBlobApi['put']>[1],
-  options: NonNullable<Parameters<IBlobApi['put']>[2]>,
-  partBytes: number,
-  concurrency: number,
-  report: (error: unknown) => void
-): Promise<string> {
-  /** One upload owns bounded buffers, admission and cleanup state. */
-  const upload = new ObjectMultipartUpload(
-    send,
-    bucket,
-    key,
-    body,
-    options,
-    partBytes,
-    concurrency,
-    report
-  )
-  return upload.run()
-}
-
-/** One multipart transfer owns its buffers and native upload lifetime. */
-class ObjectMultipartUpload {
+export class ObjectMultipartUpload {
   /** Native command execution preserves original retries and error classification. */
   readonly #send: ReturnType<typeof createObjectSender>
   /** The installation selects one bucket for every issued upload command. */

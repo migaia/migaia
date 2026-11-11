@@ -20,7 +20,8 @@ import {
   nativeArguments,
   execEntries,
   requireExecArray,
-  subscriptionResource
+  subscriptionResource,
+  deliverRedisMessage
 } from '../native.ts'
 
 /** The real SDK owns native leases; this driver owns only borrowed root metadata and reporting. */
@@ -134,22 +135,17 @@ class NodeRedisDriver<
       stopped.resolve()
       await pending
     })
-    const receive = (message: string): void => {
-      if (state.isClosing()) return
-      try {
-        const result = listener(message) as unknown
-        if (result !== undefined) void Promise.resolve(result).catch(state.report)
-      } catch (error) {
-        state.report(error)
-      }
+    /** Listener record whose `receive` identity is shared by subscribe and unsubscribe. */
+    const subscription = {
+      receive: (message: string): void => deliverRedisMessage(state, listener, message)
     }
     pending = this.#root.execute(async (client) => {
-      await client.subscribe(channel, receive)
+      await client.subscribe(channel, subscription.receive)
       ready.resolve()
       try {
         await stopped.promise
       } finally {
-        await client.unsubscribe(channel, receive)
+        await client.unsubscribe(channel, subscription.receive)
       }
     })
     // Setup observes early rejection; the same original pool Promise remains awaited by cleanup.

@@ -35,8 +35,11 @@ type ICommand =
   | AbortMultipartUploadCommand
 /** Canonical SDK middleware identities belong to the supported peer's actual stack protocol. */
 const middlewareNames = {
+  /** AWS SDK retry middleware; the dispatch marker is placed relative to it. */
   retry: 'retryMiddleware',
+  /** AWS SDK region-redirect middleware, also an anchor for the dispatch marker. */
   redirect: 'regionRedirectMiddleware',
+  /** This package's marker that records a commit command reached the network. */
   dispatched: 'objectCommitDispatched'
 } as const
 /**

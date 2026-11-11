@@ -147,6 +147,8 @@ export class StorageHostJournal {
     const existing = this.journalOrgs?.get(orgId)
     if (existing !== undefined) return existing.options
     const source = this.journal!
+    /** Candidates grouped by id once, so each store resolution is a Map lookup, not a scan. */
+    const candidatesById = indexCandidatesById(candidates)
     const options = Promise.resolve().then(async () => {
       this.#owner.assertOpen()
       if (typeof source !== 'function') {
@@ -160,9 +162,9 @@ export class StorageHostJournal {
         orgId,
         storageLogStore: (id: string, options: { readonly prefix: string }) => {
           this.#owner.assertOpen()
-          const candidate = candidates?.find(
-            (context) => context.id === id && context.getKind() !== undefined
-          )
+          const candidate = candidatesById
+            .get(id)
+            ?.find((context) => context.getKind() !== undefined)
           const published = this.#owner.registry.get(id)
           const context =
             candidate ??
@@ -332,4 +334,22 @@ export class StorageHostJournal {
       )
     return observe(this.requireJournalRuntime())
   }
+}
+
+/**
+ * Groups prepared candidates by id in input order. A lookup then visits only same-id candidates,
+ * still picking the first whose kind is known at lookup time.
+ */
+function indexCandidatesById(
+  candidates: readonly IStorageNativeRegistrationContext[] | undefined
+): Map<string, IStorageNativeRegistrationContext[]> {
+  /** Same-id candidates in input order. */
+  const index = new Map<string, IStorageNativeRegistrationContext[]>()
+  for (const context of candidates ?? []) {
+    /** Bucket for this candidate's id. */
+    const bucket = index.get(context.id)
+    if (bucket) bucket.push(context)
+    else index.set(context.id, [context])
+  }
+  return index
 }

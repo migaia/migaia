@@ -468,44 +468,87 @@ function runSparqlNativeGraph<T>(
   ctx: IOperationContext | undefined,
   write: boolean,
   method: 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE',
-  invoke: (
-    endpoint: ISparqlEndpoint,
-    signal: ISparqlAbortSignal | undefined,
-    map: (target: IRdfGraphTarget) => IRdfGraphTarget
-  ) => Promise<T>
+  invoke: ISparqlGraphInvoke<T>
 ): Promise<T> {
+  /** One accepted graph request and its organization-scoped graph mapper. */
+  const run = new SparqlNativeGraphRun(organizationContext, write, method, invoke)
   return operate(
     organizationContext,
     operation,
     undefined,
     ctx,
-    async (_input, context) => ({
-      status: 'committed',
-      value: await observeNative(organizationContext, 'graph', method, () => {
-        /** The original graph prefix mapper is passed only to this accepted native request. */
-        const map = (target: IRdfGraphTarget): IRdfGraphTarget => {
-          /**
-           * This accepted input is retained across native, pipeline or rendering awaits; caller
-           * mutation must not change that accepted operation.
-           */
-          const captured = snapshotGraphTarget(target)
-          return {
-            graph: prefixStorageOrgGraph(
-              organizationContext.orgId,
-              captured.default ? term.defaultGraph : captured.graph
-            )
-          }
-        }
-        if (write)
-          return writingValue(organizationContext, () =>
-            invoke(organizationContext.backendContext.endpoint, context.signal, map)
-          )
-        return reading(organizationContext, context, (signal) =>
-          invoke(organizationContext.backendContext.endpoint, signal, map)
-        )
-      })
-    }),
+    (_input, context) => run.commit(context),
     write,
     false
   )
+}
+
+/** Native graph request callback receiving the endpoint, signal and graph mapper. */
+type ISparqlGraphInvoke<T> = (
+  endpoint: ISparqlEndpoint,
+  signal: ISparqlAbortSignal | undefined,
+  map: (target: IRdfGraphTarget) => IRdfGraphTarget
+) => Promise<T>
+
+/** One graph operation after admission: observes the native call and selects write or read path. */
+class SparqlNativeGraphRun<T> {
+  /** Organization whose endpoint and graph prefix the request uses. */
+  readonly #organization: ISparqlOrganizationContext
+  /** Whether the request writes; writes take the writing-value path. */
+  readonly #write: boolean
+  /** HTTP method recorded by native observation. */
+  readonly #method: 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE'
+  /** Native graph request. */
+  readonly #invoke: ISparqlGraphInvoke<T>
+
+  /** Captures one accepted graph request. */
+  constructor(
+    organization: ISparqlOrganizationContext,
+    write: boolean,
+    method: 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE',
+    invoke: ISparqlGraphInvoke<T>
+  ) {
+    this.#organization = organization
+    this.#write = write
+    this.#method = method
+    this.#invoke = invoke
+  }
+
+  /**
+   * The original graph prefix mapper, passed only to this accepted native request. Each target is
+   * snapshotted first: the accepted input is retained across native, pipeline or rendering awaits.
+   */
+  readonly map = (target: IRdfGraphTarget): IRdfGraphTarget => {
+    /** Snapshot of the caller target; later caller mutation cannot change it. */
+    const captured = snapshotGraphTarget(target)
+    return {
+      graph: prefixStorageOrgGraph(
+        this.#organization.orgId,
+        captured.default ? term.defaultGraph : captured.graph
+      )
+    }
+  }
+
+  /** Commits the request under native observation. */
+  async commit(
+    context: Parameters<Parameters<typeof operate>[4]>[1]
+  ): Promise<{ status: 'committed'; value: T }> {
+    return {
+      status: 'committed',
+      value: await observeNative(this.#organization, 'graph', this.#method, () =>
+        this.#dispatch(context)
+      )
+    }
+  }
+
+  /** Writes go through the writing-value path; reads through the reading path. */
+  #dispatch(context: Parameters<Parameters<typeof operate>[4]>[1]): Promise<T> {
+    if (this.#write) return writingValue(this.#organization, () => this.#call(context.signal))
+    return reading(this.#organization, context, (signal) => this.#call(signal))
+  }
+
+  /** One native request against the organization's endpoint. */
+  #call(signal: ISparqlAbortSignal | undefined): Promise<T> {
+    return this.#invoke(this.#organization.backendContext.endpoint, signal, this.map)
+  }
 }

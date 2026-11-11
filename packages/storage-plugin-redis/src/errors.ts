@@ -14,6 +14,25 @@ export function isRedisError(value: unknown): value is IRedisFailure {
     Object.values(RedisErrorCode).includes(Reflect.get(value, 'code'))
   )
 }
+/** Same-type coded replacement for a cause that cannot take the Redis identity in place. */
+function replaceRedisCause(code: IRedisErrorCode, message: string, cause: unknown): IRedisFailure {
+  /** Replacement keeping the cause's native class where possible. */
+  const error =
+    cause instanceof TypeError
+      ? new TypeError(message, { cause })
+      : cause instanceof RangeError
+        ? new RangeError(message, { cause })
+        : cause instanceof SyntaxError
+          ? new SyntaxError(message, { cause })
+          : cause instanceof AggregateError
+            ? new AggregateError(cause.errors, message, { cause })
+            : typeof DOMException !== 'undefined' && cause instanceof DOMException
+              ? new DOMException(message, cause.name)
+              : new Error(message, { cause })
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException)
+    Object.defineProperty(error, 'cause', { value: cause })
+  return attachErrorIdentity(error, { source: STORAGE_REDIS_ERROR_SOURCE, code }) as IRedisFailure
+}
 /** Native classes remain intact when identity can be attached; immutable failures stay on cause. */
 export function redisError(code: IRedisErrorCode, cause?: unknown): IRedisFailure {
   const message =
@@ -22,30 +41,16 @@ export function redisError(code: IRedisErrorCode, cause?: unknown): IRedisFailur
       : code === RedisErrorCode.transactionFailed
         ? RedisText.transactionFailed
         : RedisText.decodeFailed
-  const fallback = (): IRedisFailure => {
-    const error =
-      cause instanceof TypeError
-        ? new TypeError(message, { cause })
-        : cause instanceof RangeError
-          ? new RangeError(message, { cause })
-          : cause instanceof SyntaxError
-            ? new SyntaxError(message, { cause })
-            : cause instanceof AggregateError
-              ? new AggregateError(cause.errors, message, { cause })
-              : typeof DOMException !== 'undefined' && cause instanceof DOMException
-                ? new DOMException(message, cause.name)
-                : new Error(message, { cause })
-    if (typeof DOMException !== 'undefined' && error instanceof DOMException)
-      Object.defineProperty(error, 'cause', { value: cause })
-    return attachErrorIdentity(error, { source: STORAGE_REDIS_ERROR_SOURCE, code }) as IRedisFailure
-  }
   return cause instanceof Error && cause.stack
     ? (attachErrorIdentity(
         cause,
         { source: STORAGE_REDIS_ERROR_SOURCE, code },
-        { onConflict: fallback, onFailure: fallback }
+        {
+          onConflict: () => replaceRedisCause(code, message, cause),
+          onFailure: () => replaceRedisCause(code, message, cause)
+        }
       ) as IRedisFailure)
-    : fallback()
+    : replaceRedisCause(code, message, cause)
 }
 /** Existing contract/host failures are never relabelled as native Redis failures. */
 export function normalizeRedisError(error: unknown): IRedisFailure {

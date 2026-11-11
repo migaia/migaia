@@ -231,23 +231,8 @@ function createSparqlScope(context: ISparqlAttemptContext): ISparqlTransactionSc
       )
   })
   scopeContext.tag = Object.assign(
-    (strings: TemplateStringsArray, ...values: readonly ISparqlInput[]) => {
-      try {
-        assertTransactionOwner(scopeContext.context.ports.base, scopeContext.scope)
-        /** The original tag owns fragment admission and update execution for this accepted scope. */
-        const query = scopeContext.native(strings, ...values)
-        return {
-          update: (ctx?: never) =>
-            ctx === undefined
-              ? query.update()
-              : runTransactionOperation(scopeContext.scope, () => {
-                  throw invalidArgument()
-                })
-        }
-      } catch (error) {
-        return failSparqlAttempt(scopeContext.context, scopeContext.scope, error)
-      }
-    },
+    (strings: TemplateStringsArray, ...values: readonly ISparqlInput[]) =>
+      runSparqlTxTag(scopeContext, strings, values),
     {
       var: scopeContext.native.var,
       join: scopeContext.native.join,
@@ -350,4 +335,33 @@ function createSparqlDraftAccess(context: ISparqlAttemptContext): ISparqlDraftAc
       for (const quad of captured) context.draft.set(quadIdentity(quad), { quad, add })
     }
   }
+}
+
+/**
+ * Transaction-scope SPARQL tag: checks the scope still owns the transaction, then admits the
+ * fragment through the original native tag. A failure marks the attempt failed.
+ */
+function runSparqlTxTag(
+  scopeContext: ISparqlScopeContext,
+  strings: TemplateStringsArray,
+  values: readonly ISparqlInput[]
+) {
+  try {
+    assertTransactionOwner(scopeContext.context.ports.base, scopeContext.scope)
+    /** The original tag owns fragment admission and update execution for this accepted scope. */
+    const query = scopeContext.native(strings, ...values)
+    return {
+      update: (ctx?: never) =>
+        ctx === undefined
+          ? query.update()
+          : runTransactionOperation(scopeContext.scope, rejectTxUpdateContext)
+    }
+  } catch (error) {
+    return failSparqlAttempt(scopeContext.context, scopeContext.scope, error)
+  }
+}
+
+/** A transaction-scope update takes no per-call context; passing one is an invalid argument. */
+function rejectTxUpdateContext(): never {
+  throw invalidArgument()
 }

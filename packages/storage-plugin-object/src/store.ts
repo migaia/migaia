@@ -52,7 +52,11 @@ type IObjectFeatureObserver = <T>(
   ctx: IOperationContext | undefined,
   invoke: () => Promise<T>
 ) => Promise<T>
-/** A Feature already runs inside the host pipeline and borrows only this native observation path. */
+/**
+ * A Feature already runs inside the host pipeline and borrows only this native observation path.
+ * This is the only access to the symbol-keyed observation port, so features never see the store's
+ * private members; it is a boundary, not a forwarding layer.
+ */
 export function observeObjectFeature<T>(
   store: IObjectStore,
   operation: string,
@@ -380,35 +384,14 @@ class ObjectOrganization {
     ctx: IOperationContext | undefined,
     invoke: (input: I, ctx: IOperationContext) => Promise<T>
   ): Promise<T> =>
-    this.#admitted(ctx, (context) => {
-      let captured = input
-      return observeStorageBatch(
-        this.#ports.stageBindings.operationStages(this.#store as IStorageStore<never>),
-        systemScheduler,
+    this.#admitted(ctx, (context) =>
+      new ObjectOperationRun(
+        { ports: this.#ports, base: this.#base, store: this.#store },
         operation,
-        operation === ObjectNames.list || operation === ObjectNames.removeByPrefix ? undefined : 1,
-        () =>
-          runWithConcurrency(
-            {
-              store: this.#base,
-              options: context,
-              execute: (actual, loop) =>
-                this.#ports.execution.run({ operation, input, ctx: actual }, (next) => {
-                  captured = next
-                  return loop()
-                })
-            },
-            {
-              attempt: async (attempt) => ({
-                status: 'committed',
-                value: await invoke(captured, attempt).catch((error: unknown) => {
-                  throw normalizeObjectError(error)
-                })
-              })
-            }
-          )
-      )
-    })
+        input,
+        invoke
+      ).start(context)
+    )
 
   /** Decode a bound cursor before native listing, never forwarding opaque caller text to S3. */
   #afterKey = (after: string | undefined, prefix: string): string | undefined => {
@@ -563,4 +546,94 @@ class ObjectOrganization {
       }
     })
   }
+}
+
+/** Host ports and store identities one operation run needs. */
+type IObjectOperationPorts = Readonly<{
+  ports: ReturnType<IStoragePluginCore['getOrgContext']>
+  base: IStorageBase & { readonly backend: 'object' }
+  store: IObjectStore
+}>
+
+/**
+ * One public object operation: observes the batch, runs the host pipeline once and commits through
+ * the concurrency runner. Pipeline stages may replace the input before the native attempt.
+ */
+class ObjectOperationRun<I, T> {
+  /** Host ports and store identities. */
+  readonly #owner: IObjectOperationPorts
+  /** Public operation name used for observation and the pipeline. */
+  readonly #operation: string
+  /** Original caller input, passed to the pipeline. */
+  readonly #input: I
+  /** Native attempt over the (possibly replaced) input. */
+  readonly #invoke: (input: I, ctx: IOperationContext) => Promise<T>
+  /** Input as last replaced by a pipeline stage; starts as the caller input. */
+  #captured: I
+
+  /** Captures one operation's inputs. */
+  constructor(
+    owner: IObjectOperationPorts,
+    operation: string,
+    input: I,
+    invoke: (input: I, ctx: IOperationContext) => Promise<T>
+  ) {
+    this.#owner = owner
+    this.#operation = operation
+    this.#input = input
+    this.#invoke = invoke
+    this.#captured = input
+  }
+
+  /** Observes the batch (one item except list/removeByPrefix) around the concurrency run. */
+  start(context: IOperationContext): Promise<Awaited<T>> {
+    return observeStorageBatch(
+      this.#owner.ports.stageBindings.operationStages(this.#owner.store as IStorageStore<never>),
+      systemScheduler,
+      this.#operation,
+      this.#operation === ObjectNames.list || this.#operation === ObjectNames.removeByPrefix
+        ? undefined
+        : 1,
+      () => this.#commit(context)
+    )
+  }
+
+  /** Runs the host pipeline once, then the native attempt under the concurrency policy. */
+  #commit(context: IOperationContext): Promise<Awaited<T>> {
+    return runWithConcurrency(
+      {
+        store: this.#owner.base,
+        options: context,
+        execute: (actual, loop) => this.#execute(actual, loop)
+      },
+      { attempt: (attempt) => this.#attempt(attempt) }
+    )
+  }
+
+  /** Host pipeline over the original input; a stage may replace the input before `loop`. */
+  #execute(actual: IOperationContext, loop: () => Promise<Awaited<T>>): Promise<Awaited<T>> {
+    return this.#owner.ports.execution.run(
+      { operation: this.#operation, input: this.#input, ctx: actual },
+      (next: I) => this.#replace(next, loop)
+    )
+  }
+
+  /** Records the stage's replacement input and continues the concurrency loop. */
+  #replace(next: I, loop: () => Promise<Awaited<T>>): Promise<Awaited<T>> {
+    this.#captured = next
+    return loop()
+  }
+
+  /** One native attempt; native failures are normalized to object errors. */
+  async #attempt(attempt: IOperationContext): Promise<{ status: 'committed'; value: Awaited<T> }> {
+    return {
+      status: 'committed',
+      value: await this.#invoke(this.#captured, attempt).catch(rethrowObjectError)
+    }
+  }
+}
+
+/** Rejection handler for a native attempt: rethrows the failure normalized to an object error. */
+function rethrowObjectError(error: unknown): never {
+  throw normalizeObjectError(error)
 }

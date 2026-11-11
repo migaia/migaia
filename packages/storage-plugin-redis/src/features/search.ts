@@ -79,6 +79,24 @@ export type IRedisVectorFeatureOutput = IStorageFeatureOutput<
   {},
   { readonly store: {}; readonly transaction: {} }
 >
+/** Snapshots upsert points and precomputes their vector bytes, payload projection and payload bytes. */
+function captureVectorPoints<TPayload>(
+  input: readonly IStorageVectorPoint<TPayload>[],
+  configuration: Parameters<typeof snapshotStorageVectorUpsert>[1]
+) {
+  return snapshotStorageVectorUpsert(input, configuration, RedisText.backend).map((point) => ({
+    point,
+    bytes: vectorBytes(point.vector),
+    projection: vectorProjection(point.payload as ICodecValue | undefined),
+    payload: point.payload === undefined ? undefined : payloadBytes(point.payload)
+  }))
+}
+
+/** Vector binding of another organized store, reading that store's own native port. */
+function storeVectorBinding(store: IRedisStore) {
+  return createRedisVectorBinding(() => readNativeFeaturePort(store))
+}
+
 /** Detect the actual module and genuine binary connection before admitting selected vector work. */
 export function rediSearchVectorFeature() {
   return defineFeature<typeof redisBackendKind, {}, IRedisVectorFeatureOutput>(
@@ -87,10 +105,6 @@ export function rediSearchVectorFeature() {
       const binding = createRedisVectorBinding(() =>
         readNativeFeaturePort(core.featureExpose.getStore())
       )
-      const create = (store: IRedisStore) =>
-        store === core.featureExpose.getStore()
-          ? binding
-          : createRedisVectorBinding(() => readNativeFeaturePort(store))
       core.featureExpose.registerDetect(async () => {
         const port = readNativeFeaturePort(core.featureExpose.getStore())
         try {
@@ -106,7 +120,9 @@ export function rediSearchVectorFeature() {
         } catch (cause) {
           unsupported(cause)
         }
-        port.enableVector(create)
+        port.enableVector((store: IRedisStore) =>
+          store === core.featureExpose.getStore() ? binding : storeVectorBinding(store)
+        )
       })
       return {
         capabilities: [implement(vector, binding.api)] as const,
@@ -603,18 +619,6 @@ class RedisVectorCollection<TPayload> implements IVectorCollection<TPayload, fal
     const ttlMs = ctx?.ttlMs,
       policy = ctx?.concurrency
     if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, RedisText.backend)
-    /** Transformed point data must remain fixed through native schema, lock and HASH awaits. */
-    const capture = (input: readonly IStorageVectorPoint<TPayload>[]) =>
-      snapshotStorageVectorUpsert(
-        input,
-        this.#collection.current.configuration,
-        RedisText.backend
-      ).map((point) => ({
-        point,
-        bytes: vectorBytes(point.vector),
-        projection: vectorProjection(point.payload as ICodecValue | undefined),
-        payload: point.payload === undefined ? undefined : payloadBytes(point.payload)
-      }))
     /** Detach caller vectors and payloads before asynchronous middleware can borrow them. */
     const initial = snapshotStorageVectorUpsert(
       points,
@@ -625,7 +629,9 @@ class RedisVectorCollection<TPayload> implements IVectorCollection<TPayload, fal
       RedisOperation.vectorUpsert,
       initial,
       ctx,
-      capture,
+      // Transformed point data must remain fixed through native schema, lock and HASH awaits.
+      (input: readonly IStorageVectorPoint<TPayload>[]) =>
+        captureVectorPoints(input, this.#collection.current.configuration),
       (actual) => actual.map(({ point }) => lock(this.#collection.name, point.id)),
       async (draft, actual) => {
         if (!actual.length) return

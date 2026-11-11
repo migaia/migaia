@@ -44,28 +44,33 @@ export function normalizeObjectError(error: unknown): Error {
     error instanceof RangeError ||
     (typeof DOMException !== 'undefined' && error instanceof DOMException)
   ) {
-    /** Immutable or already-identified native errors keep their exact original on the cause chain. */
-    const fallback = (): Error => {
-      const replacement =
-        error instanceof TypeError
-          ? new TypeError(ObjectErrorText.failed, { cause: error })
-          : error instanceof RangeError
-            ? new RangeError(ObjectErrorText.failed, { cause: error })
-            : new DOMException(ObjectErrorText.failed, error.name)
-      if (replacement instanceof DOMException)
-        Object.defineProperty(replacement, 'cause', { value: error })
-      return attachErrorIdentity(replacement, {
-        source: STORAGE_OBJECT_ERROR_SOURCE,
-        code: ObjectErrorCode.failed
-      })
-    }
     return attachErrorIdentity<Error>(
       error,
       { source: STORAGE_OBJECT_ERROR_SOURCE, code: ObjectErrorCode.failed },
-      { onConflict: fallback, onFailure: fallback }
+      // Immutable or already-identified native errors keep their exact original on the cause chain.
+      {
+        onConflict: () => replaceNativeObjectError(error),
+        onFailure: () => replaceNativeObjectError(error)
+      }
     )
   }
   return objectError(ObjectErrorCode.failed, error)
+}
+/** Same-type coded replacement for a native error that cannot take the object identity in place. */
+function replaceNativeObjectError(error: TypeError | RangeError | DOMException): Error {
+  /** Replacement keeps the native type and puts the original on `cause`. */
+  const replacement =
+    error instanceof TypeError
+      ? new TypeError(ObjectErrorText.failed, { cause: error })
+      : error instanceof RangeError
+        ? new RangeError(ObjectErrorText.failed, { cause: error })
+        : new DOMException(ObjectErrorText.failed, error.name)
+  if (replacement instanceof DOMException)
+    Object.defineProperty(replacement, 'cause', { value: error })
+  return attachErrorIdentity(replacement, {
+    source: STORAGE_OBJECT_ERROR_SOURCE,
+    code: ObjectErrorCode.failed
+  })
 }
 /** Pure factory and cursor failures belong to the existing shared argument family. */
 export function invalidArgument(cause?: unknown): StorageContractError {

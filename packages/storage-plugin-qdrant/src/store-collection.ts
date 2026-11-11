@@ -15,6 +15,7 @@ import {
   VectorQueryOriginKind,
   DeleteCountMode,
   type IStorageVectorConfiguration,
+  type IOperationContext,
   type IVectorCollection,
   type IVectorHit,
   type IStorageKey
@@ -115,41 +116,49 @@ export class QdrantVectorCollection<TPayload> implements IVectorCollection<TPayl
     )
   }
 
+  /**
+   * Loads every example point once and builds the recommend query; an expired or missing example is
+   * an invalid argument.
+   */
+  async #resolveRecommend(
+    captured: IRecommendExamples,
+    name: string,
+    configuration: IStorageVectorConfiguration,
+    ctx: IOperationContext,
+    now: number
+  ): Promise<{ query: readonly number[]; exclude: readonly string[] }> {
+    /** Native rows of every example, in one retrieve call. */
+    const rows = await retrieve(
+      this.#organization,
+      name,
+      [...captured.pos, ...captured.neg],
+      ctx,
+      configuration
+    )
+    /** Rows indexed by point id. */
+    const byId = new Map(rows.map((row) => [row.id, row]))
+    return {
+      query: recommendStorageVector(
+        captured.pos.map((id) =>
+          loadExampleVector(this.#organization, byId, id, now, configuration)
+        ) as [readonly number[], ...(readonly number[])[]],
+        captured.neg.map((id) =>
+          loadExampleVector(this.#organization, byId, id, now, configuration)
+        )
+      ),
+      exclude: [...captured.pos, ...captured.neg]
+    }
+  }
+
   /** Execute the existing recommend port using this fixed organization and schema. */
   recommend: IVectorCollection<TPayload, true>['recommend'] = (examples) => {
-    const captured = (function readAcceptedInput() {
-      const { positive, negative } = examples,
-        pos = idsOf(positive),
-        neg = idsOf(negative ?? [])
-      if (!pos.length || new Set([...pos, ...neg]).size !== pos.length + neg.length)
-        throw invalidArgument()
-      return { pos, neg }
-    })()
+    /** Positive and negative example ids, validated before any native call. */
+    const captured = readRecommendExamples(examples)
     return query<TPayload>(
       this.#organization,
       this.#current,
-      async (name, configuration, ctx, now) => {
-        const rows = await retrieve(
-            this.#organization,
-            name,
-            [...captured.pos, ...captured.neg],
-            ctx,
-            configuration
-          ),
-          byId = new Map(rows.map((row) => [row.id, row]))
-        const load = (id: string) => {
-          const row = byId.get(id)
-          if (!row || (row.expiresAt !== undefined && row.expiresAt <= now)) throw invalidArgument()
-          return sample(this.#organization, row.point, configuration)
-        }
-        return {
-          query: recommendStorageVector(
-            captured.pos.map(load) as [readonly number[], ...(readonly number[])[]],
-            captured.neg.map(load)
-          ),
-          exclude: [...captured.pos, ...captured.neg]
-        }
-      },
+      (name, configuration, ctx, now) =>
+        this.#resolveRecommend(captured, name, configuration, ctx, now),
       false,
       undefined,
       [],
@@ -338,3 +347,35 @@ export class QdrantVectorCollection<TPayload> implements IVectorCollection<TPayl
 
 /** A vector query emits logical keys and original backend hit metadata. */
 export type IQdrantQueryRow<TPayload> = readonly [IStorageKey, IVectorHit<TPayload, boolean>]
+
+/** Validated recommend example ids. */
+type IRecommendExamples = Readonly<{ pos: string[]; neg: string[] }>
+
+/** Reads recommend examples once; at least one positive and no repeated id across both lists. */
+function readRecommendExamples(examples: {
+  readonly positive: Parameters<typeof idsOf>[0]
+  readonly negative?: Parameters<typeof idsOf>[0]
+}): IRecommendExamples {
+  const { positive, negative } = examples
+  /** Positive example ids. */
+  const pos = idsOf(positive)
+  /** Negative example ids. */
+  const neg = idsOf(negative ?? [])
+  if (!pos.length || new Set([...pos, ...neg]).size !== pos.length + neg.length)
+    throw invalidArgument()
+  return { pos, neg }
+}
+
+/** Vector of one example point; a missing or expired point is an invalid argument. */
+function loadExampleVector(
+  organization: Parameters<typeof sample>[0],
+  byId: ReadonlyMap<string, Awaited<ReturnType<typeof retrieve>>[number]>,
+  id: string,
+  now: number,
+  configuration: IStorageVectorConfiguration
+): readonly number[] {
+  /** Native row of this example. */
+  const row = byId.get(id)
+  if (!row || (row.expiresAt !== undefined && row.expiresAt <= now)) throw invalidArgument()
+  return sample(organization, row.point, configuration)
+}

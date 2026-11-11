@@ -67,6 +67,9 @@ export function redisBackendPlugin<
       maxLockMs: options.maxLockMs
     },
     id = (options.id ?? RedisText.backend) as TId
-  const descriptor = (core: IStoragePluginCore<F>) => new RedisInstallation(captured, core)
-  return definePlugin<TId, typeof descriptor, F>(id, descriptor, features)
+  return definePlugin<TId, (core: IStoragePluginCore<F>) => RedisInstallation<F>, F>(
+    id,
+    (core: IStoragePluginCore<F>) => new RedisInstallation(captured, core),
+    features
+  )
 }

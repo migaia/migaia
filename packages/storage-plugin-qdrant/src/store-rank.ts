@@ -172,30 +172,7 @@ async function executeQdrantRank<TPayload>(
   const native =
     refinement === undefined
       ? undefined
-      : (function readAcceptedInput() {
-          const { kind, query, topN } = refinement as {
-            kind: unknown
-            query: IQdrantRescoreVector
-            topN: number
-          }
-          if (
-            kind !== QdrantText.rescore ||
-            !Number.isSafeInteger(topN) ||
-            topN < 1 ||
-            topN > next.topK
-          )
-            throw invalidArgument()
-          const selected = rescoreSlot(organizationContext.backendContext, state.name)
-          if (!selected) unsupported()
-          return {
-            query: admitRescore(
-              organizationContext.backendContext,
-              snapshotRescoreVector(query),
-              selected
-            ),
-            topN
-          }
-        })()
+      : readRescoreRefinement(organizationContext, state, refinement, next.topK)
   const {
     name,
     configuration,
@@ -472,5 +449,30 @@ function qdrantRankParameters(
             : QdrantManagedVectorName.search
         ]
       : false
+  }
+}
+
+/**
+ * Reads an accepted rescore refinement once: kind must be rescore, `topN` a safe integer in `[1,
+ * topK]`, and the collection must have a rescore slot.
+ */
+function readRescoreRefinement(
+  organizationContext: IQdrantQueryContext['organizationContext'],
+  state: IQdrantQueryContext['state'],
+  refinement: IVectorQueryInput['native'],
+  topK: number
+) {
+  const { kind, query, topN } = refinement as {
+    kind: unknown
+    query: IQdrantRescoreVector
+    topN: number
+  }
+  if (kind !== QdrantText.rescore || !Number.isSafeInteger(topN) || topN < 1 || topN > topK)
+    throw invalidArgument()
+  const selected = rescoreSlot(organizationContext.backendContext, state.name)
+  if (!selected) unsupported()
+  return {
+    query: admitRescore(organizationContext.backendContext, snapshotRescoreVector(query), selected),
+    topN
   }
 }

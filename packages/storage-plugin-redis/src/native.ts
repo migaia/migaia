@@ -174,3 +174,21 @@ export class RedisConnectionPool<TConnection> {
     }
   }
 }
+/**
+ * Delivers one PubSub message to a subscriber unless its subscription is closing. A synchronous
+ * throw or an async rejection of the listener is reported, never thrown into the driver.
+ */
+export function deliverRedisMessage(
+  state: { readonly isClosing: () => boolean; readonly report: (error: unknown) => void },
+  listener: (message: string) => unknown,
+  message: string
+): void {
+  if (state.isClosing()) return
+  try {
+    /** Listener result; a thenable is observed for rejection. */
+    const result = listener(message)
+    if (result !== undefined) void Promise.resolve(result).catch(state.report)
+  } catch (error) {
+    state.report(error)
+  }
+}

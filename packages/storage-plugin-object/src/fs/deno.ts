@@ -51,34 +51,17 @@ export const fileIo: IObjectFileIo = {
       }
       throw error
     }
-    let remaining = end - start + 1
-    let closed = false
-    const close = async (): Promise<void> => {
-      if (!closed) {
-        closed = true
-        handle.close()
-      }
-    }
+    /** Range state and idempotent close of this opened handle. */
+    const reader = new DenoRangeReader(handle, end - start + 1)
+    /** Pull-driven byte stream over the requested inclusive range. */
     const source = new ReadableStream<Uint8Array>(
       {
-        async pull(controller) {
-          if (remaining <= 0) {
-            controller.close()
-            return
-          }
-          const bytes = new Uint8Array(Math.min(64 * 1024, remaining))
-          const size = await handle.read(bytes)
-          if (size === null) controller.close()
-          else {
-            remaining -= size
-            controller.enqueue(bytes.subarray(0, size))
-          }
-        },
-        cancel: close
+        pull: (controller) => reader.pull(controller),
+        cancel: () => reader.close()
       },
       { highWaterMark: 0 }
     )
-    return { source, close }
+    return { source, close: reader.close }
   },
   rename: (from, to) => runtime.rename(from, to),
   async remove(path) {
@@ -93,5 +76,43 @@ export const fileIo: IObjectFileIo = {
     for await (const entry of runtime.readDir(path))
       result.push({ name: entry.name, directory: entry.isDirectory })
     return result
+  }
+}
+
+/** One opened Deno file read as a bounded byte range; owns the handle's single close. */
+class DenoRangeReader {
+  /** Opened Deno file handle positioned at the range start. */
+  readonly #handle: Awaited<ReturnType<typeof runtime.open>>
+  /** Bytes still to read before the range ends. */
+  #remaining: number
+  /** True once the handle was closed by cancel or the caller. */
+  #closed = false
+  /** Captures the positioned handle and the range length. */
+  constructor(handle: Awaited<ReturnType<typeof runtime.open>>, length: number) {
+    this.#handle = handle
+    this.#remaining = length
+  }
+  /** Enqueues the next chunk (at most 64 KiB) or closes the stream at range end or EOF. */
+  async pull(controller: ReadableStreamDefaultController<Uint8Array>): Promise<void> {
+    if (this.#remaining <= 0) {
+      controller.close()
+      return
+    }
+    /** Read buffer sized to the remaining range, capped at 64 KiB. */
+    const bytes = new Uint8Array(Math.min(64 * 1024, this.#remaining))
+    /** Bytes actually read; `null` means end of file. */
+    const size = await this.#handle.read(bytes)
+    if (size === null) controller.close()
+    else {
+      this.#remaining -= size
+      controller.enqueue(bytes.subarray(0, size))
+    }
+  }
+  /** Closes the handle once; later calls are no-ops. */
+  readonly close = async (): Promise<void> => {
+    if (!this.#closed) {
+      this.#closed = true
+      this.#handle.close()
+    }
   }
 }

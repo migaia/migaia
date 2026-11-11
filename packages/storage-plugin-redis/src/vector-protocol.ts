@@ -334,26 +334,43 @@ export function vectorProjection(
   payload: ICodecValue | undefined
 ): ReadonlyMap<string, Uint8Array> {
   const result = new Map<string, Uint8Array>()
-  const visit = (value: ICodecValue, path: readonly string[]): void => {
-    if (path.length) {
-      result.set(vectorField(path, 'e'), utf8.encode('1'))
-      if (
-        value === null ||
-        typeof value === 'string' ||
-        typeof value === 'number' ||
-        typeof value === 'boolean'
-      ) {
-        const tag = vectorTag(value)
-        if (tag.length <= RedisVector.maxTagBytes)
-          result.set(vectorField(path, 't'), utf8.encode(tag))
-      }
-      if (typeof value === 'number') result.set(vectorField(path, 'n'), utf8.encode(String(value)))
-    }
-    if (value && typeof value === 'object')
-      for (const key of Object.keys(value)) visit(Reflect.get(value, key), [...path, key])
-  }
-  if (payload !== undefined) visit(payload, [])
+  if (payload !== undefined) projectVectorNode(result, payload, [])
   return result
+}
+/**
+ * Records presence, TAG and NUMERIC projections of one payload node, then recurses into its own
+ * keys. `path` is one shared stack, pushed and popped per child.
+ *
+ * Work bound: each field name encodes the node's full path (the native field identity), so a node
+ * at depth k emits an O(k) name and does O(k) work. Total work equals the total size of the field
+ * names produced, which is the smallest possible while the field identity stays path-encoded.
+ */
+function projectVectorNode(
+  result: Map<string, Uint8Array>,
+  value: ICodecValue,
+  path: string[]
+): void {
+  if (path.length) {
+    result.set(vectorField(path, 'e'), utf8.encode('1'))
+    if (
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      /** Portable TAG text of this scalar. */
+      const tag = vectorTag(value)
+      if (tag.length <= RedisVector.maxTagBytes)
+        result.set(vectorField(path, 't'), utf8.encode(tag))
+    }
+    if (typeof value === 'number') result.set(vectorField(path, 'n'), utf8.encode(String(value)))
+  }
+  if (value && typeof value === 'object')
+    for (const key of Object.keys(value)) {
+      path.push(key)
+      projectVectorNode(result, Reflect.get(value, key), path)
+      path.pop()
+    }
 }
 /**
  * New scalar paths are registered on the real index before a point write; no schema registry is
@@ -409,12 +426,7 @@ export function vectorCondition(
     tag = vectorField(path, 't'),
     numeric = vectorField(path, 'n'),
     exists = vectorField(path, 'e')
-  const scalar = (input: unknown): boolean =>
-    input === null ||
-    typeof input === 'string' ||
-    typeof input === 'boolean' ||
-    (typeof input === 'number' && Number.isFinite(input))
-  if ((operator === QueryOperator.eq || operator === QueryOperator.ne) && scalar(value)) {
+  if ((operator === QueryOperator.eq || operator === QueryOperator.ne) && isTagScalar(value)) {
     const encoded = vectorTag(value)
     if (encoded.length > RedisVector.maxTagBytes) return undefined
     const query = present(tag, '{' + encoded + '}')
@@ -424,7 +436,7 @@ export function vectorCondition(
     const query = present(exists, '{1}')
     return value ? query : '-(' + query + ')'
   }
-  if (operator === QueryOperator.in && Array.isArray(value) && value.every(scalar)) {
+  if (operator === QueryOperator.in && Array.isArray(value) && value.every(isTagScalar)) {
     const encoded = value.map(vectorTag)
     if (encoded.some((tag) => tag.length > RedisVector.maxTagBytes)) return undefined
     return encoded.length
@@ -521,4 +533,13 @@ export function vectorExpiry(
 /** Fixed protocol text values are detached before the native draft accepts them. */
 export function vectorString(value: string): Uint8Array {
   return utf8.encode(value)
+}
+/** Values a TAG equality can match: null, strings, booleans and finite numbers. */
+function isTagScalar(input: unknown): boolean {
+  return (
+    input === null ||
+    typeof input === 'string' ||
+    typeof input === 'boolean' ||
+    (typeof input === 'number' && Number.isFinite(input))
+  )
 }

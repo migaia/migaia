@@ -139,7 +139,7 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
   if (typeof scope !== 'object' || scope === null || Array.isArray(scope)) {
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
-      cause: new TypeError('cookie scope must be an object')
+      cause: new TypeError(StorageErrorText.cookieScopeInvalid)
     })
   }
   const candidate = scope as Record<string, unknown>
@@ -154,17 +154,17 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
   )
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
-      cause: new TypeError('cookie scope contains an invalid attribute')
+      cause: new TypeError(StorageErrorText.cookieScopeAttributeInvalid)
     })
   if (sameSite === 'none' && !secure)
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
-      cause: new TypeError('SameSite=None requires Secure')
+      cause: new TypeError(StorageErrorText.cookieSameSiteNoneRequiresSecure)
     })
   if (partitioned && !secure)
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
-      cause: new TypeError('Partitioned requires Secure')
+      cause: new TypeError(StorageErrorText.cookiePartitionedRequiresSecure)
     })
   return {
     path: path as string | undefined,
@@ -279,7 +279,7 @@ function configureCookieNamespace(cookieContext: ICookieContext): void {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
-      cause: new TypeError('cookie options must be an object')
+      cause: new TypeError(StorageErrorText.cookieOptionsInvalid)
     })
   /** Physical identity is selected before native resources are acquired. */
   const namespace = options.namespace === undefined ? 'default' : options.namespace
@@ -291,7 +291,7 @@ function configureCookieNamespace(cookieContext: ICookieContext): void {
   if (typeof namespace !== 'string' || namespace.length === 0)
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
-      cause: new TypeError('namespace must be non-empty and namespaceCodec must be callable')
+      cause: new TypeError(StorageErrorText.namespaceOptionsInvalid)
     })
   cookieContext.namespace = namespace
   if (cookieContext.bindOrganizations)
@@ -317,7 +317,7 @@ function configureCookieNamespace(cookieContext: ICookieContext): void {
   )
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
-      cause: new TypeError('cookie document must expose a string cookie property')
+      cause: new TypeError(StorageErrorText.cookieDocumentInvalid)
     })
   /** Read the native surface before codec admission, preserving original construction order. */
   let initialCookie: unknown
@@ -332,7 +332,7 @@ function configureCookieNamespace(cookieContext: ICookieContext): void {
   if (typeof initialCookie !== 'string')
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
-      cause: new TypeError('cookie document must expose a string cookie property')
+      cause: new TypeError(StorageErrorText.cookieDocumentInvalid)
     })
   cookieContext.namespaceCodec = admitNamespaceCodec(
     options.namespaceCodec === undefined ? lengthPrefixedNamespaceCodec : options.namespaceCodec,
@@ -502,7 +502,7 @@ export function namespacedEntries(
         backend: StorageBackend.cookie,
         key: stripped,
         operation,
-        cause: new Error('multiple visible cookiesHost share one physical name')
+        cause: new Error(StorageErrorText.cookieNameAmbiguous)
       })
     seenPhysicalKeys.add(rawKey)
     collected.push({ physicalKey: rawKey, logicalKey: stripped })
@@ -531,7 +531,7 @@ export function readVisibleCookie(
       backend: StorageBackend.cookie,
       key: logicalKey,
       operation,
-      cause: new Error('multiple visible cookiesHost share one physical name')
+      cause: new Error(StorageErrorText.cookieNameAmbiguous)
     })
   return visible
 }

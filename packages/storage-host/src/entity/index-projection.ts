@@ -252,8 +252,41 @@ const queryIndexKey = (value: unknown, backend: IStorageBackend): IStorageKey | 
  * Compare the original canonical path facts without parsing user conditions or declaration strings
  * again.
  */
-const sameIndexPath = (left: readonly string[], right: readonly string[]): boolean =>
-  left.length === right.length && left.every((part, position) => part === right[position])
+/** Exact identity of a field path; two paths are the same index path iff their keys are equal. */
+const indexPathKey = (path: readonly string[]): string => JSON.stringify(path)
+/** One narrowing field condition. */
+type IQueryFieldCondition = Extract<IQueryCondition, { kind: 'field' }>
+/** Groups field conditions by exact path, keeping their original order within each path. */
+const groupFieldsByPath = (
+  fields: readonly IQueryFieldCondition[]
+): Map<string, IQueryFieldCondition[]> => {
+  /** Same-path conditions in original order. */
+  const grouped = new Map<string, IQueryFieldCondition[]>()
+  for (const field of fields) {
+    /** Exact path identity of this condition. */
+    const key = indexPathKey(field.path)
+    /** Conditions already grouped under the same path. */
+    const bucket = grouped.get(key)
+    if (bucket) bucket.push(field)
+    else grouped.set(key, [field])
+  }
+  return grouped
+}
+/** Scalar (non-multiEntry) indexed path keys per frozen index snapshot, computed once. */
+const indexedScalarPathCache = new WeakMap<object, ReadonlySet<string>>()
+/** Every path a scalar index covers, as exact keys; cached per index snapshot. */
+const indexedScalarPaths = <T>(indexes: ISnapshotEntityIndexes<T>): ReadonlySet<string> => {
+  /** Earlier result for this same snapshot object. */
+  const cached = indexedScalarPathCache.get(indexes)
+  if (cached) return cached
+  /** Keys of every path of every scalar index. */
+  const paths = new Set<string>()
+  for (const index of Object.values(indexes))
+    if (!index.definition.multiEntry)
+      for (const path of index.paths ?? []) paths.add(indexPathKey(path))
+  indexedScalarPathCache.set(indexes, paths)
+  return paths
+}
 /** An AND contributes safe narrowing fields; OR and NOT cannot restrict a source to one branch. */
 const queryIndexFields = (
   conditions: readonly IQueryCondition[]
@@ -271,7 +304,7 @@ const queryIndexFields = (
 const indexQueryCandidate = <T>(
   name: string,
   index: ISnapshotEntityIndex<T>,
-  fields: readonly Extract<IQueryCondition, { kind: 'field' }>[],
+  fieldsByPath: ReadonlyMap<string, readonly IQueryFieldCondition[]>,
   backend: IStorageBackend
 ): IEntityIndexQueryCandidate | undefined => {
   const paths = index.paths
@@ -279,9 +312,9 @@ const indexQueryCandidate = <T>(
   if (paths.length > 1) {
     const keys: IStorageKey[] = []
     for (const path of paths) {
-      const equality = fields.find(
-        (field) => sameIndexPath(field.path, path) && field.operator === QueryOperator.eq
-      )
+      const equality = fieldsByPath
+        .get(indexPathKey(path))
+        ?.find((field) => field.operator === QueryOperator.eq)
       const key = equality === undefined ? undefined : queryIndexKey(equality.value, backend)
       if (key === undefined) return
       keys.push(key)
@@ -296,7 +329,7 @@ const indexQueryCandidate = <T>(
       size: 0
     }
   }
-  const matching = fields.filter((field) => sameIndexPath(field.path, paths[0]!))
+  const matching = fieldsByPath.get(indexPathKey(paths[0]!)) ?? []
   for (const field of matching)
     if (field.operator === QueryOperator.eq) {
       const key = queryIndexKey(field.value, backend)
@@ -399,10 +432,11 @@ export const chooseEntityQueryIndex = <T>(
   conditions: readonly IQueryCondition[],
   backend: IStorageBackend
 ) => {
-  const fields = queryIndexFields(conditions)
+  /** Narrowing field conditions grouped by path once, in their original order per path. */
+  const fieldsByPath = groupFieldsByPath(queryIndexFields(conditions))
   const candidates = Object.entries(indexes).map(([name, index]) => ({
     name,
-    candidate: indexQueryCandidate(name, index, fields, backend)
+    candidate: indexQueryCandidate(name, index, fieldsByPath, backend)
   }))
   let chosen: IEntityIndexQueryCandidate | undefined
   for (const { candidate } of candidates)
@@ -443,10 +477,6 @@ export const supportsEntityIndexCondition = <T>(
     return condition.conditions.every((child) => supportsEntityIndexCondition(indexes, child))
   return (
     ENTITY_QUERY_INDEX_OPERATORS.includes(condition.operator) &&
-    Object.values(indexes).some(
-      (index) =>
-        !index.definition.multiEntry &&
-        index.paths?.some((path) => sameIndexPath(path, condition.path)) === true
-    )
+    indexedScalarPaths(indexes).has(indexPathKey(condition.path))
   )
 }

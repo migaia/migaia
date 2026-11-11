@@ -8,6 +8,7 @@ import {
   captureCommands,
   nativeArguments,
   subscriptionResource,
+  deliverRedisMessage,
   requireExecArray,
   RedisConnectionPool
 } from '../native.ts'
@@ -121,7 +122,7 @@ class IoredisDriver<M extends 'legacy' | 'resp3'> implements IRedisDriver<Redis<
     if (typeof channel !== 'string' || typeof listener !== 'function') throw invalidArgument()
     const owned = duplicate(this.#root)
     const state = subscriptionResource(async () => {
-      owned.off(RedisText.message, receive)
+      owned.off(RedisText.message, subscription.receive)
       try {
         await owned.unsubscribe(channel)
       } catch (error) {
@@ -134,18 +135,15 @@ class IoredisDriver<M extends 'legacy' | 'resp3'> implements IRedisDriver<Redis<
       }
       await close(owned)
     })
-    const receive = (receivedChannel: string, message: string): void => {
-      if (receivedChannel !== channel || state.isClosing()) return
-      try {
-        const pending = listener(message) as unknown
-        if (pending !== undefined) void Promise.resolve(pending).catch(state.report)
-      } catch (error) {
-        state.report(error)
+    /** Listener record whose `receive` identity is shared by on and off. */
+    const subscription = {
+      receive: (receivedChannel: string, message: string): void => {
+        if (receivedChannel === channel) deliverRedisMessage(state, listener, message)
       }
     }
     try {
       await owned.connect()
-      owned.on(RedisText.message, receive)
+      owned.on(RedisText.message, subscription.receive)
       await owned.subscribe(channel)
     } catch (error) {
       try {

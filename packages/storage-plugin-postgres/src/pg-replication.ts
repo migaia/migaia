@@ -245,8 +245,12 @@ async function inspectPgReplication(
   for (const table of tables.rows)
     if (pgReplicationTable(options.prefix, String(table.table_name)))
       required.add(String(table.table_name))
+  /** Tables whose row says they are in the publication, indexed once for membership checks. */
+  const published = new Set<unknown>()
+  for (const entry of tables.rows)
+    if (entry.published === entry.table_name) published.add(entry.table_name)
   for (const table of required)
-    if (!tables.rows.some((entry) => entry.table_name === table && entry.published === table))
+    if (!published.has(table))
       throw unsupported(
         PostgresErrorText.publicationTableMissing(options.publication, options.schema, table)
       )

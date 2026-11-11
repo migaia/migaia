@@ -26,7 +26,7 @@ import { ObjectErrorText } from './error-text.ts'
 import { invalidArgument, normalizeObjectError, objectError } from './errors.ts'
 import { createObjectSender } from './s3/send.ts'
 import { responseInfo, responseStatus } from './s3/response.ts'
-import { uploadMultipart } from './s3/multipart.ts'
+import { ObjectMultipartUpload } from './s3/multipart.ts'
 import { assertS3ObjectHeaders } from './s3/options.ts'
 import type { IObjectDriver, IObjectNative } from './types.ts'
 /** Injected clients are borrowed; a configured client belongs exclusively to this installation. */
@@ -246,7 +246,7 @@ class S3ObjectNative implements IObjectNative {
     assertS3ObjectHeaders(options)
     let etag: string
     if (!isUint8Array(body) || body.byteLength >= this.#options.threshold)
-      etag = await uploadMultipart(
+      etag = await new ObjectMultipartUpload(
         this.#send,
         this.#options.bucket,
         this.#options.prefix + key,
@@ -255,7 +255,7 @@ class S3ObjectNative implements IObjectNative {
         this.#options.partBytes,
         this.#options.concurrency,
         this.#report
-      )
+      ).run()
     else {
       const result = await this.#send<PutObjectCommandOutput>(
         new PutObjectCommand({

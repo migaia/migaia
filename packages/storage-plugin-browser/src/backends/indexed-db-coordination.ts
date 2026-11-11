@@ -262,22 +262,25 @@ const rememberHint = (entry: IIndexedDbCoordinationEntry, change: IStorageChange
 const scheduleDrain = (entry: IIndexedDbCoordinationEntry): void => {
   if (entry.drainScheduled || entry.disposed) return
   entry.drainScheduled = true
-  const drain = (): void => {
-    entry.drainScheduled = false
-    if (entry.disposed) return
-    const pending = entry.pending.splice(0)
-    entry.pendingScopes.clear()
-    for (const queued of pending) {
-      try {
-        entry.fanout.publish(queued)
-      } catch (error) {
-        // Channel aggregates synchronous listener failures; transport fanout remains report-only.
-        reportCoordinationError(entry, error)
-      }
+  if (typeof queueMicrotask === 'function') queueMicrotask(() => drainPending(entry))
+  else void Promise.resolve().then(() => drainPending(entry))
+}
+
+/** Publishes every queued hint of `entry` once; listener failures stay report-only. */
+const drainPending = (entry: IIndexedDbCoordinationEntry): void => {
+  entry.drainScheduled = false
+  if (entry.disposed) return
+  /** Hints queued since the last drain, taken in one splice. */
+  const pending = entry.pending.splice(0)
+  entry.pendingScopes.clear()
+  for (const queued of pending) {
+    try {
+      entry.fanout.publish(queued)
+    } catch (error) {
+      // Channel aggregates synchronous listener failures; transport fanout remains report-only.
+      reportCoordinationError(entry, error)
     }
   }
-  if (typeof queueMicrotask === 'function') queueMicrotask(drain)
-  else void Promise.resolve().then(drain)
 }
 
 /** Report transport/listener failures without allowing diagnostics to affect committed writes. */

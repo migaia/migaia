@@ -183,8 +183,9 @@ const leaseFailures = (error: unknown): ILeaseFailure[] => {
   const pending = [error]
   const seen = new Set<unknown>()
   const failures: ILeaseFailure[] = []
-  while (pending.length > 0) {
-    const current = pending.shift()
+  // Queue cursor: every enqueued link is visited once without shifting the array.
+  for (let cursor = 0; cursor < pending.length; cursor++) {
+    const current = pending[cursor]
     if (typeof current !== 'object' || current === null || seen.has(current)) continue
     seen.add(current)
     const failure = current as Error & { source?: string; code?: string; errors?: unknown[] }

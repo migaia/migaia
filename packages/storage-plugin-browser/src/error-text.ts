@@ -70,6 +70,24 @@ export const StorageErrorText = Object.freeze({
   indexedDbUpgradeTransactionMissing: 'IndexedDB upgrade event is missing its transaction',
   /** A cookie document must keep exposing its string cookie property after admission. */
   cookieDocumentBecameInvalid: 'cookie document must continue exposing a string cookie property',
+  /** Web Storage backend options must be a plain object. */
+  webStorageOptionsInvalid: 'web storage options must be an object',
+  /** Shared Web Storage and cookie admission of the namespace and its codec. */
+  namespaceOptionsInvalid: 'namespace must be non-empty and namespaceCodec must be callable',
+  /** Cookie scope option must be a plain object. */
+  cookieScopeInvalid: 'cookie scope must be an object',
+  /** A cookie scope attribute failed validation. */
+  cookieScopeAttributeInvalid: 'cookie scope contains an invalid attribute',
+  /** Browser rule: SameSite=None cookies must also be Secure. */
+  cookieSameSiteNoneRequiresSecure: 'SameSite=None requires Secure',
+  /** Browser rule: Partitioned cookies must also be Secure. */
+  cookiePartitionedRequiresSecure: 'Partitioned requires Secure',
+  /** Cookie backend options must be a plain object. */
+  cookieOptionsInvalid: 'cookie options must be an object',
+  /** Injected cookie document must expose a string `cookie` property at admission. */
+  cookieDocumentInvalid: 'cookie document must expose a string cookie property',
+  /** Two visible cookies with different scopes share one physical name, so a read is ambiguous. */
+  cookieNameAmbiguous: 'multiple visible cookiesHost share one physical name',
   /** Stable text for aggregate live-query cleanup failure. */
   liveQueryDisposeFailed: 'live query failed to dispose',
   /** Stable text for malformed reactive feature/provider/adapter descriptors. */

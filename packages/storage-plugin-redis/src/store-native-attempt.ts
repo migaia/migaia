@@ -59,6 +59,21 @@ type IRedisNativeAttempt<R> = {
     | ReturnType<IRedisOrganizationContext['transactionOwner']['register']>
     | undefined
 }
+/** Sends raw Redis commands for one attempt's organization over its borrowed connection. */
+class RedisAttemptSender {
+  /** Organization whose environment and org id scope every command. */
+  readonly #organization: IRedisOrganizationContext
+  /** Borrowed native connection the attempt runs on. */
+  readonly #connection: IRedisConnection
+  /** Binds one organization and connection. */
+  constructor(organization: IRedisOrganizationContext, connection: IRedisConnection) {
+    this.#organization = organization
+    this.#connection = connection
+  }
+  /** Sends one command; shared by locks, the draft and the attempt record. */
+  readonly send = (args: readonly string[]) =>
+    redisCommand(this.#organization.environment, this.#connection, args, this.#organization.orgId)
+}
 /** Prepare native state without issuing commands or replacing the existing driver lease. */
 function createRedisNativeAttempt<R>(
   organization: IRedisOrganizationContext,
@@ -66,8 +81,8 @@ function createRedisNativeAttempt<R>(
   connection: IRedisConnection,
   privateJournal: boolean
 ): IRedisNativeAttempt<R> {
-  const send = (args: readonly string[]) =>
-      redisCommand(organization.environment, connection, args, organization.orgId),
+  /** Command sender bound to this attempt's organization and connection. */
+  const send = new RedisAttemptSender(organization, connection).send,
     locks = createRedisLocks({
       layout: organization.layout,
       context,

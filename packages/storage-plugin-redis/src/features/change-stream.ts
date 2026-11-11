@@ -136,10 +136,8 @@ export function redisChangeStreamFeature(options: { readonly maxLen: number }) {
     redisBackendKind,
     (core) => {
       core.featureExpose.registerDetect(async () => {
-        readNativeFeaturePort(core.featureExpose.getStore()).enableDurable(maxLen, create)
+        readNativeFeaturePort(core.featureExpose.getStore()).enableDurable(maxLen, storeDurableApi)
       })
-      const create = (store: import('../types.ts').IRedisStore) =>
-        createRedisDurableApi(() => readNativeFeaturePort(store))
       const api = createRedisDurableApi(() => readNativeFeaturePort(core.featureExpose.getStore()))
       return {
         capabilities: [implement(durableChangeFeed, api)] as const,
@@ -148,6 +146,11 @@ export function redisChangeStreamFeature(options: { readonly maxLen: number }) {
       }
     }
   )
+}
+
+/** Durable change-feed API of another organized store, reading that store's own native port. */
+function storeDurableApi(store: import('../types.ts').IRedisStore) {
+  return createRedisDurableApi(() => readNativeFeaturePort(store))
 }
 
 /** One durable tail owns only its last successfully delivered native cursor and original lifetime. */

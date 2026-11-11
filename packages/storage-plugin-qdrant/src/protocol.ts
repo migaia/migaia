@@ -9,19 +9,22 @@ export function nativeResult<K extends IQdrantOperationName>(
 ): Awaited<ReturnType<IQdrantHttp[K]>> {
   // The SDK's snapshot method maps an accepted response without a result to null.
   if (name === QdrantRoute.createSnapshot.name && value === undefined) value = null
-  const bad = () => {
-    throw qdrantError(QdrantErrorCode.responseInvalid)
-  }
   if (
     name === QdrantRoute.createCollection.name ||
     name === QdrantRoute.deleteCollection.name ||
     name === QdrantRoute.updateCollectionAliases.name
   ) {
-    if (typeof value !== 'boolean') bad()
+    if (typeof value !== 'boolean') throwResponseInvalid()
   } else if (name === QdrantRoute.createSnapshot.name) {
-    if (value !== null && (typeof value !== 'object' || Array.isArray(value))) bad()
+    if (value !== null && (typeof value !== 'object' || Array.isArray(value)))
+      throwResponseInvalid()
   } else if (name === QdrantRoute.retrieve.name || name === QdrantRoute.recommend.name) {
-    if (!Array.isArray(value)) bad()
-  } else if (value === null || typeof value !== 'object' || Array.isArray(value)) bad()
+    if (!Array.isArray(value)) throwResponseInvalid()
+  } else if (value === null || typeof value !== 'object' || Array.isArray(value))
+    throwResponseInvalid()
   return value as Awaited<ReturnType<IQdrantHttp[K]>>
+}
+/** A native response whose result has the wrong shape for its route. */
+function throwResponseInvalid(): never {
+  throw qdrantError(QdrantErrorCode.responseInvalid)
 }

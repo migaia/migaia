@@ -48,14 +48,25 @@ export type IObjectPresignApi = {
     options?: IObjectPresignDownloadOptions
   ): Promise<IObjectSignedRequest<'GET'>>
 }
+/** Name under which the checksum-stripping middleware is registered on the PutObject stack. */
+const PRESIGN_BODY_MIDDLEWARE = 'objectPresignBodyUnspecified'
+/** AWS SDK presigner middleware the stripping step must run before; owned by the SDK. */
+const SDK_PRESIGN_INTERCEPT_MIDDLEWARE = 'presignInterceptMiddleware'
 /** HTTP names used by signed requests and the SDK's optional empty-body checksum calculation. */
 const Headers = {
+  /** HTTP header a presigned upload must send with the declared content type. */
   contentType: 'content-type',
+  /** S3 prefix of user-metadata headers; each metadata name is appended to it. */
   metadata: 'x-amz-meta-',
+  /** Conditional-write header binding the upload to an existing ETag. */
   ifMatch: 'if-match',
+  /** Conditional-write header that makes the upload create-only (`*`). */
   ifNoneMatch: 'if-none-match',
+  /** HTTP Range header a presigned download may carry. */
   range: 'range',
+  /** SDK-computed CRC32 header removed before signing, since the body is unknown. */
   checksum: 'x-amz-checksum-crc32',
+  /** SDK checksum-algorithm header removed together with the CRC32 header. */
   algorithm: 'x-amz-sdk-checksum-algorithm'
 } as const
 /** The SDK accepts seconds through seven days; actual credentials may expire sooner. */
@@ -133,60 +144,75 @@ async function signObjectUpload(
       { backend: ObjectNames.backend },
       ObjectErrorText.conditional
     )
-  return observeObjectFeature(
-    call.store,
-    ObjectNames.presignUpload,
-    captured.options.ctx,
-    async () => {
-      const address = native.getObjectAddress(captured.key, {
-        ...captured.options.ctx,
-        orgId: call.orgId
-      })
-      const headers: Record<string, string> = Object.fromEntries(
-        Object.entries(captured.options.metadata ?? {}).map(([name, value]) => [
-          Headers.metadata + name,
-          value
-        ])
-      )
-      if (captured.options.contentType !== undefined)
-        headers[Headers.contentType] = captured.options.contentType
-      if (captured.options.ifMatch !== undefined)
-        headers[Headers.ifMatch] = captured.options.ifMatch
-      if (captured.options.ifNoneMatch) headers[Headers.ifNoneMatch] = '*'
-      const command = new PutObjectCommand({
-        Bucket: address.bucket,
-        Key: address.key,
-        ContentType: captured.options.contentType,
-        Metadata: captured.options.metadata,
-        IfMatch: captured.options.ifMatch,
-        IfNoneMatch: captured.options.ifNoneMatch ? '*' : undefined
-      })
-      /** The future caller body is unknown; never sign the SDK's computed empty-body CRC32. */
-      const stripUnspecifiedBodyChecksum: Parameters<
-        PutObjectCommand['middlewareStack']['add']
-      >[0] = (next) => (args) => {
-        const request = args.request as { headers: Record<string, string> }
-        delete request.headers[Headers.checksum]
-        delete request.headers[Headers.algorithm]
-        return next(args)
-      }
-      command.middlewareStack.addRelativeTo(stripUnspecifiedBodyChecksum, {
-        name: 'objectPresignBodyUnspecified',
-        relation: 'before',
-        toMiddleware: 'presignInterceptMiddleware'
-      })
-      try {
-        const url = await getSignedUrl(native.getS3Client(), command, {
-          expiresIn: seconds,
-          unhoistableHeaders: new Set(Object.keys(headers)),
-          signableHeaders: new Set(Object.keys(headers))
-        })
-        return { url, method: 'PUT', headers: headers }
-      } catch (error) {
-        throw normalizeObjectError(error)
-      }
-    }
+  return observeObjectFeature(call.store, ObjectNames.presignUpload, captured.options.ctx, () =>
+    signCapturedUpload(native, call, captured, seconds)
   )
+}
+
+/** Upload options already captured and validated by {@link signObjectUpload}. */
+type ICapturedUpload = ReturnType<typeof snapshotStorageBlobPut>
+
+/** Signs one captured upload: builds metadata/condition headers and a presigned PUT URL. */
+async function signCapturedUpload(
+  native: IObjectSigningPort,
+  call: IObjectSigningCall,
+  captured: ICapturedUpload,
+  seconds: number
+): Promise<IObjectSignedRequest<'PUT'>> {
+  const address = native.getObjectAddress(captured.key, {
+    ...captured.options.ctx,
+    orgId: call.orgId
+  })
+  const headers: Record<string, string> = Object.fromEntries(
+    Object.entries(captured.options.metadata ?? {}).map(([name, value]) => [
+      Headers.metadata + name,
+      value
+    ])
+  )
+  if (captured.options.contentType !== undefined)
+    headers[Headers.contentType] = captured.options.contentType
+  if (captured.options.ifMatch !== undefined) headers[Headers.ifMatch] = captured.options.ifMatch
+  if (captured.options.ifNoneMatch) headers[Headers.ifNoneMatch] = '*'
+  const command = new PutObjectCommand({
+    Bucket: address.bucket,
+    Key: address.key,
+    ContentType: captured.options.contentType,
+    Metadata: captured.options.metadata,
+    IfMatch: captured.options.ifMatch,
+    IfNoneMatch: captured.options.ifNoneMatch ? '*' : undefined
+  })
+  // The future caller body is unknown; never sign the SDK's computed empty-body CRC32.
+  command.middlewareStack.addRelativeTo(stripUnspecifiedBodyChecksum, {
+    name: PRESIGN_BODY_MIDDLEWARE,
+    relation: 'before',
+    toMiddleware: SDK_PRESIGN_INTERCEPT_MIDDLEWARE
+  })
+  try {
+    const url = await getSignedUrl(native.getS3Client(), command, {
+      expiresIn: seconds,
+      unhoistableHeaders: new Set(Object.keys(headers)),
+      signableHeaders: new Set(Object.keys(headers))
+    })
+    return { url, method: 'PUT', headers: headers }
+  } catch (error) {
+    throw normalizeObjectError(error)
+  }
+}
+
+/** Middleware shape accepted by the PutObject command stack. */
+type IPutMiddleware = Parameters<PutObjectCommand['middlewareStack']['add']>[0]
+
+/** SDK middleware that drops the checksum headers the SDK computes for an empty body. */
+function stripUnspecifiedBodyChecksum(
+  next: Parameters<IPutMiddleware>[0]
+): ReturnType<IPutMiddleware> {
+  return (args) => {
+    /** Outgoing HTTP request whose headers are edited in place. */
+    const request = args.request as { headers: Record<string, string> }
+    delete request.headers[Headers.checksum]
+    delete request.headers[Headers.algorithm]
+    return next(args)
+  }
 }
 
 /**

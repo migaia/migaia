@@ -9,6 +9,7 @@ import {
   execEntries,
   requireExecArray,
   subscriptionResource,
+  deliverRedisMessage,
   RedisConnectionPool
 } from '../native.ts'
 import { normalizeRedisError, invalidArgument, redisError } from '../errors.ts'
@@ -100,7 +101,7 @@ class BunRedisDriver implements IRedisDriver<IBunRedisClient> {
     }
     const state = subscriptionResource(async () => {
       try {
-        await owned.unsubscribe(channel, receive)
+        await owned.unsubscribe(channel, subscription.receive)
       } catch (error) {
         try {
           owned.close()
@@ -111,17 +112,12 @@ class BunRedisDriver implements IRedisDriver<IBunRedisClient> {
       }
       owned.close()
     })
-    const receive = (message: string): void => {
-      if (state.isClosing()) return
-      try {
-        const pending = listener(message) as unknown
-        if (pending !== undefined) void Promise.resolve(pending).catch(state.report)
-      } catch (error) {
-        state.report(error)
-      }
+    /** Listener record whose `receive` identity is shared by subscribe and unsubscribe. */
+    const subscription = {
+      receive: (message: string): void => deliverRedisMessage(state, listener, message)
     }
     try {
-      await owned.subscribe(channel, receive)
+      await owned.subscribe(channel, subscription.receive)
     } catch (error) {
       try {
         owned.close()
