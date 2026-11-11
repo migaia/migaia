@@ -31,11 +31,11 @@ type IAuthentication = {
   onRejected?(rejection: unknown): void
 }
 /** Only the public factory names differ between the two measured versions. */
+/** Enhanced-arm factories: auth and chunk Features, installed through one features plugin. */
 type IFlowModule = {
-  auth?: (options: IAuthentication) => unknown
-  authFeature?: (options: IAuthentication) => unknown
-  chunk?: () => unknown
-  chunkFeature?: () => unknown
+  authFeature: (options: IAuthentication) => unknown
+  chunkFeature: () => unknown
+  rpcFeaturesPlugin: (options: { features: Record<string, unknown> }) => unknown
 }
 /** Explicit cold installation inputs avoid a callback capturing several independent owners. */
 type IInstallationInputs = {
@@ -235,13 +235,16 @@ class CorePerformanceCell {
     const api = (await import('@migaia/rpc-host')) as unknown as IHostModule
     /** A native MessagePort is an already-supported dedicated-worker carrier, as in existing tests. */
     const carrier = (await import('@migaia/rpc-plugin-browser')) as unknown as ICarrierModule
-    /** Inspect only published export metadata to select the old/new public plugin paths. */
-    const manifest = JSON.parse(readFileSync(join(packageRoot, 'rpc-host/package.json'), 'utf8'))
-    /** The module path changes only because move existing abilities to plugins. */
-    const featureModule = enhanced
-      ? ((await import(
-          manifest.exports['./plugins'] ? '@migaia/rpc-host/plugins' : '@migaia/rpc-host/features'
-        )) as unknown as IFlowModule)
+    /** Enhanced arm: auth and chunk Features from their public subpaths, plus the features plugin. */
+    const featureModule: IFlowModule | undefined = enhanced
+      ? {
+          authFeature: (await import('@migaia/rpc-host/plugins/auth'))
+            .authFeature as IFlowModule['authFeature'],
+          chunkFeature: (await import('@migaia/rpc-host/plugins/chunk'))
+            .chunkFeature as IFlowModule['chunkFeature'],
+          rpcFeaturesPlugin: (await import('@migaia/rpc-host/sdk'))
+            .rpcFeaturesPlugin as unknown as IFlowModule['rpcFeaturesPlugin']
+        }
       : undefined
     /** Old and new transforms receive the exact same public authentication options. */
     const authentication: IAuthentication = {
@@ -276,11 +279,15 @@ class CorePerformanceCell {
     /** Factories create separate cold instances; no installed state is shared across hosts. */
     const plugins: unknown[] = [context.carrier.dedicatedWorkerPlugin({ worker: port })]
     if (context.features) {
-      /** Factory renames are the exact move recorded in the public-contract ledger. */
-      const auth = context.features.auth ?? context.features.authFeature!
-      /** Auth and chunk always run together on the enhanced arm. */
-      const chunk = context.features.chunk ?? context.features.chunkFeature!
-      plugins.push(auth(context.authentication), chunk())
+      /** Auth and chunk always run together on the enhanced arm, as host-wide Features. */
+      plugins.push(
+        context.features.rpcFeaturesPlugin({
+          features: {
+            auth: context.features.authFeature(context.authentication),
+            chunk: context.features.chunkFeature()
+          }
+        })
+      )
     }
     return context.api
       .createRpcHost({
