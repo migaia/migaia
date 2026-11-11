@@ -451,15 +451,16 @@ getDependencyTree(root, maxDepth?) reads observer deps and accepts real Runtime 
 
 maxDepth defaults to 20 and must be a nonnegative safe integer. At 0, even the root's immediate edges remain unexpanded. Negative, fractional, NaN, and infinite values synchronously produce INVALID_OPTION RangeError. Traversal uses the actual graph; examples need no fabricated cycles or nodes.
 
-| IDependencyTreeNode field | Meaning                                                                                         |
-| ------------------------- | ----------------------------------------------------------------------------------------------- |
-| kind                      | observable / observer, reflecting the node's role in this traversal direction.                  |
-| label                     | debugName, then constructor.name, then AnonymousReactiveNode.                                   |
-| version                   | The current observable version; a dependency root represented as observer has no version field. |
-| children                  | The successors expanded in this tree.                                                           |
-| circular                  | True only when this node is already on the current recursion path, stopping expansion there.    |
+| IDependencyTreeNode field | Meaning                                                                                                          |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| kind                      | observable / observer, reflecting the node's role in this traversal direction.                                   |
+| label                     | debugName, then constructor.name, then AnonymousReactiveNode.                                                    |
+| version                   | The current observable version; a dependency root represented as observer has no version field.                  |
+| children                  | The successors expanded in this tree.                                                                            |
+| circular                  | True only when this node is already on the current recursion path, stopping expansion there.                     |
+| shared                    | True when this node was already expanded earlier in the tree; children are listed only at that first occurrence. |
 
-A shared node reached through two distinct diamond branches is not circular and expands on both paths. Only an actual path revisit sets circular. Reaching maxDepth stops expansion without marking a cycle. A Computed has both roles: it is an observable child in dependency traversal and an observer child in subscriber traversal. These data dependencies are distinct from plugin capability graphs.
+A shared node reached through two distinct diamond branches is not circular and appears on both paths. Its children are listed only at the first occurrence; later occurrences set shared, so the tree stays linear in graph size. Only an actual path revisit sets circular. Reaching maxDepth stops expansion without marking a cycle. A Computed has both roles: it is an observable child in dependency traversal and an observer child in subscriber traversal. These data dependencies are distinct from plugin capability graphs.
 
 ### Errors, factories, and maintenance commands
 

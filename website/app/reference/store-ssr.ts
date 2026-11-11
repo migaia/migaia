@@ -340,8 +340,8 @@ const stateMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   stores: {
     summary: t(
-      'Plain record of registration keys to plain IJSONValue field records; scope dehydration sorts keys and omits disposed stores.',
-      '按注册键索引普通可序列化字段表的普通对象，作用域脱水按键排序并跳过已销毁容器。'
+      'Plain record of registration keys to plain IJSONValue field records; scope dehydration keeps registration order and omits disposed stores.',
+      '按注册键索引普通可序列化字段表的普通对象，作用域脱水按登记顺序并跳过已销毁容器。'
     )
   },
   resources: {
@@ -480,8 +480,8 @@ profile.dispose()`
   },
   dehydrate: {
     summary: t(
-      'Reads live registrations in key order. Store fields and resource data are validated, deeply copied and frozen; metadata is shallow copied. Disposed entries and resource snapshots returning undefined are omitted.',
-      '按键序读取活动注册，状态字段及资源数据经校验、深拷贝与冻结，元数据浅拷贝，跳过已销毁条目及返回未定义快照的资源。'
+      'Reads live registrations in registration order. Store fields and resource data are validated, deeply copied and frozen; metadata is shallow copied. Disposed entries and resource snapshots returning undefined are omitted.',
+      '按登记顺序读取活动注册，状态字段及资源数据经校验、深拷贝与冻结，元数据浅拷贝，跳过已销毁条目及返回未定义快照的资源。'
     ),
     returns: t(
       'Frozen ISSRState; unsupported data fails SERIALIZE_UNSUPPORTED, entry access failures can become INVALID_SNAPSHOT with cause.',

@@ -251,6 +251,31 @@ describe('StoreProvider readiness and configuration', () => {
     expect(caught).toEqual([])
   })
 
+  it('keeps the same config snapshot when only the experimental key order changes', async () => {
+    /** Config snapshots seen by the child, one per render. */
+    const seen: unknown[] = []
+    /** Records the normalized snapshot identity on every render. */
+    function Consumer() {
+      seen.push(useStoreConfig())
+      return null
+    }
+    await render(
+      createElement(StoreProvider, {
+        config: { features: { experimental: { zeta: true, alpha: false } } },
+        children: createElement(Consumer)
+      })
+    )
+    await render(
+      createElement(StoreProvider, {
+        config: { features: { experimental: { alpha: false, zeta: true } } },
+        children: createElement(Consumer)
+      })
+    )
+    expect(seen.length).toBeGreaterThan(1)
+    expect(seen.at(-1)).toBe(seen[0])
+    expect(caught).toEqual([])
+  })
+
   it('returns optional configuration defaults outside a Provider', async () => {
     /** Optional feature reads support components shared between enhanced and plain trees. */
     function Consumer() {

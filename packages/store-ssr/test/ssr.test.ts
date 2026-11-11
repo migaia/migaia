@@ -315,6 +315,22 @@ describe('register()', () => {
     scope.dispose()
   })
 
+  it('dehydrates stores and resources in registration order, not sorted key order', () => {
+    const scope = createSSRRequestScope()
+    scope.register('zeta', fakeStore(scope.runtime, { count: 1 }))
+    scope.register('alpha', fakeStore(scope.runtime, { count: 2 }))
+    const snapshot = { version: 2 as const, data: 1, ageMs: 0, remainingTtlMs: null }
+    scope.registerResource('zeta', fakeResource(scope.runtime, { snapshot }))
+    scope.registerResource('alpha', fakeResource(scope.runtime, { snapshot }))
+    const state = scope.dehydrate()
+    expect(Object.keys(state.stores)).toEqual(['zeta', 'alpha'])
+    expect(Object.keys(state.resources ?? {})).toEqual(['zeta', 'alpha'])
+    const trusted = scope.dehydrateTrusted()
+    expect(Object.keys(trusted.stores)).toEqual(['zeta', 'alpha'])
+    expect(Object.keys(trusted.resources ?? {})).toEqual(['zeta', 'alpha'])
+    scope.dispose()
+  })
+
   it('rejects a duplicate key without touching the existing registration', () => {
     const scope = createSSRRequestScope()
     const first = fakeStore(scope.runtime, { count: 1 })
@@ -615,15 +631,6 @@ describe('hydrate()', () => {
 // ---- dehydrate() / dehydrateTrusted() --------------------------------------
 
 describe('dehydrate()', () => {
-  it('sorts stores and resources by key', () => {
-    const scope = createSSRRequestScope()
-    scope.register('zebra', fakeStore(scope.runtime, { v: 'z' }))
-    scope.register('alpha', fakeStore(scope.runtime, { v: 'a' }))
-    const state = scope.dehydrate()
-    expect(Object.keys(state.stores)).toEqual(['alpha', 'zebra'])
-    scope.dispose()
-  })
-
   it('skips disposed stores and resources without a value', () => {
     const scope = createSSRRequestScope()
     const disposedStore = fakeStore(scope.runtime, { v: 1 })
@@ -1204,15 +1211,6 @@ describe('serializeTrustedSSRState()', () => {
 })
 
 describe('createSSRStateScript() / readSSRStateFromDocument()', () => {
-  function documentWith(elementId: string, textContent: string | null): ISSRDocument {
-    return {
-      getElementById(id: string) {
-        if (id !== elementId) return null
-        return { textContent, getAttribute: () => null }
-      }
-    }
-  }
-
   it('produces a <script type="application/json"> tag with the default element id', () => {
     const state: ISSRState = { version: 1, stores: { app: { count: 1 } } }
     const html = createSSRStateScript(state)
@@ -1543,3 +1541,13 @@ describe('assertSSRState()', () => {
     ).toThrow('stores.app.list[0].n')
   })
 })
+
+/** Minimal SSR document exposing one element whose id and text are given. */
+function documentWith(elementId: string, textContent: string | null): ISSRDocument {
+  return {
+    getElementById(id: string) {
+      if (id !== elementId) return null
+      return { textContent, getAttribute: () => null }
+    }
+  }
+}

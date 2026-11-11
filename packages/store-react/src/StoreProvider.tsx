@@ -9,6 +9,7 @@ import { StoreProviderState } from './provider-state-constants.ts'
 import {
   decodeStoreExperimental,
   encodeStoreExperimental,
+  sameStoreExperimental,
   normalizeStoreConfig,
   StoreConfigContext,
   type IStoreProviderConfig
@@ -112,10 +113,14 @@ export function StoreProvider({
     () => encodeStoreExperimental(configSnapshot.experimental),
     [configSnapshot.experimental]
   )
-  const experimental = useMemo<Readonly<Record<string, boolean>> | undefined>(
-    () => decodeStoreExperimental(experimentalKey),
-    [experimentalKey]
-  )
+  /** Last flag map handed to normalization; a reordered but equal map keeps this identity. */
+  const lastExperimental = useRef<Readonly<Record<string, boolean>>>(undefined)
+  const experimental = useMemo<Readonly<Record<string, boolean>> | undefined>(() => {
+    /** Flags decoded from the current key. */
+    const next = decodeStoreExperimental(experimentalKey)
+    return sameStoreExperimental(lastExperimental.current, next) ? lastExperimental.current : next
+  }, [experimentalKey])
+  lastExperimental.current = experimental
   const normalized = useMemo(
     () =>
       normalizeStoreConfig(

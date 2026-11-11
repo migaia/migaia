@@ -315,7 +315,7 @@ This is best-effort application rather than an atomic transaction. One callback 
 
 ### Safe dehydration and the trusted path
 
-dehydrate() takes no arguments. It visits active registrations in sorted key order. Store $plain results are JSON-validated, deeply copied, and frozen. A Resource returning undefined is omitted. Otherwise its data receives the same validation/copying, while version, ageMs, and remainingTtlMs are preserved. The outer state, stores, and resources are frozen. Later source changes do not change this safe snapshot.
+dehydrate() takes no arguments. It visits active registrations in registration order. Store $plain results are JSON-validated, deeply copied, and frozen. A Resource returning undefined is omitted. Otherwise its data receives the same validation/copying, while version, ageMs, and remainingTtlMs are preserved. The outer state, stores, and resources are frozen. Later source changes do not change this safe snapshot.
 
 dehydrateTrusted() also takes no arguments, but it is **not a snapshot**. It retains live $plain()/dehydrate() references without JSON validation, deep copies, or deep freezing. An outer wrapper does not make all descendants immutable. The ITrustedSSRState brand prevents accidental typed input to serializeTrustedSSRState; it is not proof that untrusted application data is safe.
 

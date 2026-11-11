@@ -3,6 +3,7 @@ import {
   assertStoreFeature,
   decodeStoreExperimental,
   encodeStoreExperimental,
+  sameStoreExperimental,
   normalizeStoreConfig,
   readStoreFeature,
   type IStoreConfigValue,
@@ -136,10 +137,13 @@ describe('encodeStoreExperimental / decodeStoreExperimental', () => {
     expect(decoded).toEqual({ betaUi: true, offlineMode: false })
   })
 
-  it('produces identical encodings regardless of key insertion order (sorted-tuple canonicalization)', () => {
-    const a = encodeStoreExperimental({ zeta: true, alpha: false })
-    const b = encodeStoreExperimental({ alpha: false, zeta: true })
-    expect(a).toBe(b)
+  it('treats flag maps that differ only in key order as the same flags', () => {
+    const a = decodeStoreExperimental(encodeStoreExperimental({ zeta: true, alpha: false }))
+    const b = decodeStoreExperimental(encodeStoreExperimental({ alpha: false, zeta: true }))
+    expect(sameStoreExperimental(a, b)).toBe(true)
+    expect(sameStoreExperimental(a, { zeta: true, alpha: true })).toBe(false)
+    expect(sameStoreExperimental(a, { zeta: true })).toBe(false)
+    expect(sameStoreExperimental(undefined, b)).toBe(false)
   })
 
   it('encodes undefined input as an empty-list marker and decodes back to an empty object', () => {

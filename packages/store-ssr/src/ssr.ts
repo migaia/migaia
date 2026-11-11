@@ -481,21 +481,21 @@ export class SSRRequestScope {
   }
 
   /**
-   * Copy/freeze JSON Store state and includable resource data, sorting keys and omitting disposed
-   * or valueless entries. Getters may execute. Unsupported values, cycles or depth/node limits fail
-   * with SERIALIZE_UNSUPPORTED; closed scopes throw SCOPE_DISPOSED. No HTML encoding or waiting
-   * occurs.
+   * Copy/freeze JSON Store state and includable resource data in registration order, omitting
+   * disposed or valueless entries. Getters may execute. Unsupported values, cycles or depth/node
+   * limits fail with SERIALIZE_UNSUPPORTED; closed scopes throw SCOPE_DISPOSED. No HTML encoding or
+   * waiting occurs.
    */
   dehydrate(): ISSRState {
     this.#assertActive()
     const stores: Record<string, Readonly<Record<string, IJSONValue>>> = Object.create(null)
     const resources: Record<string, IResourceCacheSnapshot<IJSONValue>> = Object.create(null)
-    for (const key of [...this.#registrations.keys()].sort()) {
+    for (const key of this.#registrations.keys()) {
       const registration = this.#registrations.get(key)
       if (!registration || registration.store.$disposed) continue
       stores[key] = toJSONObject(registration.store.$plain(), `stores.${key}`)
     }
-    for (const key of [...this.#resources.keys()].sort()) {
+    for (const key of this.#resources.keys()) {
       const registration = this.#resources.get(key)
       if (!registration || registration.resource.disposed) continue
       const snapshot = registration.resource.dehydrate()
@@ -525,13 +525,13 @@ export class SSRRequestScope {
     this.#assertActive()
     const stores: Record<string, Readonly<Record<string, IJSONValue>>> = {}
     const resources: Record<string, IResourceCacheSnapshot<IJSONValue>> = {}
-    for (const key of [...this.#registrations.keys()].sort()) {
+    for (const key of this.#registrations.keys()) {
       const registration = this.#registrations.get(key)
       if (registration && !registration.store.$disposed) {
         stores[key] = registration.store.$plain() as Readonly<Record<string, IJSONValue>>
       }
     }
-    for (const key of [...this.#resources.keys()].sort()) {
+    for (const key of this.#resources.keys()) {
       const registration = this.#resources.get(key)
       const snapshot = registration?.resource.dehydrate()
       if (registration && !registration.resource.disposed && snapshot) {
@@ -568,26 +568,6 @@ export class SSRRequestScope {
     // timeoutMs: 0 是合法值，语义是"立刻过期"——deadline 就是此刻，第一轮
     // 检查 remaining 时几乎必然已经 <= 0，等价于完全不等待任何在途 resource。
     const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs
-    /** At the deadline, only genuinely unsettled promises receive a timeout identity. */
-    const timeoutFailures = (
-      pending: ReadonlyArray<readonly [string, Promise<unknown>]>,
-      settled: readonly (PromiseSettledResult<unknown> | undefined)[]
-    ): ISSRResourceFailure[] =>
-      pending.flatMap(([key], index) => {
-        /** Settlement belongs to this exact promise, independently of the rest of the round. */
-        const result = settled[index]
-        if (result?.status === 'fulfilled') return []
-        if (result?.status === 'rejected') return [{ key, error: result.reason }]
-        return [
-          {
-            key,
-            error: createStoreSsrError(
-              StoreSsrErrorCode.resourceTimeout,
-              StoreSsrErrorText.resourceTimeout(key, timeoutMs)
-            )
-          }
-        ]
-      })
     // 轮次上限：resource 的完成回调里无限注册新 resource 属于调用方的 bug，
     // 但不能让它把渲染线程永远吊在这里。
     // The counter is inclusive because round zero is the first settled
@@ -626,13 +606,13 @@ export class SSRRequestScope {
         // Drain already-settled Promise reactions without waiting for still-pending resource work.
         await Promise.resolve()
         if (this.#disposed) return failures
-        failures.push(...timeoutFailures(pending, settled))
+        failures.push(...resourceTimeoutFailures(timeoutMs, pending, settled))
         return failures
       }
       const outcome = await raceOutcome(work, this.#disposedSignal, remaining)
       if (outcome.kind === SsrWorkOutcome.disposed) return failures
       if (outcome.kind === SsrWorkOutcome.timeout) {
-        failures.push(...timeoutFailures(pending, settled))
+        failures.push(...resourceTimeoutFailures(timeoutMs, pending, settled))
         return failures
       }
       for (let index = 0; index < outcome.value.length; index++) {
@@ -727,6 +707,7 @@ export class SSRRequestScope {
     this.#resolveDisposedSignal()
     // 显式释放顺序：resource（order 0）先于 store（order 1）——
     // store 逻辑上拥有 resource，必须先摘子资源再释放 store。组内仍按注册逆序（LIFO）。
+    // 两组按固定顺序拼接即已满足该顺序，无需再排序。
     const entries = [
       ...[...this.#resources.values()].reverse().map((registration) => ({
         order: registration.order,
@@ -742,7 +723,7 @@ export class SSRRequestScope {
           }
         }
       }))
-    ].sort((a, b) => a.order - b.order)
+    ]
     this.#registrations.clear()
     this.#resources.clear()
     this.#pendingHydration.clear()
@@ -1366,4 +1347,27 @@ function readSsrOption<T extends object, K extends keyof T>(options: T, key: K):
       cause: error
     })
   }
+}
+
+/** At the deadline, only genuinely unsettled promises receive a timeout identity. */
+function resourceTimeoutFailures(
+  timeoutMs: number | undefined,
+  pending: ReadonlyArray<readonly [string, Promise<unknown>]>,
+  settled: readonly (PromiseSettledResult<unknown> | undefined)[]
+): ISSRResourceFailure[] {
+  return pending.flatMap(([key], index) => {
+    /** Settlement belongs to this exact promise, independently of the rest of the round. */
+    const result = settled[index]
+    if (result?.status === 'fulfilled') return []
+    if (result?.status === 'rejected') return [{ key, error: result.reason }]
+    return [
+      {
+        key,
+        error: createStoreSsrError(
+          StoreSsrErrorCode.resourceTimeout,
+          StoreSsrErrorText.resourceTimeout(key, timeoutMs)
+        )
+      }
+    ]
+  })
 }

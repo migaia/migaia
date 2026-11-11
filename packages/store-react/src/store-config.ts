@@ -268,9 +268,10 @@ function freezeExperimental(
 }
 
 /**
- * Canonical, getter-free feature snapshot used by StoreProvider memoization. Accessors and
- * non-enumerable entries are ignored; sorted tuples make key order irrelevant. `__proto__` stays an
- * inert string key on the decoded null- prototype object.
+ * Getter-free feature snapshot used by StoreProvider memoization. Accessors and non-enumerable
+ * entries are ignored. Tuples keep the input's key order (no sort, so the work stays linear);
+ * StoreProvider treats reordered maps as equal through `sameStoreExperimental`. `__proto__` stays
+ * an inert string key on the decoded null-prototype object.
  */
 export function encodeStoreExperimental(input: IStoreFeatureExperimental | undefined): string {
   if (!input) return '[]'
@@ -285,7 +286,6 @@ export function encodeStoreExperimental(input: IStoreFeatureExperimental | undef
       if (!descriptor.enumerable || !('value' in descriptor)) continue
       entries.push([key, descriptor.value === true])
     }
-    entries.sort(([left], [right]) => left.localeCompare(right))
     const encoded = JSON.stringify(entries)
     if (cacheable) EXPERIMENTAL_ENCODING_CACHE.set(input, encoded)
     return encoded
@@ -296,6 +296,22 @@ export function encodeStoreExperimental(input: IStoreFeatureExperimental | undef
       { cause: error }
     )
   }
+}
+
+/**
+ * Whether two decoded flag maps hold the same flags, in any key order. Linear in the flag count;
+ * StoreProvider uses it to keep one flag-map identity when only the key order changed.
+ */
+export function sameStoreExperimental(
+  left: Readonly<Record<string, boolean>> | undefined,
+  right: Readonly<Record<string, boolean>>
+): boolean {
+  if (left === undefined) return false
+  /** Keys of the left map. */
+  const keys = Object.keys(left)
+  if (keys.length !== Object.keys(right).length) return false
+  for (const key of keys) if (!Object.hasOwn(right, key) || right[key] !== left[key]) return false
+  return true
 }
 
 export function decodeStoreExperimental(encoded: string): Readonly<Record<string, boolean>> {

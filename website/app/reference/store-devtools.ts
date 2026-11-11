@@ -455,6 +455,10 @@ const types: Record<string, ITypeDoc> = {
       circular: p(
         'True only when this node already exists on the current recursion path; shared diamonds are not cycles.',
         '仅在当前递归路径已经存在此节点时为真，共享菱形依赖不视为环。'
+      ),
+      shared: p(
+        'True when this node was already expanded earlier in the same tree; its children are listed only at that first occurrence.',
+        '此节点已在同一棵树中较早位置展开时为真，其子节点只在第一次出现处列出。'
       )
     }
   },
@@ -500,8 +504,8 @@ const symbols: Record<string, ISymbolDoc> = {
       zh: '还需直接安装 `@migaia/reactive`。`createRuntime()` 使用默认 adapter 和调度。`signal(1, { debugName })` 创建来源，`computed(read, { debugName })` 惰性读取它，`effect(read, { debugName })` 默认立即执行一次，建立真实图关系。debugName 是可选诊断标签，默认 undefined。先读 left、再读 right，决定这里展示的既有 Set 顺序。`getDependencyTree(root, maxDepth)` 接受真实 effect/计算值句柄；maxDepth 默认 `20`，必须是非负安全整数，`0` 不展开直接边。返回的是普通可变树快照，遍历不创建观察者。最后通过公开句柄释放 effect、计算值和信号。'
     },
     purpose: t(
-      'Traverses upstream dependencies from a runtime effect or computed handle, without requiring a store session. Current-path cycle detection marks recursion loops while allowing shared diamond nodes to appear on each branch.',
-      '从运行时副作用或计算值句柄向上遍历依赖，无须诊断会话；按当前路径检测并标记递归环，允许共享菱形节点在各分支分别出现。'
+      'Traverses upstream dependencies from a runtime effect or computed handle, without requiring a store session. Current-path cycle detection marks recursion loops; shared diamond nodes appear on each branch but expand once, later occurrences marked shared.',
+      '从运行时副作用或计算值句柄向上遍历依赖，无须诊断会话；按当前路径检测并标记递归环；共享菱形节点在各分支都出现，但只展开一次，之后的出现处标 shared。'
     ),
     params: {
       root: t(

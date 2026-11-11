@@ -315,7 +315,7 @@ hydrate(state) 只有必填 state 参数，无额外选项。先 assertSSRState 
 
 ### dehydrate 与 trusted 路径
 
-dehydrate() 无参数，按 key 字典序遍历未销毁的已登记对象。Store 的 $plain() 经 JSON 校验、深拷贝和冻结；Resource 的 dehydrate() 返回 undefined 时跳过，有值时只对 data 深拷贝校验，保留 version、ageMs、remainingTtlMs。外层 state、stores、resources 都冻结，脱水后源对象变化不改变这份安全快照。
+dehydrate() 无参数，按登记顺序遍历未销毁的已登记对象。Store 的 $plain() 经 JSON 校验、深拷贝和冻结；Resource 的 dehydrate() 返回 undefined 时跳过，有值时只对 data 深拷贝校验，保留 version、ageMs、remainingTtlMs。外层 state、stores、resources 都冻结，脱水后源对象变化不改变这份安全快照。
 
 dehydrateTrusted() 无参数，但它**不是快照**。它保留 $plain()/dehydrate() 的活引用，不做 JSON 校验、深拷贝或深冻结；只有外层包装不等于整棵数据不可变。ITrustedSSRState 有不可外部构造的类型品牌，serializeTrustedSSRState 只接受这条路径产出的类型，不是对不可信数据的安全证明。
 

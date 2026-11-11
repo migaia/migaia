@@ -42,6 +42,12 @@ export type IDependencyTreeNode = {
   children: IDependencyTreeNode[]
   /** Present as true only when this node repeats on the current path, not for a shared diamond leaf. */
   circular?: boolean
+  /**
+   * Present as true when this graph node was already expanded earlier in the same tree (a shared
+   * diamond node). Its children are listed only at that first occurrence, so each node is expanded
+   * once and the tree stays linear in the graph size.
+   */
+  shared?: boolean
 }
 
 /** One published history snapshot; the runtime freezes the entry and state only at the top level. */
@@ -148,13 +154,14 @@ const nodeLabel = (node: object): string =>
   node.constructor?.name ??
   StoreDevtoolsLabel.anonymousReactiveNode
 
-// Detects cycles on the current path rather than through a global visited set. Shared diamond nodes expand once per path.
-// Only revisiting a node still on that path is a cycle. Push on entry and remove on return.
+// Detects cycles on the current path rather than through a global visited set: only revisiting a
+// node still on that path is a cycle. Shared diamond nodes appear on every path but expand once.
 /**
  * Inspect the current dependencies of a real Effect/Computed handle or extension observer without
  * changing graph subscriptions. maxDepth defaults to 20, accepts nonnegative safe integers, and
- * zero keeps only the root. The mutable result expands shared nodes once per path, marks only a
- * current-path repeat circular, and stops there. Invalid depth throws INVALID_OPTION RangeError.
+ * zero keeps only the root. The mutable result lists shared nodes on every path but expands them
+ * once (later occurrences carry `shared`), marks only a current-path repeat circular, and stops
+ * there. Invalid depth throws INVALID_OPTION RangeError.
  */
 export function getDependencyTree(
   root: IObserver | IReactiveEffect | IReactiveComputed<unknown>,
@@ -209,9 +216,10 @@ type ITreeFrame = {
 }
 
 /**
- * Expand a graph tree depth-first with an explicit stack. Shared nodes are expanded once per path,
- * a node already on the current path is marked circular and not expanded, and nodes at maxDepth
- * stay leaves. Supported depth no longer depends on the JavaScript call-stack size.
+ * Expand a graph tree depth-first with an explicit stack. A node already on the current path is
+ * marked circular and not expanded; a node already expanded elsewhere in the tree is marked shared
+ * and not expanded again, so total work is linear in the graph size; nodes at maxDepth stay leaves
+ * and are not recorded as expanded. Supported depth does not depend on the JavaScript call stack.
  */
 function expandTree(
   root: IDependencyTreeNode,
@@ -223,6 +231,8 @@ function expandTree(
 ): void {
   /** Graph objects on the current root-to-node path. */
   const path = new Set<object>([rootOwner])
+  /** Graph objects whose children were already listed somewhere in this tree. */
+  const expanded = new Set<object>([rootOwner])
   /** Frames still being expanded; the last one is the current node. */
   const stack: ITreeFrame[] = [
     { node: root, owner: rootOwner, children: rootChildren, depth: 0, next: 0 }
@@ -248,7 +258,12 @@ function expandTree(
     const depth = frame.depth + 1
     /** The child's own children, or undefined when it is a leaf at this depth. */
     const grandchildren = depth >= maxDepth ? undefined : childrenOf(child)
-    if (grandchildren === undefined) continue
+    if (grandchildren === undefined || grandchildren.length === 0) continue
+    if (expanded.has(child)) {
+      node.shared = true
+      continue
+    }
+    expanded.add(child)
     path.add(child)
     stack.push({ node, owner: child, children: grandchildren, depth, next: 0 })
   }

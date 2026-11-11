@@ -126,6 +126,52 @@ describe('getDependencyTree', () => {
     expect(rightShared.circular).toBeUndefined()
   })
 
+  it('expands a shared node with dependencies once and marks later occurrences shared', () => {
+    const source: IMockObservable = { debugName: 'source', version: 3 }
+    const shared: IMockObservable = { debugName: 'shared', version: 9, deps: new Set([source]) }
+    const left: IMockObservable = { debugName: 'left', version: 1, deps: new Set([shared]) }
+    const right: IMockObservable = { debugName: 'right', version: 2, deps: new Set([shared]) }
+    const root = asObserver({ debugName: 'root', deps: new Set([left, right]) })
+
+    const tree = getDependencyTree(root)
+    expect(tree.children[0].children[0]).toEqual({
+      kind: 'observable',
+      label: 'shared',
+      version: 9,
+      children: [{ kind: 'observable', label: 'source', version: 3, children: [] }]
+    })
+    expect(tree.children[1].children[0]).toEqual({
+      kind: 'observable',
+      label: 'shared',
+      version: 9,
+      children: [],
+      shared: true
+    })
+    expect(tree.children[1].children[0].circular).toBeUndefined()
+  })
+
+  it('keeps the tree linear in graph size for a deep chain of diamonds', () => {
+    // 15 levels of two nodes that both depend on the next level's two nodes: 2^15 root-to-leaf
+    // paths, but only 31 graph nodes.
+    let level: IMockObservable[] = [{ debugName: 'leaf', version: 0 }]
+    for (let depth = 0; depth < 15; depth++) {
+      const deps = new Set(level)
+      level = [
+        { debugName: `a${depth}`, version: 0, deps },
+        { debugName: `b${depth}`, version: 0, deps }
+      ]
+    }
+    const root = asObserver({ debugName: 'root', deps: new Set(level) })
+    const stack = [getDependencyTree(root)]
+    let count = 0
+    while (stack.length > 0) {
+      count++
+      stack.push(...stack.pop()!.children)
+    }
+    // Root plus at most two tree nodes per edge of the 31-node graph.
+    expect(count).toBeLessThanOrEqual(1 + 2 * 31 * 2)
+  })
+
   it('maxDepth = 0 keeps even the root childless', () => {
     const leaf: IMockObservable = { debugName: 'leaf', version: 1 }
     const root = asObserver({ debugName: 'root', deps: new Set([leaf]) })
