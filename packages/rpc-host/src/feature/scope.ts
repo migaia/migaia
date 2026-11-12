@@ -63,7 +63,8 @@ function captureFeatures(
     if (!execution || typeof execution.run !== 'function') invalidCallFeature()
     selected.push({ alias: name, value: { role, execution } })
   }
-  return selected
+  // Frozen, so the overlay can reuse its normalization on every later compile.
+  return Object.freeze(selected)
 }
 /** Materialize the fixed domain cache once per cold notification. */
 function compileFeatures(

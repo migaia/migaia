@@ -290,6 +290,29 @@ async function verifyLocalNormalization() {
   }
 }
 
+/** A mutable local list is read afresh on every compile; a frozen list keeps its normalization. */
+function verifyMutableLocalList() {
+  /** Projection count shows when a local list is normalized again. */
+  const projections = { count: 0 }
+  const overlay = new FeatureOverlay<IValue>((value) => {
+    projections.count += 1
+    return value
+  })
+  /** A caller-owned array that changes between compiles. */
+  const local: IFeatureOverlaySelection<IValue>[] = [
+    { alias: 'a', value: { role: Role.second, repeatable: true, id: 1 } }
+  ]
+  expect(overlay.compile(local).map((entry) => entry.alias)).toEqual(['a'])
+  local.push({ alias: 'b', value: { role: Role.second, repeatable: true, id: 2 } })
+  expect(overlay.compile(local).map((entry) => entry.alias)).toEqual(['a', 'b'])
+  /** A frozen list cannot change, so its normalization is reused. */
+  const frozen = Object.freeze([...local])
+  projections.count = 0
+  overlay.compile(frozen)
+  overlay.compile(frozen)
+  expect(projections.count).toBe(2)
+}
+
 /** Register named cases without nested callback components. */
 function registerLifecycleCases(): void {
   // These three sizes and five scenarios are the fixed acceptance matrix, not runtime configuration.
@@ -312,4 +335,6 @@ function registerLifecycleCases(): void {
   )
 
   it('reuses normalized local declarations across global notifications', verifyLocalNormalization)
+
+  it('reads a mutable local list afresh and caches a frozen one', verifyMutableLocalList)
 }

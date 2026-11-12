@@ -131,15 +131,18 @@ export class FeatureOverlay<T> {
     return contribution.published
   }
 
-  /** Compile role-first output, skipping disabled buckets and reusing normalized local declarations. */
+  /**
+   * Compile role-first output, skipping disabled buckets and reusing normalized frozen
+   * declarations.
+   */
   compile(
     local: readonly IFeatureOverlaySelection<T>[] = emptySelection
   ): readonly IFeatureOverlayEntry<T>[] {
-    /** Local declaration identity is stable for the consumer's lifetime. */
+    /** Normalized declarations; only a frozen list is cached, since any other list may change. */
     let selected = this.#locals.get(local)
     if (!selected) {
       selected = this.#normalize(local)
-      this.#locals.set(local, selected)
+      if (Object.isFrozen(local)) this.#locals.set(local, selected)
     }
     /** Complete materialization belongs to the cold consumer, never the hot call path. */
     const result: IFeatureOverlayEntry<T>[] = []
