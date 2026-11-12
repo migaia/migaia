@@ -113,14 +113,17 @@ export function StoreProvider({
     () => encodeStoreExperimental(configSnapshot.experimental),
     [configSnapshot.experimental]
   )
-  /** Last flag map handed to normalization; a reordered but equal map keeps this identity. */
+  /** Last committed flag map; a reordered but equal map keeps this identity. */
   const lastExperimental = useRef<Readonly<Record<string, boolean>>>(undefined)
   const experimental = useMemo<Readonly<Record<string, boolean>> | undefined>(() => {
     /** Flags decoded from the current key. */
     const next = decodeStoreExperimental(experimentalKey)
     return sameStoreExperimental(lastExperimental.current, next) ? lastExperimental.current : next
   }, [experimentalKey])
-  lastExperimental.current = experimental
+  // Remember the map only once this render commits; an abandoned render must not replace it.
+  useEffect(() => {
+    lastExperimental.current = experimental
+  }, [experimental])
   const normalized = useMemo(
     () =>
       normalizeStoreConfig(

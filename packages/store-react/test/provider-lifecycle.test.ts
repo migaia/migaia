@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Component, StrictMode, act, createElement, useEffect, type ReactNode } from 'react'
+import {
+  Component,
+  StrictMode,
+  act,
+  createElement,
+  startTransition,
+  useEffect,
+  type ReactNode
+} from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { createRuntime } from '@migaia/reactive'
 import {
@@ -265,6 +273,47 @@ describe('StoreProvider readiness and configuration', () => {
         children: createElement(Consumer)
       })
     )
+    await render(
+      createElement(StoreProvider, {
+        config: { features: { experimental: { alpha: false, zeta: true } } },
+        children: createElement(Consumer)
+      })
+    )
+    expect(seen.length).toBeGreaterThan(1)
+    expect(seen.at(-1)).toBe(seen[0])
+    expect(caught).toEqual([])
+  })
+
+  it('ignores the experimental map of an abandoned render when keeping config identity', async () => {
+    /** Config snapshots seen by the child in renders that did not suspend. */
+    const seen: unknown[] = []
+    /** Never settles, so the transition render that reads it is abandoned. */
+    const pending = new Promise<never>(() => {})
+    /** Suspends while the `stall` flag is on; otherwise records the config identity. */
+    function Consumer() {
+      const config = useStoreConfig()
+      if (config?.features.experimental?.stall) throw pending
+      seen.push(config)
+      return null
+    }
+    await render(
+      createElement(StoreProvider, {
+        config: { features: { experimental: { zeta: true, alpha: false } } },
+        children: createElement(Consumer)
+      })
+    )
+    await act(async () => {
+      startTransition(() => {
+        root.render(
+          createElement(ErrorBoundary, {
+            children: createElement(StoreProvider, {
+              config: { features: { experimental: { stall: true } } },
+              children: createElement(Consumer)
+            })
+          })
+        )
+      })
+    })
     await render(
       createElement(StoreProvider, {
         config: { features: { experimental: { alpha: false, zeta: true } } },
