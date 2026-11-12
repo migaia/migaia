@@ -150,6 +150,38 @@ describe('getDependencyTree', () => {
     expect(tree.children[1].children[0].circular).toBeUndefined()
   })
 
+  it('expands a shared node at its shallowest depth so maxDepth cannot cut it short', () => {
+    const z: IMockObservable = { debugName: 'z', version: 0 }
+    const y: IMockObservable = { debugName: 'y', version: 0, deps: new Set([z]) }
+    const x: IMockObservable = { debugName: 'x', version: 0, deps: new Set([y]) }
+    const b: IMockObservable = { debugName: 'b', version: 0, deps: new Set([x]) }
+    const a: IMockObservable = { debugName: 'a', version: 0, deps: new Set([b]) }
+    // Depth-first order meets x first at depth 3 (root > a > b > x), then at depth 1.
+    const root = asObserver({ debugName: 'root', deps: new Set([a, x]) })
+
+    const tree = getDependencyTree(root, 4)
+    expect(tree.children[0].children[0].children[0]).toEqual({
+      kind: 'observable',
+      label: 'x',
+      version: 0,
+      children: [],
+      shared: true
+    })
+    expect(tree.children[1]).toEqual({
+      kind: 'observable',
+      label: 'x',
+      version: 0,
+      children: [
+        {
+          kind: 'observable',
+          label: 'y',
+          version: 0,
+          children: [{ kind: 'observable', label: 'z', version: 0, children: [] }]
+        }
+      ]
+    })
+  })
+
   it('keeps the tree linear in graph size for a deep chain of diamonds', () => {
     // 15 levels of two nodes that both depend on the next level's two nodes: 2^15 root-to-leaf
     // paths, but only 31 graph nodes.

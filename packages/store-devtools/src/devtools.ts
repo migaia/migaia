@@ -206,20 +206,10 @@ export function getObserverTree(
   return tree
 }
 
-/** One node being expanded: its tree node, graph object, child list and next child to visit. */
-type ITreeFrame = {
-  readonly node: IDependencyTreeNode
-  readonly owner: object
-  readonly children: readonly object[]
-  readonly depth: number
-  next: number
-}
-
 /**
- * Expand a graph tree depth-first with an explicit stack. A node already on the current path is
- * marked circular and not expanded; a node already expanded elsewhere in the tree is marked shared
- * and not expanded again, so total work is linear in the graph size; nodes at maxDepth stay leaves
- * and are not recorded as expanded. Supported depth does not depend on the JavaScript call stack.
+ * Expand a graph tree below `root`. The one-pass walk is exact unless it both cut a branch at
+ * maxDepth and marked a node shared; then the tree is rebuilt so each node expands at its
+ * shallowest depth. Both passes are linear in the graph size.
  */
 function expandTree(
   root: IDependencyTreeNode,
@@ -229,13 +219,46 @@ function expandTree(
   createNode: (owner: object) => IDependencyTreeNode,
   childrenOf: (owner: object) => readonly object[] | undefined
 ): void {
+  if (!expandOnePass(root, rootOwner, rootChildren, maxDepth, createNode, childrenOf)) return
+  root.children.length = 0
+  expandShallowest(root, rootOwner, rootChildren, maxDepth, createNode, childrenOf)
+}
+
+/** One node being expanded: its tree node, graph object, child list and next child to visit. */
+type IOnePassFrame = {
+  readonly node: IDependencyTreeNode
+  readonly owner: object
+  readonly children: readonly object[]
+  readonly depth: number
+  next: number
+}
+
+/**
+ * Expand a graph tree depth-first with an explicit stack, expanding each graph object at its first
+ * occurrence. A node already on the current path is marked circular; a node already expanded
+ * elsewhere is marked shared; nodes at maxDepth stay leaves. Total work is linear in the graph
+ * size. Returns true when the tree both cut a branch at maxDepth and marked a node shared: only
+ * then can a shared node point at an expansion that maxDepth cut shorter.
+ */
+function expandOnePass(
+  root: IDependencyTreeNode,
+  rootOwner: object,
+  rootChildren: readonly object[],
+  maxDepth: number,
+  createNode: (owner: object) => IDependencyTreeNode,
+  childrenOf: (owner: object) => readonly object[] | undefined
+): boolean {
+  /** Whether some branch stopped at maxDepth. */
+  let truncated = false
+  /** Whether some occurrence was marked shared. */
+  let shared = false
   /**
    * Graph objects already expanded in this tree: true while still on the current root-to-node path,
    * false once their frame is finished. One map keeps the per-node cost at one lookup.
    */
   const visits = new Map<object, boolean>([[rootOwner, true]])
   /** Frames still being expanded; the last one is the current node. */
-  const stack: ITreeFrame[] = [
+  const stack: IOnePassFrame[] = [
     { node: root, owner: rootOwner, children: rootChildren, depth: 0, next: 0 }
   ]
   while (stack.length > 0) {
@@ -259,9 +282,13 @@ function expandTree(
     }
     /** Depth of `child` below the root. */
     const depth = frame.depth + 1
-    if (depth >= maxDepth) continue
+    if (depth >= maxDepth) {
+      truncated = true
+      continue
+    }
     if (visit === false) {
       node.shared = true
+      shared = true
       continue
     }
     /** The child's own children, or undefined for a plain source. */
@@ -269,6 +296,125 @@ function expandTree(
     if (grandchildren === undefined || grandchildren.length === 0) continue
     visits.set(child, true)
     stack.push({ node, owner: child, children: grandchildren, depth, next: 0 })
+  }
+  return truncated && shared
+}
+
+/** Expansion state of one graph object in a tree; plain numbers keep the per-node check cheap. */
+const TreeVisitState = {
+  /** Reachable within maxDepth and not expanded yet. */
+  pending: 0,
+  /** On the current root-to-node path; a repeat occurrence is circular. */
+  onPath: 1,
+  /** Expansion finished; a repeat occurrence is shared. */
+  expanded: 2
+} as const
+
+type TreeVisitState = (typeof TreeVisitState)[keyof typeof TreeVisitState]
+
+/** One graph object reachable within maxDepth: its shallowest depth, its children and its state. */
+type ITreeVisit = {
+  readonly depth: number
+  readonly children: readonly object[] | undefined
+  state: TreeVisitState
+}
+
+/** One node being expanded: its tree node, its graph visit, its depth and next child to visit. */
+type ITreeFrame = {
+  readonly node: IDependencyTreeNode
+  readonly visit: ITreeVisit
+  readonly depth: number
+  next: number
+}
+
+/**
+ * Record the shallowest depth of every graph object that may be expanded (depth below maxDepth),
+ * breadth-first, and read each object's children once. Work is linear in the reached graph.
+ */
+function shallowestVisits(
+  rootOwner: object,
+  rootChildren: readonly object[],
+  maxDepth: number,
+  childrenOf: (owner: object) => readonly object[] | undefined
+): Map<object, ITreeVisit> {
+  /** Every reached graph object; breadth-first order makes the first recorded depth the smallest. */
+  const visits = new Map<object, ITreeVisit>([
+    [rootOwner, { depth: 0, children: rootChildren, state: TreeVisitState.onPath }]
+  ])
+  /** Breadth-first queue of objects whose children are still to be recorded. */
+  const queue: ITreeVisit[] = [visits.get(rootOwner)!]
+  for (let index = 0; index < queue.length; index += 1) {
+    /** Object whose children are recorded now. */
+    const parent = queue[index]!
+    /** Depth of the parent's children below the root. */
+    const depth = parent.depth + 1
+    if (depth >= maxDepth || parent.children === undefined) continue
+    for (const child of parent.children) {
+      if (visits.has(child)) continue
+      /** Child record; its children are read once here and reused by the expansion. */
+      const visit: ITreeVisit = {
+        depth,
+        children: childrenOf(child),
+        state: TreeVisitState.pending
+      }
+      visits.set(child, visit)
+      if (visit.children !== undefined && visit.children.length > 0) queue.push(visit)
+    }
+  }
+  return visits
+}
+
+/**
+ * Expand a graph tree depth-first with an explicit stack. Each graph object is expanded once, at
+ * its shallowest depth, so a shared occurrence never points at an expansion that maxDepth cut
+ * shorter. It costs an extra breadth-first pass, so it runs only when the one-pass walk needs it. A
+ * node already on the current path is marked circular; any other repeat occurrence is marked shared
+ * and not expanded; nodes at maxDepth stay leaves. Total work is linear in the graph size, and
+ * supported depth does not depend on the JavaScript call stack.
+ */
+function expandShallowest(
+  root: IDependencyTreeNode,
+  rootOwner: object,
+  rootChildren: readonly object[],
+  maxDepth: number,
+  createNode: (owner: object) => IDependencyTreeNode,
+  childrenOf: (owner: object) => readonly object[] | undefined
+): void {
+  /** Shallowest depth, children and expansion state of every object reachable within maxDepth. */
+  const visits = shallowestVisits(rootOwner, rootChildren, maxDepth, childrenOf)
+  /** Frames still being expanded; the last one is the current node. */
+  const stack: ITreeFrame[] = [{ node: root, visit: visits.get(rootOwner)!, depth: 0, next: 0 }]
+  while (stack.length > 0) {
+    /** Node whose next child is visited now. */
+    const frame = stack[stack.length - 1]!
+    /** Children of the current node, read once by the breadth-first pass. */
+    const children = frame.visit.children!
+    if (frame.next >= children.length) {
+      frame.visit.state = TreeVisitState.expanded
+      stack.pop()
+      continue
+    }
+    /** Next child graph object of the current node. */
+    const child = children[frame.next++]!
+    /** Tree node for that child. */
+    const node = createNode(child)
+    frame.node.children.push(node)
+    /** Record of the child; undefined only when it lies at or beyond maxDepth. */
+    const visit = visits.get(child)
+    if (visit?.state === TreeVisitState.onPath) {
+      node.circular = true
+      continue
+    }
+    /** Depth of `child` below the root. */
+    const depth = frame.depth + 1
+    if (depth >= maxDepth || visit === undefined) continue
+    if (visit.children === undefined || visit.children.length === 0) continue
+    if (visit.state === TreeVisitState.expanded || visit.depth < depth) {
+      node.shared = true
+      continue
+    }
+    visit.state = TreeVisitState.onPath
+    stack.push({ node, visit, depth, next: 0 })
   }
 }
 
