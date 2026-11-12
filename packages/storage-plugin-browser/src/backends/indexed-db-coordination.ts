@@ -262,8 +262,7 @@ const rememberHint = (entry: IIndexedDbCoordinationEntry, change: IStorageChange
 const scheduleDrain = (entry: IIndexedDbCoordinationEntry): void => {
   if (entry.drainScheduled || entry.disposed) return
   entry.drainScheduled = true
-  if (typeof queueMicrotask === 'function') queueMicrotask(() => drainPending(entry))
-  else void Promise.resolve().then(() => drainPending(entry))
+  queueMicrotask(() => drainPending(entry))
 }
 
 /** Publishes every queued hint of `entry` once; listener failures stay report-only. */
