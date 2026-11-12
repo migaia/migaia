@@ -85,7 +85,7 @@
     "typecheck:test": "bun check -p tsconfig.test.json",
     "typecheck:e2e": "bun check -p tsconfig.e2e.json",
     "lint": "oxlint src test e2e",
-    "test": "pnpm run build && vitest run --coverage",
+    "test": "vitest run --coverage",
     "test:packed": "pnpm run build && vitest run test/bundle-boundary.spec.ts",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "release:patch": "pnpm version patch --no-git-tag-version",

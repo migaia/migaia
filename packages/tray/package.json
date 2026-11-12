@@ -43,7 +43,7 @@
     "lint": "oxlint src test",
     "typecheck": "bun check -p tsconfig.json",
     "typecheck:test": "bun check -p test/tsconfig.json",
-    "test": "pnpm run build && vitest run test --maxWorkers=1",
+    "test": "vitest run test --maxWorkers=1",
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",

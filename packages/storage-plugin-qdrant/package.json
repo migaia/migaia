@@ -52,7 +52,7 @@
     "typecheck": "bun check -p tsconfig.json",
     "typecheck:test": "bun check -p tsconfig.test.json",
     "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
-    "test": "pnpm run build && vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@migaia/lifecycle": "workspace:^",
