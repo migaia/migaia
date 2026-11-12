@@ -128,15 +128,11 @@ export type ISSRRequestScopeOptions = {
 type ISSRRegistration = {
   readonly store: ISSRStore
   readonly owned: boolean
-  /** 释放顺序键：store 晚于其所属 resource 释放。 */
-  readonly order: 1
 }
 
 type ISSRResourceRegistration = {
   readonly resource: ISSRResource
   readonly owned: boolean
-  /** 释放顺序键：resource 早于 store 释放。 */
-  readonly order: 0
 }
 
 /** Local prefetch diagnostic, not automatically embedded in dehydrated state. */
@@ -321,11 +317,7 @@ export class SSRRequestScope {
     if (hydration) store.$hydrate(hydration)
     // Hydration is application code and may close this owner before admission commits.
     this.#assertActive()
-    this.#registrations.set(key, {
-      store,
-      owned,
-      order: 1
-    })
+    this.#registrations.set(key, { store, owned })
     if (hydration) this.#pendingHydration.delete(key)
   }
 
@@ -390,11 +382,7 @@ export class SSRRequestScope {
     if (hydration) resource.hydrate(hydration)
     // Failed admission retains the candidate's caller ownership, as on a hydration throw.
     this.#assertActive()
-    this.#resources.set(key, {
-      resource,
-      owned,
-      order: 0
-    })
+    this.#resources.set(key, { resource, owned })
     if (hydration) this.#pendingResourceHydration.delete(key)
   }
 
@@ -705,18 +693,16 @@ export class SSRRequestScope {
     // Sync callers may never observe async completion; the stable public Promise still replays it.
     void this.#disposePromise.catch(() => undefined)
     this.#resolveDisposedSignal()
-    // 显式释放顺序：resource（order 0）先于 store（order 1）——
+    // 显式释放顺序：resource 先于 store——
     // store 逻辑上拥有 resource，必须先摘子资源再释放 store。组内仍按注册逆序（LIFO）。
     // 两组按固定顺序拼接即已满足该顺序，无需再排序。
     const entries = [
       ...[...this.#resources.values()].reverse().map((registration) => ({
-        order: registration.order,
         dispose: () => {
           if (registration.owned && !registration.resource.disposed) registration.resource.dispose()
         }
       })),
       ...[...this.#registrations.values()].reverse().map((registration) => ({
-        order: registration.order,
         dispose: (): void | PromiseLike<void> => {
           if (registration.owned && !registration.store.$disposed) {
             return registration.store.$dispose()
