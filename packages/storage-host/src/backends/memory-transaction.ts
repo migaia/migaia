@@ -13,6 +13,7 @@ import type {
   IConcurrencyAttemptContext,
   IConflictPolicy
 } from '@migaia/storage-contract'
+import { StorageContractErrorText } from '@migaia/storage-contract'
 import {
   snapshotStorageKey,
   encodeOrderedStorageKey,
@@ -199,7 +200,12 @@ export async function transact<T, R>(
     try {
       await transactionContext.control.closeIterators()
     } catch (cleanup) {
-      primary = normalize(transactionContext.namespaceContext, cleanup)
+      /** A distinct cleanup failure joins the primary in one aggregate; the primary stays first. */
+      if (cleanup !== primary)
+        primary = normalize(
+          transactionContext.namespaceContext,
+          new AggregateError([primary, cleanup], StorageContractErrorText.transactionCleanup)
+        )
     }
     void transactionContext.stage.afterRollback?.(primary.code)
     throw primary
