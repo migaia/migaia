@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { createLogHost, defaultLogFailureReporter } from '../src/index.ts'
 import { defineOutputPlugin } from '../src/plugin.ts'
+import { LogHost } from '../src/host.ts'
 import type { ILogEntry, ILogFailure } from '../src/typing.ts'
 import { nextTurn } from './fixtures/output.ts'
 
@@ -131,3 +132,21 @@ async function defaultTerminalBoundaries(): Promise<void> {
 it('contains transport and pipeline failures and traces listener errors', containsRuntimeFailures)
 it('contains both synchronous and rejected reporter failures', containsReporterFailures)
 it('contains default console throws, rejection and then getter failures', defaultTerminalBoundaries)
+
+it('settles shutdown with the failure when its own failure reporting throws', async () => {
+  /** Flush rejection drives the shutdown catch that calls the throwing reporter. */
+  const flushFailure = new Error('flush fixture')
+  /** The escaped reporter failure must reject the published shutdown receipt. */
+  const reportFailure = new Error('report fixture')
+  const host = createLogHost()
+  const flush = vi.spyOn(LogHost.prototype, 'flush').mockRejectedValueOnce(flushFailure)
+  const report = vi.spyOn(LogHost.prototype, 'reportFailure').mockImplementationOnce(() => {
+    throw reportFailure
+  })
+  try {
+    await expect(host.shutdown('manual')).rejects.toBe(reportFailure)
+  } finally {
+    flush.mockRestore()
+    report.mockRestore()
+  }
+})

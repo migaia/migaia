@@ -498,7 +498,8 @@ export class LogHost {
     /** Publish the native receipt before handlers execute, retaining synchronous admission timing. */
     const completion = deferred<IPluginHostDisposalResult>()
     this.#shutdownPromise = completion.promise
-    void this.#shutdown(reason).then(completion.resolve)
+    /** A rejection settles the published receipt too, so callers never wait forever. */
+    void this.#shutdown(reason).then(completion.resolve, completion.reject)
     return this.#shutdownPromise
   }
   /** Walk entry snapshots serially; output promises are tracked independently to enable batching. */
