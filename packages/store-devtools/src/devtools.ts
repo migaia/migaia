@@ -348,8 +348,9 @@ function shallowestVisits(
     const parent = queue[index]!
     /** Depth of the parent's children below the root. */
     const depth = parent.depth + 1
-    if (depth >= maxDepth || parent.children === undefined) continue
-    for (const child of parent.children) {
+    if (depth >= maxDepth) continue
+    // Only objects with children enter the queue, so `children` is set here.
+    for (const child of parent.children!) {
       if (visits.has(child)) continue
       /** Child record; its children are read once here and reused by the expansion. */
       const visit: ITreeVisit = {
