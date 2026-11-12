@@ -1,3 +1,4 @@
+import { hasErrorIdentity } from '@migaia/utils/error'
 import { createContext, useContext, type ReactNode } from 'react'
 import { createStoreReactError } from './errors.ts'
 import { StoreReactErrorCode } from './error-code.ts'
@@ -152,7 +153,7 @@ export function normalizeStoreConfig(
       }
     } catch (error) {
       // A revoked Proxy or throwing slot getter becomes INVALID_CONFIG with the error on cause.
-      if (hasCompleteIdentity(error)) throw error
+      if (hasErrorIdentity(error)) throw error
       throw createStoreReactError(
         StoreReactErrorCode.invalidConfig,
         StoreReactErrorText.readyInvalid,
@@ -417,13 +418,4 @@ export function useStoreFeature(path: IStoreFeaturePath): boolean {
 export function useAssertStoreFeature(path: IStoreFeaturePath, apiName?: string): void {
   const config = useStoreConfig()
   assertStoreFeature(config, path, apiName)
-}
-
-/** True when an error carries both `source` and `code` as own string data properties. */
-function hasCompleteIdentity(error: unknown): boolean {
-  if (error === null || (typeof error !== 'object' && typeof error !== 'function')) return false
-  return (
-    typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
-    typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
-  )
 }

@@ -4,7 +4,7 @@
  */
 import { ERROR_SOURCE, TrayErrorCode, type ITrayErrorCode } from './error-code.ts'
 import { TrayErrorText } from './error-text.ts'
-import { attachErrorIdentity, attachSecondaryErrors, isNativeErrorValue } from '@migaia/utils/error'
+import { identifyBoundaryFailure } from '@migaia/utils/error'
 
 /** Stable package source attached to every Tray-owned boundary error. */
 export const TRAY_SOURCE = ERROR_SOURCE
@@ -14,20 +14,9 @@ export const TRAY_SOURCE = ERROR_SOURCE
  * with their owner; immutable/non-native throws remain reachable through a tagged wrapper's cause.
  */
 export function attachTrayError(error: unknown, code: ITrayErrorCode): Error {
-  if (isNativeErrorValue(error)) {
-    try {
-      /** Annotation inspects descriptors so application metadata getters are not invoked. */
-      const source = Object.getOwnPropertyDescriptor(error, 'source')
-      /** Complete existing identities remain owned by their originating package. */
-      const existingCode = Object.getOwnPropertyDescriptor(error, 'code')
-      if (typeof source?.value === 'string' && typeof existingCode?.value === 'string') return error
-      if (!source && !existingCode && Object.isExtensible(error))
-        return attachErrorIdentity(error, { source: TRAY_SOURCE, code })
-    } catch (metadataError) {
-      return attachSecondaryErrors(createTrayError(code, error), [metadataError]) as Error
-    }
-  }
-  return createTrayError(code, error)
+  return identifyBoundaryFailure(error, { source: TRAY_SOURCE, code }, (cause) =>
+    createTrayError(code, cause)
+  ) as Error
 }
 
 /** Creates a new Tray-owned Error for non-Error failures or local diagnostics. */

@@ -1,9 +1,9 @@
-import { reportUnhandledError } from '@migaia/utils/error'
+import { identifyBoundaryFailure, reportUnhandledError } from '@migaia/utils/error'
 /**
  * Bridge borrowed serializers through Worker RPC with the original credit, iterator and disposal
  * owners.
  */
-import { attachErrorIdentity, attachSecondaryErrors, isNativeErrorValue } from '@migaia/utils/error'
+import { attachErrorIdentity, attachSecondaryErrors } from '@migaia/utils/error'
 import { WorkerMessagePort, type IWorkerMessagePort } from '../worker-message-event.ts'
 import {
   SerializeCodecError,
@@ -664,33 +664,15 @@ function assertSerializeHandlerInputs(
       )
     }
   } catch (error) {
-    if (isNativeErrorValue(error)) {
-      /** Classify this public factory input without invoking error metadata getters. */
-      let identified: Error | undefined
-      try {
-        /** Complete identities remain with the package that already owns the failure. */
-        const source = Object.getOwnPropertyDescriptor(error, 'source')
-        /** Unowned extensible native errors receive this existing invalid-input identity in place. */
-        const code = Object.getOwnPropertyDescriptor(error, 'code')
-        if (typeof source?.value === 'string' && typeof code?.value === 'string') identified = error
-        else if (!source && !code && Object.isExtensible(error))
-          identified = attachErrorIdentity(error, {
-            source: STORE_WORKER_SOURCE,
-            code: StoreWorkerErrorCode.invalidOption
-          })
-      } catch (metadataError) {
-        throw createStoreWorkerAggregateError(
+    throw identifyBoundaryFailure(
+      error,
+      { source: STORE_WORKER_SOURCE, code: StoreWorkerErrorCode.invalidOption },
+      (cause) =>
+        createStoreWorkerError(
           StoreWorkerErrorCode.invalidOption,
-          [error, metadataError],
-          StoreWorkerErrorText.handlerInvalid
+          StoreWorkerErrorText.handlerInvalid,
+          { cause }
         )
-      }
-      if (identified) throw identified
-    }
-    throw createStoreWorkerError(
-      StoreWorkerErrorCode.invalidOption,
-      StoreWorkerErrorText.handlerInvalid,
-      { cause: error }
     )
   }
 }

@@ -1,3 +1,4 @@
+import { hasErrorIdentity } from '@migaia/utils/error'
 import {
   createRuntime,
   ReactiveErrorPhase,
@@ -80,12 +81,7 @@ function readRegistrationOwned(options: unknown, fallback: boolean): boolean {
     return owned ?? fallback
   } catch (error) {
     // Only a complete own source/code identity passes through; anything else is INVALID_CONFIG.
-    if (
-      error instanceof Error &&
-      typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
-      typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
-    )
-      throw error
+    if (error instanceof Error && hasErrorIdentity(error)) throw error
     throw createStoreReactError(
       StoreReactErrorCode.invalidConfig,
       StoreReactErrorText.ownedOption,

@@ -1,5 +1,5 @@
 import { ERROR_SOURCE, StoreDevtoolsErrorCode, type IStoreDevtoolsErrorCode } from './error-code.ts'
-import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
+import { attachErrorIdentity, identifyBoundaryFailure } from '@migaia/utils/error'
 
 export { StoreDevtoolsErrorCode, type IStoreDevtoolsErrorCode }
 
@@ -56,22 +56,9 @@ export function createStoreDevtoolsRangeError(
 
 /** Classifies diagnostic preparation while preserving native errors and complete foreign identities. */
 export function identifyDevtoolsFailure(error: unknown, text: string): Error {
-  if (isNativeErrorValue(error)) {
-    try {
-      /** Read only metadata descriptors so annotation never invokes application getters. */
-      const source = Object.getOwnPropertyDescriptor(error, 'source')
-      /** An existing complete identity remains owned by its originating package. */
-      const code = Object.getOwnPropertyDescriptor(error, 'code')
-      if (typeof source?.value === 'string' && typeof code?.value === 'string') return error
-      if (!source && !code && Object.isExtensible(error))
-        return tagStoreDevtoolsError(error, StoreDevtoolsErrorCode.callbackFailed)
-    } catch (metadataError) {
-      return createStoreDevtoolsAggregateError(
-        StoreDevtoolsErrorCode.callbackFailed,
-        [error, metadataError],
-        text
-      )
-    }
-  }
-  return createStoreDevtoolsError(StoreDevtoolsErrorCode.callbackFailed, text, { cause: error })
+  return identifyBoundaryFailure(
+    error,
+    { source: STORE_DEVTOOLS_SOURCE, code: StoreDevtoolsErrorCode.callbackFailed },
+    (cause) => createStoreDevtoolsError(StoreDevtoolsErrorCode.callbackFailed, text, { cause })
+  ) as Error
 }

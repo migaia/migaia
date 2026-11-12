@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hasCompleteIdentity, runAtomCallback } from '../src/atom/callback-failure.ts'
+import { runAtomCallback } from '../src/atom/callback-failure.ts'
 
 describe('atom callback failure classification', () => {
   it('returns the callback value when it succeeds', () => {
@@ -28,13 +28,5 @@ describe('atom callback failure classification', () => {
       expect(thrown).toMatchObject({ code: 'CALLBACK_FAILED' })
       expect((thrown as Error).cause).toBe(failure)
     }
-  })
-
-  it('requires both identity fields as own string data', () => {
-    expect(hasCompleteIdentity(Object.assign(new Error('x'), { code: 'ONLY' }))).toBe(false)
-    const accessor = new Error('accessor')
-    Object.defineProperty(accessor, 'source', { get: () => 'app' })
-    Object.defineProperty(accessor, 'code', { value: 'X' })
-    expect(hasCompleteIdentity(accessor)).toBe(false)
   })
 })

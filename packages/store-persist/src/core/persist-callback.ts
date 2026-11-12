@@ -1,4 +1,5 @@
 /** Persist callback failure classification; internal to store-persist, not part of its public entry. */
+import { hasErrorIdentity } from '@migaia/utils/error'
 import { type IStorePersistErrorCode } from '../error-code.ts'
 import { createStorePersistError } from '../errors.ts'
 
@@ -14,13 +15,7 @@ export function runPersistCallback<T>(
   try {
     return callback()
   } catch (error) {
-    if (
-      error !== null &&
-      typeof error === 'object' &&
-      typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
-      typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
-    )
-      throw error
+    if (hasErrorIdentity(error)) throw error
     throw createStorePersistError(code, message, { cause: error })
   }
 }

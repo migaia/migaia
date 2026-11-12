@@ -39,7 +39,7 @@
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/storage-host.ts",
-    "gzip": 87024,
+    "gzip": 87030,
     "owner": "storage-host",
     "forbidden": [
       "packages/plugin-host/src/modules/enablement/**",

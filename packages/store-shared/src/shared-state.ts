@@ -20,7 +20,7 @@ import {
   createStoreSharedRangeError,
   STORE_SHARED_SOURCE
 } from './errors.ts'
-import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
+import { identifyBoundaryFailure } from '@migaia/utils/error'
 import { StoreSharedErrorCode } from './error-code.ts'
 import { StoreSharedErrorText } from './error-text.ts'
 import {
@@ -658,35 +658,17 @@ function runSharedUpdate(update: (current: number) => number, current: number): 
   try {
     return update(current)
   } catch (error) {
-    if (isNativeErrorValue(error)) {
-      /** Classified native errors keep their class, stack and exact identity. */
-      let identified: Error | undefined
-      try {
-        /** Do not invoke application-owned metadata accessors during error classification. */
-        const source = Object.getOwnPropertyDescriptor(error, 'source')
-        /** Complete existing identities continue to refer to their actual owner. */
-        const code = Object.getOwnPropertyDescriptor(error, 'code')
-        if (typeof source?.value === 'string' && typeof code?.value === 'string') identified = error
-        else if (!source && !code && Object.isExtensible(error)) {
-          identified = attachErrorIdentity(error, {
-            source: STORE_SHARED_SOURCE,
-            code: StoreSharedErrorCode.updateFailed
-          })
-        }
-      } catch (metadataError) {
-        throw attachErrorIdentity(
-          new AggregateError([error, metadataError], StoreSharedErrorText.updateFailed),
-          { source: STORE_SHARED_SOURCE, code: StoreSharedErrorCode.updateFailed }
+    throw identifyBoundaryFailure(
+      error,
+      { source: STORE_SHARED_SOURCE, code: StoreSharedErrorCode.updateFailed },
+      (cause) =>
+        createStoreSharedError(
+          StoreSharedErrorCode.updateFailed,
+          StoreSharedErrorText.updateFailed,
+          {
+            cause
+          }
         )
-      }
-      if (identified) throw identified
-    }
-    throw createStoreSharedError(
-      StoreSharedErrorCode.updateFailed,
-      StoreSharedErrorText.updateFailed,
-      {
-        cause: error
-      }
     )
   }
 }

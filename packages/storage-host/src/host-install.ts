@@ -1,4 +1,5 @@
 // Install entries and backend registration contexts for one storage host (see ./storage-host.ts).
+import { hasErrorIdentity } from '@migaia/utils/error'
 import { readStorageHookFailureCode } from './hooks.ts'
 import { createStorageObservers, type IStorageObserverSet } from './stages.ts'
 import { createStorageEnvelopeStages } from './envelope-stages.ts'
@@ -550,13 +551,7 @@ export class StorageHostInstaller {
  * EXTENSION_FAILED with the original on cause.
  */
 function toDetectFailure(error: unknown): unknown {
-  if (error instanceof Error) {
-    /** Own `source` data property, read without invoking a getter. */
-    const source = Object.getOwnPropertyDescriptor(error, 'source')?.value
-    /** Own `code` data property, read the same way. */
-    const code = Object.getOwnPropertyDescriptor(error, 'code')?.value
-    if (typeof source === 'string' && typeof code === 'string') return error
-  }
+  if (error instanceof Error && hasErrorIdentity(error)) return error
   // A detect check is a plugin-supplied extension callback; EXTENSION_FAILED is its registered code.
   return createStorageError(
     StorageHostErrorCode.extensionFailed,

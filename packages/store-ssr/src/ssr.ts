@@ -21,7 +21,7 @@ import { SsrWireType, SsrWorkOutcome } from './ssr-constants.ts'
 import { StoreSsrErrorText } from './error-text.ts'
 import { snapshotOwnDescriptors, snapshotOptionProperties } from '@migaia/utils/object'
 import { isPlainObject } from '@migaia/utils/object'
-import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
+import { attachErrorIdentity, hasErrorIdentity, identifyBoundaryFailure } from '@migaia/utils/error'
 
 /** Rejects null/non-object public options before SSR entry points read their fields. */
 function assertOptionObject(options: unknown): asserts options is object {
@@ -46,7 +46,7 @@ function readRegistrationOwned(options: unknown): boolean {
     return owned ?? true
   } catch (error) {
     // Only an error with its own complete source/code identity passes through unchanged.
-    if (hasCompleteIdentity(error)) throw error
+    if (hasErrorIdentity(error)) throw error
     throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.ownedOption, {
       cause: error
     })
@@ -1029,31 +1029,16 @@ function readSnapshotEntries(value: object, path: string): [string, unknown][] {
 
 /** Contains unknown snapshot property failures while retaining native and foreign error identity. */
 function identifySnapshotFailure(error: unknown): Error {
-  if (isNativeErrorValue(error)) {
-    try {
-      /** Descriptor reads avoid invoking application-defined error metadata. */
-      const source = Object.getOwnPropertyDescriptor(error, 'source')
-      /** A complete existing identity remains with its original owner. */
-      const code = Object.getOwnPropertyDescriptor(error, 'code')
-      if (typeof source?.value === 'string' && typeof code?.value === 'string') return error
-      if (!source && !code && Object.isExtensible(error))
-        return attachErrorIdentity(error, {
-          source: STORE_SSR_SOURCE,
-          code: StoreSsrErrorCode.invalidSnapshot
-        })
-    } catch (metadataError) {
-      return createStoreSsrAggregateError(
+  return identifyBoundaryFailure(
+    error,
+    { source: STORE_SSR_SOURCE, code: StoreSsrErrorCode.invalidSnapshot },
+    (cause) =>
+      createStoreSsrError(
         StoreSsrErrorCode.invalidSnapshot,
-        [error, metadataError],
-        StoreSsrErrorText.propertyAccess('state')
+        StoreSsrErrorText.propertyAccess('state'),
+        { cause }
       )
-    }
-  }
-  return createStoreSsrError(
-    StoreSsrErrorCode.invalidSnapshot,
-    StoreSsrErrorText.propertyAccess('state'),
-    { cause: error }
-  )
+  ) as Error
 }
 
 /**
@@ -1299,15 +1284,6 @@ function jsonValueToUnknown(value: IJSONValue): unknown {
     result[key] = jsonValueToUnknown(entry as IJSONValue)
   }
   return result
-}
-
-/** True when an error carries both `source` and `code` as own string data properties. */
-function hasCompleteIdentity(error: unknown): boolean {
-  if (error === null || (typeof error !== 'object' && typeof error !== 'function')) return false
-  return (
-    typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
-    typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
-  )
 }
 
 /**

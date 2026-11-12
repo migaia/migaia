@@ -2,44 +2,28 @@
 import {
   createStoreKeyedError,
   createStoreKeyedTypeError,
-  createStoreKeyedAggregateError,
   STORE_KEYED_SOURCE,
   StoreKeyedErrorCode
 } from '../errors.ts'
 import { StoreKeyedErrorText } from '../error-text.ts'
 
-import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
+import { identifyBoundaryFailure } from '@migaia/utils/error'
 
 /**
  * Identifies this pure optic boundary without replacing a native error or another package's
  * identity.
  */
 function identifyOpticAccessFailure(error: unknown): Error {
-  if (isNativeErrorValue(error)) {
-    try {
-      /** Own descriptors avoid invoking application metadata accessors while classifying a failure. */
-      const source = Object.getOwnPropertyDescriptor(error, 'source')
-      /** Existing complete identities continue to name their actual package owner. */
-      const code = Object.getOwnPropertyDescriptor(error, 'code')
-      if (typeof source?.value === 'string' && typeof code?.value === 'string') return error
-      if (!source && !code && Object.isExtensible(error))
-        return attachErrorIdentity(error, {
-          source: STORE_KEYED_SOURCE,
-          code: StoreKeyedErrorCode.opticAccessFailed
-        })
-    } catch (metadataError) {
-      return createStoreKeyedAggregateError(
+  return identifyBoundaryFailure(
+    error,
+    { source: STORE_KEYED_SOURCE, code: StoreKeyedErrorCode.opticAccessFailed },
+    (cause) =>
+      createStoreKeyedError(
         StoreKeyedErrorCode.opticAccessFailed,
-        [error, metadataError],
-        StoreKeyedErrorText.opticAccessFailed
+        StoreKeyedErrorText.opticAccessFailed,
+        { cause }
       )
-    }
-  }
-  return createStoreKeyedError(
-    StoreKeyedErrorCode.opticAccessFailed,
-    StoreKeyedErrorText.opticAccessFailed,
-    { cause: error }
-  )
+  ) as Error
 }
 
 /** Map and Set use SameValueZero: signed zeros share a key and NaN equals itself. */

@@ -1,3 +1,4 @@
+import { hasErrorIdentity } from '@migaia/utils/error'
 import { syncPipelineModule } from '@migaia/plugin-host/pipeline-modes/sync'
 import { identifyMiddlewareFailure } from './error-boundary.ts'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
@@ -500,13 +501,7 @@ function assertDevToolsAdapter<S>(adapter: IDevToolsAdapter<S>): void {
         StoreMiddlewareErrorText.adapterInvalid
       )
   } catch (error) {
-    if (
-      error !== null &&
-      typeof error === 'object' &&
-      typeof Object.getOwnPropertyDescriptor(error, 'source')?.value === 'string' &&
-      typeof Object.getOwnPropertyDescriptor(error, 'code')?.value === 'string'
-    )
-      throw error
+    if (hasErrorIdentity(error)) throw error
     throw createStoreMiddlewareError(
       StoreMiddlewareErrorCode.invalidOption,
       StoreMiddlewareErrorText.adapterInvalid,
