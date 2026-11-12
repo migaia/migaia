@@ -182,6 +182,33 @@ describe('getDependencyTree', () => {
     })
   })
 
+  it('marks cycles and stops at maxDepth when rebuilding at the shallowest depth', () => {
+    const w: IMockObservable = { debugName: 'w', version: 0 }
+    const z: IMockObservable = { debugName: 'z', version: 0, deps: new Set([w]) }
+    const y: IMockObservable = { debugName: 'y', version: 0, deps: new Set([z]) }
+    const x: IMockObservable = { debugName: 'x', version: 0, deps: new Set([y]) }
+    // y also depends back on x, so the rebuilt walk meets x again on its own path.
+    y.deps!.add(x)
+    const b: IMockObservable = { debugName: 'b', version: 0, deps: new Set([x]) }
+    const a: IMockObservable = { debugName: 'a', version: 0, deps: new Set([b]) }
+    const root = asObserver({ debugName: 'root', deps: new Set([a, x]) })
+
+    const tree = getDependencyTree(root, 4)
+    /** The shallow x at depth 1 owns the expansion. */
+    const shallowX = tree.children[1]
+    const shallowY = shallowX.children[0]
+    expect(shallowY.label).toBe('y')
+    expect(shallowY.children.map((child) => [child.label, child.circular === true])).toEqual([
+      ['z', false],
+      ['x', true]
+    ])
+    // z sits at depth 3; its child w is at maxDepth and stays a leaf.
+    expect(shallowY.children[0].children).toEqual([
+      { kind: 'observable', label: 'w', version: 0, children: [] }
+    ])
+    expect(tree.children[0].children[0].children[0].shared).toBe(true)
+  })
+
   it('keeps the tree linear in graph size for a deep chain of diamonds', () => {
     // 15 levels of two nodes that both depend on the next level's two nodes: 2^15 root-to-leaf
     // paths, but only 31 graph nodes.

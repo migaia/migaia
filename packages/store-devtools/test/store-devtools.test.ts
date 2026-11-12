@@ -399,3 +399,29 @@ it('contains revoked and throwing options getters as tagged configuration errors
     })
   )
 })
+
+it('rejects an invalid manual action and codes a throwing action getter', () => {
+  const { store } = makeStore()
+  const tools = createStoreDevTools(store, { captureRuntimeTrace: false })
+  expect(() => tools.recordAction(null as never)).toThrowError(
+    expect.objectContaining({ code: 'INVALID_OPTION' })
+  )
+  expect(() => tools.recordAction({ name: 1 } as never)).toThrowError(
+    expect.objectContaining({ code: 'INVALID_OPTION' })
+  )
+  /** Failure thrown by the caller's name getter. */
+  const getterFailure = new Error('name getter failed')
+  let thrown: unknown
+  try {
+    tools.recordAction({
+      get name(): string {
+        throw getterFailure
+      }
+    })
+  } catch (error) {
+    thrown = error
+  }
+  expect([thrown, (thrown as Error).cause]).toContain(getterFailure)
+  expect(tools.actions).toEqual([])
+  tools.dispose()
+})

@@ -10,7 +10,11 @@ import * as storeWorker from '../src/index.ts'
 import * as publicStoreWorker from '@migaia/store-worker'
 import * as publicWorkerParser from '@migaia/store-worker/serialize/worker'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler.ts'
-import { createSerializeWorkerHandler, workerParser } from '../src/serialize/worker.ts'
+import {
+  createSerializeWorkerHandler,
+  workerParser,
+  workerPlugin
+} from '../src/serialize/worker.ts'
 import { createWorkerContractEndpoint } from '../src/worker-contract.ts'
 
 function fakePort() {
@@ -463,6 +467,34 @@ describe('store-worker exports', () => {
     expect(returned).toBe(true)
     await handler.dispose()
     await worker.dispose?.()
+  })
+
+  it('rejects a request that reaches the endpoint after disposal started', async () => {
+    const parser: ISerializeParser = {
+      name: 'late-request',
+      encode: async function* () {},
+      decode: (chunk) => chunk[1]
+    }
+    const port = createLinkedWorkerPort()
+    const handler = installLinkedSerializeWorkerHandler(port, parser)
+    const worker = workerParser({ worker: port })
+    const pending = Promise.resolve(
+      worker.decode([SerializeChunkKind.bytes, new Uint8Array([1])], {
+        signal: new AbortController().signal,
+        context: 'late-request'
+      } as never)
+    )
+    const disposing = worker.dispose?.()
+    await expect(pending).rejects.toBeInstanceOf(Error)
+    await disposing
+    await handler.dispose()
+  })
+
+  it('builds a serialize plugin descriptor around one worker parser', async () => {
+    const plugin = workerPlugin({ worker: fakePort() as never, type: 'worker-json' })
+    expect(plugin.type).toBe('worker-json')
+    expect(plugin.parser.name).toBe('worker-json')
+    await plugin.parser.dispose?.()
   })
 
   it('settles a close-before-ready stream without sending a worker frame', async () => {

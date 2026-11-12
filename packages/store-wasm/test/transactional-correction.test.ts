@@ -214,3 +214,37 @@ describe('transactional correction', () => {
     )
   })
 })
+
+describe('array field input checks', () => {
+  beforeEach(async () => {
+    allocations.clear()
+    nextId = 1
+    nextPtr = 8
+    failNextPointer = false
+    await ensureWasm()
+  })
+
+  it('rejects an invalid length or granularity before allocation', () => {
+    expect(() => array(-1)).toThrowError(
+      expect.objectContaining({ code: StoreWasmErrorCode.invalidOption })
+    )
+    expect(() => array(2, 0)).toThrowError(
+      expect.objectContaining({ code: StoreWasmErrorCode.invalidOption })
+    )
+  })
+
+  it('gives an empty array an empty view and rejects bad indexes and values', async () => {
+    const empty = await array(0).create(context(() => source()))
+    expect(empty.view()).toEqual(new Float64Array(0))
+    const items = await array(2).create(context(() => source()))
+    expect(() => items.setAt(2, 1)).toThrowError(
+      expect.objectContaining({ code: StoreWasmErrorCode.invalidOption })
+    )
+    expect(() => items.setAt(0, 'x' as never)).toThrowError(
+      expect.objectContaining({ code: StoreWasmErrorCode.invalidOption })
+    )
+    items.setAt(1, 5)
+    items.setAt(1, 5)
+    expect(items.view()).toEqual(new Float64Array([0, 5]))
+  })
+})
