@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createSSRRequestScope, createSSRStateScriptWith } from '../src/index.ts'
+import { assertSSRState, createSSRRequestScope, createSSRStateScriptWith } from '../src/index.ts'
 
 /** Captures a synchronous or asynchronous failure for identity assertions. */
 async function failureOf(run: () => unknown): Promise<unknown> {
@@ -59,5 +59,32 @@ describe('SSR option read failures', () => {
       )
     )
     expect(fromScript).toMatchObject({ code: 'INVALID_OPTION', cause: scriptFailure })
+  })
+})
+
+describe('SSR state snapshot read failures', () => {
+  it('wraps a non-error thrown while reading a snapshot as INVALID_SNAPSHOT', () => {
+    const state = new Proxy(
+      {},
+      {
+        getOwnPropertyDescriptor() {
+          throw 'descriptor failure'
+        },
+        ownKeys() {
+          throw 'keys failure'
+        },
+        get() {
+          throw 'read failure'
+        }
+      }
+    )
+    let thrown: unknown
+    try {
+      assertSSRState(state)
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toMatchObject({ code: 'INVALID_SNAPSHOT' })
+    expect(typeof (thrown as Error).cause).toBe('string')
   })
 })
