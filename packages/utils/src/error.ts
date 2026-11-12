@@ -9,6 +9,7 @@ export {
   isNativeErrorValue,
   attachErrorIdentity,
   attachSecondaryErrors,
+  hasErrorIdentity,
   identifyBoundaryFailure,
   safeErrorReason,
   toError,

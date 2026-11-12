@@ -418,6 +418,19 @@ export { UtilsErrorCode }
 export type { IUtilsErrorCode }
 
 /**
+ * Whether `value` already carries a complete error identity: own data properties `source` and
+ * `code` that are both strings. Only own descriptors are read, so no getter runs; a Proxy whose
+ * descriptor trap throws lets that failure propagate to the caller's boundary.
+ */
+export function hasErrorIdentity(value: unknown): boolean {
+  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) return false
+  return (
+    typeof Object.getOwnPropertyDescriptor(value, 'source')?.value === 'string' &&
+    typeof Object.getOwnPropertyDescriptor(value, 'code')?.value === 'string'
+  )
+}
+
+/**
  * Give a failure crossing a package boundary that package's identity, the way the error contract
  * asks: an error that already has a complete identity (own string `source` and `code`) keeps it; an
  * uncoded, extensible native error gets `identity` attached in place, so its type, stack and object

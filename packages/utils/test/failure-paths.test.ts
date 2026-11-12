@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { collect } from '../src/collector.ts'
-import { attachErrorIdentity, identifyBoundaryFailure } from '../src/error.ts'
+import { attachErrorIdentity, hasErrorIdentity, identifyBoundaryFailure } from '../src/error.ts'
 import { diagnosticSnapshot, snapshotOptionProperties } from '../src/object.ts'
 import { asyncTask, coalesce, throttle } from '../src/scheduler.ts'
 
@@ -176,3 +176,18 @@ describe('scheduling admission failures', () => {
     expect(() => framed()).toThrowError(expect.objectContaining({ code: 'ENV_UNSUPPORTED' }))
   })
 })
+
+describe('hasErrorIdentity', () => {
+  it('accepts only own string source and code data properties', () => {
+    expect(hasErrorIdentity(Object.assign(new Error('x'), { source: 'a', code: 'B' }))).toBe(true)
+    expect(hasErrorIdentity({ source: 'a', code: 'B' })).toBe(true)
+    expect(hasErrorIdentity(Object.assign(new Error('x'), { code: 'B' }))).toBe(false)
+    expect(hasErrorIdentity(Object.assign(new Error('x'), { source: 'a', code: 1 }))).toBe(false)
+    const accessor = Object.defineProperty(new Error('x'), 'source', { get: () => 'a' })
+    Object.defineProperty(accessor, 'code', { value: 'B' })
+    expect(hasErrorIdentity(accessor)).toBe(false)
+    expect(hasErrorIdentity('text')).toBe(false)
+    expect(hasErrorIdentity(null)).toBe(false)
+  })
+})
+
