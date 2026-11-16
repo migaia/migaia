@@ -20,6 +20,8 @@ export type IStorageErrorDetails = {
   readonly extensionStage?: IExtensionStage
   /** Operation name attached by the owning boundary. */
   readonly operation?: string
+  /** Name of the plugin whose Feature factory failed during installation. */
+  readonly plugin?: string
   /** Root key of the Feature whose factory failed during installation, when known. */
   readonly feature?: string
   /** Original failure retained for bounded cause-chain inspection. */
@@ -168,6 +170,8 @@ export class StorageError<TCode extends string = IStorageHostErrorCode> extends 
   readonly extensionStage?: IExtensionStage
   /** Operation name attached by its owning boundary. */
   readonly operation?: string
+  /** Name of the plugin whose Feature factory failed; present only on such install failures. */
+  readonly plugin?: string
   /** Root key of the Feature whose factory failed; present only on such install failures. */
   readonly feature?: string
   /** Internal repository stage used to apply invalid-record policy. */
@@ -194,6 +198,7 @@ export class StorageError<TCode extends string = IStorageHostErrorCode> extends 
     this.attemptedChannel = details.attemptedChannel
     this.extensionStage = details.extensionStage
     this.operation = details.operation
+    if (details.plugin !== undefined) this.plugin = details.plugin
     if (details.feature !== undefined) this.feature = details.feature
     this.stage = stage
   }

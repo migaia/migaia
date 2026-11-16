@@ -444,7 +444,7 @@ export class StorageHost<P extends readonly IStorageBackendPluginHandle[] = read
         const primary = batchToken.active
           ? new StorageError(
               StorageHostErrorCode.backendInstallFailed,
-              { cause: error, backend: featureFailure?.plugin, feature: featureFailure?.feature },
+              { cause: error, plugin: featureFailure?.plugin, feature: featureFailure?.feature },
               StorageErrorText.backendInstallFailed
             )
           : new StorageError(

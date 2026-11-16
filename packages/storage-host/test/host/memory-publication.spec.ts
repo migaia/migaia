@@ -199,8 +199,24 @@ it('names the plugin and Feature key when a Feature factory fails during install
   )
   expect(rejection).toMatchObject({
     code: 'BACKEND_INSTALL_FAILED',
-    backend: 'main',
+    plugin: 'main',
     feature: 'broken'
   })
   expect(walkErrorCauses(rejection)).toContain(failure)
+})
+
+it('rejects plugin names outside the bounded form before a definition exists', () => {
+  /** A dot is PluginHost's separator; a colon is used by the host's own internal plugin names. */
+  for (const name of ['', 'a.b', 'storage-journal-bootstrap:main', '1st', 'a'.repeat(65)]) {
+    /** Captured so both the native type and the code can be asserted on one thrown value. */
+    let thrown: unknown
+    try {
+      memoryBackendPlugin({ name })
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(TypeError)
+    expect(thrown).toMatchObject({ code: 'BACKEND_ID_INVALID' })
+  }
+  expect(() => memoryBackendPlugin({ name: 'main_1-a' })).not.toThrow()
 })
