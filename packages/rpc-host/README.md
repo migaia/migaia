@@ -55,11 +55,11 @@ try {
 
 ## 初始化与自定义宿主
 
-`createRpcHost` 在同一个原生 plugin-host 上先提交信息流 plugin、链路策略 plugin 及其 feature，再安装传输 plugin 及其 feature。传输开始握手时，auth 等 stage 已经可用；后续安装失败由同一生命周期 owner 回滚并释放已取得的资源。
+`createRpcHost` 在同一个原生 plugin-host 上先提交宿主级 flow plugin 及其 feature，再安装传输 plugin 及其 feature。传输开始握手时，auth 等 stage 已经可用；后续安装失败由同一生命周期 owner 回滚并释放已取得的资源。
 
 构造后可用 `const extended = await host.use(transport)` 后装传输，返回同一个冻结的原生 host，并在返回值的类型上增加命名空间。每次 `use` 独立提交或回滚；构造时那一批则一起成功或失败。改变消息流的宿主级 Feature 只能在构造的 `plugins` 中配置，后装会以 `INVALID_CONFIG` 拒绝；后装传输自动借用它们，传输自己的 `features` 随传输一起安装，仍只覆盖本命名空间。只读观察插件，包括警告订阅，可以后装。
 
-已有 `defineHost` 或 class 宿主通过 `@migaia/rpc-host/sdk` 的 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`，并把原生构造请求转交 `pipeline(name, request)`。每个传输自己声明管道，无需预列命名空间。普通原生宿主用 `rpcFeaturesPlugin({ features })` 安装共享信息流，再装传输。具体接法见[使用指南](./USEGUIDE.md#在已有宿主中安装-rpc)。
+已有 `defineHost` 或 class 宿主通过 `@migaia/rpc-host/sdk` 的 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`，并把原生构造请求转交 `pipeline(name, request)`。每个传输自己声明管道，无需预列命名空间。普通原生宿主用 `defineFlowPlugin({ name, features })` 安装共享信息流，再装传输。具体接法见[使用指南](./USEGUIDE.md#在已有宿主中安装-rpc)。
 
 ## 调用与归属
 
@@ -90,14 +90,16 @@ try {
 
 ## 可选能力
 
-同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂产物放入 `rpcFeaturesPlugin({ features: { name: feature } })`，再把该 plugin 放进 host 的 `plugins`；传输也用 `features: { name: feature }`。host 配置作用于所有命名空间；传输配置只覆盖本命名空间的同种能力，每个命名空间只启用一份实现。host 级 `limitsFeature` 跨命名空间共用额度，传输级各自独立。`probe`、`typegen` 和 Devtools 只装在 host 级。原 `namespaces` 作用范围选项已删除，按传输选择范围时使用 `features`。
+同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂都从 `@migaia/rpc-host/features` 导入。产物放入 `defineFlowPlugin({ name, features: { alias: feature } })`，再把该 plugin 放进 host 的 `plugins`；传输也用 `features: { alias: feature }`。host 配置作用于所有命名空间；传输配置只覆盖本命名空间的同种能力，每个命名空间只启用一份实现。host 级 `limitsFeature` 跨命名空间共用额度，传输级各自独立。`probe`、`typegen` 和 Devtools 只装在 host 级。原 `namespaces` 作用范围选项已删除，按传输选择范围时使用 `features`。
 
 ```ts doc-test=check
-import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
-import { linkPolicy, limitsFeature, probe } from '@migaia/rpc-host/plugins'
+import { timeoutFeature, retryFeature, limitsFeature } from '@migaia/rpc-host/features'
+import { probe } from '@migaia/rpc-host/plugins'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import timeoutFromSubpath from '@migaia/rpc-host/features/timeout'
 
-export const defaults = linkPolicy({
+export const defaults = defineFlowPlugin({
+  name: 'call-defaults',
   features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) }
 })
 export const capacity = limitsFeature({ maxGlobal: 256, maxPerPeer: 64 })
@@ -113,7 +115,7 @@ export const perCallDeadline = { ms: 100 }
 
 `errorMapFeature` 同步决定对端能看到哪些错误信息，不改变本地原错、report、警告或日志观察。回调抛错、返回 Promise 或结果无法序列化时，报告映射失败，并按未映射时的规则发送原错误。未配置映射时，未认证对端的握手失败仍默认隐藏细节。见[错误映射](./USEGUIDE.md#映射发往对端的错误)。
 
-自定义信息流通过 `defineFlowFeature` 的 `setup` 返回 `stages`，放进 `rpcFeaturesPlugin` 的 `features` record 或某个传输的 `features` record；stage 接收该管道的 payload 和原生 `next(payload)`。观察事件单独放在 `observe`。frame 管道允许多次提交，各成员独立：捕获并报告一个成员失败后可以继续交出下一个；忽略失败的 `next()` Promise 会使管道拒绝。被取消的 batch 成员由原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`，其他成员照常完成。
+自定义信息流通过 `defineFlowFeature` 的 `setup` 返回 `stages`，放进 `defineFlowPlugin` 的 `features` record 或某个传输的 `features` record；stage 接收该管道的 payload 和原生 `next(payload)`。观察事件单独放在 `observe`。frame 管道允许多次提交，各成员独立：捕获并报告一个成员失败后可以继续交出下一个；忽略失败的 `next()` Promise 会使管道拒绝。被取消的 batch 成员由原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`，其他成员照常完成。
 
 内置位置固定：出站 plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire；入站反向。record 的键名与插入顺序不决定执行顺序。第三方 feature 必须声明整数 `phase`（0–65535）；同一 stage point 与 layer 不允许 phase 冲突。`dependencies` 决定原生安装顺序，`phase` 决定执行顺序。第三方 stage 默认在 plaintext，高阶 SDK 作者可显式指定受支持的 `layer`。
 
@@ -129,7 +131,7 @@ export const perCallDeadline = { ms: 100 }
 
 ## 期限、取消与错误
 
-`FeatureScope` 唯一解析覆盖顺序：单次调用 `options.timeout/retry`、所在传输 plugin 的 feature、链路策略 plugin。单次值接受 timeout `{ ms }`、retry 配置对象或 `false`；不接受 feature token、执行方法或数字。`timeout: false` 不启用 feature 超时，持续等待响应；已经继承的上游剩余期限仍递减。`retry: false` 禁用重试。只有发起方的标量调用和 group 重试，stream 从不重放、只使用 timeout；转发跳不重新开始预算。
+`FeatureScope` 唯一解析覆盖顺序：单次调用 `options.timeout/retry`、所在传输 plugin 的 feature、宿主级 flow plugin 里的默认值。单次值接受 timeout `{ ms }`、retry 配置对象或 `false`；不接受 feature token、执行方法或数字。`timeout: false` 不启用 feature 超时，持续等待响应；已经继承的上游剩余期限仍递减。`retry: false` 禁用重试。只有发起方的标量调用和 group 重试，stream 从不重放、只使用 timeout；转发跳不重新开始预算。
 
 进入 provider 前剩余截止时间已经耗尽的调用，以 `DEADLINE_EXCEEDED` 拒绝，不执行 provider；`before-start` 的取消语义保持不变。
 
@@ -167,7 +169,7 @@ verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证�
 
 ## 默认策略的安装边界
 
-在首次 transport 启动前安装 `linkPolicy` 与 feature carrier。启动后 `host.use(linkPolicy(...))` 和新增 carrier 均以现有 `INVALID_CONFIG` 拒绝，消息为 `RPC flow hooks cannot be installed after transport startup`；失败调用不会改变已编译的调用策略。每次调用仍可通过 timeout/retry 选项或 `false` 覆盖。合法的安装失败回滚用例必须在启动前安装策略，不能依赖 late link-policy。原生移除/释放仍由既有生命周期回执处理。
+带 `features` 的 `defineFlowPlugin` 必须放在构造时的 `plugins` 中，在首次 transport 启动前安装。之后用 `host.use(...)` 安装它会以现有 `INVALID_CONFIG` 拒绝，消息为 `RPC flow hooks cannot be installed after transport startup`；失败调用不会改变已编译的调用策略。每次调用仍可通过 timeout/retry 选项或 `false` 覆盖。合法的安装失败回滚用例必须在启动前安装策略，不能依赖后装的默认值。原生移除/释放仍由既有生命周期回执处理。
 
 ## 重复调用策略角色
 

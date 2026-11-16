@@ -14,7 +14,7 @@ Contract defines protocol, interfaces, portable values, and errors. Host owns RP
 
 A host supports multiple transport namespaces, but normally choose one transport kind; mixing kinds is not recommended. Calls live under `host.<ns>.*`; provider registration and whole-host closure remain on the root. See the [README](./README.en.md#start-here) for a complete runnable coroutine connection.
 
-`createRpcHost` first commits flow plugins, link-policy plugins and their features on the same native host, then installs transports and their features. Stages such as auth are visible before the first handshake. Both installations share one lifecycle owner, which also rolls back and cleans up the committed prefix if transport installation fails.
+`createRpcHost` first commits host-level flow plugins and their features on the same native host, then installs transports and their features. Stages such as auth are visible before the first handshake. Both installations share one lifecycle owner, which also rolls back and cleans up the committed prefix if transport installation fails.
 
 ## Register functions and generators
 
@@ -79,10 +79,11 @@ This example creates cold definitions only. Pass `policy` and `transport` to `cr
 
 ```ts doc-test=check
 import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
-import { linkPolicy } from '@migaia/rpc-host/plugins'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-export const policy = linkPolicy({
+export const policy = defineFlowPlugin({
+  name: 'call-defaults',
   features: { timeout: timeoutFeature({ ms: 3000 }), retry: retryFeature({ attempts: 2 }) }
 })
 export const transport = threadPlugin({
@@ -93,7 +94,7 @@ export const transport = threadPlugin({
 export const callOptions = { timeout: { ms: 100 }, retry: false } as const
 ```
 
-Selection has one order: per-call policy options or `false`, then the transport plugin's feature, then the link-policy default. Pass `callOptions` to `host.thread.request(method, payload, callOptions)` to override one call. Numeric `{ timeout: 100 }`, `timeoutMs`, and `defaultTimeoutMs` are removed.
+Selection has one order: per-call policy options or `false`, then the transport plugin's feature, then the default from a host-level flow plugin. Pass `callOptions` to `host.thread.request(method, payload, callOptions)` to override one call. Numeric `{ timeout: 100 }`, `timeoutMs`, and `defaultTimeoutMs` are removed.
 
 `timeout: false` waits for the response without a feature timeout; an upstream remaining deadline still decreases. `retry: false` disables retry. Downstream hops receive only the remaining budget and cannot extend it. Only the origin retries scalar calls and groups; streams never replay and use timeout only. Timeout or disconnection does not prove that business work never executed; reconcile uncertain non-idempotent work first. Transport handshake preparation deadlines are separate from the business timeout feature.
 
@@ -104,13 +105,18 @@ A call whose remaining deadline has expired before provider entry rejects with `
 The complete definition batch passed to `createRpcHost({ plugins })` either succeeds or rolls back together. After construction, each `host.use(...)` starts a separate native installation transaction. Failure rolls back only that batch's new resources; committed namespaces keep working. The returned value is the same public host. Assign it to a new variable to obtain the added namespaces in its static type.
 
 ```ts doc-test=check
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import { limitsFeature } from '@migaia/rpc-host/plugins'
+import { limitsFeature } from '@migaia/rpc-host/features'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
 const host = await createRpcHost({
-  plugins: [rpcFeaturesPlugin({ features: { limits: limitsFeature({ maxGlobal: 256 }) } })]
+  plugins: [
+    defineFlowPlugin({
+      name: 'shared-limits',
+      features: { limits: limitsFeature({ maxGlobal: 256 }) }
+    })
+  ]
 })
 try {
   const extended = await host.use(threadPlugin({ spawn: new URL('./worker.ts', import.meta.url) }))
@@ -136,7 +142,7 @@ An existing `defineHost` owner obtains `domainCore` from `rpcHostPipelines(getHo
 import { defineHost } from '@migaia/plugin-host'
 import {
   rpcHostPipelines,
-  rpcFeaturesPlugin,
+  defineFlowPlugin,
   type IRpcFlowFeature,
   type IRpcFlowPlugin,
   type IRpcTransportPlugin
@@ -159,12 +165,12 @@ export async function installRpc(
   observers: readonly IRpcFlowPlugin[],
   transports: readonly IRpcTransportPlugin[]
 ) {
-  await host.use(...observers, rpcFeaturesPlugin({ features }))
+  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))
   await host.use(...transports)
 }
 ```
 
-`rpcFeaturesPlugin({ features })` wraps shared flow Features for an ordinary native host. The native registration owns their actual setup and cleanup; Features such as `authFeature()` cannot be passed directly to native `host.use` as plugins. Commit this wrapper and readonly observers before transports so the first handshake already has its complete policy.
+A `defineFlowPlugin` with `features` installs shared flow Features on an ordinary native host. The native registration owns their actual setup and cleanup; Features such as `authFeature()` cannot be passed directly to native `host.use` as plugins. Commit this plugin and readonly observers before transports so the first handshake already has its complete policy.
 
 A class owner also reads `this` lazily through the helper. `createPluginDomainCore` must forward the current construction request without exposing protected `pipeline`. Install plugins in the same order after construction finishes.
 
@@ -227,7 +233,7 @@ With the default `encodedType: 'any'` and no `encrypt`, `sign` receives the sign
 
 ```ts doc-test=check
 import { createHmac } from 'node:crypto'
-import { authFeature } from '@migaia/rpc-host/plugins'
+import { authFeature } from '@migaia/rpc-host/features'
 
 /** Both peers use the same application-owned key and binding representation. */
 function mac(value: unknown, key: string): string {
@@ -266,9 +272,9 @@ Set a default with `authFeature({ retain })` or override it in a transport conne
 When a verifier or credential resolver throws or rejects, auth retains the original error on the local error's `cause`. Use `errorMapFeature(map)` to control what a peer learns, such as replacing credential details with a public message. Local thrown errors, `report`, warnings, and readonly observation plugins still receive the original errors, regardless of installation order. Install it in host `plugins` or transport `features`; transport placement overrides host placement.
 
 ```ts doc-test=check
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/plugins'
+import { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/features'
 
 /** Decide what remote callers may learn while preserving local diagnostic causes. */
 const redact: IRpcErrorMap = (error) =>
@@ -279,7 +285,9 @@ const redact: IRpcErrorMap = (error) =>
   )
 
 export const host = await createRpcHost({
-  plugins: [rpcFeaturesPlugin({ features: { errorMap: errorMapFeature(redact) } })]
+  plugins: [
+    defineFlowPlugin({ name: 'error-map', features: { errorMap: errorMapFeature(redact) } })
+  ]
 })
 ```
 
@@ -431,7 +439,7 @@ Overridden identity fields in `onWarning` are under `data`, including only the n
 
 ## Default-policy installation boundary
 
-Install `linkPolicy` and feature carriers before the first transport starts. After startup, `host.use(linkPolicy(...))` and new feature carriers reject with existing `INVALID_CONFIG` and `RPC flow hooks cannot be installed after transport startup`; rejection leaves compiled call policies unchanged. Per-call timeout/retry options and `false` overrides remain supported. Installation-rollback fixtures must install policies before startup. Native withdrawal and cleanup retain their existing lifecycle receipts.
+A `defineFlowPlugin` with `features` belongs in the construction `plugins`, installed before the first transport starts. Installing it later through `host.use(...)` rejects with existing `INVALID_CONFIG` and `RPC flow hooks cannot be installed after transport startup`; rejection leaves compiled call policies unchanged. Per-call timeout/retry options and `false` overrides remain supported. Installation-rollback fixtures must install policies before startup. Native withdrawal and cleanup retain their existing lifecycle receipts.
 
 ## Duplicate call-policy roles
 

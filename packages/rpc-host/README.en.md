@@ -55,11 +55,11 @@ Coroutines do not provide Worker isolation. Choose the [process](../rpc-plugin-p
 
 ## Initialization and custom hosts
 
-`createRpcHost` first commits flow plugins, link-policy plugins and their features, then installs transport plugins and their features on the same native plugin-host. Stages such as auth are available before transport handshake begins. The same lifecycle owner rolls back and releases acquired resources if a later installation fails.
+`createRpcHost` first commits host-level flow plugins and their features, then installs transport plugins and their features on the same native plugin-host. Stages such as auth are available before transport handshake begins. The same lifecycle owner rolls back and releases acquired resources if a later installation fails.
 
 After construction, `const extended = await host.use(transport)` installs another transport and returns the same frozen native host with an added namespace in the return type. Each `use` commits or rolls back independently; the construction batch succeeds or fails together. Host Features that change message flow must be configured in the construction `plugins`; adding them later rejects with `INVALID_CONFIG`. Later transports borrow them, and their own `features` install with the transport and override only its namespace. Readonly observer plugins, including warning subscriptions, may be installed later.
 
-An existing `defineHost` or class owner obtains `domainCore` from SDK `rpcHostPipelines(getHost, pipeline)` and forwards the native construction request to `pipeline(name, request)`. Each transport declares its own pipelines, without an advance namespace list. Ordinary native hosts install shared flow Features through `rpcFeaturesPlugin({ features })` before transports. See the [usage guide](./USEGUIDE.en.md#install-rpc-in-an-existing-host).
+An existing `defineHost` or class owner obtains `domainCore` from SDK `rpcHostPipelines(getHost, pipeline)` and forwards the native construction request to `pipeline(name, request)`. Each transport declares its own pipelines, without an advance namespace list. Ordinary native hosts install shared flow Features through `defineFlowPlugin({ name, features })` before transports. See the [usage guide](./USEGUIDE.en.md#install-rpc-in-an-existing-host).
 
 ## Calls and ownership
 
@@ -90,14 +90,16 @@ Configure each forwarding host with `forward: { maxHops: 3 }` in `createRpcHost`
 
 ## Optional capabilities
 
-The same `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, and `schemaFeature` factories return native tokens. Put host-wide tokens in `rpcFeaturesPlugin({ features: { name: feature } })`, then pass that plugin in host `plugins`; transport `features` uses the same named record. Host placement supplies every namespace; transport placement overrides that capability only in its namespace. Each namespace has one implementation of each capability. Host `limitsFeature` shares quotas across namespaces; transport `limitsFeature` owns separate quotas. `probe`, `typegen`, and Devtools are host-only plugins. The former `namespaces` scope option is removed; select a transport with `features`.
+The same `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, and `schemaFeature` factories are imported from `@migaia/rpc-host/features` and return native tokens. Put host-wide tokens in `defineFlowPlugin({ name, features: { alias: feature } })`, then pass that plugin in host `plugins`; transport `features` uses the same named record. Host placement supplies every namespace; transport placement overrides that capability only in its namespace. Each namespace has one implementation of each capability. Host `limitsFeature` shares quotas across namespaces; transport `limitsFeature` owns separate quotas. `probe`, `typegen`, and Devtools are host-only plugins. The former `namespaces` scope option is removed; select a transport with `features`.
 
 ```ts doc-test=check
-import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
-import { linkPolicy, limitsFeature, probe } from '@migaia/rpc-host/plugins'
+import { timeoutFeature, retryFeature, limitsFeature } from '@migaia/rpc-host/features'
+import { probe } from '@migaia/rpc-host/plugins'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import timeoutFromSubpath from '@migaia/rpc-host/features/timeout'
 
-export const defaults = linkPolicy({
+export const defaults = defineFlowPlugin({
+  name: 'call-defaults',
   features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) }
 })
 export const capacity = limitsFeature({ maxGlobal: 256, maxPerPeer: 64 })
@@ -113,7 +115,7 @@ Aggregate and default subpath imports support tree-shaking. Installing `limitsFe
 
 `errorMapFeature` synchronously controls the error information a peer receives without changing local originals, reports, warnings, or log observation. A throw, returned Promise, or unserializable result reports the mapping failure and sends the original error under the rules used without a mapper. Without a mapper, handshake refusals still hide details from unauthenticated peers. See [error mapping](./USEGUIDE.en.md#map-errors-sent-to-the-peer).
 
-A custom flow returns `stages` from `defineFlowFeature` setup; place the feature in an `rpcFeaturesPlugin` record or in one transport's `features` record. Each stage receives its pipeline payload and native `next(payload)`; readonly events belong in the separate `observe` field. Frame pipelines allow independent submissions: after catching and reporting one member's failure, a stage can submit another. Ignoring a failed `next()` Promise rejects the pipeline. The original call settles a cancelled batch member with `CANCELLED` and its original reason on `cause`; other members complete normally.
+A custom flow returns `stages` from `defineFlowFeature` setup; place the feature in a `defineFlowPlugin` `features` record or in one transport's `features` record. Each stage receives its pipeline payload and native `next(payload)`; readonly events belong in the separate `observe` field. Frame pipelines allow independent submissions: after catching and reporting one member's failure, a stage can submit another. Ignoring a failed `next()` Promise rejects the pipeline. The original call settles a cancelled batch member with `CANCELLED` and its original reason on `cause`; other members complete normally.
 
 Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound reverses the direction. Record keys and insertion order do not determine execution order. Custom features require an integer `phase` from 0 through 65535; duplicate phases at the same stage point and layer reject. Native `dependencies` order installation; `phase` orders execution. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly.
 
@@ -129,7 +131,7 @@ Shared or local flow Features used by open Sessions cannot be hot-unloaded: remo
 
 ## Deadlines, cancellation, and errors
 
-`FeatureScope` alone selects call `options.timeout/retry`, then the transport's installed feature, then the link-policy default. Call values accept timeout `{ ms }`, retry options, or `false`. Feature tokens, execution methods, and numbers are rejected. `timeout: false` waits for the response without a feature timeout; an upstream remaining deadline still decreases. `retry: false` disables retry. Only the origin retries scalar calls and groups; streams never replay and use timeout only; forwarding does not restart the budget.
+`FeatureScope` alone selects call `options.timeout/retry`, then the transport's installed feature, then the default from a host-level flow plugin. Call values accept timeout `{ ms }`, retry options, or `false`. Feature tokens, execution methods, and numbers are rejected. `timeout: false` waits for the response without a feature timeout; an upstream remaining deadline still decreases. `retry: false` disables retry. Only the origin retries scalar calls and groups; streams never replay and use timeout only; forwarding does not restart the budget.
 
 A call whose remaining deadline has expired before provider entry rejects with `DEADLINE_EXCEEDED` without executing the provider. `before-start` cancellation keeps its existing semantics.
 
@@ -167,7 +169,7 @@ Launched children prefer the actual parent-supplied name and instanceId. Without
 
 ## Default-policy installation boundary
 
-Install `linkPolicy` and feature carriers before the first transport starts. After startup, `host.use(linkPolicy(...))` and new feature carriers reject with existing `INVALID_CONFIG` and `RPC flow hooks cannot be installed after transport startup`; rejection leaves compiled call policies unchanged. Per-call timeout/retry options and `false` overrides remain supported. Installation-rollback fixtures must install policies before startup. Native withdrawal and cleanup retain their existing lifecycle receipts.
+A `defineFlowPlugin` with `features` belongs in the construction `plugins`, installed before the first transport starts. Installing it later through `host.use(...)` rejects with existing `INVALID_CONFIG` and `RPC flow hooks cannot be installed after transport startup`; rejection leaves compiled call policies unchanged. Per-call timeout/retry options and `false` overrides remain supported. Installation-rollback fixtures must install policies before startup. Native withdrawal and cleanup retain their existing lifecycle receipts.
 
 ## Duplicate call-policy roles
 

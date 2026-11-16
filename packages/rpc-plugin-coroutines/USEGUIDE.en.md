@@ -67,7 +67,7 @@ export function pooled(task: ICoroutineUserTask) {
 
 `host.coroutine.request/notify/stream/group/send/dispatch` uses common namespace semantics. Notify waits only for actual write; request/send waits for business results. Target notify with `{ targetId }`. Untargeted calls use the current direct set, retaining independent outcomes for several ordinary direct targets.
 
-Policy precedence is per-call options, transport features, then link-policy plugin. Per-call timeout/retry takes policy options or false. The example selects a 500 ms timeout and disables retry for that call. An absent policy adds no implicit timeout or retry loop. supervisor.startupTimeoutMs is the native task startup budget, separate from business timeout.
+Policy precedence is per-call options, transport features, then the default from a host-level flow plugin. Per-call timeout/retry takes policy options or false. The example selects a 500 ms timeout and disables retry for that call. An absent policy adds no implicit timeout or retry loop. supervisor.startupTimeoutMs is the native task startup budget, separate from business timeout.
 
 Read generation-bound streams through `host.coroutine.peers[target]`. Finish them or call return on early exit; this ends that stream rather than the task generation. Read the current directory again after restart; an old method does not silently point at a new task.
 

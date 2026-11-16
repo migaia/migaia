@@ -168,7 +168,7 @@ export async function observeFrame(target: Window, origin: string) {
 }
 ```
 
-The caller closes the returned Host. Timeout/retry factories return native tokens for the transport's `features: { localName: feature }` record. Schema/auth/chunk/batch also assemble through `rpcFeaturesPlugin` or a transport record; probe/typegen are host observer plugins under `@migaia/rpc-host/plugins/*`. `connect.timeoutMs` bounds handshake only; business calls use `timeout: { ms }` and `signal`. Cancellation does not prove remote non-execution.
+The caller closes the returned Host. Timeout/retry factories return native tokens for the transport's `features: { localName: feature }` record. Schema/auth/chunk/batch also assemble through a `defineFlowPlugin` `features` record or a transport record, with factories under `@migaia/rpc-host/features/*`; probe/typegen are host observer plugins under `@migaia/rpc-host/plugins/*`. `connect.timeoutMs` bounds handshake only; business calls use `timeout: { ms }` and `signal`. Cancellation does not prove remote non-execution.
 
 Optional extensions such as outcome require their actual plugin. Automatic claim, identity scope and replay across reconnects remain incomplete. Do not restore root Host policy fields, deployment assemblers, manual profile/ACKs or casts of unsupported options.
 
