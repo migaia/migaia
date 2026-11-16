@@ -126,6 +126,8 @@ class IndexedDbPluginInstallation<F extends IStorageFeatureRecord> {
   }
 }
 
+/** Backend-plugin definer typed for this backend; the annotation enables the descriptor checks. */
+const defineIndexedDbBackend: IStorageBackendPluginDefiner<IIndexedDbBackend> = defineBackendPlugin
 /** Declare basic IDB storage; each optional behavior requires its own explicit Feature. */
 export const indexedDbBackendPlugin = <
   const TId extends string = 'indexed-db',
@@ -136,13 +138,9 @@ export const indexedDbBackendPlugin = <
   /** A named owner is created independently for every plugin installation. */
   const descriptor = (core: IStoragePluginCore<F>) =>
     new IndexedDbPluginInstallation(options, core).descriptor()
-  return (defineBackendPlugin as IStorageBackendPluginDefiner<IIndexedDbBackend>)<
-    TId,
-    typeof descriptor,
-    F
-  >({
+  return defineIndexedDbBackend<TId, typeof descriptor, F>({
     name: readBuiltInPluginId(options, 'indexed-db', StorageBackend.indexedDb),
-    features: options.features as never,
-    open: descriptor as never
+    features: options.features,
+    open: descriptor
   })
 }

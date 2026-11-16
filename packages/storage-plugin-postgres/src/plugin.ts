@@ -118,6 +118,8 @@ class PgBackendInstallation<TValue, TServer extends IPgServer, F extends IStorag
     }
   }
 }
+/** Backend-plugin definer typed for this backend; the annotation enables the descriptor checks. */
+const definePostgresBackend: IStorageBackendPluginDefiner<IPostgresBackend> = defineBackendPlugin
 /** Definition is pure; installation alone probes the real server and initializes native tables. */
 export function postgresBackendPlugin<
   TValue = unknown,
@@ -154,14 +156,10 @@ export function postgresBackendPlugin<
   const id = (options.name ?? PgNames.backend) as TId
   const factory = (core: IStoragePluginCore<F>) =>
     new PgBackendInstallation<TValue, TServer, F>(captured, core).open()
-  return (defineBackendPlugin as IStorageBackendPluginDefiner<IPostgresBackend>)<
-    TId,
-    typeof factory,
-    F
-  >({
+  return definePostgresBackend<TId, typeof factory, F>({
     name: id,
-    features: options.features as never,
-    open: factory as never
+    features: options.features,
+    open: factory
   }) as IStorageBackendPlugin<
     IPostgresBackend,
     NoInfer<TId>,

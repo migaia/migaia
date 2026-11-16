@@ -91,5 +91,5 @@ export function createBuiltInBackendPlugin<
     defineBackendPlugin as IStorageBackendPluginDefiner<
       IStorageBackendType<S, C, IStorageReactiveProfileExpose>
     >
-  )<TId, typeof descriptor, F>({ name: id, features: features as never, open: descriptor as never })
+  )<TId, typeof descriptor, F>({ name: id, features, open: descriptor })
 }

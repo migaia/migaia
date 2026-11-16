@@ -23,6 +23,8 @@ export type IQdrantBackend = IStorageBackendType<
 >
 /** Defines this package's Features; the annotation carries the Qdrant backend type. */
 export const defineQdrantFeature: IStorageFeatureDefiner<IQdrantBackend> = defineStorageFeature
+/** Backend-plugin definer typed for this backend; the annotation enables the descriptor checks. */
+const defineQdrantBackend: IStorageBackendPluginDefiner<IQdrantBackend> = defineBackendPlugin
 /** Configuration capture is pure; actual connection checks remain the original host detect phase. */
 export function qdrantBackendPlugin<
   const TId extends string = 'qdrant',
@@ -36,17 +38,13 @@ export function qdrantBackendPlugin<
       IStorageFeatureStoreCompatibility<IQdrantBackend, NoInfer<F>, IQdrantStore>
   }
 ): IStorageBackendPlugin<IQdrantBackend, NoInfer<TId>, F, IQdrantStore> {
-  const captured = readQdrantOptions<TId>(options)
+  const { features, ...captured } = readQdrantOptions(options)
   /** Each installation gets its own named state while borrowing the validated configuration. */
   const descriptor = (core: IStoragePluginCore<F>) => new QdrantInstallation(captured, core)
-  return (defineBackendPlugin as IStorageBackendPluginDefiner<IQdrantBackend>)<
-    TId,
-    typeof descriptor,
-    F
-  >({
+  return defineQdrantBackend<TId, typeof descriptor, F>({
     name: captured.id,
-    features: options.features as never,
-    open: descriptor as never
+    features,
+    open: descriptor
   })
 }
 
@@ -94,11 +92,11 @@ class QdrantInstallation<F extends IStorageFeatureRecord> {
  * Read and validate plugin options once. A throwing option getter is INVALID_ARGUMENT with the
  * getter error on cause; invalid values are INVALID_ARGUMENT without a cause.
  */
-function readQdrantOptions<TId extends string>(
-  options: IQdrantOptions & { readonly name?: TId }
-): IQdrantInstallationOptions & { readonly id: TId } {
+function readQdrantOptions<TId extends string, TFeatures>(
+  options: IQdrantOptions & { readonly name?: TId; readonly features?: TFeatures }
+): IQdrantInstallationOptions & { readonly id: TId; readonly features: TFeatures | undefined } {
   /** One read of every option. */
-  let snapshot: IQdrantOptions & { readonly name?: TId }
+  let snapshot: IQdrantOptions & { readonly name?: TId; readonly features?: TFeatures }
   try {
     snapshot = snapshotOptionProperties(options)
   } catch (cause) {
@@ -109,10 +107,11 @@ function readQdrantOptions<TId extends string>(
     apiKey,
     collectionPrefix = QdrantText.prefix,
     http,
-    name: id = QdrantText.backend
+    name: id = QdrantText.backend,
+    features
   } = snapshot
   if (typeof url !== 'string' || typeof collectionPrefix !== 'string' || typeof id !== 'string')
     throw invalidArgument()
   const fallback = fetchHttp(url, apiKey)
-  return { url, apiKey, collectionPrefix, http: http ?? fallback, id: id as TId }
+  return { url, apiKey, collectionPrefix, http: http ?? fallback, id: id as TId, features }
 }

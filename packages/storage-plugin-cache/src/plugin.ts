@@ -17,6 +17,8 @@ export type ICacheBackend = IStorageBackendType<ICacheStore, undefined>
 /** Defines this package's Features; the annotation carries the cache backend type. */
 export const defineCacheFeature: IStorageFeatureDefiner<ICacheBackend> = defineStorageFeature
 
+/** Backend-plugin definer typed for this backend; the annotation enables the descriptor checks. */
+const defineCacheBackend: IStorageBackendPluginDefiner<ICacheBackend> = defineBackendPlugin
 /** Install only after borrowed tiers have been published by an earlier host batch. */
 export function cachePlugin<
   const TId extends string = 'cache',
@@ -45,13 +47,9 @@ export function cachePlugin<
       featureExpose: () => ({ getClient: () => undefined })
     }
   }
-  return (defineBackendPlugin as IStorageBackendPluginDefiner<ICacheBackend>)<
-    TId,
-    typeof descriptor,
-    F
-  >({
+  return defineCacheBackend<TId, typeof descriptor, F>({
     name: id,
-    features: options.features as never,
-    open: descriptor as never
+    features: options.features,
+    open: descriptor
   })
 }

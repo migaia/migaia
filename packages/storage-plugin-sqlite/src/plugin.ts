@@ -125,6 +125,8 @@ class SqliteInstallation<TValue, F extends IStorageFeatureRecord> {
     }
   }
 }
+/** Backend-plugin definer typed for this backend; the annotation enables the descriptor checks. */
+const defineSqliteBackend: IStorageBackendPluginDefiner<ISqliteBackend> = defineBackendPlugin
 /** Define an install-time SQLite backend; the injected connection remains caller-owned. */
 export function sqliteBackendPlugin<
   TValue = unknown,
@@ -152,13 +154,9 @@ export function sqliteBackendPlugin<
   const id = (options.name ?? SqliteNames.backend) as TId
   const descriptorFactory = (core: IStoragePluginCore<F>) =>
     new SqliteInstallation<TValue, F>(captured, core).open()
-  return (defineBackendPlugin as IStorageBackendPluginDefiner<ISqliteBackend>)<
-    TId,
-    typeof descriptorFactory,
-    F
-  >({
+  return defineSqliteBackend<TId, typeof descriptorFactory, F>({
     name: id,
-    features: options.features as never,
-    open: descriptorFactory as never
+    features: options.features,
+    open: descriptorFactory
   })
 }

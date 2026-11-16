@@ -50,6 +50,8 @@ class RedisInstallation<F extends IStorageFeatureRecord> {
   /** Features receive the original borrowed driver identity. */
   readonly featureExpose = () => ({ getClient: () => this.#options.driver })
 }
+/** Backend-plugin definer typed for this backend; the annotation enables the descriptor checks. */
+const defineRedisBackend: IStorageBackendPluginDefiner<IRedisBackend> = defineBackendPlugin
 /** Capture pure configuration; the original host alone owns detection, installation and cleanup. */
 export function redisBackendPlugin<
   const TId extends string = 'redis',
@@ -72,13 +74,9 @@ export function redisBackendPlugin<
       maxLockMs: options.maxLockMs
     },
     id = (options.name ?? RedisText.backend) as TId
-  return (defineBackendPlugin as IStorageBackendPluginDefiner<IRedisBackend>)<
-    TId,
-    (core: IStoragePluginCore<F>) => RedisInstallation<F>,
-    F
-  >({
+  return defineRedisBackend<TId, (core: IStoragePluginCore<F>) => RedisInstallation<F>, F>({
     name: id,
-    features: options.features as never,
-    open: ((core: IStoragePluginCore<F>) => new RedisInstallation(captured, core)) as never
+    features: options.features,
+    open: (core: IStoragePluginCore<F>) => new RedisInstallation(captured, core)
   })
 }

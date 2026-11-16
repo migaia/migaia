@@ -18,6 +18,8 @@ export type ISparqlBackend = IStorageBackendType<ISparqlStore, ISparqlEndpoint>
 /** Defines this package's Features; the annotation carries the SPARQL backend type. */
 export const defineSparqlFeature: IStorageFeatureDefiner<ISparqlBackend> = defineStorageFeature
 export type ISparqlOptions = { readonly endpoint: ISparqlEndpoint }
+/** Backend-plugin definer typed for this backend; the annotation enables the descriptor checks. */
+const defineSparqlBackend: IStorageBackendPluginDefiner<ISparqlBackend> = defineBackendPlugin
 /** Capture configuration synchronously; only installation creates the actual backend owner. */
 export function sparqlBackendPlugin<
   const TId extends string = 'sparql',
@@ -52,13 +54,9 @@ export function sparqlBackendPlugin<
       featureExpose: () => ({ getClient: () => endpoint })
     }
   }
-  return (defineBackendPlugin as IStorageBackendPluginDefiner<ISparqlBackend>)<
-    TId,
-    typeof descriptor,
-    F
-  >({
+  return defineSparqlBackend<TId, typeof descriptor, F>({
     name: id,
-    features: options.features as never,
-    open: descriptor as never
+    features: options.features,
+    open: descriptor
   })
 }

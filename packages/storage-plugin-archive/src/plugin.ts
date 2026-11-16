@@ -212,7 +212,7 @@ export function archivePlugin<const N extends string, T = ICollectionsCodecValue
   })
   return definePlugin({
     name: id,
-    setup: descriptor as never
+    setup: descriptor
   }) as unknown as IStorageBackendPluginHandle<IArchiveApi<N>> & {
     readonly name: N
   }

@@ -34,6 +34,8 @@ export type IObjectBackend = IStorageBackendType<
 >
 /** Defines this package's Features; the annotation carries the object backend type. */
 export const defineObjectFeature: IStorageFeatureDefiner<IObjectBackend> = defineStorageFeature
+/** Backend-plugin definer typed for this backend; the annotation enables the descriptor checks. */
+const defineObjectBackend: IStorageBackendPluginDefiner<IObjectBackend> = defineBackendPlugin
 /** Capture an authentic lazy driver; installation alone opens native resources. */
 export function objectBackendPlugin<
   const TId extends string = 'object',
@@ -51,14 +53,10 @@ export function objectBackendPlugin<
   if (typeof id !== 'string') throw invalidArgument()
   /** Installation receives immutable driver identity and allocates its own named lifecycle state. */
   const descriptor = (core: IStoragePluginCore<F>) => new ObjectBackendInstallation(driver, core)
-  return (defineBackendPlugin as IStorageBackendPluginDefiner<IObjectBackend>)<
-    TId,
-    typeof descriptor,
-    F
-  >({
+  return defineObjectBackend<TId, typeof descriptor, F>({
     name: id,
-    features: options.features as never,
-    open: descriptor as never
+    features: options.features,
+    open: descriptor
   })
 }
 
