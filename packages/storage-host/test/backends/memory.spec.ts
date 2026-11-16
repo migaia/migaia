@@ -17,9 +17,11 @@ import { composeRepositoryKey } from '../../src/entity/key.ts'
 const hosts: IStorageResource[] = []
 /** Construct through the actual public plugin and original host installation path. */
 async function memoryBackend() {
-  const plugin = memoryBackendPlugin(undefined, {
-    notifications: memoryNotificationsFeature(),
-    changeFeed: memoryChangeFeedFeature()
+  const plugin = memoryBackendPlugin({
+    features: {
+      notifications: memoryNotificationsFeature(),
+      changeFeed: memoryChangeFeedFeature()
+    }
   })
   const host = await createStorageHost({ plugins: [plugin] })
   hosts.push(host)

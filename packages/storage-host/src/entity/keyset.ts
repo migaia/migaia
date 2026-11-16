@@ -1,7 +1,7 @@
 import { createRecordQuery } from '../authoring/query.ts'
 import { EntityFeatureName } from './constants.ts'
-import { defineFeature } from '../contracts.ts'
-import { entityUnitTarget, registerEntityUnit } from './assembly.ts'
+import { defineFeature } from '@migaia/plugin-host/features'
+import { registerEntityUnit } from './assembly.ts'
 
 /** Keyset assembly delegates page and cursor work to the original canonical query owner. */
 class EntityKeysetOwner {
@@ -23,6 +23,6 @@ function installEntityKeyset() {
 /** Explicitly assemble keyset pagination without enabling query, indexes, unique or migration. */
 export function entityKeysetFeature() {
   /** Role identity stays private while the native Feature owns its eventual runtime output. */
-  const feature = defineFeature(entityUnitTarget, installEntityKeyset)
+  const feature = defineFeature(installEntityKeyset)
   return registerEntityUnit(feature, EntityFeatureName.keyset)
 }

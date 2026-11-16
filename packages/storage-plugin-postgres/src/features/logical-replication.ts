@@ -1,4 +1,4 @@
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import {
   implement,
   durableChangeFeed,
@@ -9,7 +9,7 @@ import {
   type IOperationContext
 } from '@migaia/storage-contract'
 import { createLifecycleScope } from '@migaia/lifecycle'
-import { postgresBackendKind } from '../plugin.ts'
+import { definePostgresFeature } from '../plugin.ts'
 import { snapshotPgReplication } from '../logical-replication.ts'
 import { pgResource } from '../driver-resource.ts'
 import { PgNames } from '../constants.ts'
@@ -20,8 +20,7 @@ import type { IPgLogicalReplicationOptions } from '../types.ts'
  */
 export function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions) {
   const captured = snapshotPgReplication(options)
-  return defineFeature<
-    typeof postgresBackendKind,
+  return definePostgresFeature<
     {},
     IStorageFeatureOutput<
       readonly [ICapabilityImpl<typeof durableChangeFeed, IDurableChangeFeedApi>],
@@ -33,7 +32,7 @@ export function pgLogicalReplicationFeature(options: IPgLogicalReplicationOption
         readonly transaction: {}
       }
     >
-  >(postgresBackendKind, ({ featureExpose: core }) => {
+  >(({ featureExpose: core }) => {
     const resources = createLifecycleScope({ scheduler: core.getScheduler() })
     core.onDispose(async () => {
       resources.close()

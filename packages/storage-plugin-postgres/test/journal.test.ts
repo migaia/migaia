@@ -181,7 +181,7 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
       org,
       plugins: [
         storageJournalPlugin({ logger, namespace: 'external-undo' }),
-        postgresBackendPlugin({ driver, prefix }, { vector: pgvectorFeature() })
+        postgresBackendPlugin({ driver, prefix, features: { vector: pgvectorFeature() } })
       ] as const
     })
     onTestFinished(async () => {
@@ -331,10 +331,11 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
       host = await createStorageHost({
         plugins: [
           storageJournalPlugin({ logger, namespace: 'ordered', binlogValues: true }),
-          postgresBackendPlugin(
-            { driver, prefix: 'pg_order_' + randomUUID().slice(0, 8) },
-            { vector: pgvectorFeature() }
-          )
+          postgresBackendPlugin({
+            driver,
+            prefix: 'pg_order_' + randomUUID().slice(0, 8),
+            features: { vector: pgvectorFeature() }
+          })
         ] as const
       }),
       store = host.backend('postgres'),
@@ -411,10 +412,11 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
       org,
       plugins: [
         storageJournalPlugin({ logger, namespace: 'native', binlogValues: true }),
-        postgresBackendPlugin(
-          { driver, prefix: 'pg_journal_' + randomUUID().slice(0, 8) },
-          { vectors: pgvectorFeature() }
-        )
+        postgresBackendPlugin({
+          driver,
+          prefix: 'pg_journal_' + randomUUID().slice(0, 8),
+          features: { vectors: pgvectorFeature() }
+        })
       ] as const
     })
     onTestFinished(async () => {

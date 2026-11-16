@@ -27,9 +27,11 @@ runConformance(harness, {
     /** Every case receives an empty original host; its owner also releases registration resources. */
     const host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })

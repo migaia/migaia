@@ -8,10 +8,10 @@ import {
   type IStorageOperationReporter,
   compileStorageWhere,
   ConcurrencyPolicy,
-  lockKey
+  lockKey,
+  definePlugin
 } from '@migaia/storage-host/sdk'
 import {
-  definePlugin,
   type IStorageBackendPluginHandle,
   type IStoragePluginCallContext,
   type IStoragePluginCore,
@@ -159,8 +159,8 @@ function admitHot(borrowed: IStorageBorrowedBackend): IArchiveHot {
  * owners.
  */
 export function archivePlugin<const N extends string, T = ICollectionsCodecValue>(
-  options: IArchivePluginOptions<T> & { readonly id: N }
-): IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly id: N } {
+  options: IArchivePluginOptions<T> & { readonly name: N }
+): IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly name: N } {
   const configuration = snapshotArchiveOptions(options),
     id = configuration.id as N
   const descriptor = (core: IArchiveCore) => ({
@@ -210,8 +210,11 @@ export function archivePlugin<const N extends string, T = ICollectionsCodecValue
       } as IArchiveApi<N>
     }
   })
-  return definePlugin(id, descriptor) as unknown as IStorageBackendPluginHandle<IArchiveApi<N>> & {
-    readonly id: N
+  return definePlugin({
+    name: id,
+    setup: descriptor as never
+  }) as unknown as IStorageBackendPluginHandle<IArchiveApi<N>> & {
+    readonly name: N
   }
 }
 /** Archive operations share explicit state while the host owns their lifecycle. */

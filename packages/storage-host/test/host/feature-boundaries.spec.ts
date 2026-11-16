@@ -4,22 +4,29 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   createStorageHost,
-  defineFeature,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
+  type IStorageBackendPluginDefiner
 } from '../../src/index.ts'
-import { memoryBackendKind, memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import { catalog } from '../helpers/catalog.ts'
+import { defineStorageFeature, defineBackendPlugin } from '../../src/sdk.ts'
+import type { IMemoryBackend } from '../../src/plugins/memory.ts'
+
+/** Feature definer typed for the imported backend. */
+const defineMemoryFeature: IStorageFeatureDefiner<IMemoryBackend> = defineStorageFeature
 
 /** The shared definition retains one kind while every installed native resource stays distinct. */
-const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(
-  'catalog'
-)
+type IKindBackend = IStorageBackendType<ReturnType<typeof catalog>['store'], Map<string, string>>
+/** Backend-plugin definer typed for this test backend. */
+const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
+/** Feature definer typed for this test backend. */
+const defineKindFeature: IStorageFeatureDefiner<IKindBackend> = defineStorageFeature
 
 describe('moved native Feature boundaries', () => {
   it('keeps one shared Feature bound to each exact store, backend id and extension plane', async () => {
-    const shared = defineFeature(kind, ({ featureExpose }) => ({
+    const shared = defineKindFeature(({ featureExpose }) => ({
       capabilities: [],
       chain: {},
       api: {
@@ -34,7 +41,6 @@ describe('moved native Feature boundaries', () => {
     let first!: ReturnType<typeof catalog>
     let second!: ReturnType<typeof catalog>
     const firstDescriptor = (core: IStoragePluginCore) => ({
-      kind,
       featureExpose: () => ({ getClient: () => first.client }),
       capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => first.installer,
       install: () => {
@@ -45,7 +51,6 @@ describe('moved native Feature boundaries', () => {
       expose: () => ({ firstVisible: () => true })
     })
     const secondDescriptor = (core: IStoragePluginCore) => ({
-      kind,
       featureExpose: () => ({ getClient: () => second.client }),
       capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => second.installer,
       install: () => {
@@ -55,10 +60,18 @@ describe('moved native Feature boundaries', () => {
       },
       expose: () => ({ secondVisible: () => true })
     })
-    const firstPlugin = definePlugin('first', firstDescriptor, { shared })
-    const secondPlugin = definePlugin('second', secondDescriptor, { shared })
-    expect(firstPlugin.id).toBe('first')
-    expect(secondPlugin.id).toBe('second')
+    const firstPlugin = defineKindBackend({
+      name: 'first',
+      features: { shared },
+      open: firstDescriptor
+    })
+    const secondPlugin = defineKindBackend({
+      name: 'second',
+      features: { shared },
+      open: secondDescriptor
+    })
+    expect(firstPlugin.name).toBe('first')
+    expect(secondPlugin.name).toBe('second')
     await using host = await createStorageHost({ plugins: [firstPlugin, secondPlugin] })
     const firstStore = host.backend('first')
     const secondStore = host.backend('second')
@@ -77,47 +90,19 @@ describe('moved native Feature boundaries', () => {
     expect(secondStore).not.toHaveProperty('readSecond')
   })
 
-  it('rejects a dependency-only wrong kind before any descriptor or Feature factory runs', () => {
-    const foreignKind = defineStorageBackendKind()('foreign')
-    const dependencyFactory = vi.fn(() => ({
-      capabilities: [],
-      chain: {},
-      api: { store: {}, transaction: {} }
-    }))
-    const dependency = defineFeature(foreignKind, dependencyFactory)
-    const wrapperFactory = vi.fn(() => ({
-      capabilities: [],
-      chain: {},
-      api: { store: {}, transaction: {} }
-    }))
-    const descriptor = vi.fn(() => ({ install: () => ({}) }))
-    expect(() => {
-      /** Bypass only static rejection to exercise the actual public dependency admission. */
-      const wrapper = Reflect.apply(defineFeature, undefined, [
-        kind,
-        wrapperFactory,
-        { dependency }
-      ])
-      Reflect.apply(definePlugin, undefined, ['wrong-dependency', descriptor, { wrapper }])
-    }).toThrowError(expect.objectContaining({ code: 'BACKEND_KIND_MISMATCH' }))
-    expect(dependencyFactory).not.toHaveBeenCalled()
-    expect(wrapperFactory).not.toHaveBeenCalled()
-    expect(descriptor).not.toHaveBeenCalled()
-  })
-
   it('inspects the original native Feature closure without executing either factory', () => {
     const sourceFactory = vi.fn(() => ({
       capabilities: [],
       chain: {},
       api: { store: {}, transaction: {} }
     }))
-    const source = defineFeature(kind, sourceFactory)
+    const source = defineKindFeature(sourceFactory)
     const derivedFactory = vi.fn(() => ({
       capabilities: [],
       chain: {},
       api: { store: {}, transaction: {} }
     }))
-    const derived = defineFeature(kind, derivedFactory, { source })
+    const derived = defineKindFeature(derivedFactory, { source })
     expect(inspectFeatures({ derived }).ordered).toEqual([source, derived])
     expect(sourceFactory).not.toHaveBeenCalled()
     expect(derivedFactory).not.toHaveBeenCalled()
@@ -126,12 +111,12 @@ describe('moved native Feature boundaries', () => {
   it('materializes a native Feature with the original Host scheduler', async () => {
     const scheduler = createManualScheduler()
     let receivedScheduler: IScheduler | undefined
-    const feature = defineFeature(memoryBackendKind, ({ featureExpose }) => {
+    const feature = defineMemoryFeature(({ featureExpose }) => {
       receivedScheduler = featureExpose.getScheduler()
       return { capabilities: [], chain: {}, api: { store: {}, transaction: {} } }
     })
     await using host = await createStorageHost({ scheduler })
-    await host.use(memoryBackendPlugin(undefined, { feature }))
+    await host.use(memoryBackendPlugin({ features: { feature } }))
     expect(receivedScheduler).toBeDefined()
     let scheduled = false
     receivedScheduler!.schedule(() => {

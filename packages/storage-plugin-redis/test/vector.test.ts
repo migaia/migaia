@@ -61,13 +61,14 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
         const prefix = namespaces.prefix(),
           host = await createStorageHost({
             plugins: [
-              redisBackendPlugin(
-                { driver: selected, prefix },
-                {
+              redisBackendPlugin({
+                driver: selected,
+                prefix,
+                features: {
                   vector: rediSearchVectorFeature(),
                   durable: redisChangeStreamFeature({ maxLen: 1000 })
                 }
-              )
+              })
             ] as const
           })
         hosts.push(host)
@@ -249,7 +250,11 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
         const prefix = namespaces.prefix()
         const host = await createStorageHost({
           plugins: [
-            redisBackendPlugin({ driver: observed, prefix }, { vector: rediSearchVectorFeature() })
+            redisBackendPlugin({
+              driver: observed,
+              prefix,
+              features: { vector: rediSearchVectorFeature() }
+            })
           ] as const
         })
         hosts.push(host)
@@ -310,7 +315,11 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
         const prefix = namespaces.prefix()
         const host = await createStorageHost({
           plugins: [
-            redisBackendPlugin({ driver: observed, prefix }, { vector: rediSearchVectorFeature() })
+            redisBackendPlugin({
+              driver: observed,
+              prefix,
+              features: { vector: rediSearchVectorFeature() }
+            })
           ] as const
         })
         hosts.push(host)
@@ -534,10 +543,11 @@ for (const url of [process.env.MIGAIA_VALKEY_URL]) {
         host = await createStorageHost({
           autoDetect: false,
           plugins: [
-            redisBackendPlugin(
-              { driver, prefix: namespaces.prefix() },
-              { search: rediSearchVectorFeature() }
-            )
+            redisBackendPlugin({
+              driver,
+              prefix: namespaces.prefix(),
+              features: { search: rediSearchVectorFeature() }
+            })
           ] as const
         })
       try {
@@ -583,10 +593,11 @@ it.skipIf(!process.env.MIGAIA_REDIS_STACK_URL)(
       await expect(
         createStorageHost({
           plugins: [
-            redisBackendPlugin(
-              { driver, prefix: namespaces.prefix() },
-              { search: rediSearchVectorFeature() }
-            )
+            redisBackendPlugin({
+              driver,
+              prefix: namespaces.prefix(),
+              features: { search: rediSearchVectorFeature() }
+            })
           ] as const
         })
       ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })

@@ -20,10 +20,10 @@ describe('native Graph Store and ontology Features', () => {
       remove = vi.spyOn(endpoint.graphStore!, 'remove'),
       host = await createStorageHost({
         plugins: [
-          sparqlBackendPlugin(
-            { endpoint },
-            { graphs: graphStoreFeature(), ontology: ontologyFeature() }
-          )
+          sparqlBackendPlugin({
+            endpoint,
+            features: { graphs: graphStoreFeature(), ontology: ontologyFeature() }
+          })
         ] as const
       })
     onTestFinished(() => host.dispose())
@@ -98,10 +98,10 @@ describe('native Graph Store and ontology Features', () => {
     const get = vi.spyOn(endpoint.graphStore!, 'get')
     const host = await createStorageHost({
       plugins: [
-        sparqlBackendPlugin(
-          { endpoint },
-          { graphs: graphStoreFeature(), ontology: ontologyFeature() }
-        )
+        sparqlBackendPlugin({
+          endpoint,
+          features: { graphs: graphStoreFeature(), ontology: ontologyFeature() }
+        })
       ] as const
     })
     onTestFinished(() => host.dispose())
@@ -149,7 +149,9 @@ describe('native Graph Store and ontology Features', () => {
     }
     const host = await createStorageHost({
       autoDetect: false,
-      plugins: [sparqlBackendPlugin({ endpoint }, { graphs: graphStoreFeature() })] as const
+      plugins: [
+        sparqlBackendPlugin({ endpoint, features: { graphs: graphStoreFeature() } })
+      ] as const
     })
     onTestFinished(() => host.dispose())
     await expect(
@@ -160,7 +162,7 @@ describe('native Graph Store and ontology Features', () => {
     const ready = await createStorageHost({
       autoDetect: false,
       plugins: [
-        sparqlBackendPlugin({ endpoint: original }, { ontology: ontologyFeature() })
+        sparqlBackendPlugin({ endpoint: original, features: { ontology: ontologyFeature() } })
       ] as const
     })
     onTestFinished(() => ready.dispose())
@@ -173,10 +175,10 @@ describe('native Graph Store and ontology Features', () => {
   it('isolates graph documents by organization and removes all organization-owned graph data', async () => {
     const host = await createStorageHost({
       plugins: [
-        sparqlBackendPlugin(
-          { endpoint: oxigraphEndpoint(new Store()) },
-          { graphs: graphStoreFeature(), ontology: ontologyFeature() }
-        )
+        sparqlBackendPlugin({
+          endpoint: oxigraphEndpoint(new Store()),
+          features: { graphs: graphStoreFeature(), ontology: ontologyFeature() }
+        })
       ] as const
     })
     onTestFinished(() => host.dispose())

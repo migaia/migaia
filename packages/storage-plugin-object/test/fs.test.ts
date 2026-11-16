@@ -277,10 +277,10 @@ describe('native filesystem objects', () => {
       createStorageHost({
         plugins: [
           storageProbe(),
-          objectBackendPlugin(
-            { driver: fsObjectDriver({ root: join(directory, 'feature') }) },
-            { presign: objectPresignFeature() }
-          )
+          objectBackendPlugin({
+            driver: fsObjectDriver({ root: join(directory, 'feature') }),
+            features: { presign: objectPresignFeature() }
+          })
         ]
       })
     ).rejects.toThrow()

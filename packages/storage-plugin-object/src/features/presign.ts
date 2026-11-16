@@ -2,7 +2,6 @@ import { ObjectErrorText } from '../error-text.ts'
 import { GetObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import {
-  defineFeature,
   type IStorageFeatureCallContext,
   type IStorageFeatureExpose,
   type IStorageFeatureOutput
@@ -15,7 +14,7 @@ import {
 } from '@migaia/storage-contract'
 import type { IObjectStore } from '../types.ts'
 import { ObjectDriverKind, ObjectNames } from '../constants.ts'
-import { objectBackendKind } from '../plugin.ts'
+import { defineObjectFeature, type IObjectBackend } from '../plugin.ts'
 import { invalidArgument, normalizeObjectError } from '../errors.ts'
 import { observeObjectFeature } from '../store.ts'
 import { assertS3ObjectHeaders } from '../s3/options.ts'
@@ -77,15 +76,14 @@ const expiry = (value: number | undefined): number => {
 }
 /** Use the official signer and the installed S3 client; the root entry never imports this Feature. */
 export function objectPresignFeature() {
-  return defineFeature<
-    typeof objectBackendKind,
+  return defineObjectFeature<
     {},
     IStorageFeatureOutput<
       readonly [],
       {},
       { readonly store: { readonly presign: IObjectPresignApi }; readonly transaction: {} }
     >
-  >(objectBackendKind, (core) => {
+  >((core) => {
     if (core.featureExpose.getDriverKind() !== ObjectDriverKind.s3)
       throw new StorageContractError(StorageContractErrorCode.unsupported, {
         backend: ObjectNames.backend
@@ -119,7 +117,7 @@ export function objectPresignFeature() {
 /** Invocation context belongs to the host and carries the fixed organized store view. */
 type IObjectSigningCall = IStorageFeatureCallContext<S3Client | undefined, IObjectStore>
 /** The existing backend feature port supplies addresses and the borrowed native signer client. */
-type IObjectSigningPort = IStorageFeatureExpose<typeof objectBackendKind>
+type IObjectSigningPort = IStorageFeatureExpose<IObjectBackend>
 
 /**
  * Sign one upload with explicit native and invocation context; options stay stable across async

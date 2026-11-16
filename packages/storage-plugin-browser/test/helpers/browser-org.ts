@@ -38,17 +38,17 @@ export async function runBrowserTextOrgScenario() {
     {
       name: 'local',
       create: <const N extends string>(id: N, namespace: string) =>
-        localStorageBackendPlugin({ id, namespace })
+        localStorageBackendPlugin({ name: id, namespace })
     },
     {
       name: 'session',
       create: <const N extends string>(id: N, namespace: string) =>
-        sessionStorageBackendPlugin({ id, namespace })
+        sessionStorageBackendPlugin({ name: id, namespace })
     },
     {
       name: 'cookie',
       create: <const N extends string>(id: N, namespace: string) =>
-        cookieBackendPlugin({ id, namespace })
+        cookieBackendPlugin({ name: id, namespace })
     }
   ] as const
   for (const selected of plugins) {
@@ -89,9 +89,9 @@ export async function runBrowserTextOrgScenario() {
         /** Install once on the real fixture host and retain exact extension inference. */
         const usersEntityPluginHost = await host.use(usersEntityPlugin)
         /** Borrow the supplied backend through the installed repository capability factories. */
-        const leftUsers = usersEntityPluginHost.extensions[usersEntityPlugin.id](left)
+        const leftUsers = usersEntityPluginHost.extensions[usersEntityPlugin.name](left)
         /** Borrow the supplied backend through the installed repository capability factories. */
-        const rightUsers = usersEntityPluginHost.extensions[usersEntityPlugin.id](right)
+        const rightUsers = usersEntityPluginHost.extensions[usersEntityPlugin.name](right)
         await leftUsers.put({ id: 'a', email: 'same' })
         await rightUsers.put({ id: 'a', email: 'same' })
         try {

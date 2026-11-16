@@ -1,10 +1,6 @@
 import { memoryTestFeatures } from './memory-features.ts'
-import { createStorageHost, defineFeature } from '@migaia/storage-host'
-import {
-  memoryBackendKind,
-  memoryBackendPlugin,
-  type IMemoryBackendStore
-} from '@migaia/storage-host/plugins/memory'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin, type IMemoryBackendStore } from '@migaia/storage-host/plugins/memory'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { onTestFinished } from 'vitest'
 import {
@@ -12,6 +8,12 @@ import {
   type IStorageReactiveService
 } from '../../src/host/reactive.ts'
 import type { IBackendChangeController } from '@migaia/storage-host/sdk'
+import type { IMemoryBackend } from '@migaia/storage-host/plugins/memory'
+import { defineStorageFeature } from '@migaia/storage-host/sdk'
+import type { IStorageFeatureDefiner } from '@migaia/storage-host'
+
+/** Feature definer typed for the imported backend. */
+const defineMemoryFeature: IStorageFeatureDefiner<IMemoryBackend> = defineStorageFeature
 
 /** The fixture exposes a finite view of the original host rather than another facade. */
 type IReactiveServiceFixture = {
@@ -37,7 +39,7 @@ export async function createReactiveServiceFixture(options: {
   let controller!: IBackendChangeController
   let attach!: () => void
   /** The original host still owns this service; the fixture creates no lifecycle or registry. */
-  const fixture = defineFeature(memoryBackendKind, ({ featureExpose }) => {
+  const fixture = defineMemoryFeature(({ featureExpose }) => {
     service = createStorageReactiveService()
     featureExpose.onDispose(() => service.dispose())
     attach = () => {
@@ -59,7 +61,7 @@ export async function createReactiveServiceFixture(options: {
   const host = await createStorageHost({
     scheduler: options.scheduler,
     report: options.report,
-    plugins: [memoryBackendPlugin(undefined, { ...memoryTestFeatures, fixture })]
+    plugins: [memoryBackendPlugin({ features: { ...memoryTestFeatures, fixture } })]
   })
   onTestFinished(() => host.dispose())
   attach()

@@ -257,13 +257,11 @@ function createStorageExecutionPorts(registration: IStorageRegistrationAssembly)
     subscribeStorageHook: ((name, handler) =>
       context.hooks.on(name, handler)) satisfies IStorageHooks['on'],
     emit: ((name, payload) => context.emit(name, payload)) satisfies IStorageHookEmitter,
-    setStorageKind: context.setKind,
     execution: forwardStorageExecution(
       host,
       context.assertExecution,
       () => ({
         backendId: context.id,
-        backend: context.getKind()?.name ?? context.id,
         orgId: context.defaultOrgId
       }),
       context.observeExecution === undefined

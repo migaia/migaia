@@ -1,10 +1,10 @@
 import {
   postgresBackendPlugin,
-  postgresBackendKind,
-  type IPgDriver
+  type IPgDriver,
+  type IPostgresBackend
 } from '@migaia/storage-plugin-postgres'
 import { createStorageHost, type IStorageFeature } from '@migaia/storage-host'
-import { memoryBackendKind } from '@migaia/storage-host/plugins/memory'
+import type { IMemoryBackend } from '@migaia/storage-host/plugins/memory'
 import {
   durableChangeFeed,
   vector,
@@ -31,9 +31,10 @@ declare const pgDriver: IPgDriver
 /** Three independent IDs retain their exact selected native API and capability surfaces. */
 const host = await createStorageHost({
   plugins: [
-    redisBackendPlugin(
-      { driver, id: 'one' },
-      {
+    redisBackendPlugin({
+      driver,
+      name: 'one',
+      features: {
         streams: redisStreamsFeature(),
         pubsub: redisPubSubFeature(),
         sorted: redisSortedSetsFeature(),
@@ -41,10 +42,11 @@ const host = await createStorageHost({
         history: redisChangeStreamFeature({ maxLen: 100 }),
         search: rediSearchVectorFeature()
       }
-    ),
-    redisBackendPlugin(
-      { driver, id: 'two' },
-      {
+    }),
+    redisBackendPlugin({
+      driver,
+      name: 'two',
+      features: {
         streams: redisStreamsFeature(),
         pubsub: redisPubSubFeature(),
         sorted: redisSortedSetsFeature(),
@@ -52,10 +54,11 @@ const host = await createStorageHost({
         history: redisChangeStreamFeature({ maxLen: 100 }),
         search: rediSearchVectorFeature()
       }
-    ),
-    redisBackendPlugin(
-      { driver, id: 'three' },
-      {
+    }),
+    redisBackendPlugin({
+      driver,
+      name: 'three',
+      features: {
         streams: redisStreamsFeature(),
         pubsub: redisPubSubFeature(),
         sorted: redisSortedSetsFeature(),
@@ -63,7 +66,7 @@ const host = await createStorageHost({
         history: redisChangeStreamFeature({ maxLen: 100 }),
         search: rediSearchVectorFeature()
       }
-    )
+    })
   ] as const
 })
 for (const store of [host.backend('one'), host.backend('two'), host.backend('three')]) {
@@ -88,9 +91,9 @@ for (const store of [host.backend('one'), host.backend('two'), host.backend('thr
   })
 }
 // @ts-expect-error Feature target identity cannot be changed to memory.
-const wrong: IStorageFeature<typeof memoryBackendKind> = redisStreamsFeature()
+const wrong: IStorageFeature<IMemoryBackend> = redisStreamsFeature()
 // @ts-expect-error Standard vector Feature targets only the Redis backend.
-const wrongVector: IStorageFeature<typeof memoryBackendKind> = rediSearchVectorFeature()
+const wrongVector: IStorageFeature<IMemoryBackend> = rediSearchVectorFeature()
 void wrongVector
 void wrong
 // @ts-expect-error Backend IDs remain the exact three registered literals.
@@ -128,7 +131,7 @@ defaults.tx().run(() => undefined)
 defaults.use(ttl).expire({ channel: 'vector', key: 'wrong' }, 1000)
 
 // @ts-expect-error A Redis Stream Feature cannot satisfy the PostgreSQL backend kind.
-const wrongPostgres: IStorageFeature<typeof postgresBackendKind> = redisStreamsFeature()
+const wrongPostgres: IStorageFeature<IPostgresBackend> = redisStreamsFeature()
 // @ts-expect-error The public PostgreSQL factory rejects the Redis Stream Feature selection.
-postgresBackendPlugin({ driver: pgDriver }, { streams: redisStreamsFeature() })
+postgresBackendPlugin({ driver: pgDriver, features: { streams: redisStreamsFeature() } })
 void wrongPostgres

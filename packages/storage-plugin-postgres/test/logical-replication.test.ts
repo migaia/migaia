@@ -40,10 +40,11 @@ for (const mode of ['tables', 'schema', 'all', 'missing-table', 'without-truncat
     const host = await createStorageHost({
       autoDetect: false,
       plugins: [
-        postgresBackendPlugin(
-          { driver: pgDriver(pool), prefix },
-          { replication: pgLogicalReplicationFeature({ slot, publication }) }
-        )
+        postgresBackendPlugin({
+          driver: pgDriver(pool),
+          prefix,
+          features: { replication: pgLogicalReplicationFeature({ slot, publication }) }
+        })
       ] as const
     })
     onTestFinished(async () => {
@@ -122,12 +123,13 @@ it('resets root and routed consumers on TRUNCATE and exposes read-only WAL healt
   const open = vi.spyOn(driver.logicalReplication!, 'open')
   const host = await createStorageHost({
     plugins: [
-      postgresBackendPlugin(
-        { driver, prefix },
-        {
+      postgresBackendPlugin({
+        driver,
+        prefix,
+        features: {
           replication: pgLogicalReplicationFeature({ slot, publication })
         }
-      )
+      })
     ] as const
   })
   onTestFinished(async () => {
@@ -237,12 +239,13 @@ it('blocks TRUNCATE without acknowledging when the selected policy is block', as
   await pool.query('SELECT pg_create_logical_replication_slot($1,$2)', [slot, 'pgoutput'])
   const host = await createStorageHost({
     plugins: [
-      postgresBackendPlugin(
-        { driver: pgDriver(pool), prefix },
-        {
+      postgresBackendPlugin({
+        driver: pgDriver(pool),
+        prefix,
+        features: {
           replication: pgLogicalReplicationFeature({ slot, publication, truncate: 'block' })
         }
-      )
+      })
     ] as const
   })
   onTestFinished(async () => {
@@ -294,12 +297,13 @@ it('replays partial multi-org commits and confirms only complete caller-processe
   await pool.query('SELECT pg_create_logical_replication_slot($1,$2)', [slot, 'pgoutput'])
   const host = await createStorageHost({
     plugins: [
-      postgresBackendPlugin(
-        { driver: pgDriver(pool), prefix },
-        {
+      postgresBackendPlugin({
+        driver: pgDriver(pool),
+        prefix,
+        features: {
           replication: pgLogicalReplicationFeature({ slot, publication })
         }
-      )
+      })
     ] as const
   })
   onTestFinished(async () => {

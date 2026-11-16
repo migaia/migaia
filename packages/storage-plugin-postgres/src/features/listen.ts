@@ -1,7 +1,7 @@
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { createLifecycleScope } from '@migaia/lifecycle'
-import { postgresBackendKind } from '../plugin.ts'
+import { definePostgresFeature } from '../plugin.ts'
 import type { IPgListenApi, IPgTransactionNotifyApi } from '../types.ts'
 import { PgNames, PgOperation } from '../constants.ts'
 import { invalidArgument } from '../errors.ts'
@@ -25,8 +25,7 @@ function notification(channel: string, payload?: string): void {
 }
 /** Native subscriptions reuse original lifecycle ownership; transaction APIs publish only. */
 export function pgListenFeature() {
-  return defineFeature<
-    typeof postgresBackendKind,
+  return definePostgresFeature<
     {},
     IStorageFeatureOutput<
       readonly [],
@@ -36,7 +35,7 @@ export function pgListenFeature() {
         readonly transaction: { readonly notifications: IPgTransactionNotifyApi }
       }
     >
-  >(postgresBackendKind, ({ featureExpose: core }) => {
+  >(({ featureExpose: core }) => {
     const resources = createLifecycleScope({ scheduler: core.getScheduler() })
     core.onDispose(async () => {
       resources.close()
@@ -63,7 +62,6 @@ export function pgListenFeature() {
                   (payload) => {
                     core.emit('onNotify', () => ({
                       backendId: core.getBackendId(),
-                      backend: PgNames.backend,
                       channel,
                       orgId: this.orgId
                     }))

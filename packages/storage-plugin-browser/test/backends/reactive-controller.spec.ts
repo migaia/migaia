@@ -2,17 +2,22 @@ import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import { createStorageHost, defineFeature } from '@migaia/storage-host'
-import type { IBackendChangeController } from '@migaia/storage-host/sdk'
-import { cookieBackendPlugin, cookieBackendKind } from '../../src/cookies.ts'
-import { localStorageBackendPlugin, localStorageBackendKind } from '../../src/local-storage.ts'
+import { createStorageHost, type IStorageFeatureDefiner } from '@migaia/storage-host'
+import { defineStorageFeature, type IBackendChangeController } from '@migaia/storage-host/sdk'
+import { cookieBackendPlugin, type ICookieBackend } from '../../src/cookies.ts'
+import { localStorageBackendPlugin, type ILocalStorageBackend } from '../../src/local-storage.ts'
 import {
   sessionStorageBackendPlugin,
-  sessionStorageBackendKind
+  type ISessionStorageBackend
 } from '../../src/session-storage.ts'
-import { indexedDbBackendPlugin, indexedDbBackendKind } from '../../src/indexed-db.ts'
+import { indexedDbBackendPlugin, type IIndexedDbBackend } from '../../src/indexed-db.ts'
 import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
+
+/** Feature definer typed for all four browser backends at once. */
+const defineBrowserFeature: IStorageFeatureDefiner<
+  [ILocalStorageBackend, ISessionStorageBackend, ICookieBackend, IIndexedDbBackend]
+> = defineStorageFeature
 
 type IObservedBackend = {
   readonly name: string
@@ -28,38 +33,36 @@ const createObservedBackends = async (): Promise<IObservedBackend[]> => {
     readonly id: string
     readonly controller: IBackendChangeController
   })[] = []
-  const feature = defineFeature(
-    [localStorageBackendKind, sessionStorageBackendKind, cookieBackendKind, indexedDbBackendKind],
-    ({ featureExpose }) => {
-      readControllers.push(() => ({
-        id: featureExpose.getBackendId(),
-        controller: featureExpose.getChangeController()!
-      }))
-      return { capabilities: [] as const, chain: {}, api: { store: {}, transaction: {} } }
-    }
-  )
+  const feature = defineBrowserFeature(({ featureExpose }) => {
+    readControllers.push(() => ({
+      id: featureExpose.getBackendId(),
+      controller: featureExpose.getChangeController()!
+    }))
+    return { capabilities: [] as const, chain: {}, api: { store: {}, transaction: {} } }
+  })
   const host = await createStorageHost({
     plugins: [
-      localStorageBackendPlugin(
-        { namespace: 'controller-local', storage: fakeWebStorage() },
-        { controller: feature }
-      ),
-      sessionStorageBackendPlugin(
-        { namespace: 'controller-session', storage: fakeWebStorage() },
-        { controller: feature }
-      ),
-      cookieBackendPlugin(
-        { namespace: 'controller-cookie', document: fakeCookieDocument() },
-        { controller: feature }
-      ),
-      indexedDbBackendPlugin(
-        {
-          dbName: `controller-${Math.random().toString(36).slice(2)}`,
-          factory: new IDBFactory(),
-          keyRange: IDBKeyRange
-        },
-        { ...indexedDbTestFeatures, controller: feature }
-      )
+      localStorageBackendPlugin({
+        namespace: 'controller-local',
+        storage: fakeWebStorage(),
+        features: { controller: feature }
+      }),
+      sessionStorageBackendPlugin({
+        namespace: 'controller-session',
+        storage: fakeWebStorage(),
+        features: { controller: feature }
+      }),
+      cookieBackendPlugin({
+        namespace: 'controller-cookie',
+        document: fakeCookieDocument(),
+        features: { controller: feature }
+      }),
+      indexedDbBackendPlugin({
+        dbName: `controller-${Math.random().toString(36).slice(2)}`,
+        factory: new IDBFactory(),
+        keyRange: IDBKeyRange,
+        features: { ...indexedDbTestFeatures, controller: feature }
+      })
     ]
   })
   onTestFinished(() => host.dispose())

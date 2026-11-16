@@ -2,11 +2,18 @@ import { memoryNotificationsFeature } from '../../src/features/memory-notificati
 import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { createStorageHost, defineFeature, definePlugin } from '../../src/index.ts'
-import { memoryBackendKind, memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { createStorageHost } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { definePlugin } from '../../src/sdk.ts'
+import type { IMemoryBackend } from '../../src/plugins/memory.ts'
+import { defineStorageFeature } from '../../src/sdk.ts'
+import type { IStorageFeatureDefiner } from '../../src/index.ts'
+
+/** Feature definer typed for the imported backend. */
+const defineMemoryFeature: IStorageFeatureDefiner<IMemoryBackend> = defineStorageFeature
 
 /** The actual Feature borrows the same controlled backend object through its declared lazy port. */
-const controllerFeature = defineFeature(memoryBackendKind, ({ featureExpose }) => ({
+const controllerFeature = defineMemoryFeature(({ featureExpose }) => ({
   capabilities: [],
   chain: {},
   api: {
@@ -24,11 +31,11 @@ it('rejects duplicate public ids before either native descriptor or install runs
   const secondInstall = vi.fn(() => ({}))
   const firstDescriptor = vi.fn(() => ({ install: firstInstall }))
   const secondDescriptor = vi.fn(() => ({ install: secondInstall }))
-  const first = definePlugin('duplicate', firstDescriptor)
-  const second = definePlugin('duplicate', secondDescriptor)
+  const first = definePlugin({ name: 'duplicate', setup: firstDescriptor })
+  const second = definePlugin({ name: 'duplicate', setup: secondDescriptor })
   await expect(createStorageHost({ plugins: [first, second] as never })).rejects.toMatchObject({
     code: 'BACKEND_INSTALL_FAILED',
-    cause: { code: 'BACKEND_DUPLICATE' }
+    cause: { code: 'PLUGIN_DUPLICATE' }
   })
   expect(firstDescriptor).not.toHaveBeenCalled()
   expect(secondDescriptor).not.toHaveBeenCalled()
@@ -45,10 +52,12 @@ it('rejects duplicate public ids before either native descriptor or install runs
 it('commits once, reports listener failure, keeps failed writes silent and preserves disposal identity', async () => {
   await using host = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(undefined, {
-        controller: controllerFeature,
-        notifications: memoryNotificationsFeature(),
-        changeFeed: memoryChangeFeedFeature()
+      memoryBackendPlugin({
+        features: {
+          controller: controllerFeature,
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
       })
     ]
   })
@@ -85,10 +94,12 @@ it('commits once, reports listener failure, keeps failed writes silent and prese
 it('drains an admitted real memory transaction before disposal and publishes no failed draft', async () => {
   await using host = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(undefined, {
-        controller: controllerFeature,
-        notifications: memoryNotificationsFeature(),
-        changeFeed: memoryChangeFeedFeature()
+      memoryBackendPlugin({
+        features: {
+          controller: controllerFeature,
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
       })
     ]
   })
@@ -123,22 +134,22 @@ it('publishes completed transactions and preserves exact multiple-backend public
   const features = { controller: controllerFeature }
   const host = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(
-        { id: 'first' },
-        {
+      memoryBackendPlugin({
+        name: 'first',
+        features: {
           ...features,
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()
         }
-      ),
-      memoryBackendPlugin(
-        { id: 'second' },
-        {
+      }),
+      memoryBackendPlugin({
+        name: 'second',
+        features: {
           ...features,
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()
         }
-      )
+      })
     ]
   })
   const first = host.backend('first')
@@ -153,15 +164,15 @@ it('publishes completed transactions and preserves exact multiple-backend public
   expect(events).toHaveLength(1)
   await expect(
     Reflect.apply(host.use, host, [
-      memoryBackendPlugin(
-        { id: 'first' },
-        {
+      memoryBackendPlugin({
+        name: 'first',
+        features: {
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()
         }
-      )
+      })
     ])
-  ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED', cause: { code: 'BACKEND_DUPLICATE' } })
+  ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED', cause: { code: 'PLUGIN_DUPLICATE' } })
   expect([...host.backends().keys()]).toEqual(['first', 'second'])
   expect(host.backend('first')).toBe(first)
   expect(host.backend('second')).toBe(second)

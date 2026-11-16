@@ -4,26 +4,31 @@ import {
   type IKeyValueStore
 } from '@migaia/storage-contract'
 import {
-  definePlugin,
-  type IStorageBackendKind,
   type IStorageBackendPlugin,
+  type IStorageBackendType,
   type IStorageFeatureRecord,
   type IStorageFeatureStoreCompatibility,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageReactiveProfile,
+  type IStorageReactiveProfileExpose,
+  type IStorageReactiveVisibility,
+  type IStorageBackendPluginDefiner
 } from '@migaia/storage-host'
+import type { IBackendKind } from '@migaia/storage-contract'
+import { defineBackendPlugin } from '@migaia/storage-host/sdk'
+import { BROWSER_REACTIVE_POLL_INTERVAL_MS } from '../constants.ts'
 import type { IBackendConstruction } from '../backends/construction.ts'
 import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import type { IBackendKind } from '@migaia/storage-contract'
 
-/** Read the optional factory id without allowing an options accessor to leave the Web boundary. */
+/** Read the optional plugin name without allowing an options accessor to leave the Web boundary. */
 export function readBuiltInPluginId<TId extends string>(
-  options: { readonly id?: TId },
+  options: { readonly name?: TId },
   fallback: string,
   backend: IBackendKind
 ): TId {
   try {
-    return (options.id ?? fallback) as TId
+    return (options.name ?? fallback) as TId
   } catch (cause) {
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, { backend, cause })
   }
@@ -31,24 +36,32 @@ export function readBuiltInPluginId<TId extends string>(
 
 /** Preserve the original create, admission, controller registration and preparation order. */
 export function createBuiltInBackendPlugin<
-  const TName extends string,
   S extends IKeyValueStore,
   C,
   const TId extends string,
   const F extends IStorageFeatureRecord = {}
 >(
-  kind: IStorageBackendKind<TName, S, C>,
+  visibility: IStorageReactiveVisibility,
   id: TId,
   createStore: (core: IStoragePluginCore) => IBackendConstruction<S, C>,
-  features?: F & IStorageFeatureStoreCompatibility<IStorageBackendKind<TName, S, C>, NoInfer<F>>,
+  features?: F &
+    IStorageFeatureStoreCompatibility<
+      IStorageBackendType<S, C, IStorageReactiveProfileExpose>,
+      NoInfer<F>
+    >,
   journal = false
-): IStorageBackendPlugin<IStorageBackendKind<TName, S, C>, TId, F> {
+): IStorageBackendPlugin<IStorageBackendType<S, C, IStorageReactiveProfileExpose>, TId, F> {
+  /** Web storage and cookies notify within one page only, so a live query also reconciles. */
+  const profile: IStorageReactiveProfile = {
+    mode: 'hybrid',
+    visibility,
+    pollIntervalMs: BROWSER_REACTIVE_POLL_INTERVAL_MS
+  }
   /** The descriptor borrows this exact construction; only the host owns its lifetime. */
   const descriptor = (core: IStoragePluginCore<F>) => {
     /** Installation initializes the original native client before lazy Feature getters run. */
     let construction: IBackendConstruction<S, C>
     return {
-      kind,
       install: () => {
         construction = createStore(core)
         core.registerStore(construction.store)
@@ -59,7 +72,10 @@ export function createBuiltInBackendPlugin<
           core.registerValueCommit(construction.store, construction.commitValueWrite)
         return construction.prepare ? construction.prepare().then(() => ({})) : {}
       },
-      featureExpose: () => ({ getClient: () => construction.getClient() }),
+      featureExpose: () => ({
+        getClient: () => construction.getClient(),
+        reactiveProfile: () => profile
+      }),
       capabilityInstaller: (_store: S) => construction.installer,
       ...(journal
         ? {
@@ -72,5 +88,9 @@ export function createBuiltInBackendPlugin<
         : {})
     }
   }
-  return definePlugin<TId, typeof descriptor, F>(id, descriptor, features)
+  return (
+    defineBackendPlugin as IStorageBackendPluginDefiner<
+      IStorageBackendType<S, C, IStorageReactiveProfileExpose>
+    >
+  )<TId, typeof descriptor, F>({ name: id, features: features as never, open: descriptor as never })
 }

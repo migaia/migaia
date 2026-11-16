@@ -47,7 +47,6 @@ it('observes complete original retry loops once with canonical native keys and f
     tag: 'storage',
     message: 'set',
     meta: {
-      backend: 'postgres',
       operation: 'set',
       outcome: 'success',
       payload: { key: 'key', value: 'before' },

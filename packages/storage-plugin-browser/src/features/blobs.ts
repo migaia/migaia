@@ -5,12 +5,8 @@ import {
   type IOperationContext
 } from '@migaia/storage-contract'
 import { runTransactionOperation, createStorageOperationRuntime } from '@migaia/storage-host/sdk'
-import {
-  defineFeature,
-  type IStorageFeature,
-  type IStorageFeatureOutput
-} from '@migaia/storage-host'
-import { indexedDbBackendKind } from '../host/builtin-kinds.ts'
+import { type IStorageFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { defineIndexedDbFeature, type IIndexedDbBackend } from '../host/builtin-backends.ts'
 import { INDEXED_DB_BLOB_STORE, StorageBackend } from '../constants.ts'
 import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
@@ -42,7 +38,7 @@ type IIndexedDbBlobOutput = IStorageFeatureOutput<
 /** Declare native schema before opening, then join every Blob request to the original executor. */
 export function indexedDbBlobFeature(options?: {
   readonly storeName?: string
-}): IStorageFeature<typeof indexedDbBackendKind, IIndexedDbBlobOutput> {
+}): IStorageFeature<IIndexedDbBackend, IIndexedDbBlobOutput> {
   /** Borrowed configuration is captured before any installation or database request. */
   let storeName: string
   try {
@@ -66,94 +62,91 @@ export function indexedDbBlobFeature(options?: {
       StorageErrorText.indexedDbSchemaDeclarationInvalid
     )
   }
-  return defineFeature<typeof indexedDbBackendKind, {}, IIndexedDbBlobOutput>(
-    indexedDbBackendKind,
-    ({ featureExpose }) => {
-      featureExpose.requireObjectStore(storeName)
-      /** Request normalization reuses the backend's original bridge and diagnostic owner. */
-      const runtime = createStorageOperationRuntime()
-      /** Request success stays provisional until the original transaction owner reaches commit. */
-      function request<T>(
-        transaction: IDBTransaction,
-        invoke: (store: IDBObjectStore) => IDBRequest<T>
-      ): Promise<T> {
-        try {
-          return fromIdbRequest(invoke(transaction.objectStore(storeName)), undefined, runtime)
-        } catch (cause) {
-          return Promise.reject(normalizeIdbRequestFailure(cause))
-        }
+  return defineIndexedDbFeature<{}, IIndexedDbBlobOutput>(({ featureExpose }) => {
+    featureExpose.requireObjectStore(storeName)
+    /** Request normalization reuses the backend's original bridge and diagnostic owner. */
+    const runtime = createStorageOperationRuntime()
+    /** Request success stays provisional until the original transaction owner reaches commit. */
+    function request<T>(
+      transaction: IDBTransaction,
+      invoke: (store: IDBObjectStore) => IDBRequest<T>
+    ): Promise<T> {
+      try {
+        return fromIdbRequest(invoke(transaction.objectStore(storeName)), undefined, runtime)
+      } catch (cause) {
+        return Promise.reject(normalizeIdbRequestFailure(cause))
       }
-      /** Native put preserves Blob/File metadata and never serializes portable payload bytes. */
-      function put(transaction: IDBTransaction, key: string, value: Blob): Promise<void> {
-        assertStringStorageKey(key, StorageBackend.indexedDb)
-        if (typeof Blob === 'undefined' || !(value instanceof Blob))
-          return Promise.reject(
-            new StorageContractError(StorageContractErrorCode.invalidArgument, {
-              backend: StorageBackend.indexedDb
-            })
-          )
-        return request(transaction, (store) => store.put(value, key)).then(() => undefined)
-      }
-      /** Missing values keep the native undefined result. */
-      function get(transaction: IDBTransaction, key: string): Promise<Blob | undefined> {
-        assertStringStorageKey(key, StorageBackend.indexedDb)
-        return request(transaction, (store) => store.get(key))
-      }
-      /** Removing a missing native Blob row is idempotent and remains in the same transaction. */
-      function remove(transaction: IDBTransaction, key: string): Promise<void> {
-        assertStringStorageKey(key, StorageBackend.indexedDb)
-        return request(transaction, (store) => store.delete(key)).then(() => undefined)
-      }
-      return {
-        capabilities: [] as const,
-        chain: {},
-        api: {
-          store: {
-            blobs: {
-              put(key, value, ctx) {
-                return this.store.transaction(
-                  (scope) =>
-                    runTransactionOperation(scope, (current) =>
-                      put(featureExpose.getTransactionClientForOrg(current, this.orgId), key, value)
-                    ),
-                  ctx
-                )
-              },
-              get(key, ctx) {
-                return this.store.transaction(
-                  (scope) =>
-                    runTransactionOperation(scope, (current) =>
-                      get(featureExpose.getTransactionClientForOrg(current, this.orgId), key)
-                    ),
-                  ctx
-                )
-              },
-              remove(key, ctx) {
-                return this.store.transaction(
-                  (scope) =>
-                    runTransactionOperation(scope, (current) =>
-                      remove(featureExpose.getTransactionClientForOrg(current, this.orgId), key)
-                    ),
-                  ctx
-                )
-              }
+    }
+    /** Native put preserves Blob/File metadata and never serializes portable payload bytes. */
+    function put(transaction: IDBTransaction, key: string, value: Blob): Promise<void> {
+      assertStringStorageKey(key, StorageBackend.indexedDb)
+      if (typeof Blob === 'undefined' || !(value instanceof Blob))
+        return Promise.reject(
+          new StorageContractError(StorageContractErrorCode.invalidArgument, {
+            backend: StorageBackend.indexedDb
+          })
+        )
+      return request(transaction, (store) => store.put(value, key)).then(() => undefined)
+    }
+    /** Missing values keep the native undefined result. */
+    function get(transaction: IDBTransaction, key: string): Promise<Blob | undefined> {
+      assertStringStorageKey(key, StorageBackend.indexedDb)
+      return request(transaction, (store) => store.get(key))
+    }
+    /** Removing a missing native Blob row is idempotent and remains in the same transaction. */
+    function remove(transaction: IDBTransaction, key: string): Promise<void> {
+      assertStringStorageKey(key, StorageBackend.indexedDb)
+      return request(transaction, (store) => store.delete(key)).then(() => undefined)
+    }
+    return {
+      capabilities: [] as const,
+      chain: {},
+      api: {
+        store: {
+          blobs: {
+            put(key, value, ctx) {
+              return this.store.transaction(
+                (scope) =>
+                  runTransactionOperation(scope, (current) =>
+                    put(featureExpose.getTransactionClientForOrg(current, this.orgId), key, value)
+                  ),
+                ctx
+              )
+            },
+            get(key, ctx) {
+              return this.store.transaction(
+                (scope) =>
+                  runTransactionOperation(scope, (current) =>
+                    get(featureExpose.getTransactionClientForOrg(current, this.orgId), key)
+                  ),
+                ctx
+              )
+            },
+            remove(key, ctx) {
+              return this.store.transaction(
+                (scope) =>
+                  runTransactionOperation(scope, (current) =>
+                    remove(featureExpose.getTransactionClientForOrg(current, this.orgId), key)
+                  ),
+                ctx
+              )
             }
-          },
-          transaction: {
-            blobs: {
-              put(key, value) {
-                return put(this.client, key, value)
-              },
-              get(key) {
-                return get(this.client, key)
-              },
-              remove(key) {
-                return remove(this.client, key)
-              }
+          }
+        },
+        transaction: {
+          blobs: {
+            put(key, value) {
+              return put(this.client, key, value)
+            },
+            get(key) {
+              return get(this.client, key)
+            },
+            remove(key) {
+              return remove(this.client, key)
             }
           }
         }
       }
     }
-  )
+  })
 }

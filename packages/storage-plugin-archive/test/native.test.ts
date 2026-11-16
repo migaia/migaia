@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Pool } from 'pg'
 import { describe, it, expect } from 'vitest'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
@@ -14,6 +14,7 @@ import { fsObjectDriver } from '@migaia/storage-plugin-object/fs'
 import { blob } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
 import { archivePlugin } from '../src/index.ts'
+import { definePlugin } from '@migaia/storage-host/sdk'
 
 /** Native PostgreSQL runs through the sole repository service launcher rather than skipping. */
 const connectionString = process.env.MIGAIA_PG_URL
@@ -63,41 +64,44 @@ for (const backend of ['memory', 'sqlite', 'postgres'] as const)
       let hold = false
       const entered = deferred<void>(),
         resume = deferred<void>()
-      const observer = definePlugin('native-observer', (core) => ({
-        install() {
-          core.useAsyncPipeline(async (input, next) => {
-            if (hold && input.backendId === 'cold' && input.operation.endsWith('head')) {
-              hold = false
-              entered.resolve()
-              await resume.promise
-            }
-            await next(input)
-            ports.push({
-              backend: input.backendId,
-              operation: input.operation,
-              stream:
-                input.operation === 'blob.put' &&
-                (input.input as { body: unknown }).body instanceof ReadableStream,
-              ...(input.operation === 'putRecord'
-                ? { key: (input.input as { key: unknown }).key }
-                : {})
+      const observer = definePlugin({
+        name: 'native-observer',
+        setup: (core) => ({
+          install() {
+            core.useAsyncPipeline(async (input, next) => {
+              if (hold && input.backendId === 'cold' && input.operation.endsWith('head')) {
+                hold = false
+                entered.resolve()
+                await resume.promise
+              }
+              await next(input)
+              ports.push({
+                backend: input.backendId,
+                operation: input.operation,
+                stream:
+                  input.operation === 'blob.put' &&
+                  (input.input as { body: unknown }).body instanceof ReadableStream,
+                ...(input.operation === 'putRecord'
+                  ? { key: (input.input as { key: unknown }).key }
+                  : {})
+              })
             })
-          })
-          return {}
-        }
-      }))
+            return {}
+          }
+        })
+      })
       const initial = await createStorageHost({
         plugins: [
           backend === 'memory'
-            ? memoryBackendPlugin({ id: 'hot' })
+            ? memoryBackendPlugin({ name: 'hot' })
             : backend === 'sqlite'
               ? sqliteBackendPlugin({
-                  id: 'hot',
+                  name: 'hot',
                   driver: observedSqlite!
                 })
-              : postgresBackendPlugin({ id: 'hot', driver: pgDriver(pool), prefix }),
+              : postgresBackendPlugin({ name: 'hot', driver: pgDriver(pool), prefix }),
           objectBackendPlugin({
-            id: 'cold',
+            name: 'cold',
             driver: fsObjectDriver({ root: join(directory, 'cold') })
           }),
           observer
@@ -105,7 +109,7 @@ for (const backend of ['memory', 'sqlite', 'postgres'] as const)
       })
       const host = await initial.use(
         archivePlugin({
-          id: 'archive',
+          name: 'archive',
           hot: 'hot',
           cold: 'cold',
           rules: [{ name: 'all', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]
@@ -209,30 +213,33 @@ it('reopens the original SQLite and filesystem owners and sweeps an upload orpha
   const open = async () => {
     const base = await createStorageHost({
       plugins: [
-        sqliteBackendPlugin({ id: 'hot', driver: nodeSqliteDriver(path) }),
-        objectBackendPlugin({ id: 'cold', driver: fsObjectDriver({ root: coldRoot }) }),
-        definePlugin('rollback', (core) => ({
-          install() {
-            core.useAsyncPipeline(async (input, next) => {
-              if (
-                fail &&
-                input.backendId === 'hot' &&
-                input.operation === 'putRecord' &&
-                input.scope !== undefined &&
-                Array.isArray((input.input as { key?: unknown }).key) &&
-                (input.input as { key: unknown[] }).key[2] === 'manifest'
-              )
-                throw new RangeError('persisted orphan fixture')
-              await next(input)
-            })
-            return {}
-          }
-        }))
+        sqliteBackendPlugin({ name: 'hot', driver: nodeSqliteDriver(path) }),
+        objectBackendPlugin({ name: 'cold', driver: fsObjectDriver({ root: coldRoot }) }),
+        definePlugin({
+          name: 'rollback',
+          setup: (core) => ({
+            install() {
+              core.useAsyncPipeline(async (input, next) => {
+                if (
+                  fail &&
+                  input.backendId === 'hot' &&
+                  input.operation === 'putRecord' &&
+                  input.scope !== undefined &&
+                  Array.isArray((input.input as { key?: unknown }).key) &&
+                  (input.input as { key: unknown[] }).key[2] === 'manifest'
+                )
+                  throw new RangeError('persisted orphan fixture')
+                await next(input)
+              })
+              return {}
+            }
+          })
+        })
       ]
     })
     const host = await base.use(
       archivePlugin({
-        id: 'archive',
+        name: 'archive',
         hot: 'hot',
         cold: 'cold',
         rules: [{ name: 'all', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]

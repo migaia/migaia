@@ -116,7 +116,7 @@ const browserQueryEntry = [
   '  try {',
   "    const usersEntityPlugin = defineEntityPlugin('users', { name: 'users', key: 'id', features: { query: entityQueryFeature() } })",
   '    const entityHost = await host.use(usersEntityPlugin)',
-  "    const users = entityHost.extensions[usersEntityPlugin.id](host.backend('indexed-db'))",
+  "    const users = entityHost.extensions[usersEntityPlugin.name](host.backend('indexed-db'))",
   "    return await users.query().where({ active: true }).select('name').all()",
   '  } finally { await host.dispose() }',
   '}'
@@ -161,7 +161,7 @@ const browserFullQueryEntry = [
   '      query: entityQueryFeature(), unique: entityUniqueFeature(), migration: entityMigrationFeature(), indexes: entityIndexesFeature(), keyset: entityKeysetFeature()',
   '    } })',
   '    const entityHost = await host.use(usersEntityPlugin)',
-  "    const users = entityHost.extensions[usersEntityPlugin.id](host.backend('indexed-db'))",
+  "    const users = entityHost.extensions[usersEntityPlugin.name](host.backend('indexed-db'))",
   "    return await users.query().where({ active: true }).select('name').all()",
   '  } finally { await host.dispose() }',
   '}'

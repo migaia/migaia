@@ -42,7 +42,6 @@ function emitStorageTelemetry(
       args: outcome === 'error' ? [error] : [],
       meta: {
         backendId: request.backendId,
-        backend: request.backend,
         orgId: request.orgId,
         operation: request.operation,
         level,

@@ -3,24 +3,26 @@ import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.t
 import { createBackendChangeController } from '../../src/core/change-controller.ts'
 import {
   createStorageHost,
-  defineFeature,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
+  type IStorageBackendPluginDefiner
 } from '../../src/index.ts'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import type { ICapabilityInstallPort, IKeyValueStore } from '@migaia/storage-contract'
+import { defineStorageFeature, defineBackendPlugin } from '../../src/sdk.ts'
+import { type IStorageBase } from '@migaia/storage-contract'
 
 /** Built-in installation retains memory's record and synchronous native surface. */
 const builtInHost = await createStorageHost({
   plugins: [
-    memoryBackendPlugin(
-      { id: 'cache' },
-      {
+    memoryBackendPlugin({
+      name: 'cache',
+      features: {
         notifications: memoryNotificationsFeature(),
         changeFeed: memoryChangeFeedFeature()
       }
-    )
+    })
   ] as const
 })
 const builtInMemory = builtInHost.backend('cache')
@@ -28,22 +30,23 @@ void builtInMemory.getRecord
 void builtInMemory.sync.clearValues()
 
 /** Exact literal IDs contribute one backend key; runtime unions and wide IDs contribute none. */
-const kind = defineStorageBackendKind()('native')
+type IKindBackend = IStorageBackendType<IStorageBase, undefined>
+/** Backend-plugin definer typed for this test backend. */
+const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
 declare const store: IKeyValueStore
 const descriptor = (core: IStoragePluginCore) => ({
-  kind,
   featureExpose: () => ({ getClient: () => undefined }),
   install: () => {
     core.registerStore(store)
     return {}
   }
 })
-const exactPlugin = definePlugin('exact', descriptor)
+const exactPlugin = defineKindBackend({ name: 'exact', open: descriptor })
 const exactHost = await createStorageHost({ plugins: [exactPlugin] as const })
 exactHost.backend('exact')
 
 declare const unionId: 'present' | 'absent'
-const unionPlugin = definePlugin(unionId, descriptor)
+const unionPlugin = defineKindBackend({ name: unionId, open: descriptor })
 const unionHost = await createStorageHost({ plugins: [unionPlugin] as const })
 // @ts-expect-error union IDs cannot contribute absent static backend authority.
 unionHost.backend('absent')
@@ -51,7 +54,7 @@ unionHost.backend('absent')
 unionHost.backend('present')
 
 declare const wideId: string
-const widePlugin = definePlugin(wideId, descriptor)
+const widePlugin = defineKindBackend({ name: wideId, open: descriptor })
 const wideHost = await createStorageHost({ plugins: [widePlugin] as const })
 // @ts-expect-error widened IDs cannot contribute a guessed static backend key.
 wideHost.backend('anything')
@@ -60,13 +63,17 @@ wideHost.backend('anything')
 type ICustomStore = IKeyValueStore & { readonly custom: () => void }
 declare const customStore: ICustomStore
 declare const installer: ICapabilityInstallPort
-const customKind = defineStorageBackendKind<ICustomStore, undefined>()('custom')
-const customFeature = defineFeature(customKind, (core) => {
+type ICustomKindBackend = IStorageBackendType<ICustomStore, undefined>
+/** Backend-plugin definer typed for this test backend. */
+const defineCustomKindBackend: IStorageBackendPluginDefiner<ICustomKindBackend> =
+  defineBackendPlugin
+/** Feature definer typed for this test backend. */
+const defineCustomKindFeature: IStorageFeatureDefiner<ICustomKindBackend> = defineStorageFeature
+const customFeature = defineCustomKindFeature((core) => {
   core.featureExpose.getStore().custom()
   return { capabilities: [], chain: {}, api: { store: {}, transaction: {} } }
 })
 const customDescriptor = (core: IStoragePluginCore) => ({
-  kind: customKind,
   featureExpose: () => ({ getClient: () => undefined }),
   capabilityInstaller: (_store: ICustomStore) => installer,
   install: () => {
@@ -74,17 +81,17 @@ const customDescriptor = (core: IStoragePluginCore) => ({
     return {}
   }
 })
-definePlugin('custom-store', customDescriptor, { customFeature })
-definePlugin<
-  'incompatible-store',
-  typeof descriptor,
-  { readonly customFeature: typeof customFeature }
->(
-  'incompatible-store',
-  descriptor,
-  // @ts-expect-error a base Store kind cannot satisfy a Feature requiring ICustomStore.
-  { customFeature }
-)
+defineCustomKindBackend({
+  name: 'custom-store',
+  features: { customFeature },
+  open: customDescriptor
+})
+defineKindBackend({
+  name: 'incompatible-store',
+  // @ts-expect-error a base Store cannot satisfy a Feature requiring ICustomStore.
+  features: { customFeature },
+  open: descriptor
+})
 
 /** Only the original backend installation can capture late physical-child construction authority. */
 declare const authorCore: IStoragePluginCore

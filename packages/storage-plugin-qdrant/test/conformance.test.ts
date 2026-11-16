@@ -6,10 +6,10 @@ import type { Schemas } from '@qdrant/js-client-rest'
 import { deferred } from '@migaia/utils/promise'
 import { describe, it, expect, vi, onTestFinished } from 'vitest'
 import { runConformance } from '@migaia/storage-contract/conformance'
-import { createStorageHost, createOrgId, definePlugin, StorageError } from '@migaia/storage-host'
+import { createStorageHost, createOrgId, StorageError } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'
-import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
+import { lockKey, ConcurrencyPolicy, definePlugin } from '@migaia/storage-host/sdk'
 import { qdrantBackendPlugin } from '../src/index.ts'
 import { fetchHttp } from '../src/http.ts'
 import { qdrantManagementFeature } from '../src/features/management.ts'
@@ -101,14 +101,16 @@ describe('real native vector backend', () => {
         const other = createOrgId()
         const host = await createStorageHost({
           plugins: [
-            qdrantBackendPlugin(
-              { url: url!, collectionPrefix: crypto.randomUUID(), http: fixture.http },
-              {
+            qdrantBackendPlugin({
+              url: url!,
+              collectionPrefix: crypto.randomUUID(),
+              http: fixture.http,
+              features: {
                 rescore: qdrantRescoreFeature({
                   collections: { points: { dimensions: 2, metric: 'dot', multivector } }
                 })
               }
-            )
+            })
           ] as const
         })
         const store = host.backend('qdrant')
@@ -267,14 +269,16 @@ describe('real native vector backend', () => {
       await first.dispose()
       const host = await createStorageHost({
         plugins: [
-          qdrantBackendPlugin(
-            { url: url!, collectionPrefix: prefix, http: fixture.http },
-            {
+          qdrantBackendPlugin({
+            url: url!,
+            collectionPrefix: prefix,
+            http: fixture.http,
+            features: {
               rescore: qdrantRescoreFeature({
                 collections: { old: { dimensions: 2, metric: 'dot' } }
               })
             }
-          )
+          })
         ] as const
       })
       try {
@@ -377,15 +381,17 @@ describe('real native vector backend', () => {
       Reflect.deleteProperty(http, 'updateVectors')
       const host = await createStorageHost({
           plugins: [
-            qdrantBackendPlugin(
-              { url: url!, collectionPrefix: crypto.randomUUID(), http },
-              {
+            qdrantBackendPlugin({
+              url: url!,
+              collectionPrefix: crypto.randomUUID(),
+              http,
+              features: {
                 management: qdrantManagementFeature(),
                 rescore: qdrantRescoreFeature({
                   collections: { valid: { dimensions: 1, metric: 'dot' } }
                 })
               }
-            )
+            })
           ] as const
         }),
         store = host.backend('qdrant')
@@ -511,10 +517,12 @@ describe('real native vector backend', () => {
         host = await createStorageHost({
           org,
           plugins: [
-            qdrantBackendPlugin(
-              { url: url!, collectionPrefix: crypto.randomUUID(), http: fixture.http },
-              { management: qdrantManagementFeature() }
-            )
+            qdrantBackendPlugin({
+              url: url!,
+              collectionPrefix: crypto.randomUUID(),
+              http: fixture.http,
+              features: { management: qdrantManagementFeature() }
+            })
           ] as const
         }),
         store = host.backend('qdrant'),
@@ -719,10 +727,12 @@ describe('real native vector backend', () => {
         host = await createStorageHost({
           org,
           plugins: [
-            qdrantBackendPlugin(
-              { url: url!, collectionPrefix: crypto.randomUUID(), http: fixture.http },
-              { management: qdrantManagementFeature() }
-            )
+            qdrantBackendPlugin({
+              url: url!,
+              collectionPrefix: crypto.randomUUID(),
+              http: fixture.http,
+              features: { management: qdrantManagementFeature() }
+            })
           ] as const
         }),
         store = host.backend('qdrant'),
@@ -817,15 +827,16 @@ describe('real native vector backend', () => {
       const fixture = native(),
         host = await createStorageHost({
           plugins: [
-            qdrantBackendPlugin(
-              { url: url!, http: fixture.http },
-              {
+            qdrantBackendPlugin({
+              url: url!,
+              http: fixture.http,
+              features: {
                 hybrid: qdrantHybridFeature(),
                 recommend: qdrantRecommendFeature(),
                 groups: qdrantGroupByFeature(),
                 management: qdrantManagementFeature()
               }
-            )
+            })
           ] as const
         }),
         store = host.backend('qdrant'),
@@ -1092,23 +1103,26 @@ describe('real native vector backend', () => {
         stack = business.stack,
         counts = new Map<string, number>()
       let fail = true
-      const stage = definePlugin('transform', (core) => ({
-        install() {
-          core.useAsyncPipeline(async (input, next) => {
-            counts.set(input.operation, (counts.get(input.operation) ?? 0) + 1)
-            if (fail) throw business
-            await next(
-              input.operation === 'vector.upsert'
-                ? {
-                    ...input,
-                    input: [{ id: 'changed', vector: [0, 1], payload: { category: 'new' } }]
-                  }
-                : input
-            )
-          })
-          return {}
-        }
-      }))
+      const stage = definePlugin({
+        name: 'transform',
+        setup: (core) => ({
+          install() {
+            core.useAsyncPipeline(async (input, next) => {
+              counts.set(input.operation, (counts.get(input.operation) ?? 0) + 1)
+              if (fail) throw business
+              await next(
+                input.operation === 'vector.upsert'
+                  ? {
+                      ...input,
+                      input: [{ id: 'changed', vector: [0, 1], payload: { category: 'new' } }]
+                    }
+                  : input
+              )
+            })
+            return {}
+          }
+        })
+      })
       const host = await createStorageHost({
           autoDetect: false,
           plugins: [

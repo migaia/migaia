@@ -1,35 +1,30 @@
 import { StorageBackend } from '../constants.ts'
 import { cookiesHost, type ICookiesOptions } from '../backends/cookie.ts'
 import { createBuiltInBackendPlugin, readBuiltInPluginId } from './builtin-factory.ts'
-import { cookieBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.ts'
-import type {
-  IStorageBackendPlugin,
-  IStorageFeatureRecord,
-  IStorageFeatureStoreCompatibility
-} from '@migaia/storage-host'
+import type { ICookieBackend, IBuiltInPluginOptions } from '../host/builtin-backends.ts'
+import type { IStorageBackendPlugin, IStorageFeatureRecord } from '@migaia/storage-host'
+import { StorageReactiveVisibility } from '@migaia/storage-host/sdk'
 
 /**
- * Define a cookie backend plugin with default id cookies. Store acquisition waits for Host install,
- * which owns rollback and final disposal; this ordinary plugin adds no reactive adapter. Backend
- * options retain their factory defaults.
+ * Define a cookie backend plugin with default name cookies. Store acquisition waits for Host
+ * install, which owns rollback and final disposal; this ordinary plugin adds no reactive adapter.
+ * Backend options retain their factory defaults.
  */
 export const cookieBackendPlugin = <
   const TId extends string = 'cookies',
   const F extends IStorageFeatureRecord = {}
 >(
-  options: ICookiesOptions & IBuiltInPluginId<TId> = {},
-  features?: F & IStorageFeatureStoreCompatibility<typeof cookieBackendKind, NoInfer<F>>
-): IStorageBackendPlugin<typeof cookieBackendKind, NoInfer<TId>, F> =>
+  options: ICookiesOptions & IBuiltInPluginOptions<ICookieBackend, TId, F> = {}
+): IStorageBackendPlugin<ICookieBackend, NoInfer<TId>, F> =>
   createBuiltInBackendPlugin<
-    typeof cookieBackendKind.name,
     ReturnType<typeof cookiesHost>['store'],
     ReturnType<ReturnType<typeof cookiesHost>['getClient']>,
     TId,
     F
   >(
-    cookieBackendKind,
+    StorageReactiveVisibility.originJsVisibleEventual,
     readBuiltInPluginId(options, 'cookies', StorageBackend.cookie),
     (core) => cookiesHost(options, core),
-    features,
+    options.features,
     true
   )

@@ -1,7 +1,7 @@
 import { EntityFeatureName } from './constants.ts'
 import { EntityIndexesOwner } from './indexes-owner.ts'
-import { defineFeature } from '../contracts.ts'
-import { entityUnitTarget, registerEntityUnit } from './assembly.ts'
+import { defineFeature } from '@migaia/plugin-host/features'
+import { registerEntityUnit } from './assembly.ts'
 import { snapshotEntityIndexes } from './index-projection.ts'
 import type { IEntityPluginOptions } from './types.ts'
 
@@ -25,6 +25,6 @@ function installEntityIndexes() {
 /** Explicitly assemble entity indexes; omission keeps its owner outside the base import graph. */
 export function entityIndexesFeature() {
   /** Exact native identity selects this role independently of the caller's record key. */
-  const feature = defineFeature(entityUnitTarget, installEntityIndexes)
+  const feature = defineFeature(installEntityIndexes)
   return registerEntityUnit(feature, EntityFeatureName.indexes, configureEntityIndexes)
 }

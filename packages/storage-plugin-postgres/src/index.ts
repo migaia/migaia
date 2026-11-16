@@ -1,4 +1,5 @@
-export { postgresBackendKind, postgresBackendPlugin } from './plugin.ts'
+export { postgresBackendPlugin } from './plugin.ts'
+export type { IPostgresBackend } from './plugin.ts'
 
 export type { IPgCapabilityProbeHookPayload, IPgNotifyHookPayload } from './hooks.ts'
 export type {

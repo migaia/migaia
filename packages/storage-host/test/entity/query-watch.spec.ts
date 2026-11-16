@@ -42,7 +42,7 @@ it('uses the native watcher on a frozen raw base and rejects client predicates b
 
   const store = await memoryBackend()
   Object.freeze(store)
-  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](store)
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](store)
   const query = repo.query().where({ group: 'one' })
   expect(typeof query.watch).toBe('function')
   const iterator = query.watch()
@@ -68,18 +68,20 @@ it('keeps the borrowed organization watcher on its original native organization'
 
   await using host = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(undefined, {
-        notifications: memoryNotificationsFeature(),
-        changeFeed: memoryChangeFeedFeature()
+      memoryBackendPlugin({
+        features: {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
       })
     ] as const
   })
   const first = '00000000-0000-0000-0000-000000000001'
   const second = '00000000-0000-0000-0000-000000000002'
-  const left = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+  const left = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](
     host.org(first).backend('memory') as IStorageBorrowedBackend<IMemoryBackendWithChangeFeed>
   )
-  const right = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+  const right = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](
     host.org(second).backend('memory') as IStorageBorrowedBackend<IMemoryBackendWithChangeFeed>
   )
   const iterator = left.query().watch()
@@ -102,7 +104,7 @@ it('keeps transaction scopes free of native watch and preserves strict page admi
   const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
 
   const store = await memoryBackend()
-  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](store)
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](store)
   await store.transaction(async (scope) => {
     expect(Reflect.get(repo.in(scope).query(), 'watch')).toBeUndefined()
     await scope.set('watch-owner', 'same transaction')
@@ -117,14 +119,14 @@ it('exposes the guarded watcher protocol and rejects advances after entity remov
   /** This actual storage host owns the entity installation for this test scope. */
   const watchHost = await entityHost(definitionEntityPlugin)
   const store = await memoryBackend()
-  const repo = watchHost.extensions[definitionEntityPlugin.id](store)
+  const repo = watchHost.extensions[definitionEntityPlugin.name](store)
   /** Early return and symbolic disposal reach the borrowed native watcher. */
   const early = repo.query().where({ group: 'one' }).watch()
   await early.return?.(undefined)
   await early[asyncDisposeKey]()
   /** A watcher retained across removal rejects every later advance and closes its source once. */
   const retained = repo.query().where({ group: 'one' }).watch()
-  await watchHost.unUse(definitionEntityPlugin.id)
+  await watchHost.unUse(definitionEntityPlugin.name)
   await expect(retained.next()).rejects.toMatchObject({ code: 'ABORTED' })
   await expect(retained.next()).rejects.toMatchObject({ code: 'ABORTED' })
 })

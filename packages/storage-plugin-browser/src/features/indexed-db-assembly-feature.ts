@@ -1,9 +1,5 @@
-import {
-  defineFeature,
-  type IStorageFeature,
-  type IStorageFeatureOutput
-} from '@migaia/storage-host'
-import { indexedDbBackendKind } from '../host/builtin-kinds.ts'
+import { type IStorageFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { defineIndexedDbFeature, type IIndexedDbBackend } from '../host/builtin-backends.ts'
 import type { IIndexedDbAssemblyPlan } from '../backends/indexed-db-assembly.ts'
 /** Backend-native assembly contributes implementation ports without allocating another store. */
 export type IIndexedDbAssemblyOutput = IStorageFeatureOutput<
@@ -15,15 +11,12 @@ export type IIndexedDbAssemblyOutput = IStorageFeatureOutput<
 export function createIndexedDbAssemblyFeature<K extends keyof IIndexedDbAssemblyPlan>(
   name: K,
   owner: NonNullable<IIndexedDbAssemblyPlan[K]>
-): IStorageFeature<typeof indexedDbBackendKind, IIndexedDbAssemblyOutput> {
-  return defineFeature(indexedDbBackendKind, ({ featureExpose }) => {
+): IStorageFeature<IIndexedDbBackend, IIndexedDbAssemblyOutput> {
+  return defineIndexedDbFeature(({ featureExpose }) => {
     featureExpose.installAssembly(name, owner)
     return { capabilities: [] as const, chain: {}, api: { store: {}, transaction: {} } }
   })
 }
 
 /** Named public result prevents private provider symbols from escaping inferred declarations. */
-export type IIndexedDbAssemblyFeature = IStorageFeature<
-  typeof indexedDbBackendKind,
-  IIndexedDbAssemblyOutput
->
+export type IIndexedDbAssemblyFeature = IStorageFeature<IIndexedDbBackend, IIndexedDbAssemblyOutput>

@@ -279,7 +279,6 @@ async function redisCommitNativeAttempt<R>(
     attempt.ambiguous = false
     attempt.organization.environment.core.emit(RedisOperation.onWatchConflict, () => ({
       backendId: attempt.organization.environment.core.getBackendId(),
-      backend: RedisText.backend,
       orgId: attempt.organization.orgId,
       keyCount:
         attempt.draft.entries.size +

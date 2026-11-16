@@ -1,35 +1,39 @@
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
-import { createStorageHost, definePlugin } from '../../src/index.ts'
+import { createStorageHost } from '../../src/index.ts'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import { MemoryOperation } from '../../src/backends/memory-constants.ts'
+import { definePlugin } from '../../src/sdk.ts'
 
 describe('memory execution and the original concurrency budget', () => {
   it('keeps after-next and native failure handling around the actual root operation', async () => {
     const order: string[] = []
     let observed: unknown
-    const intervention = definePlugin('intervention', (core) => ({
-      install: () => {
-        core.useAsyncPipeline(async (input, next) => {
-          if (
-            input.operation !== MemoryOperation.set &&
-            input.operation !== MemoryOperation.putRecord
-          )
-            return next(input)
-          order.push('before')
-          try {
-            await next(input)
-            order.push('after')
-          } catch (error) {
-            observed = error
-            order.push('caught')
-            throw error
-          }
-        })
-        return {}
-      }
-    }))
+    const intervention = definePlugin({
+      name: 'intervention',
+      setup: (core) => ({
+        install: () => {
+          core.useAsyncPipeline(async (input, next) => {
+            if (
+              input.operation !== MemoryOperation.set &&
+              input.operation !== MemoryOperation.putRecord
+            )
+              return next(input)
+            order.push('before')
+            try {
+              await next(input)
+              order.push('after')
+            } catch (error) {
+              observed = error
+              order.push('caught')
+              throw error
+            }
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin(), intervention] })
     const store = host.backend('memory')
     await store.set('shared', 'value')
@@ -46,18 +50,21 @@ describe('memory execution and the original concurrency budget', () => {
   it('includes awaited intervention in the one root deadline and settles it before closing the budget', async () => {
     const entered = deferred<void>()
     const ready = deferred<void>()
-    const intervention = definePlugin('intervention', (core) => ({
-      install: () => {
-        core.useAsyncPipeline(async (input, next) => {
-          if (input.operation === MemoryOperation.set) {
-            entered.resolve()
-            await ready.promise
-          }
-          await next(input)
-        })
-        return {}
-      }
-    }))
+    const intervention = definePlugin({
+      name: 'intervention',
+      setup: (core) => ({
+        install: () => {
+          core.useAsyncPipeline(async (input, next) => {
+            if (input.operation === MemoryOperation.set) {
+              entered.resolve()
+              await ready.promise
+            }
+            await next(input)
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin(), intervention] })
     const store = host.backend('memory')
     const pending = store.set('late', 'value', { timeoutMs: 20 })
@@ -74,25 +81,28 @@ describe('memory execution and the original concurrency budget', () => {
   it('reenters the original pipeline for each real transaction attempt after a commit conflict', async () => {
     let stages = 0
     const events: string[] = []
-    const intervention = definePlugin('intervention', (core) => ({
-      install: () => {
-        core.useAsyncPipeline(async (input, next) => {
-          if (input.operation !== MemoryOperation.transaction) return next(input)
-          const current = ++stages
-          events.push(`enter:${current}`)
-          try {
-            await next(input)
-            events.push(`committed:${current}`)
-          } catch (error) {
-            events.push((error as { code: string }).code)
-            throw error
-          } finally {
-            events.push(`exit:${current}`)
-          }
-        })
-        return {}
-      }
-    }))
+    const intervention = definePlugin({
+      name: 'intervention',
+      setup: (core) => ({
+        install: () => {
+          core.useAsyncPipeline(async (input, next) => {
+            if (input.operation !== MemoryOperation.transaction) return next(input)
+            const current = ++stages
+            events.push(`enter:${current}`)
+            try {
+              await next(input)
+              events.push(`committed:${current}`)
+            } catch (error) {
+              events.push((error as { code: string }).code)
+              throw error
+            } finally {
+              events.push(`exit:${current}`)
+            }
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin(), intervention] })
     const store = host.backend('memory')
     await store.putRecord({ value: 0 }, 'row')

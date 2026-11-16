@@ -32,7 +32,10 @@ async function prepareTextRedoOwner(
   kind: 'local' | 'session' | 'cookies' = 'local'
 ) {
   const carrierHost = await createStorageHost({
-    plugins: [storageJournalPlugin(), indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+    plugins: [
+      storageJournalPlugin(),
+      indexedDbBackendPlugin({ dbName, features: indexedDbTestFeatures })
+    ]
   })
   const carrier = await storageLogStore(carrierHost, 'indexed-db', { prefix: 'wal' })
   const logger = createLogger(carrier)

@@ -34,7 +34,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await repo.put({ id: 'u1', name: 'Ada', email: 'ada@example.com' })
@@ -51,7 +51,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await expect(repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })).resolves.toBe('u1')
@@ -63,7 +63,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await expect(repo.get('missing')).resolves.toBeUndefined()
@@ -75,7 +75,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await expect(repo.put({ name: 'Ada' } as unknown as IUser)).rejects.toMatchObject({
@@ -89,7 +89,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -103,7 +103,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -119,7 +119,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -135,7 +135,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -151,7 +151,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await repo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
@@ -171,7 +171,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await repo.put({ id: 'c', name: 'C', email: 'c@d.e' })
@@ -188,7 +188,7 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         usersEntityPluginBackendStore
       )
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -212,11 +212,11 @@ for (const { label, create } of backends) {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await storeHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const userRepo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+      const userRepo = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
       /** Install once on the real fixture host and retain exact extension inference. */
       const postsEntityPluginHost = await storeHost.use(postsEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const postRepo = postsEntityPluginHost.extensions[postsEntityPlugin.id](store)
+      const postRepo = postsEntityPluginHost.extensions[postsEntityPlugin.name](store)
       await userRepo.put({ id: 'shared-id', name: 'Ada', email: 'a@b.c' })
       await postRepo.put({ id: 'shared-id', title: 'Hello' })
       await expect(userRepo.list()).resolves.toEqual([
@@ -242,7 +242,7 @@ describe('value-only entity repository', () => {
     const diagnosedEntityPluginHost =
       await diagnosedEntityPluginBackendHost.use(diagnosedEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = diagnosedEntityPluginHost.extensions[diagnosedEntityPlugin.id](
+    const repo = diagnosedEntityPluginHost.extensions[diagnosedEntityPlugin.name](
       diagnosedEntityPluginBackendStore
     )
     await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -266,7 +266,7 @@ describe('value-only entity repository', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const entityEntityPluginHost = await entityEntityPluginBackendHost.use(entityEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.name](
       entityEntityPluginBackendStore
     )
     await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -279,7 +279,7 @@ describe('value-only entity repository', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
       usersEntityPluginBackendStore
     )
     await repo.put({ id: 'a', name: 'Ada', email: 'a@example.com' })
@@ -314,7 +314,7 @@ describe('value-only entity repository', () => {
     )
     /** Install once on the real fixture host and retain exact extension inference. */
     const v1EntityPluginHost = await storeHost.use(v1EntityPlugin)
-    await v1EntityPluginHost.extensions[v1EntityPlugin.id](store).put({ id: 'u1', name: 'Ada' })
+    await v1EntityPluginHost.extensions[v1EntityPlugin.name](store).put({ id: 'u1', name: 'Ada' })
 
     /** Explicit native declaration owns this scenario's optional repository capabilities. */
     const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
@@ -330,7 +330,7 @@ describe('value-only entity repository', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const v2EntityPluginHost = await storeHost.use(v2EntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.id](store)
+    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.name](store)
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', displayName: 'Ada' })
   })
 
@@ -350,7 +350,7 @@ describe('value-only entity repository', () => {
     )
     /** Install once on the real fixture host and retain exact extension inference. */
     const entity1EntityPluginHost = await storeHost.use(entity1EntityPlugin)
-    await entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store).put({
+    await entity1EntityPluginHost.extensions[entity1EntityPlugin.name](store).put({
       id: 'u1',
       name: 'Ada'
     })
@@ -368,7 +368,7 @@ describe('value-only entity repository', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const v2EntityPluginHost = await storeHost.use(v2EntityPlugin)
     await expect(
-      v2EntityPluginHost.extensions[v2EntityPlugin.id](store).migrate({ batchSize: 1 })
+      v2EntityPluginHost.extensions[v2EntityPlugin.name](store).migrate({ batchSize: 1 })
     ).resolves.toMatchObject({
       eligible: 1,
       migrated: 1
@@ -396,7 +396,7 @@ describe('value-only entity repository', () => {
     )
     /** Install once on the real fixture host and retain exact extension inference. */
     const currentEntityPluginHost = await storeHost.use(currentEntityPlugin)
-    await currentEntityPluginHost.extensions[currentEntityPlugin.id](store).put({
+    await currentEntityPluginHost.extensions[currentEntityPlugin.name](store).put({
       id: 'current',
       name: 'Current'
     })
@@ -412,12 +412,14 @@ describe('value-only entity repository', () => {
     )
     /** Install once on the real fixture host and retain exact extension inference. */
     const legacyEntityPluginHost = await storeHost.use(legacyEntityPlugin)
-    await legacyEntityPluginHost.extensions[legacyEntityPlugin.id](store).put({
+    await legacyEntityPluginHost.extensions[legacyEntityPlugin.name](store).put({
       id: 'legacy',
       name: 'Legacy'
     })
     await store.set(
-      String(currentEntityPluginHost.extensions[currentEntityPlugin.id](store).lockKey('bad').key),
+      String(
+        currentEntityPluginHost.extensions[currentEntityPlugin.name](store).lockKey('bad').key
+      ),
       '{broken-json'
     )
 
@@ -435,7 +437,9 @@ describe('value-only entity repository', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const migratedEntityPluginHost = await storeHost.use(migratedEntityPlugin)
     await expect(
-      migratedEntityPluginHost.extensions[migratedEntityPlugin.id](store).migrate({ batchSize: 1 })
+      migratedEntityPluginHost.extensions[migratedEntityPlugin.name](store).migrate({
+        batchSize: 1
+      })
     ).resolves.toEqual({
       scanned: 3,
       eligible: 1,
@@ -445,7 +449,7 @@ describe('value-only entity repository', () => {
       conflicted: 0
     })
     await expect(
-      migratedEntityPluginHost.extensions[migratedEntityPlugin.id](store).get('legacy')
+      migratedEntityPluginHost.extensions[migratedEntityPlugin.name](store).get('legacy')
     ).resolves.toEqual({
       id: 'legacy',
       name: 'Legacy'
@@ -458,7 +462,7 @@ describe('value-only entity repository', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const usersEntityPluginHost = await usersEntityPluginBackendHost.use(usersEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](
       usersEntityPluginBackendStore
     )
     await expect(repo.batch(async () => {})).rejects.toMatchObject({
@@ -493,7 +497,7 @@ describe('value-only entity repository', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](store)
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.name](store)
     await repo.put({ id: 'good', n: 1 })
     await store.set(
       String(repo.lockKey('bad').key),

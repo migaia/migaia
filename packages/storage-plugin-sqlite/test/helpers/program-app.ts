@@ -39,7 +39,7 @@ export async function runStorageProgramApp(
   const entityHost = await createStorageHost({ plugins: [programEntityPlugin] })
   try {
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = entityHost.extensions[programEntityPlugin.id](store)
+    const repo = entityHost.extensions[programEntityPlugin.name](store)
     const state = createStore({ count: 0 })
     const handle = persist(state, { key: 'program-state', storage: store, version: 1 })
     try {

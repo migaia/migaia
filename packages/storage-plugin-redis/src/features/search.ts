@@ -1,4 +1,4 @@
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import {
   vector,
   implement,
@@ -39,7 +39,7 @@ import {
 } from '@migaia/storage-host/sdk'
 import { parseObjectPath } from '@migaia/utils/object'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import { redisBackendKind } from '../plugin.ts'
+import { defineRedisFeature } from '../plugin.ts'
 import {
   readNativeFeaturePort,
   type IRedisNativeFeaturePort,
@@ -99,38 +99,35 @@ function storeVectorBinding(store: IRedisStore) {
 
 /** Detect the actual module and genuine binary connection before admitting selected vector work. */
 export function rediSearchVectorFeature() {
-  return defineFeature<typeof redisBackendKind, {}, IRedisVectorFeatureOutput>(
-    redisBackendKind,
-    (core) => {
-      const binding = createRedisVectorBinding(() =>
-        readNativeFeaturePort(core.featureExpose.getStore())
-      )
-      core.featureExpose.registerDetect(async () => {
-        const port = readNativeFeaturePort(core.featureExpose.getStore())
-        try {
-          await port.driver.withConnection(async (connection) => {
-            if (
-              typeof connection.binaryCommand !== 'function' ||
-              typeof connection.exec !== 'function'
-            )
-              unsupported()
-            const result = await connection.command([RedisVector.list])
-            if (!Array.isArray(result)) unsupported()
-          })
-        } catch (cause) {
-          unsupported(cause)
-        }
-        port.enableVector((store: IRedisStore) =>
-          store === core.featureExpose.getStore() ? binding : storeVectorBinding(store)
-        )
-      })
-      return {
-        capabilities: [implement(vector, binding.api)] as const,
-        chain: {},
-        api: { store: {}, transaction: {} }
+  return defineRedisFeature<{}, IRedisVectorFeatureOutput>((core) => {
+    const binding = createRedisVectorBinding(() =>
+      readNativeFeaturePort(core.featureExpose.getStore())
+    )
+    core.featureExpose.registerDetect(async () => {
+      const port = readNativeFeaturePort(core.featureExpose.getStore())
+      try {
+        await port.driver.withConnection(async (connection) => {
+          if (
+            typeof connection.binaryCommand !== 'function' ||
+            typeof connection.exec !== 'function'
+          )
+            unsupported()
+          const result = await connection.command([RedisVector.list])
+          if (!Array.isArray(result)) unsupported()
+        })
+      } catch (cause) {
+        unsupported(cause)
       }
+      port.enableVector((store: IRedisStore) =>
+        store === core.featureExpose.getStore() ? binding : storeVectorBinding(store)
+      )
+    })
+    return {
+      capabilities: [implement(vector, binding.api)] as const,
+      chain: {},
+      api: { store: {}, transaction: {} }
     }
-  )
+  })
 }
 /** Native legacy filter syntax is projected into the one canonical condition AST before translation. */
 function filterCondition(filter: IVectorFilter): IQueryCondition {

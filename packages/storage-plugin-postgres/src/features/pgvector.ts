@@ -1,4 +1,4 @@
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import {
   implement,
   vector,
@@ -7,7 +7,7 @@ import {
   type ICapabilityImpl,
   type IVectorApi
 } from '@migaia/storage-contract'
-import { postgresBackendKind } from '../plugin.ts'
+import { definePostgresFeature } from '../plugin.ts'
 import type { IPgNativeVectorApi } from '../types.ts'
 import { searchPgNativeVector } from '../vector-native.ts'
 import { PgNames } from '../constants.ts'
@@ -16,8 +16,7 @@ import { PgNames } from '../constants.ts'
  * separate.
  */
 export function pgvectorFeature() {
-  return defineFeature<
-    typeof postgresBackendKind,
+  return definePostgresFeature<
     {},
     IStorageFeatureOutput<
       readonly [ICapabilityImpl<typeof vector, IVectorApi<true>>],
@@ -27,7 +26,7 @@ export function pgvectorFeature() {
         readonly transaction: { readonly pgvector: IPgNativeVectorApi }
       }
     >
-  >(postgresBackendKind, ({ featureExpose: core }) => {
+  >(({ featureExpose: core }) => {
     core.selectVector()
     /** Factory execution precedes native installation; lookup stays lazy until actual API use. */
     const standard: IVectorApi<true> = {

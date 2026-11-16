@@ -106,7 +106,7 @@ describe('explicit IndexedDB assembly', () => {
     /** Immediate expiry removes the physical point through the original IndexedDB delete port. */
     const nativeDelete = vi.spyOn(IDBObjectStore.prototype, 'delete')
     const host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin(options(), { ttl: indexedDbTtlFeature() })]
+      plugins: [indexedDbBackendPlugin({ ...options(), features: { ttl: indexedDbTtlFeature() } })]
     })
     const store = host.backend('indexed-db')
     nativeDelete.mockClear()
@@ -126,7 +126,9 @@ describe('explicit IndexedDB assembly', () => {
     /** Observe the existing write port while leaving native transaction behavior intact. */
     const nativePut = vi.spyOn(IDBObjectStore.prototype, 'put')
     const host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin(options(), { batch: indexedDbBatchFeature() })]
+      plugins: [
+        indexedDbBackendPlugin({ ...options(), features: { batch: indexedDbBatchFeature() } })
+      ]
     })
     const store = host.backend('indexed-db')
     nativePut.mockClear()
@@ -164,7 +166,10 @@ describe('explicit IndexedDB assembly', () => {
     const nativePut = vi.spyOn(IDBObjectStore.prototype, 'put')
     const host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin(options(), { notifications: indexedDbNotificationsFeature() })
+        indexedDbBackendPlugin({
+          ...options(),
+          features: { notifications: indexedDbNotificationsFeature() }
+        })
       ]
     })
     const store = host.backend('indexed-db')
@@ -204,7 +209,12 @@ describe('explicit IndexedDB assembly', () => {
 
   it('does not install notification prerequisites implicitly for change feeds', async () => {
     const host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin(options(), { changeFeed: indexedDbChangeFeedFeature() })]
+      plugins: [
+        indexedDbBackendPlugin({
+          ...options(),
+          features: { changeFeed: indexedDbChangeFeedFeature() }
+        })
+      ]
     })
     try {
       expect(() => host.backend('indexed-db').watch('key')).toThrowError(
@@ -230,13 +240,13 @@ describe('explicit IndexedDB assembly', () => {
     try {
       await using host = await createStorageHost({
         plugins: [
-          indexedDbBackendPlugin(
-            { keyRange: IDBKeyRange },
-            {
+          indexedDbBackendPlugin({
+            keyRange: IDBKeyRange,
+            features: {
               notifications: indexedDbNotificationsFeature(),
               changeFeed: indexedDbChangeFeedFeature()
             }
-          )
+          })
         ]
       })
       /** Only selected producers and iterators can expose the admitted public feed. */
@@ -271,7 +281,9 @@ describe('independent IndexedDB native owners', () => {
     /** The page source must reach the original IndexedDB cursor port. */
     const nativeCursor = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
     await using host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin(options(), { keyset: indexedDbKeysetFeature() })]
+      plugins: [
+        indexedDbBackendPlugin({ ...options(), features: { keyset: indexedDbKeysetFeature() } })
+      ]
     })
     /** The native store retains the original committed record owner. */
     const store = host.backend('indexed-db')
@@ -293,7 +305,9 @@ describe('independent IndexedDB native owners', () => {
     /** The secondary-index source must execute an engine index cursor. */
     const nativeIndexCursor = vi.spyOn(IDBIndex.prototype, 'openCursor')
     await using host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin(options(), { indexes: indexedDbIndexesFeature() })]
+      plugins: [
+        indexedDbBackendPlugin({ ...options(), features: { indexes: indexedDbIndexesFeature() } })
+      ]
     })
     const store = host.backend('indexed-db')
     expect(store.capabilities.secondaryIndexes).toBe(true)
@@ -326,7 +340,7 @@ describe('independent IndexedDB native owners', () => {
     await using host = await createStorageHost({
       plugins: [
         storageJournalPlugin(),
-        indexedDbBackendPlugin(options(), { journal: indexedDbJournalFeature() })
+        indexedDbBackendPlugin({ ...options(), features: { journal: indexedDbJournalFeature() } })
       ]
     })
     const store = host.backend('indexed-db')
@@ -396,10 +410,11 @@ it('captures and undoes native images with journal alone while leaving TTL and n
           binlogValues: true
         }
       }),
-      indexedDbBackendPlugin(
-        { ...options(), journalFactoryIsPrivate: true },
-        { journal: indexedDbJournalFeature() }
-      )
+      indexedDbBackendPlugin({
+        ...options(),
+        journalFactoryIsPrivate: true,
+        features: { journal: indexedDbJournalFeature() }
+      })
     ]
   })
   try {

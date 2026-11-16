@@ -45,16 +45,17 @@ for (const service of [
       hasVector = adapter !== 'bun' && service !== 'MIGAIA_VALKEY_URL',
       host = await createStorageHost({
         plugins: [
-          redisBackendPlugin(
-            { driver, prefix },
-            {
+          redisBackendPlugin({
+            driver,
+            prefix,
+            features: {
               streams: redisStreamsFeature(),
               pubsub: redisPubSubFeature(),
               sorted: redisSortedSetsFeature(),
               rate: redisRateLimitFeature({ limit: 2, windowMs: 10000 }),
               durable: redisChangeStreamFeature({ maxLen: 1000 })
             }
-          )
+          })
         ] as const
       })
     try {
@@ -94,7 +95,7 @@ for (const service of [
       if (hasVector) {
         const vectorHost = await createStorageHost({
           plugins: [
-            redisBackendPlugin({ driver, prefix }, { search: rediSearchVectorFeature() })
+            redisBackendPlugin({ driver, prefix, features: { search: rediSearchVectorFeature() } })
           ] as const
         })
         try {

@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest'
 import {
   createStorageHost,
   createOrgId,
-  definePlugin,
-  defineStorageBackendKind,
   type IStorageOrgAuthoringPort,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendPluginDefiner,
+  type IStorageBackendType
 } from '../src/index.ts'
 import { getBackendChangeController } from '../src/core/change-controller.ts'
 import { catalog } from './helpers/catalog.ts'
+import { defineBackendPlugin } from '../src/sdk.ts'
 
 /** A lazy physical backend uses the original controller and exact-store registry after installation. */
 function lazyBackend() {
@@ -22,50 +23,54 @@ function lazyBackend() {
   const finalizeFailures = new Map<string, unknown>()
   let port!: IStorageOrgAuthoringPort
   let installedCore!: IStoragePluginCore
-  const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store']>()('catalog')
-  const plugin = definePlugin('lazy', (core: IStoragePluginCore) => {
-    installedCore = core
-    let root!: ReturnType<typeof catalog>
-    return {
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => root.installer,
-      install: () => {
-        port = core.createOrgAuthoringPort()
-        root = catalog(core)
-        core.registerStore(root.store)
-        core.registerChangeController(
-          root.store,
-          core.createChangeController({ backend: 'catalog' }, createBackendChangeController)
-        )
-        core.registerOrgBinding(root.store, {
-          backend: (orgId) => {
-            if (orgId === core.defaultOrgId) return root.store
-            const existing = children.get(orgId)
-            if (existing !== undefined) return existing.store
-            const ports = core.getOrgContext(orgId)
-            const child = catalog({ ...core, ...ports })
-            const controller = port.createChangeController(
-              {
-                backend: 'catalog',
-                finalize: async () => {
-                  finalized.push(orgId)
-                  await child.store.dispose()
-                  if (finalizeFailures.has(orgId)) throw finalizeFailures.get(orgId)
-                }
-              },
-              createBackendChangeController
-            )
-            port.registerChangeController(child.store, controller)
-            controllers.set(orgId, controller)
-            children.set(orgId, child)
-            return child.store
-          },
-          drop: async (orgId) => {
-            children.get(orgId)?.client.clear()
-          }
-        })
-        return {}
+  type IKindBackend = IStorageBackendType<ReturnType<typeof catalog>['store'], undefined>
+  /** Backend-plugin definer typed for this test backend. */
+  const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
+  const plugin = defineKindBackend({
+    name: 'lazy',
+    open: (core: IStoragePluginCore) => {
+      installedCore = core
+      let root!: ReturnType<typeof catalog>
+      return {
+        featureExpose: () => ({ getClient: () => undefined }),
+        capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => root.installer,
+        install: () => {
+          port = core.createOrgAuthoringPort()
+          root = catalog(core)
+          core.registerStore(root.store)
+          core.registerChangeController(
+            root.store,
+            core.createChangeController({ backend: 'catalog' }, createBackendChangeController)
+          )
+          core.registerOrgBinding(root.store, {
+            backend: (orgId) => {
+              if (orgId === core.defaultOrgId) return root.store
+              const existing = children.get(orgId)
+              if (existing !== undefined) return existing.store
+              const ports = core.getOrgContext(orgId)
+              const child = catalog({ ...core, ...ports })
+              const controller = port.createChangeController(
+                {
+                  backend: 'catalog',
+                  finalize: async () => {
+                    finalized.push(orgId)
+                    await child.store.dispose()
+                    if (finalizeFailures.has(orgId)) throw finalizeFailures.get(orgId)
+                  }
+                },
+                createBackendChangeController
+              )
+              port.registerChangeController(child.store, controller)
+              controllers.set(orgId, controller)
+              children.set(orgId, child)
+              return child.store
+            },
+            drop: async (orgId) => {
+              children.get(orgId)?.client.clear()
+            }
+          })
+          return {}
+        }
       }
     }
   })

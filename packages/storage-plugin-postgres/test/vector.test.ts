@@ -41,10 +41,11 @@ async function installed(adapter: 'pg' | 'postgres-js') {
   }
   const host = await createStorageHost({
     plugins: [
-      postgresBackendPlugin(
-        { driver, prefix: 'pg_vector_' + randomUUID().slice(0, 8) },
-        { vector: pgvectorFeature() }
-      )
+      postgresBackendPlugin({
+        driver,
+        prefix: 'pg_vector_' + randomUUID().slice(0, 8),
+        features: { vector: pgvectorFeature() }
+      })
     ] as const
   })
   onTestFinished(async () => {
@@ -255,10 +256,11 @@ async function installedQuantized(
   }
   const host = await createStorageHost({
     plugins: [
-      postgresBackendPlugin(
-        { driver, prefix: 'pg_quant_' + randomUUID().slice(0, 8) },
-        { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode }) }
-      )
+      postgresBackendPlugin({
+        driver,
+        prefix: 'pg_quant_' + randomUUID().slice(0, 8),
+        features: { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode }) }
+      })
     ] as const
   })
   onTestFinished(async () => {
@@ -450,7 +452,9 @@ it('prepares one cold expression index through two hosts on the same native conf
   const driver = pgDriver(pool)
   const prefix = 'pg_quant_cold_' + randomUUID().slice(0, 8)
   const initial = await createStorageHost({
-    plugins: [postgresBackendPlugin({ driver, prefix }, { vector: pgvectorFeature() })] as const
+    plugins: [
+      postgresBackendPlugin({ driver, prefix, features: { vector: pgvectorFeature() } })
+    ] as const
   })
   try {
     await initial
@@ -465,10 +469,14 @@ it('prepares one cold expression index through two hosts on the same native conf
     [0, 1].map(() =>
       createStorageHost({
         plugins: [
-          postgresBackendPlugin(
-            { driver, prefix },
-            { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }
-          )
+          postgresBackendPlugin({
+            driver,
+            prefix,
+            features: {
+              vector: pgvectorFeature(),
+              quantized: pgQuantizedFeature({ mode: 'halfvec' })
+            }
+          })
         ] as const
       })
     )
@@ -545,7 +553,10 @@ it('rejects malformed modes before installation and requires the selected origin
   try {
     const error = await createStorageHost({
       plugins: [
-        postgresBackendPlugin({ driver }, { quantized: pgQuantizedFeature({ mode: 'halfvec' }) })
+        postgresBackendPlugin({
+          driver,
+          features: { quantized: pgQuantizedFeature({ mode: 'halfvec' }) }
+        })
       ] as const
     }).then(
       () => undefined,

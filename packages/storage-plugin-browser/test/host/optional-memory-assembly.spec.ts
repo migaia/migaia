@@ -6,7 +6,7 @@ import {
   STORAGE_HOST_ERROR_SOURCE,
   StorageHostErrorCode
 } from '@migaia/storage-contract/error-code'
-import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
 import { walkErrorCauses } from '@migaia/utils/error'
@@ -40,9 +40,11 @@ describe('explicit memory owners used by web Features', () => {
     /** This public host owns and releases the case's original backend. */
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          reactive: reactiveFeature(memoryBackendKind)
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            reactive: reactiveFeature()
+          }
         })
       ]
     })
@@ -70,7 +72,7 @@ describe('explicit memory owners used by web Features', () => {
   it('rejects a feed without its explicit notification producer during installation', async () => {
     /** Retain the original failure chain rather than replacing its package identity. */
     const failure = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { changeFeed: memoryChangeFeedFeature() })]
+      plugins: [memoryBackendPlugin({ features: { changeFeed: memoryChangeFeedFeature() } })]
     }).catch((error: unknown) => error)
     expect(walkErrorCauses(failure)).toContainEqual(
       expect.objectContaining({
@@ -84,9 +86,11 @@ describe('explicit memory owners used by web Features', () => {
     /** This public host owns and releases the case's original backend. */
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })

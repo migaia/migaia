@@ -2,18 +2,23 @@ import { indexedDbFeatureMissing } from '../backends/indexed-db-base-access.ts'
 import type { IIndexedDbAssemblyPlan } from '../backends/indexed-db-assembly.ts'
 import { readBuiltInPluginId } from './builtin-factory.ts'
 import { indexedDbHost, type IIndexedDbOptions } from '../backends/indexed-db.ts'
-import { indexedDbBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.ts'
+import type { IIndexedDbBackend, IBuiltInPluginOptions } from '../host/builtin-backends.ts'
 import {
-  definePlugin,
   type IStorageBackendPlugin,
   type IStorageFeatureRecord,
-  type IStorageFeatureStoreCompatibility,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageReactiveProfile,
+  type IStorageBackendPluginDefiner
 } from '@migaia/storage-host'
+import { defineBackendPlugin, StorageReactiveVisibility } from '@migaia/storage-host/sdk'
 import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.ts'
-import { StorageBackend, IndexedDbFeature } from '../constants.ts'
+import {
+  BROWSER_REACTIVE_POLL_INTERVAL_MS,
+  StorageBackend,
+  IndexedDbFeature
+} from '../constants.ts'
 /** One installed backend owns its schema declarations and optional assembly selection. */
 class IndexedDbPluginInstallation<F extends IStorageFeatureRecord> {
   /** Borrowed validated options remain fixed for this installation. */
@@ -36,7 +41,6 @@ class IndexedDbPluginInstallation<F extends IStorageFeatureRecord> {
   /** Publish callbacks which always resolve this same installation owner. */
   descriptor() {
     return {
-      kind: indexedDbBackendKind,
       install: () => this.install(),
       featureExpose: () => this.featureExpose(),
       capabilityInstaller: (_store: ReturnType<typeof indexedDbHost>['store']) =>
@@ -80,7 +84,17 @@ class IndexedDbPluginInstallation<F extends IStorageFeatureRecord> {
       ) => this.#construction.getTransactionClient(scope),
       getTransactionClientForOrg: (scope: object, orgId: string) =>
         this.#construction.getOrgTransactionClient(scope, orgId),
-      requireObjectStore: (name: string): void => this.requireObjectStore(name)
+      requireObjectStore: (name: string): void => this.requireObjectStore(name),
+      reactiveProfile: (hasController: boolean) => this.reactiveProfile(hasController)
+    }
+  }
+  /** Other pages change the same database, so a live query needs notifications and reconciles. */
+  reactiveProfile(hasController: boolean): IStorageReactiveProfile {
+    if (!hasController) indexedDbFeatureMissing.fail(IndexedDbFeature.notifications)
+    return {
+      mode: 'hybrid',
+      visibility: StorageReactiveVisibility.originEventual,
+      pollIntervalMs: BROWSER_REACTIVE_POLL_INTERVAL_MS
     }
   }
   /** Duplicate or late owners are configuration errors; no capability silently replaces another. */
@@ -117,15 +131,18 @@ export const indexedDbBackendPlugin = <
   const TId extends string = 'indexed-db',
   const F extends IStorageFeatureRecord = {}
 >(
-  options: IIndexedDbOptions & IBuiltInPluginId<TId> = {},
-  features?: F & IStorageFeatureStoreCompatibility<typeof indexedDbBackendKind, NoInfer<F>>
-): IStorageBackendPlugin<typeof indexedDbBackendKind, NoInfer<TId>, F> => {
+  options: IIndexedDbOptions & IBuiltInPluginOptions<IIndexedDbBackend, TId, F> = {}
+): IStorageBackendPlugin<IIndexedDbBackend, NoInfer<TId>, F> => {
   /** A named owner is created independently for every plugin installation. */
   const descriptor = (core: IStoragePluginCore<F>) =>
     new IndexedDbPluginInstallation(options, core).descriptor()
-  return definePlugin<TId, typeof descriptor, F>(
-    readBuiltInPluginId(options, 'indexed-db', StorageBackend.indexedDb),
-    descriptor,
-    features
-  )
+  return (defineBackendPlugin as IStorageBackendPluginDefiner<IIndexedDbBackend>)<
+    TId,
+    typeof descriptor,
+    F
+  >({
+    name: readBuiltInPluginId(options, 'indexed-db', StorageBackend.indexedDb),
+    features: options.features as never,
+    open: descriptor as never
+  })
 }

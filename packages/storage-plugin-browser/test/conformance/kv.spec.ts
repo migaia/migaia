@@ -111,7 +111,7 @@ runConformance(harness, {
     })
     const entityHost = await indexFixture.host.use(repositoryEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repository = entityHost.extensions[repositoryEntityPlugin.id](store)
+    const repository = entityHost.extensions[repositoryEntityPlugin.name](store)
     return (key: string) => repository.lockKey(key).key
   }
 })

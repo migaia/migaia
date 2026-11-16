@@ -49,10 +49,11 @@ async function installed(adapter: 'pg' | 'postgres-js') {
   }
   const host = await createStorageHost({
     plugins: [
-      postgresBackendPlugin(
-        { driver, prefix: 'pg_feature_' + randomUUID().slice(0, 8) },
-        { copy: pgCopyFeature(), listen: pgListenFeature() }
-      )
+      postgresBackendPlugin({
+        driver,
+        prefix: 'pg_feature_' + randomUUID().slice(0, 8),
+        features: { copy: pgCopyFeature(), listen: pgListenFeature() }
+      })
     ] as const
   })
   onTestFinished(async () => {

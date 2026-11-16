@@ -15,12 +15,13 @@ import {
  */
 async function composition() {
   const base = await createStorageHost({
-    plugins: [memoryBackendPlugin({ id: 'memory' }), memoryBackendPlugin({ id: 'vectors' })]
+    plugins: [memoryBackendPlugin({ name: 'memory' }), memoryBackendPlugin({ name: 'vectors' })]
   })
   const host = await base.use(
-    cachePlugin(
-      { tiers: [{ backend: 'memory' }], propagate: false },
-      {
+    cachePlugin({
+      tiers: [{ backend: 'memory' }],
+      propagate: false,
+      features: {
         semantic: semanticCacheFeature({
           backend: 'vectors',
           collection: 'answers',
@@ -29,7 +30,7 @@ async function composition() {
           embed: async () => [1, 0]
         })
       }
-    )
+    })
   )
   await host.detect()
   const cache = host.backend('cache')

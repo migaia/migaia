@@ -1,6 +1,6 @@
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import { refineStorageVectorQuery, snapshotStorageVectorCollection } from '@migaia/storage-host/sdk'
-import { qdrantBackendKind } from '../plugin.ts'
+import { defineQdrantFeature } from '../plugin.ts'
 import { readNativeFeaturePort } from '../native-feature.ts'
 import {
   snapshotRescoreOptions,
@@ -17,15 +17,14 @@ import type {
 /** Extra vectors and their native ranking reuse the original installed backend and query nodes. */
 export function qdrantRescoreFeature(options: IQdrantRescoreOptions) {
   const configuration = snapshotRescoreOptions(options)
-  return defineFeature<
-    typeof qdrantBackendKind,
+  return defineQdrantFeature<
     {},
     IStorageFeatureOutput<
       readonly [],
       { readonly vector: IQdrantRescoreMethods },
       { readonly store: { readonly qdrantRescore: IQdrantRescoreApi }; readonly transaction: {} }
     >
-  >(qdrantBackendKind, ({ featureExpose: core }) => {
+  >(({ featureExpose: core }) => {
     core.selectRescore(configuration)
     return {
       capabilities: [] as const,

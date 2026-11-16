@@ -9,14 +9,20 @@ import { cachePlugin } from '../src/index.ts'
 it('routes ephemeral commits by immutable org and ignores non-value channels and unrelated keys', async () => {
   const base = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(
-        { id: 'fast' },
-        { notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature() }
-      ),
-      memoryBackendPlugin(
-        { id: 'slow' },
-        { notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature() }
-      )
+      memoryBackendPlugin({
+        name: 'fast',
+        features: {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
+      }),
+      memoryBackendPlugin({
+        name: 'slow',
+        features: {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
+      })
     ]
   })
   const host = await base.use(

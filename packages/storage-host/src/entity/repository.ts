@@ -145,7 +145,7 @@ export class EntityRepositoryOwner<
     )
       throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#store.backend,
-        cause: new TypeError(StorageErrorText.backendKindMismatch)
+        cause: new TypeError(StorageErrorText.stageKindMismatch)
       })
     this.#recordStore = this.#backend.recordStore()
     this.#records = this.#recordStore !== undefined

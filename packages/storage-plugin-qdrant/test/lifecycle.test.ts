@@ -4,10 +4,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { QdrantClient } from '@qdrant/js-client-rest'
 import { deferred } from '@migaia/utils/promise'
 import { vector } from '@migaia/storage-contract'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { qdrantBackendPlugin } from '../src/plugin.ts'
 import { qdrantClientHttp } from '../src/client.ts'
 import { qdrantManagementFeature } from '../src/features/management.ts'
+import { definePlugin } from '@migaia/storage-host/sdk'
 
 /** The canonical launcher supplies the actual engine; no alternate service or private API is used. */
 const url = process.env.MIGAIA_QDRANT_URL
@@ -122,10 +123,11 @@ describe('real SDK request and backend lifetime boundaries', () => {
       const host = await createStorageHost({
         plugins: [
           storageProbe(),
-          qdrantBackendPlugin(
-            { url: native.origin, http: native.http },
-            { management: qdrantManagementFeature() }
-          )
+          qdrantBackendPlugin({
+            url: native.origin,
+            http: native.http,
+            features: { management: qdrantManagementFeature() }
+          })
         ]
       })
       const store = host.backend('qdrant')
@@ -238,15 +240,18 @@ describe('real SDK request and backend lifetime boundaries', () => {
       const native = await forwardedNative()
       const counts = new Map<string, number>()
       const report = vi.fn()
-      const stage = definePlugin('counting', (core) => ({
-        install() {
-          core.useAsyncPipeline(async (input, next) => {
-            counts.set(input.operation, (counts.get(input.operation) ?? 0) + 1)
-            await next(input)
-          })
-          return {}
-        }
-      }))
+      const stage = definePlugin({
+        name: 'counting',
+        setup: (core) => ({
+          install() {
+            core.useAsyncPipeline(async (input, next) => {
+              counts.set(input.operation, (counts.get(input.operation) ?? 0) + 1)
+              await next(input)
+            })
+            return {}
+          }
+        })
+      })
       const host = await createStorageHost({
         plugins: [
           storageProbe(),

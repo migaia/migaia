@@ -1,7 +1,7 @@
 import { EntityFeatureName } from './constants.ts'
 import { EntityMigrationOwner } from './migration-owner.ts'
-import { defineFeature } from '../contracts.ts'
-import { entityUnitTarget, registerEntityUnit } from './assembly.ts'
+import { defineFeature } from '@migaia/plugin-host/features'
+import { registerEntityUnit } from './assembly.ts'
 import { createMigrationPlan } from '../authoring/migration.ts'
 import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
@@ -41,6 +41,6 @@ function installEntityMigration() {
 /** Explicitly assemble entity migration; omission keeps its owner outside the base import graph. */
 export function entityMigrationFeature() {
   /** The opaque native definition exposes no configuration callbacks or public role name. */
-  const feature = defineFeature(entityUnitTarget, installEntityMigration)
+  const feature = defineFeature(installEntityMigration)
   return registerEntityUnit(feature, EntityFeatureName.migration, configureEntityMigration)
 }

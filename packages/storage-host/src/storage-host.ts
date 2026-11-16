@@ -24,7 +24,7 @@ import { observeThenableRejection } from '@migaia/utils/function'
 import { createStorageTypeError, createStorageAggregateError, StorageError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.ts'
-import { readStorageNativePluginDefinition, readStorageNativePluginMetadata } from './contracts.ts'
+import type { IStorageDefinitionMetadata } from './contracts.ts'
 import type { IStorageStoreCell } from './store-cell.ts'
 import type { IStorageBase, IStorageBaseAdmission } from '@migaia/storage-contract'
 import type {
@@ -33,16 +33,13 @@ import type {
   IStorageHostCreateOptions,
   IStorageHostOptions,
   IPluginStoreMap,
-  IRejectInstalledOrDuplicateIds,
   IStoragePipelineInput,
-  IStorageBackendKind,
   IStoragePluginCore,
   IStorageEnvelopeStages,
   IStorageOrgView,
   IStorageBackendOrgContext,
   IStorageBorrowedBackend
 } from './types.ts'
-import { pluginNameFromBackendId } from './names.ts'
 import { readStorageProbeHandlers } from './plugins/probe/handlers.ts'
 import type { IStorageHookMap } from './hook-types.ts'
 import { storageJournalAccess, type IStorageJournalBackendAccess } from './journal/binding.ts'
@@ -103,8 +100,8 @@ export type IStorageNativeRegistrationContext = {
   readonly hooks: IStorageHooks
   readonly emit: IStorageHookEmitter
   readonly scheduler: IScheduler
-  readonly getKind: () => IStorageBackendKind | undefined
-  readonly setKind: (kind: IStorageBackendKind | undefined) => void
+  /** True when the registration came from `defineBackendPlugin` and so owns a Store. */
+  readonly backend: boolean
   readonly storeCell: IStorageStoreCell
   readonly runInstall: <T>(operation: () => Promise<T>) => Promise<T>
   readonly isInstallExpired: () => boolean
@@ -197,18 +194,15 @@ export type IStorageInstallEntryContext = {
   /** Original plugin is captured before native construction begins. */
   readonly plugin: IStorageBackendPluginHandle
   /** Original metadata is captured before native construction begins. */
-  readonly metadata: NonNullable<ReturnType<typeof readStorageNativePluginMetadata>>
+  readonly metadata: IStorageDefinitionMetadata
   /** Original index is captured before native construction begins. */
   readonly index: number
 
   /** Retain only this entry original trusted definition metadata. */
-  native: NonNullable<ReturnType<typeof readStorageNativePluginMetadata>>
+  native: IStorageDefinitionMetadata
 
   /** Preserve the exact admitted store with one single-assignment handoff. */
   storeCell: IStorageStoreCell
-
-  /** Kind is captured per registration, never in reusable definition metadata. */
-  kind: IStorageBackendKind | undefined
 
   /** The original core supplies registration and installation admission for all bound ports. */
   registrationCore: IStorageInstallCore | undefined
@@ -230,9 +224,6 @@ export type IStorageInstallEntryContext = {
 
   /** Bind the next domain core to its matching entry in this install batch. */
   context: IStorageNativeRegistrationContext
-
-  /** The original PluginHost definition remains the registration and lifecycle owner. */
-  definition: ReturnType<typeof readStorageNativePluginDefinition>
 }
 /** Storage facade over the canonical PluginHost lifecycle owner and its batch transaction. */
 export class StorageHost<P extends readonly IStorageBackendPluginHandle[] = readonly []> {
@@ -384,7 +375,7 @@ export class StorageHost<P extends readonly IStorageBackendPluginHandle[] = read
    * and roll back newly owned Stores.
    */
   use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(
-    ...plugins: IRejectInstalledOrDuplicateIds<{ [N in P[number]['id']]: true }, TPlugins>
+    ...plugins: TPlugins
   ): Promise<IStorageHost<readonly [...P, ...TPlugins]>> {
     this.#assertOpen()
     return this.#enqueue(() =>
@@ -518,7 +509,7 @@ export class StorageHost<P extends readonly IStorageBackendPluginHandle[] = read
     this.#withdrawPlugin(id, context)
     this.#state = 'installing'
     try {
-      await this.#inner.unUse(pluginNameFromBackendId(id))
+      await this.#inner.unUse(id)
     } finally {
       if (this.#state === 'installing') this.#state = 'open'
     }

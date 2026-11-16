@@ -64,10 +64,11 @@ for (const [service, url] of [
             const prefix = namespaces.prefix(),
               host = await createStorageHost({
                 plugins: [
-                  redisBackendPlugin(
-                    { driver, prefix },
-                    { history: redisChangeStreamFeature({ maxLen: 1000 }) }
-                  )
+                  redisBackendPlugin({
+                    driver,
+                    prefix,
+                    features: { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+                  })
                 ] as const
               })
             tag = createRedisLayout(prefix, crypto.randomUUID()).tag

@@ -42,10 +42,13 @@ export function storageJournalPlugin<const O extends IStorageJournalStaticOption
 export function storageJournalPlugin(
   options?: IStorageJournalConfiguration
 ): IStorageJournalPluginHandle<IStorageJournalConfiguration | undefined> {
-  const plugin = definePlugin(STORAGE_JOURNAL_PLUGIN_ID, (core) => {
-    /** The named assembly owns the only runtime installation callback. */
-    const assembly = new StorageJournalPluginAssembly(core)
-    return { install: () => assembly.install() }
+  const plugin = definePlugin({
+    name: STORAGE_JOURNAL_PLUGIN_ID,
+    setup: (core) => {
+      /** The named assembly owns the only runtime installation callback. */
+      const assembly = new StorageJournalPluginAssembly(core)
+      return { install: () => assembly.install() }
+    }
   })
   attachStorageJournalConfiguration(plugin, options)
   return plugin as unknown as IStorageJournalPluginHandle<IStorageJournalConfiguration | undefined>

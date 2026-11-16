@@ -2,14 +2,25 @@ import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { describe, it, expect, onTestFinished } from 'vitest'
 import { Store } from 'oxigraph'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { createStorageHost, createOrgId, definePlugin, defineFeature } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { rdf, sparql, type IQuad } from '@migaia/storage-contract'
-import { term, prefixStorageOrgGraph, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
-import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.ts'
+import {
+  term,
+  prefixStorageOrgGraph,
+  ConcurrencyPolicy,
+  definePlugin
+} from '@migaia/storage-host/sdk'
+import { sparqlBackendPlugin } from '../src/index.ts'
 import { oxigraphEndpoint } from '../src/oxigraph.ts'
 import { graphStoreFeature } from '../src/features/graph-store.ts'
 import { ontologyFeature } from '../src/features/ontology.ts'
 import type { ISparqlEndpoint } from '../src/endpoint.ts'
+import type { ISparqlBackend } from '../src/index.ts'
+import { defineStorageFeature } from '@migaia/storage-host/sdk'
+import type { IStorageFeatureDefiner } from '@migaia/storage-host'
+
+/** Feature definer typed for the imported backend. */
+const defineSparqlFeature: IStorageFeatureDefiner<ISparqlBackend> = defineStorageFeature
 /** All transaction cases execute the real native RDF engine; counters observe its existing protocol. */
 async function installed(
   options: {
@@ -36,7 +47,7 @@ async function installed(
     atomicUpdate: original.atomicUpdate,
     graphStore: original.graphStore
   }
-  const extension = defineFeature(sparqlBackendKind, () => ({
+  const extension = defineSparqlFeature(() => ({
     capabilities: [],
     chain: {
       rdf: {
@@ -53,10 +64,10 @@ async function installed(
     },
     plugins: [
       storageProbe(),
-      sparqlBackendPlugin(
-        { endpoint },
-        { graphs: graphStoreFeature(), ontology: ontologyFeature(), extension }
-      )
+      sparqlBackendPlugin({
+        endpoint,
+        features: { graphs: graphStoreFeature(), ontology: ontologyFeature(), extension }
+      })
     ] as const
   })
   onTestFinished(() => host.dispose())
@@ -393,25 +404,28 @@ describe('native RDF storage and atomic transactions', () => {
   it('uses one pipeline per root operation and reports observing hooks without changing the commit', async () => {
     const counts = new Map<string, number>(),
       reports: unknown[] = [],
-      intervention = definePlugin('count', (core) => ({
-        install() {
-          core.useAsyncPipeline(async (input, next) => {
-            counts.set(input.operation, (counts.get(input.operation) ?? 0) + 1)
-            await next(input)
-          })
-          return {}
-        }
-      })),
+      intervention = definePlugin({
+        name: 'count',
+        setup: (core) => ({
+          install() {
+            core.useAsyncPipeline(async (input, next) => {
+              counts.set(input.operation, (counts.get(input.operation) ?? 0) + 1)
+              await next(input)
+            })
+            return {}
+          }
+        })
+      }),
       host = await createStorageHost({
         report: (error) => {
           reports.push(error)
         },
         plugins: [
           storageProbe(),
-          sparqlBackendPlugin(
-            { endpoint: oxigraphEndpoint(new Store()) },
-            { graphs: graphStoreFeature() }
-          ),
+          sparqlBackendPlugin({
+            endpoint: oxigraphEndpoint(new Store()),
+            features: { graphs: graphStoreFeature() }
+          }),
           intervention
         ] as const
       })

@@ -1,11 +1,13 @@
 import {
-  definePlugin,
-  defineStorageBackendKind,
   type IStorageBackendPlugin,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
   type IStorageFeatureRecord,
   type IStorageFeatureStoreCompatibility,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendPluginDefiner
 } from '@migaia/storage-host'
+import { defineBackendPlugin, defineStorageFeature } from '@migaia/storage-host/sdk'
 import type { ICapabilityInstallPort } from '@migaia/storage-contract'
 import { createPostgresStore, type IPostgresConstruction } from './store.ts'
 import type {
@@ -20,8 +22,8 @@ import type {
 import { PgNames } from './constants.ts'
 import type { IPgQuantizedOptions } from './features/quantized.ts'
 import type { IPgReplicationSelection } from './logical-replication.ts'
-/** Exact backend identity gates each selected Feature before any native client can be borrowed. */
-export const postgresBackendKind = defineStorageBackendKind<
+/** The PostgreSQL engine as a type: its Store, native driver and the ports Features borrow. */
+export type IPostgresBackend = IStorageBackendType<
   IPostgresStore<IPgServer>,
   IPgDriver,
   {
@@ -37,7 +39,9 @@ export const postgresBackendKind = defineStorageBackendKind<
     assertNativeRoot(value: object): void
     createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>
   }
->()(PgNames.backend)
+>
+/** Defines this package's Features; the annotation carries the PostgreSQL backend type. */
+export const definePostgresFeature: IStorageFeatureDefiner<IPostgresBackend> = defineStorageFeature
 /** Caller options are read once because installation may begin after the plugin is defined. */
 type IPgPluginOptions<TServer extends IPgServer> = Pick<
   IPostgresOptions<TServer>,
@@ -65,7 +69,6 @@ class PgBackendInstallation<TValue, TServer extends IPgServer, F extends IStorag
   /** Return own descriptor ports because plugin projection captures own properties. */
   open() {
     return {
-      kind: postgresBackendKind,
       install: async () => {
         this.#construction = await createPostgresStore<TValue>(
           this.#options,
@@ -122,15 +125,19 @@ export function postgresBackendPlugin<
   const TId extends string = 'postgres',
   const F extends IStorageFeatureRecord = {}
 >(
-  options: IPostgresOptions<TServer> & { readonly id?: TId },
-  features?: F &
-    IStorageFeatureStoreCompatibility<
-      typeof postgresBackendKind,
-      NoInfer<F>,
-      IPostgresStore<NoInfer<TServer>, TValue>
-    >
+  options: IPostgresOptions<TServer> & {
+    /** Plugin name and backend lookup key; `'postgres'` when omitted. */
+    readonly name?: TId
+    /** Features installed on this backend. */
+    readonly features?: F &
+      IStorageFeatureStoreCompatibility<
+        IPostgresBackend,
+        NoInfer<F>,
+        IPostgresStore<NoInfer<TServer>, TValue>
+      >
+  }
 ): IStorageBackendPlugin<
-  typeof postgresBackendKind,
+  IPostgresBackend,
   NoInfer<TId>,
   F,
   IPostgresStore<NoInfer<TServer>, TValue>
@@ -144,11 +151,19 @@ export function postgresBackendPlugin<
     owner: options.owner,
     maxLockMs: options.maxLockMs
   }
-  const id = (options.id ?? PgNames.backend) as TId
+  const id = (options.name ?? PgNames.backend) as TId
   const factory = (core: IStoragePluginCore<F>) =>
     new PgBackendInstallation<TValue, TServer, F>(captured, core).open()
-  return definePlugin<TId, typeof factory, F>(id, factory, features) as IStorageBackendPlugin<
-    typeof postgresBackendKind,
+  return (defineBackendPlugin as IStorageBackendPluginDefiner<IPostgresBackend>)<
+    TId,
+    typeof factory,
+    F
+  >({
+    name: id,
+    features: options.features as never,
+    open: factory as never
+  }) as IStorageBackendPlugin<
+    IPostgresBackend,
     NoInfer<TId>,
     F,
     IPostgresStore<NoInfer<TServer>, TValue>

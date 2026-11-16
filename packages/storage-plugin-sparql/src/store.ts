@@ -174,7 +174,7 @@ export type ISparqlOrganizationContext = {
 
   prefix: string
 
-  identity: { backendId: string; backend: string; orgId: string }
+  identity: { backendId: string; orgId: string }
 
   store: ISparqlStore
 
@@ -210,7 +210,6 @@ function forOrg(
   organizationContext.prefix = getStorageOrgGraphPrefix(organizationContext.orgId)
   organizationContext.identity = {
     backendId: organizationContext.backendContext.core.getBackendId(),
-    backend: SparqlText.backend,
     orgId: organizationContext.orgId
   }
   organizationContext.base = createSparqlBackendBase(organizationContext)

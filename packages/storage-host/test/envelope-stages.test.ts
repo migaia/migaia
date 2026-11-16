@@ -8,18 +8,19 @@ import {
 } from '../src/authoring/migration.ts'
 import {
   createStorageHost,
-  definePlugin,
-  defineStorageBackendKind,
   type IStoragePluginCore,
-  type IStorageHookMap
+  type IStorageHookMap,
+  type IStorageBackendType,
+  type IStorageBackendPluginDefiner
 } from '../src/index.ts'
 import { catalog } from './helpers/catalog.ts'
 import { getBackendEnvelopeStages } from '../src/core/change-controller.ts'
+import { defineBackendPlugin } from '../src/sdk.ts'
 
 /** Actual backend identity binds observations without replacing the migration or store owner. */
-const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(
-  'catalog'
-)
+type IKindBackend = IStorageBackendType<ReturnType<typeof catalog>['store'], Map<string, string>>
+/** Backend-plugin definer typed for this test backend. */
+const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
 
 /** Construct one original store for public host-stage factory calls. */
 function plugin() {
@@ -27,7 +28,6 @@ function plugin() {
   let state!: ReturnType<typeof catalog>
   /** A named descriptor retains the backend's exact public store type. */
   const descriptor = (core: IStoragePluginCore) => ({
-    kind,
     featureExpose: () => ({ getClient: () => state.client }),
     capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
     install: () => {
@@ -36,7 +36,7 @@ function plugin() {
       return {}
     }
   })
-  return definePlugin('catalog', descriptor)
+  return defineKindBackend({ name: 'catalog', open: descriptor })
 }
 
 describe('envelope observation binding', () => {
@@ -59,9 +59,10 @@ describe('envelope observation binding', () => {
       [Symbol.asyncDispose]: async () => {}
     })
     /** Both original hosts own their own normal registration window and observer identity. */
-    const rawKind = defineStorageBackendKind<typeof raw>()('shared-raw')
+    type IRawKindBackend = IStorageBackendType<typeof raw, undefined>
+    /** Backend-plugin definer typed for the raw store. */
+    const defineRawKindBackend: IStorageBackendPluginDefiner<IRawKindBackend> = defineBackendPlugin
     const descriptor = (core: IStoragePluginCore) => ({
-      kind: rawKind,
       featureExpose: () => ({ getClient: () => undefined }),
       install: () => {
         core.registerStore(raw)
@@ -77,7 +78,7 @@ describe('envelope observation binding', () => {
             seen.push(event.backendId)
           }
         }),
-        definePlugin('first', descriptor)
+        defineRawKindBackend({ name: 'first', open: descriptor })
       ]
     })
     await using second = await createStorageHost({
@@ -87,7 +88,7 @@ describe('envelope observation binding', () => {
             seen.push(event.backendId)
           }
         }),
-        definePlugin('second', descriptor)
+        defineRawKindBackend({ name: 'second', open: descriptor })
       ]
     })
     getBackendEnvelopeStages(raw, {
@@ -144,14 +145,12 @@ describe('envelope observation binding', () => {
     expect(order).toEqual(['check', 'checked', 'before', 'after', 'before', 'after', 'migrated'])
     expect(received[0]).toEqual({
       backendId: 'catalog',
-      backend: 'catalog',
       orgId: '00000000-0000-0000-0000-000000000000',
       operation: 'recover',
       targetVersion: 1
     })
     expect(received[1]).toEqual({
       backendId: 'catalog',
-      backend: 'catalog',
       orgId: '00000000-0000-0000-0000-000000000000',
       operation: 'recover',
       fromVersion: 0,

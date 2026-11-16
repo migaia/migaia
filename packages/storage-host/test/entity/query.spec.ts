@@ -11,10 +11,16 @@ import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { composeRepositoryKey } from '../../src/entity/key.ts'
 import { defineEntityPlugin } from '../../src/entity.ts'
-import { createStorageHost, defineFeature, StorageError } from '../../src/index.ts'
+import { createStorageHost, StorageError } from '../../src/index.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { memoryBackendPlugin, memoryBackendKind } from '../../src/plugins/memory.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import { memoryBackend } from '../helpers/memory.ts'
+import type { IMemoryBackend } from '../../src/plugins/memory.ts'
+import { defineStorageFeature } from '../../src/sdk.ts'
+import type { IStorageFeatureDefiner } from '../../src/index.ts'
+
+/** Feature definer typed for the imported backend. */
+const defineMemoryFeature: IStorageFeatureDefiner<IMemoryBackend> = defineStorageFeature
 
 /** One domain definition drives root and authentic transaction queries. */
 type IRow = { id: string; group: string; score: number }
@@ -37,7 +43,7 @@ it('writes only the selected page through the original entity transaction', asyn
   const rowsEntityPluginHost = await entityHost(rowsEntityPlugin)
 
   const store = await memoryBackend()
-  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](store)
+  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](store)
   await repo.put({ id: 'a', group: 'one', score: 1 })
   await repo.put({ id: 'b', group: 'one', score: 2 })
   await repo.put({ id: 'c', group: 'two', score: 3 })
@@ -60,7 +66,7 @@ it('keeps entity query deletion and text writes in the same authentic transactio
   const rowsEntityPluginHost = await entityHost(rowsEntityPlugin)
 
   const store = await memoryBackend()
-  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](store)
+  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](store)
   await repo.put({ id: 'a', group: 'one', score: 1 })
   const primary = new Error('entity delete rollback')
   const failed = await store
@@ -106,7 +112,7 @@ it('rolls back failed query patches and refuses identity changes before any enti
   /** This actual storage host owns the entity installation for this test scope. */
   const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
 
-  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](store)
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](store)
   await repo.put({ id: 'a', group: 'one', score: 1 })
   await repo.put({ id: 'b', group: 'one', score: 2 })
   const failed = await repo
@@ -144,7 +150,7 @@ it('deletes the actual selected physical record when migration changes its logic
   /** This actual storage host owns the entity installation for this test scope. */
   const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
 
-  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](store)
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](store)
   await store.putRecord(
     { version: 1, state: { id: 'a', group: 'old', score: 1 } },
     composeRepositoryKey('query-migrated', 'a')
@@ -159,7 +165,7 @@ it('keeps source branches immutable and shares index filtering, projection and b
   /** This actual storage host owns the entity installation for this test scope. */
   const rowsEntityPluginHost = await entityHost(rowsEntityPlugin)
 
-  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](await memoryBackend())
+  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](await memoryBackend())
   for (const row of [
     { id: 'b', group: 'one', score: 3 },
     { id: 'a', group: 'one', score: 1 },
@@ -193,7 +199,7 @@ it('retains the complete unawaited transaction query and mapper under the origin
   const rowsEntityPluginHost = await entityHost(rowsEntityPlugin)
 
   const store = await memoryBackend()
-  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](store)
+  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](store)
   await repo.put({ id: 'a', group: 'one', score: 1 })
   const entered = deferred<void>()
   const release = deferred<void>()
@@ -228,7 +234,7 @@ it('forwards selected scalar and callback terminals through the same entity sour
   /** This actual storage host owns the entity installation for this test scope. */
   const rowsEntityPluginHost = await entityHost(rowsEntityPlugin)
 
-  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](await memoryBackend())
+  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](await memoryBackend())
   await repo.put({ id: 'a', group: 'one', score: 2 })
   await repo.put({ id: 'b', group: 'one', score: 4 })
   await repo.put({ id: 'c', group: 'two', score: 99 })
@@ -277,7 +283,7 @@ it('drains unawaited each callbacks and admits invalid terminals under the origi
   const rowsEntityPluginHost = await entityHost(rowsEntityPlugin)
 
   const store = await memoryBackend()
-  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](store)
+  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](store)
   await repo.put({ id: 'a', group: 'one', score: 1 })
   const entered = deferred<void>()
   const release = deferred<void>()
@@ -323,7 +329,7 @@ it('keeps a mapped stream advance active until disposal can drain it', async () 
   const rowsEntityPluginHost = await entityHost(rowsEntityPlugin)
 
   const store = await memoryBackend()
-  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](store)
+  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](store)
   await repo.put({ id: 'a', group: 'one', score: 1 })
   await store.transaction(async (scope) => {
     const entered = deferred<void>()
@@ -362,7 +368,7 @@ it('wraps original query callback failures even when they already carry a code',
   /** This actual storage host owns the entity installation for this test scope. */
   const rowsEntityPluginHost = await entityHost(rowsEntityPlugin)
 
-  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](await memoryBackend())
+  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](await memoryBackend())
   await repo.put({ id: 'a', group: 'one', score: 1 })
   const original = new StorageError(StorageHostErrorCode.invalidConfig)
   for (const [operation, query] of [
@@ -419,15 +425,15 @@ it('inherits installed query methods through the same original storage cell', as
   const mark = vi.fn(function (this: object) {
     return this
   })
-  const feature = defineFeature(memoryBackendKind, () => ({
+  const feature = defineMemoryFeature(() => ({
     capabilities: [],
     api: { store: {}, transaction: {} },
     chain: { query: { mark } }
   }))
   await using host = await createStorageHost({
-    plugins: [memoryBackendPlugin(undefined, { marker: feature })]
+    plugins: [memoryBackendPlugin({ features: { marker: feature } })]
   })
-  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](host.backend('memory'))
+  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](host.backend('memory'))
   const branch = repo.query().where({ group: 'one' }).select('id')
   expect(branch.mark()).toBe(branch)
   expect(mark).toHaveBeenCalledTimes(1)
@@ -452,7 +458,7 @@ it('applies the default bounded comparator before limit and projection', async (
   })
   /** This actual storage host owns the entity installation for this test scope. */
   const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
-  const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](await memoryBackend())
+  const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.name](await memoryBackend())
   for (const [id, score] of [
     ['a', 1],
     ['b', 2],
@@ -488,7 +494,7 @@ it('observes a rejected comparator thenable before rejecting its synchronous con
   /** This actual storage host owns the entity installation for this test scope. */
   const rowsEntityPluginHost = await entityHost(rowsEntityPlugin)
 
-  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](await memoryBackend())
+  const repo = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](await memoryBackend())
   await repo.put({ id: 'a', group: 'one', score: 1 })
   await repo.put({ id: 'b', group: 'one', score: 2 })
   const original = new Error('late comparator rejection')
@@ -540,7 +546,7 @@ it('applies one invalid-record policy to index projection failures in root and t
   /** This actual storage host owns the entity installation for this test scope. */
   const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
-  const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](store)
+  const repo = entityEntityPluginHost.extensions[entityEntityPlugin.name](store)
   await repo.put({ id: 'bad', group: 'one', score: -1 })
   await repo.put({ id: 'good', group: 'one', score: 1 })
   rejectProjection = true
@@ -573,7 +579,7 @@ it('rejects an explicit index full scan under strict intent before opening the f
   /** Memory records support authoritative entity scans, without a native secondary index. */
   const store = await memoryBackend()
   /** The same public definition keeps ordinary indexed filtering available. */
-  const repository = rowsEntityPluginHost.extensions[rowsEntityPlugin.id](store)
+  const repository = rowsEntityPluginHost.extensions[rowsEntityPlugin.name](store)
   await repository.put({ id: 'a', group: 'one', score: 1 })
   /** This public source observes whether strict admission leaks into physical scan work. */
   const scan = vi.spyOn(store, 'iterateRecords')

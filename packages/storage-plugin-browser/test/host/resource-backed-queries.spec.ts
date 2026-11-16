@@ -4,7 +4,7 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { Resource } from '@migaia/resource'
 import { records, StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
-import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -20,9 +20,11 @@ async function createPublicReactiveFixture() {
   /** The public host owns every native notification and query created by the case. */
   const host = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(undefined, {
-        notifications: memoryNotificationsFeature(),
-        reactive: reactiveFeature(memoryBackendKind)
+      memoryBackendPlugin({
+        features: {
+          notifications: memoryNotificationsFeature(),
+          reactive: reactiveFeature()
+        }
       })
     ]
   })
@@ -123,7 +125,7 @@ describe('public reactive query policies', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const selectedEntityPluginHost = await host.use(selectedEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const selected = selectedEntityPluginHost.extensions[selectedEntityPlugin.id](store)
+    const selected = selectedEntityPluginHost.extensions[selectedEntityPlugin.name](store)
     /** A second ordinary entity supplies a real unrelated committed invalidation. */
     const foreignEntityPlugin = defineEntityPlugin<IReactiveFixtureRow>()(
       'resource-backed-queries-spec-ts-123',
@@ -132,7 +134,7 @@ describe('public reactive query policies', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const foreignEntityPluginHost = await host.use(foreignEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const foreign = foreignEntityPluginHost.extensions[foreignEntityPlugin.id](store)
+    const foreign = foreignEntityPluginHost.extensions[foreignEntityPlugin.name](store)
     await selected.put({ id: 'selected', value: 'initial' })
     await foreign.put({ id: 'foreign', value: 'foreign' })
     /** Count public projections rather than observing any private source implementation. */

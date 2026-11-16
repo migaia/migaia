@@ -69,19 +69,20 @@ for (const adapter of ['pg', 'postgres-js'] as const)
             ? await createStorageHost({
                 org,
                 plugins: [
-                  postgresBackendPlugin(
-                    { driver, prefix },
-                    {
+                  postgresBackendPlugin({
+                    driver,
+                    prefix,
+                    features: {
                       vector: pgvectorFeature(),
                       replication: pgLogicalReplicationFeature({ slot, publication })
                     }
-                  )
+                  })
                 ] as const
               })
             : await createStorageHost({
                 org,
                 plugins: [
-                  postgresBackendPlugin({ driver, prefix }, { vector: pgvectorFeature() })
+                  postgresBackendPlugin({ driver, prefix, features: { vector: pgvectorFeature() } })
                 ] as const
               })
         onTestFinished(async () => {

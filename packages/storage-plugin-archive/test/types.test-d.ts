@@ -5,11 +5,11 @@ import { archivePlugin, type IArchiveApi, type IArchiveRunResult } from '../src/
 /** Literal extension identities survive the flat extension functions' public projection. */
 async function declarations() {
   const base = await createStorageHost({
-    plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+    plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
   })
   const host = await base.use(
     archivePlugin({
-      id: 'history',
+      name: 'history',
       hot: 'hot',
       cold: 'cold',
       rules: [{ name: 'all', prefix: '', olderThanMs: 0, where: () => ({}) }]

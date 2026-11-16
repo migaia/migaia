@@ -63,14 +63,20 @@ async function fixture() {
   /** The Memory value tier and Qdrant vector backend are published before the cache batch. */
   const initial = await createStorageHost({
     plugins: [
-      memoryBackendPlugin({ id: 'values' }),
-      qdrantBackendPlugin({ id: 'vectors', url: url!, http, collectionPrefix: crypto.randomUUID() })
+      memoryBackendPlugin({ name: 'values' }),
+      qdrantBackendPlugin({
+        name: 'vectors',
+        url: url!,
+        http,
+        collectionPrefix: crypto.randomUUID()
+      })
     ] as const
   })
   const host = await initial.use(
-    cachePlugin(
-      { tiers: [{ backend: 'values' }], propagate: false },
-      {
+    cachePlugin({
+      tiers: [{ backend: 'values' }],
+      propagate: false,
+      features: {
         semantic: semanticCacheFeature({
           backend: 'vectors',
           collection: 'answers',
@@ -80,7 +86,7 @@ async function fixture() {
           embed: async () => [1, 0]
         })
       }
-    )
+    })
   )
   await host.detect()
   return {

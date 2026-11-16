@@ -2,20 +2,23 @@ import { createBackendChangeController } from '../src/core/change-controller.ts'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createStorageHost,
-  definePlugin,
-  defineFeature,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
+  type IStorageBackendPluginDefiner
 } from '../src/index.ts'
 import type { IBackendChangeController } from '../src/authoring/backend.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { catalog } from './helpers/catalog.ts'
+import { defineStorageFeature, defineBackendPlugin } from '../src/sdk.ts'
 
 /** One actual map backend is bound to the controller's existing mutation resource owner. */
-const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(
-  'catalog'
-)
+type IKindBackend = IStorageBackendType<ReturnType<typeof catalog>['store'], Map<string, string>>
+/** Backend-plugin definer typed for this test backend. */
+const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
+/** Feature definer typed for this test backend. */
+const defineKindFeature: IStorageFeatureDefiner<IKindBackend> = defineStorageFeature
 
 describe('controlled backend change authoring', () => {
   it.each([false, true])(
@@ -31,7 +34,6 @@ describe('controlled backend change authoring', () => {
       const descriptor = (core: IStoragePluginCore) => {
         let state!: ReturnType<typeof catalog>
         return {
-          kind,
           featureExpose: () => ({ getClient: () => state.client }),
           capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
           install: () => {
@@ -53,7 +55,7 @@ describe('controlled backend change authoring', () => {
       }
       /** Reporter remains separate from the explicit primary disposal result. */
       const host = await createStorageHost({
-        plugins: [definePlugin('finalize', descriptor)],
+        plugins: [defineKindBackend({ name: 'finalize', open: descriptor })],
         report: vi.fn()
       })
       /**
@@ -83,7 +85,7 @@ describe('controlled backend change authoring', () => {
     /** The factory creates one real controller, without an independent Feature registry. */
     let controller!: IBackendChangeController
     /** Feature construction retains the guarded lazy getter until the actual API endpoint. */
-    const feature = defineFeature(kind, ({ featureExpose }) => ({
+    const feature = defineKindFeature(({ featureExpose }) => ({
       capabilities: [],
       chain: {},
       api: {
@@ -99,7 +101,6 @@ describe('controlled backend change authoring', () => {
     const descriptor = (core: IStoragePluginCore) => {
       retained = core
       return {
-        kind,
         featureExpose: () => ({ getClient: () => state.client }),
         capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
         install: () => {
@@ -123,7 +124,7 @@ describe('controlled backend change authoring', () => {
     }
     /** One installed registration supplies the same controller to its selected Feature. */
     const host = await createStorageHost({
-      plugins: [definePlugin('catalog', descriptor, { feature })]
+      plugins: [defineKindBackend({ name: 'catalog', features: { feature }, open: descriptor })]
     })
     expect(await host.backend('catalog').api.controller()).toBe(controller)
     expect(() =>
@@ -175,7 +176,6 @@ describe('controlled backend change authoring', () => {
     let state!: ReturnType<typeof catalog>
     /** Registration must use the exact store already handed to its own core. */
     const descriptor = (core: IStoragePluginCore) => ({
-      kind,
       featureExpose: () => ({ getClient: () => state.client }),
       install: () => {
         /** Resource creation is admitted by the original install scope before any store is exposed. */
@@ -198,7 +198,7 @@ describe('controlled backend change authoring', () => {
     })
     /** The original host install wrappers retain the exact semantic rejection on their cause chain. */
     const failure = await createStorageHost({
-      plugins: [definePlugin('foreign', descriptor)]
+      plugins: [defineKindBackend({ name: 'foreign', open: descriptor })]
     }).catch((error) => error)
     expect(failure.cause.cause).toMatchObject({ code: 'BACKEND_PLUGIN_INVALID' })
     expect(cleanup).toHaveBeenCalledTimes(1)
@@ -206,7 +206,7 @@ describe('controlled backend change authoring', () => {
 
   it('returns undefined for a registration without a controller', async () => {
     /** Lazy absence never creates a fallback registry or controller. */
-    const feature = defineFeature(kind, ({ featureExpose }) => ({
+    const feature = defineKindFeature(({ featureExpose }) => ({
       capabilities: [],
       chain: {},
       api: {
@@ -222,7 +222,6 @@ describe('controlled backend change authoring', () => {
     const descriptor = (core: IStoragePluginCore) => {
       let state!: ReturnType<typeof catalog>
       return {
-        kind,
         featureExpose: () => ({ getClient: () => state.client }),
         capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
         install: () => {
@@ -233,7 +232,7 @@ describe('controlled backend change authoring', () => {
       }
     }
     await using host = await createStorageHost({
-      plugins: [definePlugin('plain', descriptor, { feature })]
+      plugins: [defineKindBackend({ name: 'plain', features: { feature }, open: descriptor })]
     })
     expect(await host.backend('plain').api.controller()).toBeUndefined()
   })

@@ -51,9 +51,11 @@ describe('global native storage journal', () => {
             atomicUndo: { memory: images }
           }
         }),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -175,13 +177,13 @@ describe('global native storage journal', () => {
             atomicUndo: { memory: images }
           }
         }),
-        memoryBackendPlugin(
-          { capacity: { maxEntries: 2, eviction: 'lru' } },
-          {
+        memoryBackendPlugin({
+          capacity: { maxEntries: 2, eviction: 'lru' },
+          features: {
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           }
-        )
+        })
       ]
     })
     try {
@@ -230,9 +232,11 @@ describe('global native storage journal', () => {
             acquired = await storageLogStore('memory', { prefix: 'failed-initializer' })
             throw original
           }),
-          memoryBackendPlugin(undefined, {
-            notifications: memoryNotificationsFeature(),
-            changeFeed: memoryChangeFeedFeature()
+          memoryBackendPlugin({
+            features: {
+              notifications: memoryNotificationsFeature(),
+              changeFeed: memoryChangeFeedFeature()
+            }
           })
         ]
       })
@@ -256,9 +260,11 @@ describe('global native storage journal', () => {
             atomicUndo: { memory: images }
           }
         }),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -352,9 +358,11 @@ describe('external storage binlog', () => {
           }
         }),
         storageJournalPlugin({ logger: borrowed, namespace: 'external' }),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ],
       report: (error) => {

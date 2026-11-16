@@ -137,3 +137,9 @@ export const IndexedDbFeature = {
   changeFeed: 'changeFeed',
   hostJournal: 'host journal plugin'
 } as const
+
+/**
+ * Reconciliation interval, in milliseconds, of the live-query profile the four browser backends
+ * state.
+ */
+export const BROWSER_REACTIVE_POLL_INTERVAL_MS = 1000

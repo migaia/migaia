@@ -1,8 +1,9 @@
 import { createClientPool } from 'redis'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
 import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
+import { definePlugin } from '@migaia/storage-host/sdk'
 
 /** Each actual process borrows its own connection pool to the same fresh Redis namespace. */
 const prefix = process.argv[2]!,
@@ -11,18 +12,21 @@ await pool.connect()
 /** Root lookups are counted outside storage transactions solely to coordinate this finite fixture. */
 const reads = prefix + ':reads',
   loads = prefix + ':loads'
-const observer = definePlugin('root-lookups', (core) => ({
-  install() {
-    core.useAsyncPipeline(async (input, next) => {
-      if (input.backendId === 'redis' && input.operation === 'get' && input.scope === undefined)
-        await pool.sendCommand(['INCR', reads])
-      return next(input)
-    })
-    return {}
-  }
-}))
+const observer = definePlugin({
+  name: 'root-lookups',
+  setup: (core) => ({
+    install() {
+      core.useAsyncPipeline(async (input, next) => {
+        if (input.backendId === 'redis' && input.operation === 'get' && input.scope === undefined)
+          await pool.sendCommand(['INCR', reads])
+        return next(input)
+      })
+      return {}
+    }
+  })
+})
 const base = await createStorageHost({
-  plugins: [redisBackendPlugin({ id: 'redis', driver: nodeRedisDriver(pool), prefix }), observer]
+  plugins: [redisBackendPlugin({ name: 'redis', driver: nodeRedisDriver(pool), prefix }), observer]
 })
 const host = await base.use(
   cachePlugin({

@@ -1,12 +1,14 @@
 import {
-  definePlugin,
-  defineStorageBackendKind,
   type IStorageBackendPlugin,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
   type IStorageFeatureRecord,
   type IStorageFeatureStoreCompatibility,
   type IStoragePluginCore,
-  type IStorageJournalBackendBinding
+  type IStorageJournalBackendBinding,
+  type IStorageBackendPluginDefiner
 } from '@migaia/storage-host'
+import { defineBackendPlugin, defineStorageFeature } from '@migaia/storage-host/sdk'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -20,12 +22,14 @@ import type {
   ISqliteTransactionScope,
   ISqliteOptions
 } from './types.ts'
-/** Exact kind identity gates Features before native client access or construction. */
-export const sqliteBackendKind = defineStorageBackendKind<
+/** The SQLite engine as a type: its Store, native driver and transaction client getter. */
+export type ISqliteBackend = IStorageBackendType<
   ISqliteStore,
   ISqliteDriver,
   { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver }
->()(SqliteNames.backend)
+>
+/** Defines this package's Features; the annotation carries the SQLite backend type. */
+export const defineSqliteFeature: IStorageFeatureDefiner<ISqliteBackend> = defineStorageFeature
 /** One native installation owns its organization registry and exact provider authority. */
 class SqliteInstallation<TValue, F extends IStorageFeatureRecord> {
   /** Captured deployment fields stay fixed while installation or later org creation can await. */
@@ -109,7 +113,6 @@ class SqliteInstallation<TValue, F extends IStorageFeatureRecord> {
   /** Plugin projection receives own callbacks; native class methods are invoked directly. */
   open() {
     return {
-      kind: sqliteBackendKind,
       install: () => this.#install(),
       journalBinding: () => this.#journalBinding(this.#core.defaultOrgId),
       capabilityInstaller: (_store: ISqliteStore<TValue>): ICapabilityInstallPort =>
@@ -128,10 +131,14 @@ export function sqliteBackendPlugin<
   const TId extends string = 'sqlite',
   const F extends IStorageFeatureRecord = {}
 >(
-  options: ISqliteOptions & { readonly id?: TId },
-  features?: F &
-    IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>
-): IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>> {
+  options: ISqliteOptions & {
+    /** Plugin name and backend lookup key; `'sqlite'` when omitted. */
+    readonly name?: TId
+    /** Features installed on this backend. */
+    readonly features?: F &
+      IStorageFeatureStoreCompatibility<ISqliteBackend, NoInfer<F>, ISqliteStore<TValue>>
+  }
+): IStorageBackendPlugin<ISqliteBackend, NoInfer<TId>, F, ISqliteStore<TValue>> {
   /** Deployment fields remain stable when installation is deferred after plugin definition. */
   const captured = {
     driver: options.driver,
@@ -142,8 +149,16 @@ export function sqliteBackendPlugin<
     wal: options.wal
   }
   /** Literal default ids survive host-context inference. */
-  const id = (options.id ?? SqliteNames.backend) as TId
+  const id = (options.name ?? SqliteNames.backend) as TId
   const descriptorFactory = (core: IStoragePluginCore<F>) =>
     new SqliteInstallation<TValue, F>(captured, core).open()
-  return definePlugin<TId, typeof descriptorFactory, F>(id, descriptorFactory, features)
+  return (defineBackendPlugin as IStorageBackendPluginDefiner<ISqliteBackend>)<
+    TId,
+    typeof descriptorFactory,
+    F
+  >({
+    name: id,
+    features: options.features as never,
+    open: descriptorFactory as never
+  })
 }

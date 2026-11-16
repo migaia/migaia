@@ -1,28 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { blob, records, ttl } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/sdk'
+import { lockKey, definePlugin } from '@migaia/storage-host/sdk'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { cachePlugin } from '../src/index.ts'
 
 describe('cache policy composition', () => {
   it('loads exactly four absent batch keys while preserving three-tier provenance and an existing flight', async () => {
     const calls: { backendId: string; operation: string; input: unknown }[] = []
-    const observer = definePlugin('mixed-batch', (core) => ({
-      install() {
-        core.useAsyncPipeline((input, next) => {
-          calls.push({ backendId: input.backendId, operation: input.operation, input: input.input })
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observer = definePlugin({
+      name: 'mixed-batch',
+      setup: (core) => ({
+        install() {
+          core.useAsyncPipeline((input, next) => {
+            calls.push({
+              backendId: input.backendId,
+              operation: input.operation,
+              input: input.input
+            })
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     const base = await createStorageHost({
       plugins: [
-        memoryBackendPlugin({ id: 'zero' }),
-        memoryBackendPlugin({ id: 'one' }),
-        memoryBackendPlugin({ id: 'two' }),
+        memoryBackendPlugin({ name: 'zero' }),
+        memoryBackendPlugin({ name: 'one' }),
+        memoryBackendPlugin({ name: 'two' }),
         observer
       ]
     })
@@ -160,7 +167,7 @@ describe('cache policy composition', () => {
     let sample = 0
     const base = await createStorageHost({
       scheduler,
-      plugins: [memoryBackendPlugin({ id: 'small' }), memoryBackendPlugin({ id: 'full' })]
+      plugins: [memoryBackendPlugin({ name: 'small' }), memoryBackendPlugin({ name: 'full' })]
     })
     const host = await base.use(
       cachePlugin({
@@ -255,17 +262,24 @@ describe('cache policy composition', () => {
   })
   it('uses one native batch per layer and joins a single-key caller to the same batch source', async () => {
     const calls: { backendId: string; operation: string }[] = []
-    const observer = definePlugin('observer', (core) => ({
-      install() {
-        core.useAsyncPipeline((input, next) => {
-          calls.push({ backendId: input.backendId, operation: input.operation })
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observer = definePlugin({
+      name: 'observer',
+      setup: (core) => ({
+        install() {
+          core.useAsyncPipeline((input, next) => {
+            calls.push({ backendId: input.backendId, operation: input.operation })
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     const base = await createStorageHost({
-      plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' }), observer]
+      plugins: [
+        memoryBackendPlugin({ name: 'fast' }),
+        memoryBackendPlugin({ name: 'slow' }),
+        observer
+      ]
     })
     const host = await base.use(
       cachePlugin({ propagate: false, tiers: [{ backend: 'fast' }, { backend: 'slow' }] })
@@ -342,7 +356,7 @@ describe('cache policy composition', () => {
   })
   it('indexes tags first and invalidates only the selected application dependency', async () => {
     const base = await createStorageHost({
-      plugins: [memoryBackendPlugin({ id: 'tier' }), memoryBackendPlugin({ id: 'tags' })]
+      plugins: [memoryBackendPlugin({ name: 'tier' }), memoryBackendPlugin({ name: 'tags' })]
     })
     const host = await base.use(
       cachePlugin({
@@ -396,7 +410,7 @@ describe('cache policy composition', () => {
       report: (error) => {
         reports.push(error)
       },
-      plugins: [memoryBackendPlugin({ id: 'tier' }), memoryBackendPlugin({ id: 'objects' })]
+      plugins: [memoryBackendPlugin({ name: 'tier' }), memoryBackendPlugin({ name: 'objects' })]
     })
     const host = await base.use(
       cachePlugin({
@@ -444,7 +458,7 @@ describe('cache policy composition', () => {
     }
   })
   it('honors shortened lifetimes, deterministic jitter and cacheIf without policy extension', async () => {
-    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'tier' })] })
+    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ name: 'tier' })] })
     const host = await base.use(
       cachePlugin({
         propagate: false,
@@ -496,22 +510,25 @@ describe('cache policy composition', () => {
   it('skips every locked cache write when the tag index rejects', async () => {
     const reports: unknown[] = [],
       failure = new RangeError('tag storage failed')
-    const observer = definePlugin('tag-failure', (core) => ({
-      install() {
-        core.useAsyncPipeline((input, next) => {
-          if (input.backendId === 'tags' && input.operation === 'putRecord') throw failure
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observer = definePlugin({
+      name: 'tag-failure',
+      setup: (core) => ({
+        install() {
+          core.useAsyncPipeline((input, next) => {
+            if (input.backendId === 'tags' && input.operation === 'putRecord') throw failure
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     const base = await createStorageHost({
       report: (error) => {
         reports.push(error)
       },
       plugins: [
-        memoryBackendPlugin({ id: 'shared' }),
-        memoryBackendPlugin({ id: 'tags' }),
+        memoryBackendPlugin({ name: 'shared' }),
+        memoryBackendPlugin({ name: 'tags' }),
         observer
       ]
     })
@@ -550,7 +567,7 @@ describe('cache policy composition', () => {
     }
   })
   it('preserves a lock-time batch hit without rewriting its original expiry or metadata', async () => {
-    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'shared' })] })
+    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ name: 'shared' })] })
     const host = await base.use(
       cachePlugin({
         propagate: false,
@@ -630,20 +647,27 @@ describe('cache policy composition', () => {
       gate = new Promise<void>((resolve) => {
         finish = resolve
       })
-    const observer = definePlugin('paused-back', (core) => ({
-      install() {
-        core.useAsyncPipeline(async (input, next) => {
-          if (active && input.backendId === 'fast' && input.operation === 'set') {
-            entered()
-            await gate
-          }
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observer = definePlugin({
+      name: 'paused-back',
+      setup: (core) => ({
+        install() {
+          core.useAsyncPipeline(async (input, next) => {
+            if (active && input.backendId === 'fast' && input.operation === 'set') {
+              entered()
+              await gate
+            }
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     const base = await createStorageHost({
-      plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' }), observer]
+      plugins: [
+        memoryBackendPlugin({ name: 'fast' }),
+        memoryBackendPlugin({ name: 'slow' }),
+        observer
+      ]
     })
     const host = await base.use(
       cachePlugin({
@@ -677,21 +701,24 @@ describe('cache policy composition', () => {
   it('bounds a cache copy even when the native expiry operation fails', async () => {
     let now = 1000
     const reports: unknown[] = []
-    const observer = definePlugin('failed-expiry', (core) => ({
-      install() {
-        core.useAsyncPipeline((input, next) => {
-          if (input.backendId === 'tier' && input.operation === 'ttl.expire')
-            throw new RangeError('native expiry failed')
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observer = definePlugin({
+      name: 'failed-expiry',
+      setup: (core) => ({
+        install() {
+          core.useAsyncPipeline((input, next) => {
+            if (input.backendId === 'tier' && input.operation === 'ttl.expire')
+              throw new RangeError('native expiry failed')
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     const base = await createStorageHost({
       report: (error) => {
         reports.push(error)
       },
-      plugins: [memoryBackendPlugin({ id: 'tier' }), observer]
+      plugins: [memoryBackendPlugin({ name: 'tier' }), observer]
     })
     const host = await base.use(
       cachePlugin({ propagate: false, clock: () => now, tiers: [{ backend: 'tier', ttlMs: 100 }] })
@@ -712,12 +739,12 @@ describe('cache policy composition', () => {
     }
   })
   it('admits native batch immediate expiry without granting positive call TTL on a non-TTL tier', async () => {
-    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })
+    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ name: 'memory' })] })
     const inner = await base.use(
-      cachePlugin({ id: 'inner', propagate: false, tiers: [{ backend: 'memory' }] })
+      cachePlugin({ name: 'inner', propagate: false, tiers: [{ backend: 'memory' }] })
     )
     const host = await inner.use(
-      cachePlugin({ id: 'outer', propagate: false, tiers: [{ backend: 'inner' }] })
+      cachePlugin({ name: 'outer', propagate: false, tiers: [{ backend: 'inner' }] })
     )
     await host.detect()
     try {
@@ -745,7 +772,7 @@ describe('cache policy composition', () => {
   })
   it('clears an old tag deadline when a refreshed entry has no finite lifetime', async () => {
     const base = await createStorageHost({
-      plugins: [memoryBackendPlugin({ id: 'tier' }), memoryBackendPlugin({ id: 'tags' })]
+      plugins: [memoryBackendPlugin({ name: 'tier' }), memoryBackendPlugin({ name: 'tags' })]
     })
     const host = await base.use(
       cachePlugin({ propagate: false, tiers: [{ backend: 'tier' }], tagIndex: { backend: 'tags' } })
@@ -770,7 +797,7 @@ describe('cache policy composition', () => {
   it.each([false, true])(
     'clears finite deadlines on single and batch refresh with native lock=%s',
     async (locked) => {
-      const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'tier' })] })
+      const base = await createStorageHost({ plugins: [memoryBackendPlugin({ name: 'tier' })] })
       const host = await base.use(
         cachePlugin({
           propagate: false,
@@ -803,7 +830,7 @@ describe('cache policy composition', () => {
     }
   )
   it('shares the original native key lock across two cache instances', async () => {
-    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'shared' })] })
+    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ name: 'shared' })] })
     const options = {
       tiers: [{ backend: 'shared', ttlMs: 10000 }] as const,
       prefix: 'shared-cache:',
@@ -811,8 +838,8 @@ describe('cache policy composition', () => {
       stampedeLock: { backend: 'shared' }
     }
     const host = await base.use(
-      cachePlugin({ ...options, id: 'one' }),
-      cachePlugin({ ...options, id: 'two' })
+      cachePlugin({ ...options, name: 'one' }),
+      cachePlugin({ ...options, name: 'two' })
     )
     await host.detect()
     try {

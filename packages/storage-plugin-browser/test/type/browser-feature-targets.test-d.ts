@@ -1,21 +1,25 @@
 import { memoryTestFeatures } from '../helpers/memory-features.ts'
-import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { localStorageBackendKind, localStorageBackendPlugin } from '../../src/local-storage.ts'
+import { memoryBackendPlugin, type IMemoryBackend } from '@migaia/storage-host/plugins/memory'
+import { localStorageBackendPlugin, type ILocalStorageBackend } from '../../src/local-storage.ts'
 import { reactiveFeature } from '../../src/features/reactive.ts'
 
-/** Targets retain opaque native identities through the backend's second Feature argument. */
-memoryBackendPlugin(undefined, {
-  ...memoryTestFeatures,
-  reactive: reactiveFeature(memoryBackendKind)
+/** Targets retain opaque native identities through the backend's `features` option. */
+memoryBackendPlugin({
+  features: {
+    ...memoryTestFeatures,
+    reactive: reactiveFeature<IMemoryBackend>()
+  }
 })
-localStorageBackendPlugin(undefined, { reactive: reactiveFeature(localStorageBackendKind) })
-// @ts-expect-error the first-party Feature target must match the actual native backend kind.
-memoryBackendPlugin(undefined, {
-  ...memoryTestFeatures,
-  reactive: reactiveFeature(localStorageBackendKind)
+localStorageBackendPlugin({ features: { reactive: reactiveFeature<ILocalStorageBackend>() } })
+memoryBackendPlugin({
+  features: {
+    ...memoryTestFeatures,
+    // @ts-expect-error the first-party Feature target must match the actual native backend type.
+    reactive: reactiveFeature<ILocalStorageBackend>()
+  }
 })
 
-/** One explicitly multi-target Feature remains valid for each selected kind. */
-const shared = reactiveFeature([memoryBackendKind, localStorageBackendKind])
-memoryBackendPlugin(undefined, { ...memoryTestFeatures, reactive: shared })
-localStorageBackendPlugin(undefined, { reactive: shared })
+/** One explicitly multi-target Feature remains valid for each selected backend type. */
+const shared = reactiveFeature<[IMemoryBackend, ILocalStorageBackend]>()
+memoryBackendPlugin({ features: { ...memoryTestFeatures, reactive: shared } })
+localStorageBackendPlugin({ features: { reactive: shared } })

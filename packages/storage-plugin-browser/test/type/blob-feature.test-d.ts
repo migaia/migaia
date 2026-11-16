@@ -11,7 +11,9 @@ import {
 async function blobFeatureTypes() {
   const host = await createStorageHost({
     plugins: [
-      indexedDbBackendPlugin({}, { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature() })
+      indexedDbBackendPlugin({
+        features: { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature() }
+      })
     ]
   })
   const root: IIndexedDbBlobApi = host.backend('indexed-db').api.blobs
@@ -26,7 +28,7 @@ async function blobFeatureTypes() {
     tx.dispose()
   })
   const bare = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({}, indexedDbTestFeatures)]
+    plugins: [indexedDbBackendPlugin({ features: indexedDbTestFeatures })]
   })
   // @ts-expect-error Unselected Blob Feature contributes no API group.
   void bare.backend('indexed-db').api.blobs

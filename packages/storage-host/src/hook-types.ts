@@ -17,7 +17,6 @@ export type IStorageHooks = {
 /** 真实登记身份。事务编号只取原拥有者登记，不携带 store、scope 或原生客户端。 */
 export type IStorageHookIdentity = Readonly<{
   backendId: string
-  backend: string
   orgId: string
   transactionId?: string
 }>

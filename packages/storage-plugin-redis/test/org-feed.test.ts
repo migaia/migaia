@@ -23,10 +23,11 @@ for (const url of [
       const driver = nodeRedisDriver(pool),
         host = await createStorageHost({
           plugins: [
-            redisBackendPlugin(
-              { driver, prefix },
-              { history: redisChangeStreamFeature({ maxLen: 10 }) }
-            )
+            redisBackendPlugin({
+              driver,
+              prefix,
+              features: { history: redisChangeStreamFeature({ maxLen: 10 }) }
+            })
           ] as const
         })
       try {
@@ -73,10 +74,11 @@ for (const url of [
       const driver = nodeRedisDriver(pool),
         host = await createStorageHost({
           plugins: [
-            redisBackendPlugin(
-              { driver, prefix },
-              { history: redisChangeStreamFeature({ maxLen: 1000 }) }
-            )
+            redisBackendPlugin({
+              driver,
+              prefix,
+              features: { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+            })
           ] as const
         }),
         root = host.backend('redis')
@@ -118,10 +120,11 @@ for (const url of [
         const writer = await createStorageHost({
           org: defaultOrg,
           plugins: [
-            redisBackendPlugin(
-              { driver, prefix },
-              { history: redisChangeStreamFeature({ maxLen: 1000 }) }
-            )
+            redisBackendPlugin({
+              driver,
+              prefix,
+              features: { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+            })
           ] as const
         })
         try {
@@ -138,10 +141,11 @@ for (const url of [
         const reopened = await createStorageHost({
           org: defaultOrg,
           plugins: [
-            redisBackendPlugin(
-              { driver, prefix },
-              { history: redisChangeStreamFeature({ maxLen: 1000 }) }
-            )
+            redisBackendPlugin({
+              driver,
+              prefix,
+              features: { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+            })
           ] as const
         })
         try {

@@ -8,9 +8,8 @@ import {
 import { StorageError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.ts'
-import { readStorageNativePluginMetadata } from './contracts.ts'
+import { readStorageDefinition } from './contracts.ts'
 import type { IStorageBackendPluginHandle } from './types.ts'
-import { pluginNameFromBackendId } from './names.ts'
 import type {
   IStorageHostCore,
   IStorageInstallCore,
@@ -55,7 +54,7 @@ export class StorageHostBatch {
     /** Resolve only trusted plugin identities before constructing backends. */
     const nativeMetadata = plugins.map((plugin) => {
       /** Read the captured storage-owned metadata without invoking native getters. */
-      const metadata = readStorageNativePluginMetadata(plugin)
+      const metadata = readStorageDefinition(plugin)
       if (metadata === undefined)
         throw new StorageError(
           StorageHostErrorCode.backendPluginInvalid,
@@ -65,22 +64,6 @@ export class StorageHostBatch {
       return metadata
     })
     this.#owner.journalOwner.admitJournalConfiguration(plugins)
-    /**
-     * Storage owns duplicate backend admission before any backend factory or PluginHost install
-     * runs.
-     */
-    const admittedBackendIds = new Set(this.#owner.registry.keys())
-    for (const [index] of plugins.entries()) {
-      /** Check duplicate public ids independently of native name encoding. */
-      const backendId = nativeMetadata[index]!.id
-      if (admittedBackendIds.has(backendId))
-        throw new StorageError(
-          StorageHostErrorCode.backendDuplicate,
-          {},
-          StorageErrorText.backendDuplicate
-        )
-      admittedBackendIds.add(backendId)
-    }
     this.assertBatchOwner(batchToken)
     /** Only the final original batch preparation admits already completed candidate reads. */
     const installState = { batchToken, preparingJournal: false } as IStorageInstallBatchContext
@@ -113,7 +96,7 @@ export class StorageHostBatch {
     this.#owner.inner.setNativeContexts(
       new Map(
         [...installState.nativeContexts].map(([index, context]) => [
-          pluginNameFromBackendId(nativeMetadata[index]!.id),
+          nativeMetadata[index]!.id,
           context
         ])
       )
@@ -151,7 +134,7 @@ export class StorageHostBatch {
       const native = installState.nativeContexts.get(index)
       this.#owner.extensionKeys.set(native!.id, Reflect.ownKeys(innerHandles[index]!.extensions))
       this.#owner.detectContexts.add(native!)
-      if (native!.getKind() !== undefined) {
+      if (native!.backend) {
         nextRegistry.set(native!.id, entries[index]!.storeCell.get())
         this.#owner.storeContexts.set(entries[index]!.storeCell.get(), {
           context: native!,
@@ -187,7 +170,7 @@ export class StorageHostBatch {
     try {
       await this.#owner.journalOwner.journalOptions(this.#owner.orgId, candidates)
       for (const context of candidates)
-        if (context.getKind() !== undefined)
+        if (context.backend)
           await this.#owner.journalOwner.prepareJournalBackend(
             context,
             this.#owner.orgId,

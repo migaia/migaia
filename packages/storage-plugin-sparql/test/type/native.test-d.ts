@@ -1,13 +1,19 @@
 import { Store } from 'oxigraph'
-import { createStorageHost, defineFeature } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { rdf, sparql, kv } from '@migaia/storage-contract'
 import { term, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
-import { sparqlBackendPlugin, sparqlBackendKind } from '../../src/index.ts'
+import { sparqlBackendPlugin } from '../../src/index.ts'
 import { oxigraphEndpoint } from '../../src/oxigraph.ts'
 import { graphStoreFeature } from '../../src/features/graph-store.ts'
 import { ontologyFeature } from '../../src/features/ontology.ts'
+import type { ISparqlBackend } from '../../src/index.ts'
+import { defineStorageFeature } from '@migaia/storage-host/sdk'
+import type { IStorageFeatureDefiner } from '@migaia/storage-host'
+
+/** Feature definer typed for the imported backend. */
+const defineSparqlFeature: IStorageFeatureDefiner<ISparqlBackend> = defineStorageFeature
 /** A real nonempty RDF extension must preserve the complete native scope and unlocked builder. */
-const extension = defineFeature(sparqlBackendKind, () => ({
+const extension = defineSparqlFeature(() => ({
   capabilities: [],
   chain: {
     rdf: {
@@ -20,10 +26,10 @@ const extension = defineFeature(sparqlBackendKind, () => ({
 }))
 const host = await createStorageHost({
   plugins: [
-    sparqlBackendPlugin(
-      { endpoint: oxigraphEndpoint(new Store()) },
-      { extension, graphs: graphStoreFeature(), ontology: ontologyFeature() }
-    )
+    sparqlBackendPlugin({
+      endpoint: oxigraphEndpoint(new Store()),
+      features: { extension, graphs: graphStoreFeature(), ontology: ontologyFeature() }
+    })
   ] as const
 })
 const store = host.backend('sparql')

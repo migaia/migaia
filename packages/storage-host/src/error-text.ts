@@ -94,10 +94,6 @@ export const StorageErrorText = {
    * neutral owner.
    */
   defaultError: (code: string) => `[storage-host] ${code}`,
-  /** Stable text for rejecting malformed backend identifiers before host mutation. */
-  backendIdInvalid: 'storage backend id is invalid',
-  /** Stable text for duplicate backend registration or install-batch identifiers. */
-  backendDuplicate: 'storage backend is already installed',
   /** Stable text for a valid backend identifier absent from the host registry. */
   backendNotInstalled: 'storage backend is not installed',
   /** Stable text for backend plugin/store contract rejection. */
@@ -112,8 +108,11 @@ export const StorageErrorText = {
   storageHostDisposed: 'storage host is disposed',
   /** Stable text for aggregate host cleanup failure. */
   storageHostDisposeFailed: 'storage host failed to dispose',
-  /** Stable kind mismatch diagnostic; token identity remains the authority. */
-  backendKindMismatch: 'storage backend kind does not match',
+  /**
+   * Cause text when an entity repository is given a stage observer of the wrong stage kind (codec
+   * or query). Read by `entity/repository.ts`.
+   */
+  stageKindMismatch: 'storage stage observer kind does not match',
   /** Standard Schema construction requires an object descriptor. */
   standardSchemaObject: 'Standard Schema must be an object',
   /** Version, vendor and callback are captured before exposing a schema adapter. */

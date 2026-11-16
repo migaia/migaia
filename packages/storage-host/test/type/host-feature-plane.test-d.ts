@@ -1,9 +1,9 @@
 import {
   createStorageHost,
-  defineFeature,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendPluginDefiner,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner
 } from '../../src/index.ts'
 import {
   records,
@@ -12,9 +12,11 @@ import {
   type ITransactionScope,
   type ITransactionBuilder,
   type ICapabilityInstallPort,
-  type IKeyValueStore
+  type IKeyValueStore,
+  type IStorageBase
 } from '@migaia/storage-contract'
 import type { IStorageFeatureClientResolver } from '@migaia/storage-host'
+import { defineBackendPlugin, defineStorageFeature } from '../../src/sdk.ts'
 
 /** The public erased type grants client selection without exposing a store or installer. */
 const resolver: IStorageFeatureClientResolver<
@@ -30,10 +32,14 @@ void resolver
 type IExactStore = IKeyValueStore & { readonly custom: <TValue>(value: TValue) => TValue }
 declare const exactStore: IExactStore
 declare const installer: ICapabilityInstallPort
-const exactKind = defineStorageBackendKind<IExactStore, undefined>()('exact')
+type IExactKindBackend = IStorageBackendType<IExactStore, undefined>
+/** Backend-plugin definer typed for this test backend. */
+const defineExactKindBackend: IStorageBackendPluginDefiner<IExactKindBackend> = defineBackendPlugin
+/** Feature definer typed for this test backend. */
+const defineExactKindFeature: IStorageFeatureDefiner<IExactKindBackend> = defineStorageFeature
 
 /** Feature factories receive only reserved exposure and their declared dependencies. */
-const reservedFeature = defineFeature(exactKind, (core, dependencies) => {
+const reservedFeature = defineExactKindFeature((core, dependencies) => {
   // @ts-expect-error cross-plugin capabilities arrive through declared Feature dependencies.
   void core.features
   // @ts-expect-error Store transfer belongs to Plugin install, not Feature factories.
@@ -52,7 +58,6 @@ void reservedFeature
 
 /** Kind identity and the admitted installer carry the exact backend through public installation. */
 const exactDescriptor = (core: IStoragePluginCore) => ({
-  kind: exactKind,
   featureExpose: () => ({ getClient: () => undefined }),
   capabilityInstaller: (_store: IExactStore) => installer,
   install: () => {
@@ -61,7 +66,7 @@ const exactDescriptor = (core: IStoragePluginCore) => ({
   },
   expose: () => ({ installed: () => true })
 })
-const exactPlugin = definePlugin('exact', exactDescriptor)
+const exactPlugin = defineExactKindBackend({ name: 'exact', open: exactDescriptor })
 const exactHost = await createStorageHost({ plugins: [exactPlugin] as const })
 const exactBackend: IExactStore = exactHost.backend('exact')
 /** A valid raw backend without a Feature API projects the actual absent value. */
@@ -85,7 +90,7 @@ exactHost.extensions.custom('literal')
 exactHost.backend('exact').installed()
 
 /** Host API projection preserves each selected backend's exact names and result types. */
-const apiFeature = defineFeature(exactKind, () => ({
+const apiFeature = defineExactKindFeature(() => ({
   capabilities: [],
   chain: {},
   api: {
@@ -97,7 +102,11 @@ const apiFeature = defineFeature(exactKind, () => ({
     transaction: {}
   }
 }))
-const apiPlugin = definePlugin('with-api', exactDescriptor, { apiFeature })
+const apiPlugin = defineExactKindBackend({
+  name: 'with-api',
+  features: { apiFeature },
+  open: exactDescriptor
+})
 const apiHost = await createStorageHost({ plugins: [apiPlugin] as const })
 const apiLiteral: 'literal' = await apiHost.api['with-api'].literal()
 void apiLiteral
@@ -126,15 +135,19 @@ apiOrg.backend('with-api').dispose()
 apiOrg.backend('with-api')[Symbol.asyncDispose]()
 
 /** A descriptor without a typed installer retains the base admission contract. */
-const baseKind = defineStorageBackendKind()('base')
-const basePlugin = definePlugin('base', (core: IStoragePluginCore) => ({
-  kind: baseKind,
-  featureExpose: () => ({ getClient: () => undefined }),
-  install: () => {
-    core.registerStore(exactStore)
-    return {}
-  }
-}))
+type IBaseKindBackend = IStorageBackendType<IStorageBase, undefined>
+/** Backend-plugin definer typed for this test backend. */
+const defineBaseKindBackend: IStorageBackendPluginDefiner<IBaseKindBackend> = defineBackendPlugin
+const basePlugin = defineBaseKindBackend({
+  name: 'base',
+  open: (core: IStoragePluginCore) => ({
+    featureExpose: () => ({ getClient: () => undefined }),
+    install: () => {
+      core.registerStore(exactStore)
+      return {}
+    }
+  })
+})
 const baseHost = await createStorageHost({ plugins: [basePlugin] as const })
 // @ts-expect-error Store transfer alone cannot manufacture a custom static backend surface.
 baseHost.backend('base').custom('literal')
@@ -148,12 +161,17 @@ type IFamilyStore = IStorageStore<typeof records | typeof rdf> & {
 }
 declare const familyStore: IFamilyStore
 /** Each family carries its own literal method result, without assertions or an alternate query API. */
-const familyKind = defineStorageBackendKind<
+type IFamilyKindBackend = IStorageBackendType<
   IFamilyStore,
   undefined,
   { getTransactionClient(scope: IFamilyScope): undefined }
->()('families')
-const familyFeature = defineFeature(familyKind, () => ({
+>
+/** Feature definer typed for this test backend. */
+const defineFamilyKindFeature: IStorageFeatureDefiner<IFamilyKindBackend> = defineStorageFeature
+/** Backend-plugin definer typed for this test backend. */
+const defineFamilyKindBackend: IStorageBackendPluginDefiner<IFamilyKindBackend> =
+  defineBackendPlugin
+const familyFeature = defineFamilyKindFeature(() => ({
   capabilities: [],
   chain: {
     query: {
@@ -169,10 +187,10 @@ const familyFeature = defineFeature(familyKind, () => ({
   },
   api: { store: {}, transaction: {} }
 }))
-const familyPlugin = definePlugin(
-  'families',
-  (core: IStoragePluginCore) => ({
-    kind: familyKind,
+const familyPlugin = defineFamilyKindBackend({
+  name: 'families',
+  features: { familyFeature },
+  open: (core: IStoragePluginCore) => ({
     featureExpose: () => ({
       getClient: () => undefined,
       getTransactionClient: (_scope: IFamilyScope) => undefined
@@ -182,9 +200,8 @@ const familyPlugin = definePlugin(
       core.registerStore(familyStore)
       return {}
     }
-  }),
-  { familyFeature }
-)
+  })
+})
 const familyHost = await createStorageHost({ plugins: [familyPlugin] })
 await familyHost.backend('families').transaction(async (scope) => {
   const recordQuery = scope.use(records).query()

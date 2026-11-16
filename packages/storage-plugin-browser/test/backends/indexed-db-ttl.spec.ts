@@ -15,14 +15,12 @@ async function setup() {
   const host = await createStorageHost({
     scheduler,
     plugins: [
-      indexedDbBackendPlugin(
-        {
-          factory: new IDBFactory(),
-          keyRange: IDBKeyRange,
-          dbName: `ttl-${crypto.randomUUID()}`
-        },
-        indexedDbTestFeatures
-      )
+      indexedDbBackendPlugin({
+        factory: new IDBFactory(),
+        keyRange: IDBKeyRange,
+        dbName: `ttl-${crypto.randomUUID()}`,
+        features: indexedDbTestFeatures
+      })
     ]
   })
   onTestFinished(() => host.dispose())
@@ -68,10 +66,12 @@ describe('native IndexedDB TTL', () => {
     const expiringHost = await createStorageHost({
       scheduler,
       plugins: [
-        indexedDbBackendPlugin(
-          { factory, keyRange: IDBKeyRange, dbName },
-          { ttl: indexedDbTtlFeature() }
-        )
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          dbName,
+          features: { ttl: indexedDbTtlFeature() }
+        })
       ]
     })
     onTestFinished(() => expiringHost.dispose())
@@ -141,7 +141,7 @@ describe('native IndexedDB TTL', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const repositoryEntityPluginHost = await host.use(repositoryEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
+    const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.name](store)
     await repository.put({ id: 'expired', score: 1 })
     await repository.migrate()
     await expect(repository.query().index('score').all()).resolves.toEqual([
@@ -165,7 +165,12 @@ describe('native IndexedDB TTL', () => {
     const dbName = `ttl-reopen-${crypto.randomUUID()}`
     const first = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName }, indexedDbTestFeatures)
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          dbName,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     const firstStore = first.backend('indexed-db')
@@ -174,7 +179,12 @@ describe('native IndexedDB TTL', () => {
     await first.dispose()
     const second = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName }, indexedDbTestFeatures)
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          dbName,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     onTestFinished(() => second.dispose())

@@ -1,19 +1,21 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { snapshotStorageBaseDetailed } from '../../src/authoring/store.ts'
-import { type IKeyValueStore } from '@migaia/storage-contract'
+import { type IKeyValueStore, type IStorageBase } from '@migaia/storage-contract'
 import { describe, expect, it } from 'vitest'
 import {
-  assertStorageBackendId,
   createStorageHost,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendPluginDefiner,
+  type IStorageBackendType
 } from '../../src/index.ts'
 import { STORAGE_HOST_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import { memoryBackend } from '../helpers/memory.ts'
+import { defineBackendPlugin, definePlugin } from '../../src/sdk.ts'
 
 /** Admission baselines supply the same resource label without requiring memory-native ports. */
-const kind = defineStorageBackendKind()('memory')
+type IKindBackend = IStorageBackendType<IStorageBase, undefined>
+/** Backend-plugin definer typed for this test backend. */
+const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
 
 /** Deferred Store settlement proves Host deadline ownership after native installation times out. */
 const deferred = <T>() => {
@@ -72,27 +74,34 @@ describe('PluginHost materialization', () => {
         await failedStore.dispose()
       }
     } as IKeyValueStore
-    const first = definePlugin('first', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        core.registerStore(firstStore)
-        return {}
-      }
-    }))
-    const failed = definePlugin('failed', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        core.registerStore(trackedFailedStore)
-        return {}
-      }
-    }))
-    const throws = definePlugin('throws', () => ({
-      install: () => {
-        throw new Error('factory failure')
-      }
-    }))
+    const first = defineKindBackend({
+      name: 'first',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => {
+          core.registerStore(firstStore)
+          return {}
+        }
+      })
+    })
+    const failed = defineKindBackend({
+      name: 'failed',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => {
+          core.registerStore(trackedFailedStore)
+          return {}
+        }
+      })
+    })
+    const throws = definePlugin({
+      name: 'throws',
+      setup: () => ({
+        install: () => {
+          throw new Error('factory failure')
+        }
+      })
+    })
     const installed = await host.use(first)
     await expect(host.use(failed, throws)).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
@@ -115,19 +124,24 @@ describe('PluginHost materialization', () => {
       }
     }
 
-    const rollback = definePlugin('captured-rollback', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        core.registerStore(nativeRollbackStore)
-        return {}
-      }
-    }))
-    const throws = definePlugin('captured-throws', () => ({
-      install: () => {
-        throw new Error('rollback')
-      }
-    }))
+    const rollback = defineKindBackend({
+      name: 'captured-rollback',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => {
+          core.registerStore(nativeRollbackStore)
+          return {}
+        }
+      })
+    })
+    const throws = definePlugin({
+      name: 'captured-throws',
+      setup: () => ({
+        install: () => {
+          throw new Error('rollback')
+        }
+      })
+    })
     const host = await createStorageHost()
     await expect(host.use(rollback, throws)).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
@@ -145,14 +159,16 @@ describe('PluginHost materialization', () => {
       }
     }
 
-    const installed = definePlugin('captured-dispose', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        core.registerStore(nativeDisposeStore)
-        return {}
-      }
-    }))
+    const installed = defineKindBackend({
+      name: 'captured-dispose',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => {
+          core.registerStore(nativeDisposeStore)
+          return {}
+        }
+      })
+    })
     const installedHost = await createStorageHost({ plugins: [installed] as const })
     await installedHost.dispose()
     expect(disposeCalls).toBe(1)
@@ -172,14 +188,16 @@ describe('PluginHost materialization', () => {
         await store.dispose()
       }
     } as IKeyValueStore
-    const plugin = definePlugin('late', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: async () => {
-        core.registerStore(await late.promise)
-        return {}
-      }
-    }))
+    const plugin = defineKindBackend({
+      name: 'late',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: async () => {
+          core.registerStore(await late.promise)
+          return {}
+        }
+      })
+    })
     const host = await createStorageHost({
       scheduler,
       installTimeoutMs: 1,
@@ -215,14 +233,16 @@ describe('PluginHost materialization', () => {
         await store.dispose()
       }
     } as IKeyValueStore
-    const plugin = definePlugin('initial', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: async () => {
-        core.registerStore(await late.promise)
-        return {}
-      }
-    }))
+    const plugin = defineKindBackend({
+      name: 'initial',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: async () => {
+          core.registerStore(await late.promise)
+          return {}
+        }
+      })
+    })
     const creation = createStorageHost({
       plugins: [plugin] as const,
       scheduler,
@@ -260,12 +280,15 @@ describe('PluginHost materialization', () => {
     const gates = [deferred<void>(), deferred<void>()] as const
     /** Each plugin waits for its own gate; together they exceed one budget, alone neither does. */
     const waiting = <const N extends string>(id: N, gate: (typeof gates)[number]) =>
-      definePlugin(id, () => ({
-        install: async () => {
-          await gate.promise
-          return {}
-        }
-      }))
+      definePlugin({
+        name: id,
+        setup: () => ({
+          install: async () => {
+            await gate.promise
+            return {}
+          }
+        })
+      })
     const host = await createStorageHost({ scheduler, installTimeoutMs: 10 })
     const installation = host.use(waiting('first', gates[0]), waiting('second', gates[1]))
     await flush()
@@ -280,9 +303,12 @@ describe('PluginHost materialization', () => {
 
   it('reports an install timeout with the PluginHost timeout on its cause chain', async () => {
     const scheduler = createManualScheduler()
-    const never = definePlugin('never', () => ({
-      install: () => new Promise<Record<string, never>>(() => {})
-    }))
+    const never = definePlugin({
+      name: 'never',
+      setup: () => ({
+        install: () => new Promise<Record<string, never>>(() => {})
+      })
+    })
     const host = await createStorageHost({ scheduler, installTimeoutMs: 10 })
     const installation = host.use(never).catch((error: unknown) => error)
     for (let step = 0; step < 20; step += 1) await Promise.resolve()
@@ -308,15 +334,17 @@ describe('PluginHost materialization', () => {
         await source.dispose()
       }
     } as IKeyValueStore
-    const blocked = definePlugin('registered-timeout', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: async () => {
-        core.registerStore(store)
-        await late.promise
-        return {}
-      }
-    }))
+    const blocked = defineKindBackend({
+      name: 'registered-timeout',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: async () => {
+          core.registerStore(store)
+          await late.promise
+          return {}
+        }
+      })
+    })
     const host = await createStorageHost({ scheduler, installTimeoutMs: 1 })
     const installation = host.use(blocked)
     await Promise.resolve()
@@ -325,14 +353,16 @@ describe('PluginHost materialization', () => {
     expect(host.hasBackend('registered-timeout')).toBe(false)
     expect(disposals).toBe(1)
     const retryStore = await memoryBackend()
-    const retry = definePlugin('retry', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        core.registerStore(retryStore)
-        return {}
-      }
-    }))
+    const retry = defineKindBackend({
+      name: 'retry',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => {
+          core.registerStore(retryStore)
+          return {}
+        }
+      })
+    })
     await host.use(retry)
     expect(host.hasBackend('retry')).toBe(true)
     late.resolve()
@@ -354,13 +384,15 @@ describe('PluginHost materialization', () => {
         await source.dispose()
       }
     } as IKeyValueStore
-    const plugin = definePlugin('ordinary-failure', (core: IStoragePluginCore) => {
-      capturedCore = core
-      return {
-        kind,
-        featureExpose: () => ({ getClient: () => undefined }),
-        install: () => {
-          throw new Error('ordinary failure')
+    const plugin = defineKindBackend({
+      name: 'ordinary-failure',
+      open: (core: IStoragePluginCore) => {
+        capturedCore = core
+        return {
+          featureExpose: () => ({ getClient: () => undefined }),
+          install: () => {
+            throw new Error('ordinary failure')
+          }
         }
       }
     })
@@ -393,15 +425,17 @@ describe('PluginHost materialization', () => {
         await secondSource.dispose()
       }
     } as IKeyValueStore
-    const plugin = definePlugin('duplicate-after-timeout', (core: IStoragePluginCore) => {
-      capturedCore = core
-      return {
-        kind,
-        featureExpose: () => ({ getClient: () => undefined }),
-        install: async () => {
-          core.registerStore(firstStore)
-          await late.promise
-          return {}
+    const plugin = defineKindBackend({
+      name: 'duplicate-after-timeout',
+      open: (core: IStoragePluginCore) => {
+        capturedCore = core
+        return {
+          featureExpose: () => ({ getClient: () => undefined }),
+          install: async () => {
+            core.registerStore(firstStore)
+            await late.promise
+            return {}
+          }
         }
       }
     })
@@ -425,40 +459,32 @@ describe('PluginHost materialization', () => {
     expect(direct.counts.calls).toBe(1)
 
     const hostOwned = await createReceiverDependentStore()
-    const plugin = definePlugin('receiver-dependent', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        core.registerStore(hostOwned.store)
-        return {}
-      }
-    }))
+    const plugin = defineKindBackend({
+      name: 'receiver-dependent',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => {
+          core.registerStore(hostOwned.store)
+          return {}
+        }
+      })
+    })
     const host = await createStorageHost({ plugins: [plugin] as const })
     await host.dispose()
     expect(hostOwned.counts.calls).toBe(1)
   })
 
   it('reports invalid admission as native coded TypeError', async () => {
-    let invalidIdError: unknown
-    try {
-      assertStorageBackendId('bad id')
-    } catch (error) {
-      invalidIdError = error
-    }
-    expect(invalidIdError).toBeInstanceOf(TypeError)
-    expect(invalidIdError).toMatchObject({
-      source: STORAGE_HOST_ERROR_SOURCE,
-      code: 'BACKEND_ID_INVALID'
+    const plugin = defineKindBackend({
+      name: 'invalid',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => {
+          core.registerStore({} as IKeyValueStore)
+          return {}
+        }
+      })
     })
-
-    const plugin = definePlugin('invalid', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        core.registerStore({} as IKeyValueStore)
-        return {}
-      }
-    }))
     const host = await createStorageHost()
     const failure = await host.use(plugin).catch((error: unknown) => error)
     expect(failure).toMatchObject({

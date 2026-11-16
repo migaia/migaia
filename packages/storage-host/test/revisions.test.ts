@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   createStorageHost,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendType,
+  type IStorageBackendPluginDefiner
 } from '../src/index.ts'
 import type { IBackendRevisionPort } from '../src/authoring/backend.ts'
 import { catalog } from './helpers/catalog.ts'
+import { defineBackendPlugin } from '../src/sdk.ts'
 
 /** Real installations issue revision facts without transferring resource ownership to a member. */
 async function fixture(shared?: IBackendRevisionPort, org?: string) {
@@ -15,9 +16,10 @@ async function fixture(shared?: IBackendRevisionPort, org?: string) {
   /** The native backend group may retain and share an existing original port. */
   let revisions!: IBackendRevisionPort
   /** The real catalog remains the resource owned by this host registration. */
-  const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store']>()('catalog')
+  type IKindBackend = IStorageBackendType<ReturnType<typeof catalog>['store'], undefined>
+  /** Backend-plugin definer typed for this test backend. */
+  const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
   const descriptor = (installed: IStoragePluginCore) => ({
-    kind,
     featureExpose: () => ({ getClient: () => undefined }),
     install: () => {
       core = installed
@@ -26,7 +28,10 @@ async function fixture(shared?: IBackendRevisionPort, org?: string) {
       return {}
     }
   })
-  const host = await createStorageHost({ org, plugins: [definePlugin('revisions', descriptor)] })
+  const host = await createStorageHost({
+    org,
+    plugins: [defineKindBackend({ name: 'revisions', open: descriptor })]
+  })
   return { host, core, revisions }
 }
 

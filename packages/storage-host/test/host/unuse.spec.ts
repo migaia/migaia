@@ -1,24 +1,28 @@
 import { expect, it } from 'vitest'
 import { createLogHost } from '@migaia/log-host'
 import { levelPlugin } from '@migaia/log-host'
-import { createStorageHost, definePlugin } from '../../src/index.ts'
+import { createStorageHost } from '../../src/index.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import { storageJournalPlugin } from '../../src/journal.ts'
 import { storageProbe } from '../../src/plugins/probe/index.ts'
+import { definePlugin } from '../../src/sdk.ts'
 
 /** A plugin that borrows the memory backend the way a cache tier or archive source does. */
 const borrower = (target: string) =>
-  definePlugin('borrower', (core) => ({
-    install() {
-      core.getPublishedBackend(target)
-      return {}
-    }
-  }))
+  definePlugin({
+    name: 'borrower',
+    setup: (core) => ({
+      install() {
+        core.getPublishedBackend(target)
+        return {}
+      }
+    })
+  })
 
 it('removes one backend, closes its store once and accepts the same id again', async () => {
   await using host = await createStorageHost({
-    plugins: [memoryBackendPlugin(), memoryBackendPlugin({ id: 'other' })]
+    plugins: [memoryBackendPlugin(), memoryBackendPlugin({ name: 'other' })]
   })
   const store = host.backend('memory')
   await store.set('key', 'value')
@@ -26,7 +30,6 @@ it('removes one backend, closes its store once and accepts the same id again', a
   expect(host.hasBackend('memory')).toBe(false)
   expect(host.hasBackend('other')).toBe(true)
   await expect(store.get('key')).rejects.toBeDefined()
-  // @ts-expect-error The static host type keeps listing a removed id; the runtime accepts it again.
   await host.use(memoryBackendPlugin())
   await host.detect()
   expect(await host.backend('memory').get('key')).toBeNull()
@@ -63,7 +66,7 @@ it('rejects an unknown id, a configured journal plugin and removal during an ins
     code: StorageHostErrorCode.invalidConfig
   })
   /** A removal issued during an install waits for it, then runs in call order. */
-  const installing = host.use(memoryBackendPlugin({ id: 'later' }))
+  const installing = host.use(memoryBackendPlugin({ name: 'later' }))
   const removing = host.unUse('memory')
   await installing
   await removing
@@ -82,10 +85,10 @@ it('stops every probe listener when the probe is removed', async () => {
   })
   const later: string[] = []
   host.extensions.observe('beforeBackendPluginInstall', ({ backendId }) => later.push(backendId))
-  await host.use(memoryBackendPlugin({ id: 'first' }))
+  await host.use(memoryBackendPlugin({ name: 'first' }))
   expect([initial, later]).toEqual([['first'], ['first']])
   await host.unUse('storage-probe')
-  await host.use(memoryBackendPlugin({ id: 'second' }))
+  await host.use(memoryBackendPlugin({ name: 'second' }))
   expect([initial, later]).toEqual([['first'], ['first']])
   expect('observe' in host.extensions).toBe(false)
 })

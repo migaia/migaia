@@ -29,9 +29,11 @@ export type IMemoryBackendWithChangeFeed = IMemoryBackendStore & {
 export async function memoryBackend(): Promise<IMemoryBackendWithChangeFeed> {
   const host = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(undefined, {
-        notifications: memoryNotificationsFeature(),
-        changeFeed: memoryChangeFeedFeature()
+      memoryBackendPlugin({
+        features: {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
       })
     ]
   })

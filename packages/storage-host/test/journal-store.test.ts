@@ -7,16 +7,21 @@ import { deferred } from '@migaia/utils/promise'
 import {
   createOrgId,
   createStorageHost,
-  definePlugin,
   type IStoragePluginCore,
   type IStorageJournalBackendBinding,
   type IStorageJournalNamespace,
   type IStorageJournalNamespaceView
 } from '../src/index.ts'
-import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.ts'
+import { memoryBackendPlugin } from '../src/plugins/memory.ts'
 import { storageLogStore } from '../src/journal.ts'
 import { createMemoryBackend } from '../src/backends/memory.ts'
 import { resolveStorageJournalBinding } from '../src/journal/binding.ts'
+import type { IMemoryBackend } from '../src/plugins/memory.ts'
+import { defineBackendPlugin } from '../src/sdk.ts'
+import type { IStorageBackendPluginDefiner } from '../src/index.ts'
+
+/** Backend-plugin definer typed for the imported backend. */
+const defineMemoryBackend: IStorageBackendPluginDefiner<IMemoryBackend> = defineBackendPlugin
 
 /** Faults surround real private memory I/O admitted through the original descriptor boundary. */
 function nonAtomicPrivatePlugin(fault: {
@@ -28,66 +33,69 @@ function nonAtomicPrivatePlugin(fault: {
   afterSet?: (key: string) => void
   beforeRemove?: (key: string) => void
 }) {
-  return definePlugin('history', (core: IStoragePluginCore) => {
-    let constructed: ReturnType<typeof createMemoryBackend>
-    /** Each method commits independently, modelling a reliable private single-key namespace. */
-    const project = (binding: IStorageJournalBackendBinding): IStorageJournalBackendBinding => ({
-      forOrg: (orgId) => project(binding.forOrg(orgId)),
-      openNamespace: async (prefix) => {
-        const namespace = await binding.openNamespace(prefix)
-        fault.opened?.(namespace)
-        return {
-          ...namespace,
-          nativeAtomic: false,
-          indexExclusive: fault.indexExclusive,
-          dispose: () => {
-            fault.disposed?.()
-            return namespace.dispose()
-          },
-          runCommitted: undefined,
-          run: (work) => {
-            fault.beforeRun?.()
-            return work({
-              get: (key) => namespace.run((view) => view.get(key)),
-              has: (key) => namespace.run((view) => view.has(key)),
-              set: async (key, value) => {
-                await fault.beforeSet?.(key)
-                await namespace.run((view) => view.set(key, value))
-                fault.afterSet?.(key)
-              },
-              remove: (key) => {
-                fault.beforeRemove?.(key)
-                return namespace.run((view) => view.remove(key))
-              },
-              clearValues: () => namespace.run((view) => view.clearValues()),
-              clearAll: () => namespace.run((view) => view.clearAll()),
-              keys: () => namespace.run((view) => view.keys())
-            } satisfies IStorageJournalNamespaceView)
+  return defineMemoryBackend({
+    name: 'history',
+    open: (core: IStoragePluginCore) => {
+      let constructed: ReturnType<typeof createMemoryBackend>
+      /** Each method commits independently, modelling a reliable private single-key namespace. */
+      const project = (binding: IStorageJournalBackendBinding): IStorageJournalBackendBinding => ({
+        forOrg: (orgId) => project(binding.forOrg(orgId)),
+        openNamespace: async (prefix) => {
+          const namespace = await binding.openNamespace(prefix)
+          fault.opened?.(namespace)
+          return {
+            ...namespace,
+            nativeAtomic: false,
+            indexExclusive: fault.indexExclusive,
+            dispose: () => {
+              fault.disposed?.()
+              return namespace.dispose()
+            },
+            runCommitted: undefined,
+            run: (work) => {
+              fault.beforeRun?.()
+              return work({
+                get: (key) => namespace.run((view) => view.get(key)),
+                has: (key) => namespace.run((view) => view.has(key)),
+                set: async (key, value) => {
+                  await fault.beforeSet?.(key)
+                  await namespace.run((view) => view.set(key, value))
+                  fault.afterSet?.(key)
+                },
+                remove: (key) => {
+                  fault.beforeRemove?.(key)
+                  return namespace.run((view) => view.remove(key))
+                },
+                clearValues: () => namespace.run((view) => view.clearValues()),
+                clearAll: () => namespace.run((view) => view.clearAll()),
+                keys: () => namespace.run((view) => view.keys())
+              } satisfies IStorageJournalNamespaceView)
+            }
           }
         }
-      }
-    })
-    return {
-      kind: memoryBackendKind,
-      featureExpose: () => ({
-        getClient: () => undefined,
-        getTransactionClient: (
-          scope: Parameters<ReturnType<typeof createMemoryBackend>['assertScope']>[0]
-        ) => {
-          constructed.assertScope(scope)
-          return undefined
+      })
+      return {
+        featureExpose: () => ({
+          getClient: () => undefined,
+          reactiveProfile: () => ({ mode: 'push' as const, visibility: 'instance' as const }),
+          getTransactionClient: (
+            scope: Parameters<ReturnType<typeof createMemoryBackend>['assertScope']>[0]
+          ) => {
+            constructed.assertScope(scope)
+            return undefined
+          }
+        }),
+        capabilityInstaller: (_store: ReturnType<typeof createMemoryBackend>['store']) =>
+          constructed.installer,
+        journalBinding: (_store: ReturnType<typeof createMemoryBackend>['store']) =>
+          project(constructed.journalBinding),
+        install: () => {
+          constructed = createMemoryBackend(core, {})
+          core.registerStore(constructed.store)
+          core.registerChangeController(constructed.store, constructed.controller)
+          core.registerOrgBinding(constructed.store, constructed.orgBinding)
+          return {}
         }
-      }),
-      capabilityInstaller: (_store: ReturnType<typeof createMemoryBackend>['store']) =>
-        constructed.installer,
-      journalBinding: (_store: ReturnType<typeof createMemoryBackend>['store']) =>
-        project(constructed.journalBinding),
-      install: () => {
-        constructed = createMemoryBackend(core, {})
-        core.registerStore(constructed.store)
-        core.registerChangeController(constructed.store, constructed.controller)
-        core.registerOrgBinding(constructed.store, constructed.orgBinding)
-        return {}
       }
     }
   })
@@ -142,9 +150,11 @@ describe('private storage log resource', () => {
     await using host = await createStorageHost({
       plugins: [
         storageJournalPlugin(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -173,9 +183,11 @@ describe('private storage log resource', () => {
     await using host = await createStorageHost({
       plugins: [
         storageJournalPlugin(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -207,9 +219,11 @@ describe('private storage log resource', () => {
       org: orgId,
       plugins: [
         storageJournalPlugin(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -259,9 +273,11 @@ describe('private storage log resource', () => {
     const host = await createStorageHost({
       plugins: [
         storageJournalPlugin(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -297,9 +313,11 @@ describe('private storage log resource', () => {
     await using host = await createStorageHost({
       plugins: [
         storageJournalPlugin(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })

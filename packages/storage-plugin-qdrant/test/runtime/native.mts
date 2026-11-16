@@ -28,16 +28,18 @@ async function exercise(native: IQdrantHttp, url: string): Promise<void> {
       }
     },
     org = createOrgId()
-  const plugin = qdrantBackendPlugin(
-    { url, http, collectionPrefix: crypto.randomUUID() },
-    {
+  const plugin = qdrantBackendPlugin({
+    url,
+    http,
+    collectionPrefix: crypto.randomUUID(),
+    features: {
       management: qdrantManagementFeature(),
       hybrid: qdrantHybridFeature(),
       recommend: qdrantRecommendFeature(),
       groups: qdrantGroupByFeature(),
       rescore: qdrantRescoreFeature({ collections: { runtime: { dimensions: 2, metric: 'dot' } } })
     }
-  )
+  })
   const host = await createStorageHost({ org, plugins: [plugin] as const })
   try {
     const store = host.backend('qdrant'),

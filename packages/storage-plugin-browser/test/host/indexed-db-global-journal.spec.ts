@@ -42,15 +42,13 @@ describe('global IndexedDB native journal', () => {
             binlogValues: true
           }
         }),
-        indexedDbBackendPlugin(
-          {
-            factory,
-            keyRange: IDBKeyRange,
-            dbName: 'global',
-            journalFactoryIsPrivate: true
-          },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          dbName: 'global',
+          journalFactoryIsPrivate: true,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     try {
@@ -125,11 +123,14 @@ describe('global IndexedDB native journal', () => {
             atomicUndo: { 'indexed-db': images }
           }
         }),
-        indexedDbBackendPlugin(options, indexedDbTestFeatures)
+        indexedDbBackendPlugin({ ...options, features: indexedDbTestFeatures })
       ]
     })
     await using peer = await createStorageHost({
-      plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options, indexedDbTestFeatures)]
+      plugins: [
+        storageJournalPlugin(),
+        indexedDbBackendPlugin({ ...options, features: indexedDbTestFeatures })
+      ]
     })
     try {
       const store = host.backend('indexed-db')
@@ -168,14 +169,12 @@ describe('global IndexedDB native journal', () => {
             atomicUndo: { 'indexed-db': images }
           }
         }),
-        indexedDbBackendPlugin(
-          {
-            factory: new IDBFactory(),
-            keyRange: IDBKeyRange,
-            journalFactoryIsPrivate: true
-          },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          journalFactoryIsPrivate: true,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     try {
@@ -256,10 +255,12 @@ describe('global IndexedDB native journal', () => {
               atomicUndo: { 'indexed-db': images }
             }
           }),
-          indexedDbBackendPlugin(
-            { factory: new IDBFactory(), keyRange: IDBKeyRange, journalFactoryIsPrivate: true },
-            { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature() }
-          )
+          indexedDbBackendPlugin({
+            factory: new IDBFactory(),
+            keyRange: IDBKeyRange,
+            journalFactoryIsPrivate: true,
+            features: { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature() }
+          })
         ]
       })
       try {

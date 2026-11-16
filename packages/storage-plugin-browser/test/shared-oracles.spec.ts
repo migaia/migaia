@@ -51,7 +51,7 @@ describe('shared oracle clusters', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const entityEntityPluginHost = await entityEntityPluginBackendHost.use(entityEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repository = entityEntityPluginHost.extensions[entityEntityPlugin.id](
+    const repository = entityEntityPluginHost.extensions[entityEntityPlugin.name](
       entityEntityPluginBackendStore
     )
     await repository.put({ id: 'u2', email: 'same@example.com', tags: ['staff'] })

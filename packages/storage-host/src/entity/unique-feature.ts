@@ -1,8 +1,8 @@
 import { snapshotEntityIndexes } from './index-projection.ts'
 import { EntityFeatureName } from './constants.ts'
 import { EntityUniqueOwner } from './unique-owner.ts'
-import { defineFeature } from '../contracts.ts'
-import { entityUnitTarget, registerEntityUnit } from './assembly.ts'
+import { defineFeature } from '@migaia/plugin-host/features'
+import { registerEntityUnit } from './assembly.ts'
 import type { IEntityPluginOptions } from './types.ts'
 
 /** Unique-only assembly snapshots indexes without implicitly enabling index planning. */
@@ -30,6 +30,6 @@ function installEntityUnique() {
 /** Explicitly assemble entity unique; omission keeps its owner outside the base import graph. */
 export function entityUniqueFeature() {
   /** Metadata declares this unit's role; all mutable state belongs to its native output. */
-  const feature = defineFeature(entityUnitTarget, installEntityUnique)
+  const feature = defineFeature(installEntityUnique)
   return registerEntityUnit(feature, EntityFeatureName.unique, configureEntityUnique)
 }

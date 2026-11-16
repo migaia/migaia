@@ -28,13 +28,15 @@ it('invalidates every cache org after the PostgreSQL root feed emits reset', asy
   await pool.query('SELECT pg_create_logical_replication_slot($1,$2)', [slot, 'pgoutput'])
   const base = await createStorageHost({
     plugins: [
-      memoryBackendPlugin({ id: 'upper' }),
-      postgresBackendPlugin(
-        { id: 'lower', driver: pgDriver(pool), prefix },
-        {
+      memoryBackendPlugin({ name: 'upper' }),
+      postgresBackendPlugin({
+        name: 'lower',
+        driver: pgDriver(pool),
+        prefix,
+        features: {
           replication: pgLogicalReplicationFeature({ slot, publication })
         }
-      )
+      })
     ] as const
   })
   const host = await base.use(

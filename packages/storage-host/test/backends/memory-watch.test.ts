@@ -42,9 +42,11 @@ describe('memory native text watch', () => {
   it('reports late observer rejection once while preserving root and organization commits', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -75,9 +77,11 @@ describe('memory native text watch', () => {
   it('exposes genuine text watch and coalesces only unconsumed matching invalidations', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -108,9 +112,11 @@ describe('memory native text watch', () => {
     await using host = await createStorageHost({
       org: defaultOrg,
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -137,9 +143,11 @@ describe('memory native text watch', () => {
   it('binds all three native query watches and rejects client predicates before subscribing', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -177,9 +185,11 @@ describe('memory native text watch', () => {
   it('wakes concurrent pending next calls on disposal and preserves main and symbolic promise identities', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -200,9 +210,11 @@ describe('memory native text watch', () => {
   it('retains original cancellation reasons, timeout and root-close failures without leaving reads pending', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })

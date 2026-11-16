@@ -17,10 +17,11 @@ it('routes the same text, record and selected vector identities to their immutab
   const host = await createStorageHost({
     org: defaultOrgId,
     plugins: [
-      postgresBackendPlugin(
-        { driver: pgDriver(pool), prefix: 'pg_org_' + randomUUID().slice(0, 8) },
-        { vector: pgvectorFeature(), copy: pgCopyFeature() }
-      )
+      postgresBackendPlugin({
+        driver: pgDriver(pool),
+        prefix: 'pg_org_' + randomUUID().slice(0, 8),
+        features: { vector: pgvectorFeature(), copy: pgCopyFeature() }
+      })
     ] as const
   })
   onTestFinished(async () => {
@@ -85,7 +86,11 @@ it('shares native collections and drops their historical org rows without select
     createStorageHost({
       org: randomUUID(),
       plugins: [
-        postgresBackendPlugin({ driver: pgDriver(pool), prefix }, { vector: pgvectorFeature() })
+        postgresBackendPlugin({
+          driver: pgDriver(pool),
+          prefix,
+          features: { vector: pgvectorFeature() }
+        })
       ] as const
     })
   const first = await makeHost()

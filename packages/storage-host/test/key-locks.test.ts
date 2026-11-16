@@ -21,14 +21,15 @@ import {
 } from '../src/authoring/concurrency.ts'
 import {
   createStorageHost,
-  definePlugin,
-  defineStorageBackendKind,
   StorageError,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendType,
+  type IStorageBackendPluginDefiner
 } from '../src/index.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import type { IBackendKeyLockPort, IBackendChangeController } from '../src/authoring/backend.ts'
 import { catalog } from './helpers/catalog.ts'
+import { defineBackendPlugin } from '../src/sdk.ts'
 
 /** The actual native catalog and original transaction metadata supply one real installation. */
 async function fixture(shared?: IBackendKeyLockPort) {
@@ -41,10 +42,11 @@ async function fixture(shared?: IBackendKeyLockPort) {
   /** The actual controller owns direct closure and the original native map cleanup. */
   let controller!: IBackendChangeController
   /** Kind identity is independent of the native client's diagnostic name. */
-  const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store']>()('catalog')
+  type IKindBackend = IStorageBackendType<ReturnType<typeof catalog>['store'], undefined>
+  /** Backend-plugin definer typed for this test backend. */
+  const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
   /** Named descriptor retains actual store inference without granting a standalone constructor. */
   const descriptor = (core: IStoragePluginCore) => ({
-    kind,
     featureExpose: () => ({ getClient: () => undefined }),
     install: () => {
       installedCore = core
@@ -67,7 +69,9 @@ async function fixture(shared?: IBackendKeyLockPort) {
     }
   })
   /** The physical owner is explicit in each test; core creation does not auto-close a shared port. */
-  const host = await createStorageHost({ plugins: [definePlugin('locks', descriptor)] })
+  const host = await createStorageHost({
+    plugins: [defineKindBackend({ name: 'locks', open: descriptor })]
+  })
   return { host, port, state, core: installedCore, controller }
 }
 

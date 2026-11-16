@@ -2,6 +2,7 @@ import type { IBackendValueCommit } from './core/backend-registry.ts'
 import type { IBackendRevisionPort } from './backends/revisions.ts'
 import type { IBackendKeyLockPort } from './backends/key-locks.ts'
 import type { IStorageHooks } from './hook-types.ts'
+import type { StorageReactiveVisibility } from './state-constants.ts'
 import type { IStorageHookEmitter } from './hooks.ts'
 import type {
   IPluginHostCore,
@@ -82,40 +83,60 @@ export type IStorageExecutionPort = {
     invoke: (input: TInput) => TResult
   ): TResult
 }
-/** Type carrier mirrors private kind identity without granting it. */
-declare const storageBackendKindBrand: unique symbol
-/** Retain a Feature target while runtime identity remains private. */
+/** Carries a backend's Store, client and expose types; no value of this type exists at runtime. */
+declare const storageBackendTypeBrand: unique symbol
+/** Records, on a Feature's type, which backend types the Feature extends. */
 declare const storageFeatureTargetBrand: unique symbol
-/** Private native-unit targets carry only their required expose contract in declarations. */
-declare const storageUnitTargetBrand: unique symbol
-/** Internal targets share native Feature identity checks without pretending to be a backend. */
-export type IStorageUnitTarget<TExpose extends object> = Readonly<{
-  readonly [storageUnitTargetBrand]: TExpose
-}>
 /** Preserve the actual installed backend and selected roots in declarations. */
 declare const storageBackendPluginBrand: unique symbol
-export type IStorageBackendKind<
-  TName extends string = string,
+/**
+ * Type-only description of one storage engine: the Store its plugin hands over, the native client
+ * its Features receive and the extra methods its `featureExpose` adds. A backend package declares
+ * one and uses it to type its plugin factory and its Feature definer.
+ */
+export type IStorageBackendType<
   TStore extends IStorageBase = IStorageBase,
   TClient = unknown,
   TExpose extends object = {}
 > = {
-  readonly name: TName
-  readonly [storageBackendKindBrand]: {
+  readonly [storageBackendTypeBrand]: {
     readonly store: TStore
     readonly client: TClient
     readonly expose: TExpose
   }
 }
-export type IStorageKindStore<K extends IStorageBackendKind> =
-  K[typeof storageBackendKindBrand]['store']
-export type IStorageKindClient<K extends IStorageBackendKind> =
-  K[typeof storageBackendKindBrand]['client']
-export type IStorageKindExpose<K extends IStorageBackendKind> =
-  K[typeof storageBackendKindBrand]['expose']
+/** Observation scope of a backend's changes, from this instance to eventual same-origin visibility. */
+export type IStorageReactiveVisibility =
+  (typeof StorageReactiveVisibility)[keyof typeof StorageReactiveVisibility]
+/** How a live query observes one backend: by notification, by polling, or by both. */
+export type IStorageReactiveProfile = {
+  /**
+   * Push uses notifications only; hybrid adds periodic reconciliation; polling uses periodic
+   * reconciliation.
+   */
+  readonly mode: 'push' | 'hybrid' | 'polling'
+  /** Declared observation scope of this backend's changes. */
+  readonly visibility: IStorageReactiveVisibility
+  /** Required positive finite milliseconds for hybrid and polling; forbidden for push. */
+  readonly pollIntervalMs?: number
+}
+/**
+ * `featureExpose` member by which a backend states its own live-query profile. `hasController` says
+ * whether a change controller is installed; a backend that cannot observe without one throws here.
+ */
+export type IStorageReactiveProfileExpose = {
+  reactiveProfile(hasController: boolean): IStorageReactiveProfile
+}
+export type IStorageBackendTypeStore<B extends IStorageBackendType> =
+  B[typeof storageBackendTypeBrand]['store']
+export type IStorageBackendTypeClient<B extends IStorageBackendType> =
+  B[typeof storageBackendTypeBrand]['client']
+export type IStorageBackendTypeExpose<B extends IStorageBackendType> =
+  B[typeof storageBackendTypeBrand]['expose']
+/** One backend type, or a non-empty tuple when a Feature works on several backends. */
 export type IStorageFeatureTarget =
-  | IStorageBackendKind
-  | readonly [IStorageBackendKind, ...IStorageBackendKind[]]
+  | IStorageBackendType
+  | readonly [IStorageBackendType, ...IStorageBackendType[]]
 /** Borrowing retains the admitted store surface without lifecycle ownership. */
 export type IStorageBorrowedBackend<S extends IStorageBase = IStorageStore<never>> = Omit<
   S,
@@ -166,16 +187,15 @@ export type IStorageOrgAuthoringPort = Pick<
   | 'registerChangeController'
   | 'registerValueCommit'
 >
-type ITargetKind<T extends IStorageFeatureTarget> = T extends readonly IStorageBackendKind[]
+type ITargetBackend<T extends IStorageFeatureTarget> = T extends readonly IStorageBackendType[]
   ? T[number]
-  : T extends IStorageBackendKind
+  : T extends IStorageBackendType
     ? T
     : never
-export type IStorageFeatureExpose<K extends IStorageBackendKind> = K extends IStorageBackendKind
+export type IStorageFeatureExpose<K extends IStorageBackendType> = K extends IStorageBackendType
   ? Readonly<{
-      getKind(): K
-      getStore(): IStorageKindStore<K>
-      getClient(): IStorageKindClient<K>
+      getStore(): IStorageBackendTypeStore<K>
+      getClient(): IStorageBackendTypeClient<K>
       getChangeController(): IBackendChangeController | undefined
       getBackendId(): string
       getLifecycle(): IPluginRegistrationContext
@@ -185,7 +205,7 @@ export type IStorageFeatureExpose<K extends IStorageBackendKind> = K extends ISt
       emit: IStorageHookEmitter
       registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
     }> &
-      IStorageKindExpose<K>
+      IStorageBackendTypeExpose<K>
   : never
 type IStorageMethodExpose<E extends object> = {
   [P in keyof E]: P extends string
@@ -194,10 +214,9 @@ type IStorageMethodExpose<E extends object> = {
       : never
     : never
 }
-export type IStorageDescriptorFeatureExpose<K extends IStorageBackendKind> = Readonly<{
-  getClient(): IStorageKindClient<K>
+export type IStorageDescriptorFeatureExpose<K extends IStorageBackendType> = Readonly<{
+  getClient(): IStorageBackendTypeClient<K>
   getChangeController?: never
-  getKind?: never
   getStore?: never
   getBackendId?: never
   getLifecycle?: never
@@ -207,19 +226,19 @@ export type IStorageDescriptorFeatureExpose<K extends IStorageBackendKind> = Rea
   emit?: never
   registerDetect?: never
 }> &
-  IStorageKindExpose<K> &
-  IStorageMethodExpose<IStorageKindExpose<K>>
-type ITransactionClientGetter<K extends IStorageBackendKind> =
-  IStorageKindExpose<K> extends { getTransactionClient: infer G }
+  IStorageBackendTypeExpose<K> &
+  IStorageMethodExpose<IStorageBackendTypeExpose<K>>
+type ITransactionClientGetter<K extends IStorageBackendType> =
+  IStorageBackendTypeExpose<K> extends { getTransactionClient: infer G }
     ? Extract<G, (...args: never[]) => unknown>
     : never
-export type IStorageKindTransactionClient<K extends IStorageBackendKind> = ReturnType<
+export type IStorageBackendTransactionClient<K extends IStorageBackendType> = ReturnType<
   ITransactionClientGetter<K>
 >
-export type IStorageKindTransactionScope<K extends IStorageBackendKind> = Parameters<
+export type IStorageBackendTransactionScope<K extends IStorageBackendType> = Parameters<
   ITransactionClientGetter<K>
 >[0]
-type IWithoutTransactionClient<K> = K extends IStorageBackendKind
+type IWithoutTransactionClient<K> = K extends IStorageBackendType
   ? [ITransactionClientGetter<K>] extends [never]
     ? K
     : never
@@ -271,17 +290,17 @@ type IContextualApi<T extends IStorageFeatureTarget, O extends IStorageFeatureOu
     IContextualApiGroup<
       O['api']['store'],
       IStorageFeatureCallContext<
-        IStorageKindClient<ITargetKind<T>>,
-        IStorageKindStore<ITargetKind<T>>
+        IStorageBackendTypeClient<ITargetBackend<T>>,
+        IStorageBackendTypeStore<ITargetBackend<T>>
       >
     >
   readonly transaction: O['api']['transaction'] &
     IContextualApiGroup<
       O['api']['transaction'],
       IStorageFeatureCallContext<
-        IStorageKindTransactionClient<ITargetKind<T>>,
-        IStorageKindStore<ITargetKind<T>>,
-        IStorageKindTransactionScope<ITargetKind<T>>
+        IStorageBackendTransactionClient<ITargetBackend<T>>,
+        IStorageBackendTypeStore<ITargetBackend<T>>,
+        IStorageBackendTransactionScope<ITargetBackend<T>>
       >
     >
 }
@@ -290,22 +309,22 @@ type ITransactionApiCompatibility<
   O extends IStorageFeatureOutput
 > = keyof O['api']['transaction'] extends never
   ? unknown
-  : [IWithoutTransactionClient<ITargetKind<T>>] extends [never]
+  : [IWithoutTransactionClient<ITargetBackend<T>>] extends [never]
     ? unknown
     : { readonly storageFeatureTransactionClientMissing: never }
 export type IStorageFeature<
   T extends IStorageFeatureTarget = IStorageFeatureTarget,
   O extends IStorageFeatureOutput = IStorageFeatureOutput,
   D extends IFeatureDependencyRecord = IFeatureDependencyRecord
-> = IFeature<IStorageFeatureExpose<ITargetKind<T>>, O, D> & {
-  readonly [storageFeatureTargetBrand]: ITargetKind<T>
+> = IFeature<IStorageFeatureExpose<ITargetBackend<T>>, O, D> & {
+  readonly [storageFeatureTargetBrand]: ITargetBackend<T>
 }
 export type IStorageFeatureRecord = Readonly<Record<string, IStorageFeature>>
 type IDependencyCompatibility<K, D extends IFeatureDependencyRecord> = {
   [N in keyof D]: D[N] extends { readonly [storageFeatureTargetBrand]: infer Target }
     ? [K] extends [Target]
       ? unknown
-      : { readonly storageFeatureDependencyBackendKindMismatch: never }
+      : { readonly storageFeatureDependencyBackendMismatch: never }
     : { readonly storageFeatureDependencyTargetMissing: never }
 }
 type IOutput<F> = F extends {
@@ -335,19 +354,19 @@ type IFeatureImplementations<F extends IStorageFeatureRecord> = IOutput<
   F[keyof F]
 >['capabilities'][number]
 export type IStorageFeatureStoreCompatibility<
-  K extends IStorageBackendKind,
+  K extends IStorageBackendType,
   F extends IStorageFeatureRecord,
-  S extends IStorageBase = IStorageKindStore<K>
+  S extends IStorageBase = IStorageBackendTypeStore<K>
 > = {
   [N in keyof F]: K extends F[N][typeof storageFeatureTargetBrand]
     ? S extends ReturnType<F[N]['__feature']['expose']['getStore']>
       ? unknown
       : { readonly storageFeatureStoreMustSatisfyRequiredExpose: never }
-    : { readonly storageFeatureBackendKindMismatch: never }
+    : { readonly storageFeatureBackendMismatch: never }
 }
 // Preserve the existing core fields at implementation; this changed-surface projection has no new execution mechanism.
 export type IStoragePipelineInput = IStorageExecutionRequest<unknown> &
-  Readonly<{ backendId: string; backend: string; orgId: string }>
+  Readonly<{ backendId: string; orgId: string }>
 export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
   IPluginHostCore<IStoragePipelineInput>,
   'operation' | 'lifecycle' | 'onDispose' | 'usePipeline' | 'useAsyncPipeline'
@@ -397,13 +416,9 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     getStore(): IStorageBase
     getBackendId(): string
     readonly features: IFeatureOutputs<F>
-    readonly featureExpose: IStorageFeatureExpose<IStorageBackendKind>
+    readonly featureExpose: IStorageFeatureExpose<IStorageBackendType>
   }
-export type IStorageNativePluginDescriptor<
-  K extends IStorageBackendKind = IStorageBackendKind,
-  S extends IStorageBase = IStorageBase
-> = {
-  readonly kind?: K
+export type IStorageNativePluginDescriptor<S extends IStorageBase = IStorageBase> = {
   install?():
     | (object & ThisType<IStoragePluginCallContext>)
     | PromiseLike<object & ThisType<IStoragePluginCallContext>>
@@ -442,31 +457,29 @@ type IDescriptorStore<D extends IStorageNativePluginDescriptor> =
       : IStorageBase
     : IStorageBase
 type IDescriptorCompatibility<
-  D extends IStorageNativePluginDescriptor & {
-    readonly kind: IStorageBackendKind
-    featureExpose(): object
-  }
+  B extends IStorageBackendType,
+  D extends IStorageNativePluginDescriptor & { featureExpose(): object }
 > =
-  ReturnType<D['featureExpose']> extends IStorageDescriptorFeatureExpose<D['kind']>
+  ReturnType<D['featureExpose']> extends IStorageDescriptorFeatureExpose<B>
     ? unknown
     : { readonly storageFeatureExposeMismatch: never }
 export type IStorageBackendPluginHandle<
   E extends object = {},
   S extends IStorageBase = IStorageBase
 > = {
-  readonly id: string
+  readonly name: string
   readonly [storageBackendPluginBrand]: { readonly store: S }
   readonly [storageBackendPluginExtensionsBrand]: E
 }
 export type IStorageBackendPlugin<
-  K extends IStorageBackendKind = IStorageBackendKind,
+  K extends IStorageBackendType = IStorageBackendType,
   N extends string = string,
   F extends IStorageFeatureRecord = {},
-  S extends IStorageBase = IStorageKindStore<K>
+  S extends IStorageBase = IStorageBackendTypeStore<K>
 > = IStorageBackendPluginHandle<{}, S> & {
-  readonly id: N
+  readonly name: N
   readonly [storageBackendPluginBrand]: {
-    readonly kind: K
+    readonly backend: K
     readonly features: F
     readonly store: S
   }
@@ -553,10 +566,10 @@ type IPluginStore<P> =
 export type IPluginStoreMap<P extends readonly IStorageBackendPluginHandle[]> = {
   readonly [V in P[number] as IPluginStore<V> extends never
     ? never
-    : IStoragePluginId<V>]: IPluginStore<V>
+    : IStoragePluginName<V>]: IPluginStore<V>
 }
-/** Return one literal plugin id, excluding widened names and unions. */
-export type IStoragePluginId<P> = P extends { readonly id: infer N extends string }
+/** Return one literal plugin name, excluding widened names and unions. */
+export type IStoragePluginName<P> = P extends { readonly name: infer N extends string }
   ? IIsSingletonString<N> extends true
     ? N
     : never
@@ -569,29 +582,6 @@ type IIsSingletonString<T extends string> = string extends T
   : IIsUnion<T> extends true
     ? false
     : true
-/** Static duplicate rejection mirrors the original runtime batch check. */
-type IHasDuplicatePluginIds<
-  P extends readonly IStorageBackendPluginHandle[],
-  Seen extends string = never
-> = P extends readonly [infer H, ...infer R]
-  ? H extends { readonly id: infer N extends string }
-    ? N extends Seen
-      ? true
-      : R extends readonly IStorageBackendPluginHandle[]
-        ? IHasDuplicatePluginIds<R, Seen | N>
-        : false
-    : false
-  : false
-/** Reject a new tuple that collides with an installed literal id. */
-export type IRejectInstalledOrDuplicateIds<
-  Installed extends object,
-  P extends readonly IStorageBackendPluginHandle[]
-> =
-  Extract<IStoragePluginId<P[number]>, keyof Installed & string> extends never
-    ? IHasDuplicatePluginIds<P> extends true
-      ? never
-      : P
-    : never
 /** Construction captures timing and diagnostic ownership before a plugin runs. */
 export type IStorageHostOptions = {
   readonly org?: string
@@ -600,10 +590,10 @@ export type IStorageHostOptions = {
   readonly scheduler?: IScheduler
   readonly report?: (error: unknown) => void | PromiseLike<void>
 }
-/** Exact initial tuple participates in duplicate admission and store inference. */
+/** Exact initial tuple participates in store inference. */
 export type IStorageHostCreateOptions<P extends readonly IStorageBackendPluginHandle[]> =
   IStorageHostOptions & {
-    readonly plugins?: IRejectInstalledOrDuplicateIds<{}, P>
+    readonly plugins?: P
   }
 /** Only an actual statically selected undo extension adds the public undo business method. */
 type IStorageJournalUndoSurface<J> = (
@@ -646,13 +636,13 @@ export type IStorageHost<
       : undefined
   }
   use<const Next extends readonly IStorageBackendPluginHandle[]>(
-    ...plugins: IRejectInstalledOrDuplicateIds<{ [N in IStoragePluginId<P[number]>]: true }, Next>
+    ...plugins: Next
   ): Promise<IStorageHost<readonly [...P, ...Next], J>>
   /**
-   * Remove one installed plugin by id and release its resources. Rejects while another plugin
+   * Remove one installed plugin by name and release its resources. Rejects while another plugin
    * borrows the backend (BACKEND_IN_USE). The static host type keeps listing the plugin.
    */
-  unUse(id: IStoragePluginId<P[number]>): Promise<void>
+  unUse(id: IStoragePluginName<P[number]>): Promise<void>
   backend<N extends keyof IPluginStoreMap<P> & string>(
     id: N
   ): IPluginStoreMap<P>[N] & IStorageJournalUndoSurface<J>
@@ -692,102 +682,75 @@ export type IStorageOrgView<
   >
 }
 
-/** Keeps higher-order factory inference in the defining module. */
-export type IStorageDefinePlugin = {
-  <const N extends string, const F extends IFeatureRecord, E extends Record<string, unknown>>(
-    name: N,
-    descriptorFactory: (
-      core: Pick<IPluginHostCore<IStoragePipelineInput>, 'lifecycle'> &
-        Readonly<{ features: IFeatureOutputs<F> }>
-    ) => Readonly<{ install(): E }>,
-    features: F,
-    target: IStorageUnitTarget<Record<never, never>>
-  ): IStorageBackendPluginHandle<E> & Readonly<{ id: N }>
-  <
-    const N extends string,
-    const Factory extends (core: IStoragePluginCore<F>) => IStorageNativePluginDescriptor & {
-      readonly kind: IStorageBackendKind
-      featureExpose(): object
-    },
-    const F extends IStorageFeatureRecord = {}
-  >(
-    name: N,
-    descriptorFactory: Factory & IDescriptorCompatibility<ReturnType<NoInfer<Factory>>>,
-    features?: F &
-      IStorageFeatureStoreCompatibility<
-        ReturnType<NoInfer<Factory>>['kind'],
-        NoInfer<F>,
-        IDescriptorStore<ReturnType<NoInfer<Factory>>>
-      >
-  ): IStorageBackendPlugin<
-    ReturnType<Factory>['kind'],
-    N,
-    F,
-    IDescriptorStore<ReturnType<Factory>>
-  > & {
-    readonly [storageBackendPluginExtensionsBrand]: IStorageNativePluginExtensions<
-      ReturnType<Factory>
-    >
-  }
-  <
-    const N extends string,
-    const Factory extends (
-      core: Pick<
-        IStoragePluginCore,
-        | 'operation'
-        | 'lifecycle'
-        | 'onDispose'
-        | 'usePipeline'
-        | 'useAsyncPipeline'
-        | 'execution'
-        | 'defaultOrgId'
-        | 'hooks'
-        | 'subscribeStorageHook'
-        | 'emit'
-        | 'registerDetect'
-        | 'getPublishedBackend'
-        | 'createChangeController'
-        | 'registerJournalRuntime'
-        | 'getOrgContext'
-      > & { readonly features: IFeatureOutputs<F> }
-    ) => IStorageNativePluginDescriptor & { readonly kind?: never },
-    const F extends IFeatureRecord = {}
-  >(
-    name: N,
-    descriptorFactory: Factory,
-    features?: F
-  ): IStorageBackendPluginHandle<IStorageNativePluginExtensions<ReturnType<Factory>>> & {
-    readonly id: N
-  }
+/** Core handed to a plugin that owns no Store. */
+type IStoragePlainPluginCore<F extends IFeatureRecord> = Pick<
+  IStoragePluginCore,
+  | 'operation'
+  | 'lifecycle'
+  | 'onDispose'
+  | 'usePipeline'
+  | 'useAsyncPipeline'
+  | 'execution'
+  | 'defaultOrgId'
+  | 'hooks'
+  | 'subscribeStorageHook'
+  | 'emit'
+  | 'registerDetect'
+  | 'getPublishedBackend'
+  | 'createChangeController'
+  | 'registerJournalRuntime'
+  | 'getOrgContext'
+> & { readonly features: IFeatureOutputs<F> }
+
+/** Signature of `definePlugin`: a plugin that owns no Store. */
+export type IStorageDefinePlugin = <
+  const N extends string,
+  const Factory extends (core: IStoragePlainPluginCore<F>) => IStorageNativePluginDescriptor,
+  const F extends IFeatureRecord = {}
+>(definition: {
+  readonly name: N
+  readonly features?: F
+  readonly setup: Factory
+}) => IStorageBackendPluginHandle<IStorageNativePluginExtensions<ReturnType<Factory>>> & {
+  readonly name: N
 }
-/** Backend Features retain the exact target, dependencies and contextual API receiver. */
-type IStorageDefineBackendFeature = <
-  const T extends IStorageFeatureTarget,
+
+/**
+ * A backend-plugin definer for the backend type `B`. A backend package annotates
+ * `defineBackendPlugin` with its own backend type, so the name, the descriptor and the Feature
+ * record are inferred at each call while the Feature record is checked against `B`.
+ */
+export type IStorageBackendPluginDefiner<B extends IStorageBackendType> = <
+  const N extends string,
+  const Factory extends (core: IStoragePluginCore<F>) => IStorageNativePluginDescriptor & {
+    featureExpose(): object
+  },
+  const F extends IStorageFeatureRecord = {}
+>(definition: {
+  readonly name: N
+  readonly features?: F &
+    IStorageFeatureStoreCompatibility<B, NoInfer<F>, IDescriptorStore<ReturnType<NoInfer<Factory>>>>
+  readonly open: Factory & IDescriptorCompatibility<B, ReturnType<NoInfer<Factory>>>
+}) => IStorageBackendPlugin<B, N, F, IDescriptorStore<ReturnType<Factory>>> & {
+  readonly [storageBackendPluginExtensionsBrand]: IStorageNativePluginExtensions<
+    ReturnType<Factory>
+  >
+}
+
+/**
+ * A Feature definer for the backend type `T`. A backend package annotates `defineStorageFeature`
+ * with its own backend type and uses the result for every Feature it ships; the annotation is what
+ * gives `this.store`, `this.client` and `featureExpose` their types inside the factory.
+ */
+export type IStorageFeatureDefiner<T extends IStorageFeatureTarget> = <
   const D extends IFeatureDependencyRecord = {},
   O extends IStorageFeatureOutput = IStorageFeatureOutput
 >(
-  target: T,
   factory: (
-    core: { readonly featureExpose: IStorageFeatureExpose<ITargetKind<T>> },
+    core: { readonly featureExpose: IStorageFeatureExpose<ITargetBackend<T>> },
     dependencies: IFeatureOutputs<D>
   ) => O &
     IExactOutput<NoInfer<O>> &
     ITransactionApiCompatibility<T, O> & { readonly api: IContextualApi<T, O> },
-  dependencies?: D & IDependencyCompatibility<ITargetKind<T>, NoInfer<D>>
+  dependencies?: D & IDependencyCompatibility<ITargetBackend<T>, NoInfer<D>>
 ) => IStorageFeature<T, O, D>
-
-/** Entity units reuse the same target metadata and native installation as backend Features. */
-export type IStorageDefineFeature = IStorageDefineBackendFeature & {
-  <
-    TExpose extends object,
-    const D extends IFeatureRecord = {},
-    O extends object = Record<never, never>
-  >(
-    target: IStorageUnitTarget<TExpose>,
-    factory: (
-      core: { readonly featureExpose: TExpose },
-      dependencies: IFeatureOutputs<D>
-    ) => O & (O extends PromiseLike<unknown> ? never : unknown),
-    dependencies?: D
-  ): IFeature<TExpose, O, D>
-}

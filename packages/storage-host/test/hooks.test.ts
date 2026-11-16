@@ -2,12 +2,13 @@ import { storageProbe } from '../src/plugins/probe/index.ts'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createStorageHost,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendType,
+  type IStorageBackendPluginDefiner
 } from '../src/index.ts'
 import type { ICodecStageObserver, IStorageBase } from '@migaia/storage-contract'
 import { catalog } from './helpers/catalog.ts'
+import { definePlugin, defineBackendPlugin } from '../src/sdk.ts'
 
 /** One actual catalog fixture publishes the exact store used by its construction stage port. */
 function observedCatalog() {
@@ -18,12 +19,11 @@ function observedCatalog() {
   /** This stable observer exists before application listeners are registered. */
   let codec!: ICodecStageObserver
   /** The actual store and its native client determine authoring inference. */
-  const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(
-    'catalog'
-  )
+  type IKindBackend = IStorageBackendType<ReturnType<typeof catalog>['store'], Map<string, string>>
+  /** Backend-plugin definer typed for this test backend. */
+  const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
   /** Named descriptor keeps the store and original provider visible to public typing. */
   const descriptor = (current: IStoragePluginCore) => ({
-    kind,
     featureExpose: () => ({ getClient: () => state.client }),
     install: () => {
       core = current
@@ -35,7 +35,7 @@ function observedCatalog() {
     }
   })
   return {
-    plugin: definePlugin('observed', descriptor),
+    plugin: defineKindBackend({ name: 'observed', open: descriptor }),
     core: () => core,
     state: () => state,
     codec: () => codec
@@ -58,13 +58,11 @@ describe('the shared storage observation owner', () => {
     stages.onStorageOperationError?.('read', 'INVALID_ARGUMENT')
     expect(before).toHaveBeenLastCalledWith({
       backendId: 'observed',
-      backend: 'catalog',
       orgId: '00000000-0000-0000-0000-000000000000',
       operation: 'read'
     })
     expect(failed).toHaveBeenLastCalledWith({
       backendId: 'observed',
-      backend: 'catalog',
       orgId: '00000000-0000-0000-0000-000000000000',
       operation: 'read',
       code: 'INVALID_ARGUMENT'
@@ -73,14 +71,12 @@ describe('the shared storage observation owner', () => {
     stages.onStorageOperationError?.('setMany', 'INVALID_ARGUMENT', 0)
     expect(before).toHaveBeenLastCalledWith({
       backendId: 'observed',
-      backend: 'catalog',
       orgId: '00000000-0000-0000-0000-000000000000',
       operation: 'setMany',
       count: 0
     })
     expect(failed).toHaveBeenLastCalledWith({
       backendId: 'observed',
-      backend: 'catalog',
       orgId: '00000000-0000-0000-0000-000000000000',
       operation: 'setMany',
       code: 'INVALID_ARGUMENT',
@@ -117,7 +113,6 @@ describe('the shared storage observation owner', () => {
     const release = host.extensions.observe('beforeEncode', (payload) => {
       expect(payload).toEqual({
         backendId: 'observed',
-        backend: 'catalog',
         orgId: '00000000-0000-0000-0000-000000000000',
         operation: 'read',
         codec: 'json@1'
@@ -166,7 +161,6 @@ describe('the shared storage observation owner', () => {
       constructed += 1
       return {
         backendId: 'observed',
-        backend: 'catalog',
         orgId: '00000000-0000-0000-0000-000000000000',
         operation: 'read',
         codec: 'json@1'
@@ -192,7 +186,6 @@ describe('the shared storage observation owner', () => {
       constructed += 1
       return {
         backendId: 'observed',
-        backend: 'catalog',
         orgId: '00000000-0000-0000-0000-000000000000',
         parameterCount: 0,
         sqlBytes: 0
@@ -216,14 +209,17 @@ describe('the shared storage observation owner', () => {
       settle = resolve
     })
     /** Register through the actual install hook, retaining the original unsubscribe handle. */
-    const plugin = definePlugin('listener', (core) => ({
-      install: () => {
-        installedCore = core
-        core.hooks.on('beforeSql', listener)
-        core.onDispose(() => nativeEnd)
-        return {}
-      }
-    }))
+    const plugin = definePlugin({
+      name: 'listener',
+      setup: (core) => ({
+        install: () => {
+          installedCore = core
+          core.hooks.on('beforeSql', listener)
+          core.onDispose(() => nativeEnd)
+          return {}
+        }
+      })
+    })
     /** A saved public hook port must not reopen the terminal host. */
     const host = await createStorageHost({ plugins: [storageProbe(), plugin] })
     /** Reentrant cleanup must observe this same cached completion rather than start another close. */
@@ -242,7 +238,6 @@ describe('the shared storage observation owner', () => {
     /** Closing native diagnostics neither create payloads nor replace the accepted native result. */
     const payload = vi.fn(() => ({
       backendId: 'none',
-      backend: 'none',
       orgId: '00000000-0000-0000-0000-000000000000',
       parameterCount: 0,
       sqlBytes: 0
@@ -262,7 +257,6 @@ describe('the shared storage observation owner', () => {
     expect(() =>
       installedCore.emit('beforeSql', () => ({
         backendId: 'none',
-        backend: 'none',
         orgId: '00000000-0000-0000-0000-000000000000',
         parameterCount: 0,
         sqlBytes: 0

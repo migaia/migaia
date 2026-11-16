@@ -2,7 +2,7 @@ import { memoryTestFeatures } from '../helpers/memory-features.ts'
 import { createRuntime } from '@migaia/reactive'
 import { describe, expect, it } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
-import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { createStorageReactiveService } from '../../src/host/reactive.ts'
 import { createReactiveServiceFixture } from '../helpers/reactive-service.ts'
 import { reactiveFeature } from '../../src/features/reactive.ts'
@@ -12,16 +12,18 @@ import { records } from '@migaia/storage-contract'
 describe('Host capability and computed state', () => {
   it('adds live only to actual query chains selected by the reactive Feature', async () => {
     const plain = await createStorageHost({
-      plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+      plugins: [memoryBackendPlugin({ features: memoryTestFeatures })]
     })
     expect(plain).not.toHaveProperty('liveQuery')
     expect(plain.backend('memory').use(records).query()).not.toHaveProperty('live')
     await plain.dispose()
     const host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          ...memoryTestFeatures,
-          reactive: reactiveFeature(memoryBackendKind)
+        memoryBackendPlugin({
+          features: {
+            ...memoryTestFeatures,
+            reactive: reactiveFeature()
+          }
         })
       ]
     })
@@ -35,7 +37,9 @@ describe('Host capability and computed state', () => {
   it('supports dynamic use after the facade is made non-extensible', async () => {
     const host = await createStorageHost()
     Object.preventExtensions(host)
-    const plugins = [memoryBackendPlugin({ id: 'dynamic-use' }, memoryTestFeatures)] as const
+    const plugins = [
+      memoryBackendPlugin({ name: 'dynamic-use', features: memoryTestFeatures })
+    ] as const
     const installed = await host.use(...plugins)
     const installedBackends = installed.backends() as ReadonlyMap<string, unknown>
     const originalBackends = host.backends() as ReadonlyMap<string, unknown>

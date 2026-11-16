@@ -4,14 +4,12 @@ import { cachePlugin } from '@migaia/storage-plugin-cache'
 import { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'
 
 const base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]
+  plugins: [memoryBackendPlugin({ name: 'values' }), memoryBackendPlugin({ name: 'vectors' })]
 })
 const host = await base.use(
-  cachePlugin(
-    {
-      tiers: [{ backend: 'values', ttlMs: 30000 }]
-    },
-    {
+  cachePlugin({
+    tiers: [{ backend: 'values', ttlMs: 30000 }],
+    features: {
       semantic: semanticCacheFeature({
         backend: 'vectors',
         collection: 'answers',
@@ -21,7 +19,7 @@ const host = await base.use(
         embed: async () => [1, 0]
       })
     }
-  )
+  })
 )
 await host.detect()
 try {

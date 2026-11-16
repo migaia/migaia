@@ -23,7 +23,6 @@ import { assertCodec, type IStorageKey } from '@migaia/storage-contract'
 import {
   captureEntityUnitRecord,
   configureEntityUnits,
-  entityUnitTarget,
   missingEntityFeature,
   snapshotEntityUnits,
   type IInstalledRepositoryUnit,
@@ -230,7 +229,11 @@ class EntityPluginDefinition<TDomain, TStored, TId extends string> {
 
   /** Existing storage admission installs this actual native plugin, with no private Host. */
   plugin(): IEntityPlugin<TDomain, Readonly<Record<string, IStorageKey>>, TId> {
-    return definePlugin(this.#id, (core) => this.#descriptor(core), this.#record, entityUnitTarget)
+    return definePlugin({
+      name: this.#id,
+      features: this.#record,
+      setup: (core) => this.#descriptor(core)
+    }) as unknown as IEntityPlugin<TDomain, Readonly<Record<string, IStorageKey>>, TId>
   }
 
   /** One descriptor owner is created per host installation, before native feature construction. */

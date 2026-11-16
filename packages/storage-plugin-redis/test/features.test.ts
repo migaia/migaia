@@ -1,8 +1,6 @@
-import { postgresBackendPlugin, type IPgDriver } from '@migaia/storage-plugin-postgres'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createClientPool } from 'redis'
-import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
-import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { durableChangeFeed } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
 import { redisChangeStreamFeature } from '../src/features/change-stream.ts'
@@ -14,6 +12,7 @@ import { redisSortedSetsFeature } from '../src/features/sorted-sets.ts'
 import { redisRateLimitFeature } from '../src/features/rate-limit.ts'
 import { createRedisLayout } from '../src/layout.ts'
 import { namespaces } from './helpers/namespaces.ts'
+import { definePlugin } from '@migaia/storage-host/sdk'
 
 /** All native feature fixtures use fresh same-slot namespaces on actual services. */
 for (const url of [
@@ -51,10 +50,11 @@ for (const url of [
       }
       const host = await createStorageHost({
         plugins: [
-          redisBackendPlugin(
-            { driver: observed, prefix: namespaces.prefix() },
-            { pubsub: redisPubSubFeature() }
-          )
+          redisBackendPlugin({
+            driver: observed,
+            prefix: namespaces.prefix(),
+            features: { pubsub: redisPubSubFeature() }
+          })
         ] as const
       })
       try {
@@ -82,15 +82,16 @@ for (const url of [
         layoutB = createRedisLayout(prefix, b)
       const host = await createStorageHost({
         plugins: [
-          redisBackendPlugin(
-            { driver, prefix },
-            {
+          redisBackendPlugin({
+            driver,
+            prefix,
+            features: {
               streams: redisStreamsFeature(),
               sorted: redisSortedSetsFeature(),
               rate: redisRateLimitFeature({ limit: 3, windowMs: 60000 }),
               history: redisChangeStreamFeature({ maxLen: 1000 })
             }
-          )
+          })
         ] as const
       })
       try {
@@ -158,34 +159,38 @@ for (const url of [
       if (!pool.isOpen) await pool.connect()
       const commands: import('../src/hooks.ts').IRedisCommandHookPayload[] = [],
         counts = new Map<string, number>(),
-        stage = definePlugin('observe', (core) => ({
-          install() {
-            core.onDispose(
-              core.hooks.on('onRedisCommand', (payload) => {
-                commands.push(payload)
+        stage = definePlugin({
+          name: 'observe',
+          setup: (core) => ({
+            install() {
+              core.onDispose(
+                core.hooks.on('onRedisCommand', (payload) => {
+                  commands.push(payload)
+                })
+              )
+              core.useAsyncPipeline(async (input, next) => {
+                counts.set(input.operation, (counts.get(input.operation) ?? 0) + 1)
+                await next(input)
               })
-            )
-            core.useAsyncPipeline(async (input, next) => {
-              counts.set(input.operation, (counts.get(input.operation) ?? 0) + 1)
-              await next(input)
-            })
-            return {}
-          }
-        })),
+              return {}
+            }
+          })
+        }),
         prefix = namespaces.prefix(),
         host = await createStorageHost({
           plugins: [
             stage,
-            redisBackendPlugin(
-              { driver, prefix },
-              {
+            redisBackendPlugin({
+              driver,
+              prefix,
+              features: {
                 streams: redisStreamsFeature(),
                 pubsub: redisPubSubFeature(),
                 sorted: redisSortedSetsFeature(),
                 rate: redisRateLimitFeature({ limit: 3, windowMs: 10000 }),
                 history: redisChangeStreamFeature({ maxLen: 1000 })
               }
-            )
+            })
           ] as const
         }),
         store = host.backend('redis'),
@@ -197,9 +202,9 @@ for (const url of [
         expect(
           commands.every(
             (payload) =>
-              payload.backend === 'redis' &&
+              payload.backendId === 'redis' &&
               typeof payload.orgId === 'string' &&
-              Object.keys(payload).length === 5
+              Object.keys(payload).length === 4
           )
         ).toBe(true)
         expect(await api.streams.range('jobs')).toEqual([
@@ -380,60 +385,7 @@ for (const url of [
 }
 
 /** Runtime admission also rejects a deliberately type-erased wrong backend before native access. */
-it('rejects native Features on a memory backend', async () => {
-  const failure = await createStorageHost({
-    plugins: [memoryBackendPlugin({}, { streams: redisStreamsFeature() as never })] as const
-  }).then(
-    () => undefined,
-    (error) => error as unknown
-  )
-  expect(failure).toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
-  const chain: unknown[] = [failure],
-    codes: unknown[] = []
-  for (let index = 0; index < chain.length && index < 16; index++) {
-    const error = chain[index]
-    if (!(error instanceof Error)) continue
-    codes.push(Reflect.get(error, 'code'))
-    if (error.cause !== undefined) chain.push(error.cause)
-    if (error instanceof AggregateError) chain.push(...error.errors)
-  }
-  expect(codes).toContain('BACKEND_KIND_MISMATCH')
-})
-
 /**
  * A type-erased wrong Feature fails at the real PostgreSQL installation boundary before any native
  * access.
  */
-it('rejects a Redis Stream Feature on PostgreSQL before driver access', async () => {
-  let nativeCalls = 0
-  const driver: IPgDriver = {
-    async query() {
-      nativeCalls++
-      return { rows: [], rowCount: 0 }
-    },
-    async connect() {
-      nativeCalls++
-      throw new Error('Wrong Feature must be rejected before PostgreSQL acquisition')
-    }
-  }
-  const failure = await createStorageHost({
-    plugins: [
-      postgresBackendPlugin({ driver }, { streams: redisStreamsFeature() as never })
-    ] as const
-  }).then(
-    () => undefined,
-    (error) => error as unknown
-  )
-  expect(failure).toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
-  const chain: unknown[] = [failure],
-    codes: unknown[] = []
-  for (let index = 0; index < chain.length && index < 16; index++) {
-    const error = chain[index]
-    if (!(error instanceof Error)) continue
-    codes.push(Reflect.get(error, 'code'))
-    if (error.cause !== undefined) chain.push(error.cause)
-    if (error instanceof AggregateError) chain.push(...error.errors)
-  }
-  expect(codes).toContain('BACKEND_KIND_MISMATCH')
-  expect(nativeCalls).toBe(0)
-})

@@ -18,15 +18,21 @@ import { lockKey } from '../src/authoring/concurrency.ts'
 import {
   createStorageHost,
   createOrgId,
-  definePlugin,
-  defineFeature,
-  defineStorageBackendKind,
   type IStoragePluginCore,
-  type IStoragePluginCallContext
+  type IStoragePluginCallContext,
+  type IStorageBackendPluginDefiner,
+  type IStorageBackendType
 } from '../src/index.ts'
-import { memoryBackendPlugin, memoryBackendKind } from '../src/plugins/memory.ts'
+import { memoryBackendPlugin } from '../src/plugins/memory.ts'
 import { catalog } from './helpers/catalog.ts'
 import { defineEntityPlugin } from '../src/entity.ts'
+import { defineBackendPlugin, definePlugin } from '../src/sdk.ts'
+import type { IMemoryBackend } from '../src/plugins/memory.ts'
+import { defineStorageFeature } from '../src/sdk.ts'
+import type { IStorageFeatureDefiner } from '../src/index.ts'
+
+/** Feature definer typed for the imported backend. */
+const defineMemoryFeature: IStorageFeatureDefiner<IMemoryBackend> = defineStorageFeature
 
 describe('immutable storage organizations', () => {
   it('shares the configured default target and isolates two organizations and plugin namespaces', async () => {
@@ -36,20 +42,22 @@ describe('immutable storage organizations', () => {
       org: defaultOrg,
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(
-          { id: 'prefs', namespace: 'preferences' },
-          {
+        memoryBackendPlugin({
+          name: 'prefs',
+          namespace: 'preferences',
+          features: {
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           }
-        ),
-        memoryBackendPlugin(
-          { id: 'cache', namespace: 'cache' },
-          {
+        }),
+        memoryBackendPlugin({
+          name: 'cache',
+          namespace: 'cache',
+          features: {
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           }
-        )
+        })
       ]
     })
     const first = createOrgId()
@@ -104,13 +112,13 @@ describe('immutable storage organizations', () => {
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(
-          { namespace: 'notifications' },
-          {
+        memoryBackendPlugin({
+          namespace: 'notifications',
+          features: {
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           }
-        )
+        })
       ]
     })
     const first = createOrgId()
@@ -158,7 +166,7 @@ describe('immutable storage organizations', () => {
   it('binds extracted Feature, extension, borrowed backend, transaction and query methods to their original organization', async () => {
     /** A captured-root implementation must never be silently reused in another native namespace. */
     const custom = defineStorageCapability<{ identity(): Promise<string> }>()('root-sensitive')
-    const feature = defineFeature(memoryBackendKind, () => ({
+    const feature = defineMemoryFeature(() => ({
       capabilities: [implement(custom, { identity: async () => 'root-only' })],
       chain: {},
       api: {
@@ -179,24 +187,29 @@ describe('immutable storage organizations', () => {
         }
       }
     }))
-    const composition = definePlugin('composition', (core) => {
-      const memory = core.getPublishedBackend('memory')
-      return {
-        install: () => ({
-          async putBorrowed(this: IStoragePluginCallContext, key: string, value: string) {
-            await this.backend(memory).use(kv).set(key, value)
-            return this.orgId
-          }
-        })
+    const composition = definePlugin({
+      name: 'composition',
+      setup: (core) => {
+        const memory = core.getPublishedBackend('memory')
+        return {
+          install: () => ({
+            async putBorrowed(this: IStoragePluginCallContext, key: string, value: string) {
+              await this.backend(memory).use(kv).set(key, value)
+              return this.orgId
+            }
+          })
+        }
       }
     })
     const base = await createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(undefined, {
-          feature,
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            feature,
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -239,37 +252,41 @@ describe('immutable storage organizations', () => {
   it('attempts every target after one deletion fails and retains the original failure', async () => {
     const original = new Error('native deletion failed')
     const attempted: string[] = []
-    const first = memoryBackendPlugin(
-      { id: 'first' },
-      {
+    const first = memoryBackendPlugin({
+      name: 'first',
+      features: {
         notifications: memoryNotificationsFeature(),
         changeFeed: memoryChangeFeedFeature()
       }
-    )
-    const third = memoryBackendPlugin(
-      { id: 'third' },
-      {
+    })
+    const third = memoryBackendPlugin({
+      name: 'third',
+      features: {
         notifications: memoryNotificationsFeature(),
         changeFeed: memoryChangeFeedFeature()
       }
-    )
-    const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store']>()('catalog')
-    const broken = definePlugin('broken', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        const state = catalog(core)
-        core.registerStore(state.store)
-        core.registerOrgBinding(state.store, {
-          backend: () => state.store,
-          drop: async () => {
-            attempted.push('broken')
-            throw original
-          }
-        })
-        return {}
-      }
-    }))
+    })
+    type IKindBackend = IStorageBackendType<ReturnType<typeof catalog>['store'], undefined>
+    /** Backend-plugin definer typed for this test backend. */
+    const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
+    const broken = defineKindBackend({
+      name: 'broken',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => {
+          const state = catalog(core)
+          core.registerStore(state.store)
+          core.registerOrgBinding(state.store, {
+            backend: () => state.store,
+            drop: async () => {
+              attempted.push('broken')
+              throw original
+            }
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({ plugins: [storageProbe(), first, broken, third] })
     const org = createOrgId()
     await host.org(org).backend('first').set('key', 'first')
@@ -288,9 +305,11 @@ describe('immutable storage organizations', () => {
     const host = await createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -315,24 +334,27 @@ describe('immutable storage organizations', () => {
     const second = createOrgId()
     const leftStore = host.org(first).backend('memory')
     const rightStore = host.org(second).backend('memory')
-    const left = usersEntityPluginHost.extensions[usersEntityPlugin.id](leftStore)
-    const right = usersEntityPluginHost.extensions[usersEntityPlugin.id](rightStore)
+    const left = usersEntityPluginHost.extensions[usersEntityPlugin.name](leftStore)
+    const right = usersEntityPluginHost.extensions[usersEntityPlugin.name](rightStore)
     /**
      * A dynamic dependency ID has no statically known channel; this fixture explicitly declares its
      * installed memory dependency and tests the original runtime admission.
      */
-    const borrowed = definePlugin('borrowed-entity', (core) => {
-      const store = core.getPublishedBackend('memory')
-      const repository = usersEntityPluginHost.extensions[usersEntityPlugin.id](
-        store as typeof store &
-          import('../src/types.ts').IStorageBorrowedBackend<
-            import('@migaia/storage-contract').IKeyValueStore
-          >
-      )
-      return { install: () => ({ readBorrowed: (id: string) => repository.get(id) }) }
+    const borrowed = definePlugin({
+      name: 'borrowed-entity',
+      setup: (core) => {
+        const store = core.getPublishedBackend('memory')
+        const repository = usersEntityPluginHost.extensions[usersEntityPlugin.name](
+          store as typeof store &
+            import('../src/types.ts').IStorageBorrowedBackend<
+              import('@migaia/storage-contract').IKeyValueStore
+            >
+        )
+        return { install: () => ({ readBorrowed: (id: string) => repository.get(id) }) }
+      }
     })
     const composed = await host.use(borrowed)
-    await usersEntityPluginHost.extensions[usersEntityPlugin.id](host.backend('memory')).put({
+    await usersEntityPluginHost.extensions[usersEntityPlugin.name](host.backend('memory')).put({
       id: 'default',
       email: 'default@example.test'
     })
@@ -358,10 +380,10 @@ describe('immutable storage organizations', () => {
     })
     /** Shape forwarding alone cannot copy the original host's exact identity admission. */
     expect(() =>
-      usersEntityPluginHost.extensions[usersEntityPlugin.id]({ ...leftStore })
+      usersEntityPluginHost.extensions[usersEntityPlugin.name]({ ...leftStore })
     ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
     expect(() =>
-      usersEntityPluginHost.extensions[usersEntityPlugin.id](new Proxy(leftStore, {}))
+      usersEntityPluginHost.extensions[usersEntityPlugin.name](new Proxy(leftStore, {}))
     ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
     expect('dispose' in leftStore).toBe(false)
     const captured = left.query()

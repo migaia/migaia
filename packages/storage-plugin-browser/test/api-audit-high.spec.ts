@@ -64,7 +64,7 @@ describe('storage-plugin-browser audit high severity regressions', () => {
       /** Install once on the real fixture host and retain exact extension inference. */
       const oldEntityPluginHost = await storeHost.use(oldEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const old = oldEntityPluginHost.extensions[oldEntityPlugin.id](store)
+      const old = oldEntityPluginHost.extensions[oldEntityPlugin.name](store)
       await old.put({ id: 'row', value: 'old' })
       /** The complete v2 graph is valid independently of the race. */
       const upgradedEntityPlugin = defineEntityPlugin<{ id: string; value: string }>()(
@@ -93,7 +93,7 @@ describe('storage-plugin-browser audit high severity regressions', () => {
       /** Install once on the real fixture host and retain exact extension inference. */
       const upgradedEntityPluginHost = await storeHost.use(upgradedEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const upgraded = upgradedEntityPluginHost.extensions[upgradedEntityPlugin.id](store)
+      const upgraded = upgradedEntityPluginHost.extensions[upgradedEntityPlugin.name](store)
       /** Migration captures old data before the competing write. */
       const migrating = upgraded.migrate({ batchSize: 1 })
       await reached
@@ -125,7 +125,7 @@ describe('storage-plugin-browser audit high severity regressions', () => {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await storeHost.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const users = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+      const users = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
       await users.put({ id: 'first', email: 'same' })
       await expect(users.put({ id: 'second', email: 'same' })).rejects.toMatchObject({
         source: 'storage.host',

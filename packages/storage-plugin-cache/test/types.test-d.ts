@@ -1,9 +1,8 @@
-import { cacheBackendKind, cacheKey, type ICacheOptions, type ICacheStore } from '../src/index.ts'
+import { cacheKey, type ICacheOptions, type ICacheStore } from '../src/index.ts'
 import { kv } from '@migaia/storage-contract'
 /** Configuration and business declarations preserve the exact common value and token domains. */
 const options: ICacheOptions = { tiers: [{ backend: 'memory', ttlMs: 1000 }], random: () => 0.5 }
 void options
-void cacheBackendKind
 const key: Promise<string> = cacheKey('model', { version: 1 })
 void key
 declare const store: ICacheStore

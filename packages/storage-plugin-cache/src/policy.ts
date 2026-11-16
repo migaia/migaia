@@ -20,7 +20,7 @@ export function duration(value: unknown, tier?: number): number | undefined {
   return value
 }
 /** Capture options before any backend is borrowed or modified. */
-export function snapshotCacheOptions(options: ICacheOptions & { readonly id?: string }) {
+export function snapshotCacheOptions(options: ICacheOptions & { readonly name?: string }) {
   try {
     return readSnapshotCacheOptions(options)
   } catch (cause) {
@@ -31,11 +31,11 @@ export function snapshotCacheOptions(options: ICacheOptions & { readonly id?: st
 }
 
 /** Validate options; reads happen inside the caller's getter-failure boundary. */
-function readSnapshotCacheOptions(options: ICacheOptions & { readonly id?: string }) {
+function readSnapshotCacheOptions(options: ICacheOptions & { readonly name?: string }) {
   if (typeof options !== 'object' || options === null || Array.isArray(options))
     throw cacheError(CacheErrorCode.tierInvalid)
   const {
-    id = CacheText.backend,
+    name: id = CacheText.backend,
     tiers: input,
     prefix = `cache:${id}:`,
     maxAgeMs,

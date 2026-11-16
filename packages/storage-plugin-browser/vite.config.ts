@@ -20,7 +20,9 @@ const isRuntimeExternal = (id: string): boolean =>
 
 /** Produces runtime-neutral ESM entries; declarations are emitted by TypeScript. */
 export default defineConfig({
-  cacheDir: fileURLToPath(new URL('../../node_modules/.vite/storage-plugin-browser', import.meta.url)),
+  cacheDir: fileURLToPath(
+    new URL('../../node_modules/.vite/storage-plugin-browser', import.meta.url)
+  ),
   build: {
     target: 'es2022',
     lib: {

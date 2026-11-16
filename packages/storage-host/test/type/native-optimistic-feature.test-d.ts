@@ -1,9 +1,9 @@
 import {
   createStorageHost,
-  defineFeature,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendPluginDefiner,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner
 } from '../../src/index.ts'
 import { ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
 import {
@@ -13,6 +13,7 @@ import {
   type IOptimisticTransactionBuilder,
   type ICapabilityInstallPort
 } from '@migaia/storage-contract'
+import { defineBackendPlugin, defineStorageFeature } from '../../src/sdk.ts'
 
 /** The native RDF-only scope has no KV methods or key-lock surface to manufacture. */
 type INativeScope = {
@@ -26,12 +27,17 @@ type INativeStore = IStorageStore<typeof rdf> & {
 }
 declare const nativeStore: INativeStore
 declare const installer: ICapabilityInstallPort
-const nativeKind = defineStorageBackendKind<
+type INativeKindBackend = IStorageBackendType<
   INativeStore,
   undefined,
   { getTransactionClient(scope: INativeScope): undefined }
->()('native-rdf')
-const feature = defineFeature(nativeKind, () => ({
+>
+/** Feature definer typed for this test backend. */
+const defineNativeKindFeature: IStorageFeatureDefiner<INativeKindBackend> = defineStorageFeature
+/** Backend-plugin definer typed for this test backend. */
+const defineNativeKindBackend: IStorageBackendPluginDefiner<INativeKindBackend> =
+  defineBackendPlugin
+const feature = defineNativeKindFeature(() => ({
   capabilities: [],
   chain: {
     query: {
@@ -59,10 +65,10 @@ const feature = defineFeature(nativeKind, () => ({
     }
   }
 }))
-const plugin = definePlugin(
-  'native-rdf',
-  (core: IStoragePluginCore) => ({
-    kind: nativeKind,
+const plugin = defineNativeKindBackend({
+  name: 'native-rdf',
+  features: { feature },
+  open: (core: IStoragePluginCore) => ({
     featureExpose: () => ({
       getClient: () => undefined,
       getTransactionClient: (_scope: INativeScope) => undefined
@@ -72,9 +78,8 @@ const plugin = definePlugin(
       core.registerStore(nativeStore)
       return {}
     }
-  }),
-  { feature }
-)
+  })
+})
 const host = await createStorageHost({ plugins: [plugin] })
 const builder = host.backend('native-rdf').tx().mark()
 const nativeLiteral: 'native-builder' = builder.nativeBuilder()

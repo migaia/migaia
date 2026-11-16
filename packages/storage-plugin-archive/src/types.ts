@@ -42,7 +42,8 @@ export type IArchiveApi<N extends string = 'archive'> = {
 }
 /** Both backends must already be published by an earlier installation batch. */
 export type IArchivePluginOptions<T = ICollectionsCodecValue> = {
-  readonly id: string
+  /** Plugin name; it prefixes the archive methods and scopes the manifest keys. */
+  readonly name: string
   readonly hot: string
   readonly cold: string
   readonly rules: readonly IArchiveRule<T>[]

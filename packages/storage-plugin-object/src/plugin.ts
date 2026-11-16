@@ -1,12 +1,14 @@
 import type { S3Client } from '@aws-sdk/client-s3'
 import {
-  definePlugin,
-  defineStorageBackendKind,
   type IStorageBackendPlugin,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
   type IStorageFeatureRecord,
   type IStorageFeatureStoreCompatibility,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendPluginDefiner
 } from '@migaia/storage-host'
+import { defineBackendPlugin, defineStorageFeature } from '@migaia/storage-host/sdk'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -18,8 +20,8 @@ import { readObjectDriver } from './driver.ts'
 import { createObjectBackend } from './store.ts'
 import { invalidArgument } from './errors.ts'
 import type { IObjectAddress, IObjectDriver, IObjectStore } from './types.ts'
-/** Kind identity selects exactly the object backend and its two real native driver families. */
-export const objectBackendKind = defineStorageBackendKind<
+/** The object engine as a type: its Store and the two real native driver families. */
+export type IObjectBackend = IStorageBackendType<
   IObjectStore,
   S3Client | undefined,
   {
@@ -29,28 +31,39 @@ export const objectBackendKind = defineStorageBackendKind<
     /** True once the driver confirmed conditional writes; presign checks it before signing. */
     supportsConditionalWrites(): boolean
   }
->()(ObjectNames.backend)
+>
+/** Defines this package's Features; the annotation carries the object backend type. */
+export const defineObjectFeature: IStorageFeatureDefiner<IObjectBackend> = defineStorageFeature
 /** Capture an authentic lazy driver; installation alone opens native resources. */
 export function objectBackendPlugin<
   const TId extends string = 'object',
   const F extends IStorageFeatureRecord = {}
->(
-  options: { readonly id?: TId; readonly driver: IObjectDriver },
-  features?: F & IStorageFeatureStoreCompatibility<typeof objectBackendKind, NoInfer<F>>
-): IStorageBackendPlugin<typeof objectBackendKind, NoInfer<TId>, F> {
+>(options: {
+  /** Plugin name and backend lookup key; `'object'` when omitted. */
+  readonly name?: TId
+  readonly driver: IObjectDriver
+  /** Features installed on this backend. */
+  readonly features?: F & IStorageFeatureStoreCompatibility<IObjectBackend, NoInfer<F>>
+}): IStorageBackendPlugin<IObjectBackend, NoInfer<TId>, F> {
   const driver = options?.driver
   readObjectDriver(driver)
-  const id = (options.id ?? ObjectNames.backend) as TId
+  const id = (options.name ?? ObjectNames.backend) as TId
   if (typeof id !== 'string') throw invalidArgument()
   /** Installation receives immutable driver identity and allocates its own named lifecycle state. */
   const descriptor = (core: IStoragePluginCore<F>) => new ObjectBackendInstallation(driver, core)
-  return definePlugin<TId, typeof descriptor, F>(id, descriptor, features)
+  return (defineBackendPlugin as IStorageBackendPluginDefiner<IObjectBackend>)<
+    TId,
+    typeof descriptor,
+    F
+  >({
+    name: id,
+    features: options.features as never,
+    open: descriptor as never
+  })
 }
 
 /** One plugin installation publishes exactly one physical object backend into its original host. */
 class ObjectBackendInstallation<F extends IStorageFeatureRecord> {
-  /** Backend identity selects the existing capability contract. */
-  readonly kind = objectBackendKind
   /** Lazy native construction uses the validated descriptor selected by the caller. */
   readonly #driver: IObjectDriver
   /** Original host owns registration, stages and resource shutdown. */
