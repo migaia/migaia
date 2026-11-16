@@ -35,7 +35,7 @@ it('rejects duplicate public ids before either native descriptor or install runs
   const second = definePlugin({ name: 'duplicate', setup: secondDescriptor })
   await expect(createStorageHost({ plugins: [first, second] as never })).rejects.toMatchObject({
     code: 'BACKEND_INSTALL_FAILED',
-    cause: { code: 'PLUGIN_DUPLICATE' }
+    cause: { code: 'BACKEND_DUPLICATE' }
   })
   expect(firstDescriptor).not.toHaveBeenCalled()
   expect(secondDescriptor).not.toHaveBeenCalled()
@@ -172,7 +172,7 @@ it('publishes completed transactions and preserves exact multiple-backend public
         }
       })
     ])
-  ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED', cause: { code: 'PLUGIN_DUPLICATE' } })
+  ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED', cause: { code: 'BACKEND_DUPLICATE' } })
   expect([...host.backends().keys()]).toEqual(['first', 'second'])
   expect(host.backend('first')).toBe(first)
   expect(host.backend('second')).toBe(second)

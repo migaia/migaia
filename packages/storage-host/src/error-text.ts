@@ -94,6 +94,10 @@ export const StorageErrorText = {
    * neutral owner.
    */
   defaultError: (code: string) => `[storage-host] ${code}`,
+  /** Stable text for rejecting a malformed plugin name before any definition is recorded. */
+  backendIdInvalid: 'storage backend id is invalid',
+  /** Stable text for duplicate backend registration or install-batch identifiers. */
+  backendDuplicate: 'storage backend is already installed',
   /** Stable text for a valid backend identifier absent from the host registry. */
   backendNotInstalled: 'storage backend is not installed',
   /** Stable text for backend plugin/store contract rejection. */

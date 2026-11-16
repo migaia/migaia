@@ -64,6 +64,17 @@ export class StorageHostBatch {
       return metadata
     })
     this.#owner.journalOwner.admitJournalConfiguration(plugins)
+    /** Reject a repeated backend id before any batch state, backend factory or install runs. */
+    const admittedBackendIds = new Set(this.#owner.registry.keys())
+    for (const metadata of nativeMetadata) {
+      if (admittedBackendIds.has(metadata.id))
+        throw new StorageError(
+          StorageHostErrorCode.backendDuplicate,
+          {},
+          StorageErrorText.backendDuplicate
+        )
+      admittedBackendIds.add(metadata.id)
+    }
     this.assertBatchOwner(batchToken)
     /** Only the final original batch preparation admits already completed candidate reads. */
     const installState = { batchToken, preparingJournal: false } as IStorageInstallBatchContext

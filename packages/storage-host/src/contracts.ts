@@ -180,6 +180,22 @@ type IStorageNativeDescriptorContext = {
   readonly journalBinding?: IStorageNativePluginDescriptor['journalBinding']
 }
 
+/**
+ * Plugin names are bounded ASCII: a letter, then letters, digits, `_` or `-`, 64 characters at
+ * most. The name is the backend lookup key and the PluginHost plugin name, so it excludes `.`
+ * (PluginHost's separator) and `:` (used by the host's own internal plugin names).
+ */
+const STORAGE_PLUGIN_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/
+
+/** Reject a malformed plugin name with BACKEND_ID_INVALID before a definition is recorded. */
+function assertStoragePluginName(name: unknown): asserts name is string {
+  if (typeof name !== 'string' || !STORAGE_PLUGIN_NAME_PATTERN.test(name))
+    throw createStorageTypeError(
+      StorageHostErrorCode.backendIdInvalid,
+      StorageErrorText.backendIdInvalid
+    )
+}
+
 /** Shared by both definers: one native definition per call, recorded with its storage facts. */
 function defineStoragePlugin(
   name: string,
@@ -187,9 +203,10 @@ function defineStoragePlugin(
   features: IFeatureRecord | undefined,
   backend: boolean
 ): object {
+  assertStoragePluginName(name)
   /** Definition data is shared by every registration of this plugin. */
   const context: IStoragePluginDefinitionContext = { name, descriptorFactory, features, backend }
-  /** PluginHost validates the name, inspects the Feature record and owns each registration. */
+  /** PluginHost inspects the Feature record and owns each registration. */
   const definition = defineNativePlugin(
     name,
     (core) => createStorageNativeRegistration(context, core as unknown as IStorageNativeCore),
