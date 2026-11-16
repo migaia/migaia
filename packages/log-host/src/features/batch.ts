@@ -1,4 +1,5 @@
-import { defineNativeLogFeature, type IBatchOptions } from '../feature-metadata.ts'
+import { defineFeature } from '@migaia/plugin-host/features'
+import type { IBatchOptions } from '../feature-metadata.ts'
 import { LogDeliveryPolicy, FeaturePhase } from '../state-constants.ts'
 import { invalidOption } from '../errors.ts'
 import type { ILogFeature } from '../typing.ts'
@@ -21,16 +22,13 @@ export function batchFeature(options: IBatchOptions = {}): ILogFeature {
     if (!Number.isSafeInteger(value) || value < 1) throw invalidOption()
   for (const value of [normalized.maxWaitMs, normalized.drainTimeoutMs])
     if (!Number.isFinite(value) || value < 0) throw invalidOption()
-  return defineNativeLogFeature(
-    { policy: LogDeliveryPolicy.batch, phase: FeaturePhase.delivery },
-    () => ({
-      implementation: Object.freeze({
-        policy: LogDeliveryPolicy.batch,
-        phase: FeaturePhase.delivery,
-        options: Object.freeze({ ...normalized })
-      }),
-      controls: Object.freeze({})
-    })
-  )
+  return defineFeature(() => ({
+    implementation: Object.freeze({
+      policy: LogDeliveryPolicy.batch,
+      phase: FeaturePhase.delivery,
+      options: Object.freeze({ ...normalized })
+    }),
+    controls: Object.freeze({})
+  }))
 }
 export default batchFeature

@@ -1,4 +1,5 @@
-import { defineNativeLogFeature, type ILogFeatureRuntime } from '../feature-metadata.ts'
+import { defineFeature } from '@migaia/plugin-host/features'
+import type { ILogFeatureRuntime } from '../feature-metadata.ts'
 import { FeaturePhase } from '../state-constants.ts'
 import type { ILogEntry, ILogFeature } from '../typing.ts'
 import { invalidOption } from '../errors.ts'
@@ -49,8 +50,6 @@ export function filterFeature(
   /** Preserve initial predicates without borrowing the caller's array until later installation. */
   const filters = Object.freeze([...(options.filters ?? [])])
   for (const filter of filters) if (typeof filter !== 'function') throw invalidOption()
-  return defineNativeLogFeature({ phase: FeaturePhase.gate }, () =>
-    new FilterFeature(filters).runtime()
-  )
+  return defineFeature(() => new FilterFeature(filters).runtime())
 }
 export default filterFeature

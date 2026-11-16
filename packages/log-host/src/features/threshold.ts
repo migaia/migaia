@@ -1,4 +1,5 @@
-import { defineNativeLogFeature, type ILogFeatureRuntime } from '../feature-metadata.ts'
+import { defineFeature } from '@migaia/plugin-host/features'
+import type { ILogFeatureRuntime } from '../feature-metadata.ts'
 import { FeaturePhase, explicitLevel, levelOrder, LogLevel } from '../state-constants.ts'
 import type { ILogEntry, ILogFeature } from '../typing.ts'
 import { invalidOption } from '../errors.ts'
@@ -47,8 +48,6 @@ export function thresholdFeature(
   /** Snapshot the initial value without constructing mutable runtime state before installation. */
   const level = options.level ?? LogLevel.debug
   if (!Object.hasOwn(levelOrder, level)) throw invalidOption()
-  return defineNativeLogFeature({ phase: FeaturePhase.gate }, () =>
-    new ThresholdFeature(level).runtime()
-  )
+  return defineFeature(() => new ThresholdFeature(level).runtime())
 }
 export default thresholdFeature

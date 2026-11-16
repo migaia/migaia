@@ -28,12 +28,12 @@ import type { ILogDomainCore } from './core.ts'
 import type { LogHost } from './host.ts'
 import {
   featureScope,
-  featureMetadata,
-  installedFeatureScope,
+  admitInstalledFeatures,
   acceptsEntry,
   deliveryFeature,
   type IBatchOptions,
-  type IFeatureImplementation
+  type IFeatureImplementation,
+  type ILogFeatureRuntime
 } from './feature-metadata.ts'
 import {
   featureControlExtensions,
@@ -118,14 +118,24 @@ function explicitFormat(features: Iterable<IFeatureImplementation>): ILogFormat 
   for (const feature of features) if (feature.phase === FeaturePhase.format) return feature
   return undefined
 }
-/** Literal defaults become native roots and are installed by the declaring output plugin. */
+/**
+ * Literal defaults become native roots and are installed by the declaring output plugin. A custom
+ * default is shape-checked here; installation rejects it unless it is a format feature.
+ */
 function normalizeFormat(
   value: ITextOutputDefinition<Record<string, unknown>>['defaultFormat']
 ): ILogFeature {
   if (value === LogFormat.json || value === LogFormat.plain) return formatFeature({ format: value })
   featureScope({ fallback: value })
-  if (featureMetadata(value)?.phase !== FeaturePhase.format) throw invalidOption()
   return value
+}
+
+/** Read the installed default formatter; a default that is not a format feature is rejected. */
+function installedFallback(installed: unknown): ILogFormat {
+  /** Only a log feature output carries an implementation. */
+  const implementation = (installed as Partial<ILogFeatureRuntime> | undefined)?.implementation
+  if (implementation?.phase !== FeaturePhase.format) throw invalidOption()
+  return implementation
 }
 
 /** One started batch owns its retry/timeout state until every canonical attempt has settled. */
@@ -665,7 +675,7 @@ class OutputPlugin<
   /** Exact literal plugin name contributes to inferred control extension names. */
   readonly #name: N
 
-  /** Validate options and native roots before any transport owns resources. */
+  /** Validate options and native root shape; log roles are admitted when the output installs. */
   constructor(definition: IOutputDefinition<O, F> & { name: N }) {
     if (
       !definition ||
@@ -706,7 +716,7 @@ class OutputPlugin<
         disabled.push(key)
       } else Object.defineProperty(local, key, descriptor)
     }
-    featureScope(local, true)
+    featureScope(local)
     this.local = Object.freeze({ ...local }) as IEnabledLogFeatures<F>
     this.#disabledRoles = Object.freeze(disabled)
     /** Any suffix on the longest declared alias is longer than every caller-owned key. */
@@ -718,8 +728,6 @@ class OutputPlugin<
     const snapshot = { ...definition, features: this.local }
     if (snapshot.consumesText === false) {
       if (snapshot.defaultFormat !== undefined) throw invalidOption()
-      for (const feature of Object.values(this.local))
-        if (featureMetadata(feature)?.phase === FeaturePhase.format) throw invalidOption()
       this.#configuration = { consumesText: false, definition: snapshot }
       this.features = Object.freeze({ ...this.local })
     } else {
@@ -733,17 +741,22 @@ class OutputPlugin<
   install(
     core: ILogPluginCore & { readonly features: Readonly<Record<string, unknown>> }
   ): O & ILogControlExtensions<N, F> {
-    /** Alias projection selects actual native-installed local implementations. */
-    const local = installedFeatureScope(this.local, core.features)
     /** Discriminated configuration keeps entry-only transports free of formatter work. */
     const configuration = this.#configuration
+    /** Admission runs before this output owns anything; it selects the installed local policies. */
+    const local = admitInstalledFeatures(
+      this.local,
+      core.features,
+      true,
+      configuration.consumesText
+    )
     /** The selected fallback was installed alongside all other native roots. */
     const output = configuration.consumesText
       ? new TextOutputInstallation(
           core,
           configuration.definition,
           local,
-          (core.features[this.#fallbackAlias] as { implementation: ILogFormat }).implementation
+          installedFallback(core.features[this.#fallbackAlias])
         )
       : new EntryOutputInstallation(core, configuration.definition, local)
     /** The scope prepares this output against current and earlier same-batch declarations. */

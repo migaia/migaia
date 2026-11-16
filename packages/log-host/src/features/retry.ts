@@ -1,4 +1,5 @@
-import { defineNativeLogFeature, type IRetryFeatureOptions } from '../feature-metadata.ts'
+import { defineFeature } from '@migaia/plugin-host/features'
+import type { IRetryFeatureOptions } from '../feature-metadata.ts'
 import { LogDeliveryPolicy, FeaturePhase } from '../state-constants.ts'
 import { createLogError, invalidOption } from '../errors.ts'
 import { LogHostErrorCode } from '../error-code.ts'
@@ -15,16 +16,13 @@ export function retryFeature(options: IRetryFeatureOptions): ILogFeature {
   const backoff = options.backoff ?? 0
   if (typeof backoff !== 'function' && (!Number.isFinite(backoff) || backoff < 0))
     throw invalidOption()
-  return defineNativeLogFeature(
-    { policy: LogDeliveryPolicy.retry, phase: FeaturePhase.delivery },
-    () => ({
-      implementation: Object.freeze({
-        policy: LogDeliveryPolicy.retry,
-        phase: FeaturePhase.delivery,
-        options: Object.freeze({ attempts, backoff })
-      }),
-      controls: Object.freeze({})
-    })
-  )
+  return defineFeature(() => ({
+    implementation: Object.freeze({
+      policy: LogDeliveryPolicy.retry,
+      phase: FeaturePhase.delivery,
+      options: Object.freeze({ attempts, backoff })
+    }),
+    controls: Object.freeze({})
+  }))
 }
 export default retryFeature

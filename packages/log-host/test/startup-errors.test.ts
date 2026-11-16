@@ -20,25 +20,28 @@ function customText(): string {
 function ignoreDelivery(): void {}
 /** Distinct host keys both survive, so a text output rejects the second effective format. */
 function duplicateHostFormats(): void {
-  /** Constructing cold declarations is valid before an output's effective scope exists. */
-  expect(() =>
-    sdk.defineLogPlugin({
-      name: 'policy',
-      features: { format: formatFeature({ format: 'json' }), otherFormat: otherFormat() }
-    })
-  ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
+  /** Constructing the cold declaration is valid; the role collision is found at installation. */
+  const policy = sdk.defineLogPlugin({
+    name: 'policy',
+    features: { format: formatFeature({ format: 'json' }), otherFormat: otherFormat() }
+  })
+  expect(() => createLogHost({ plugins: [policy] })).toThrowError(
+    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
+  )
 }
 /** Local singular-slot validation runs at actual installation rather than cold definition. */
 function duplicateOutputFormats(): void {
-  expect(() =>
-    sdk.defineOutputPlugin({
-      name: 'output',
-      batchable: true,
-      defaultFormat: 'json',
-      features: { format: formatFeature({ format: 'json' }), otherFormat: otherFormat() },
-      deliver: ignoreDelivery
-    })
-  ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
+  /** Defining the record is cold; the role collision is found when its outputs are installed. */
+  const output = sdk.defineOutputPlugin({
+    name: 'output',
+    batchable: true,
+    defaultFormat: 'json',
+    features: { format: formatFeature({ format: 'json' }), otherFormat: otherFormat() },
+    deliver: ignoreDelivery
+  })
+  expect(() => createLogHost({ plugins: [output] })).toThrowError(
+    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
+  )
 }
 
 /** The capture fixture observes selected text and the installed formatter from real output delivery. */
@@ -102,15 +105,17 @@ function malformedHostOptions(): void {
       ]
     })
   ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
-  expect(() =>
-    sdk.defineOutputPlugin({
-      name: 'entry-output',
-      batchable: true,
-      defaultFormat: 'json',
-      features: { uuid: uuidFeature() },
-      deliver: ignoreDelivery
-    })
-  ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
+  /** An output-local entry feature is declared cold and rejected when the output installs. */
+  const entryOutput = sdk.defineOutputPlugin({
+    name: 'entry-output',
+    batchable: true,
+    defaultFormat: 'json',
+    features: { uuid: uuidFeature() },
+    deliver: ignoreDelivery
+  })
+  expect(() => createLogHost({ plugins: [entryOutput] })).toThrowError(
+    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
+  )
 }
 
 it('rejects two formats in one host plugin record', duplicateHostFormats)
@@ -301,19 +306,21 @@ async function entryOnlyIgnoresHostFormat(): Promise<void> {
 
 /** Output-local text policies contradict an explicitly entry-only transport definition. */
 function entryOnlyRejectsLocalFormat(): void {
-  expect(() =>
-    sdk.defineOutputPlugin({
-      name: 'invalid-entry-only',
-      batchable: true,
-      consumesText: false,
-      features: { format: formatFeature({ format: 'json' }) },
-      deliver: ignoreDelivery
-    })
-  ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
+  /** The cold definition is accepted; the format feature is rejected when the output installs. */
+  const output = sdk.defineOutputPlugin({
+    name: 'invalid-entry-only',
+    batchable: true,
+    consumesText: false,
+    features: { format: formatFeature({ format: 'json' }) },
+    deliver: ignoreDelivery
+  })
+  expect(() => createLogHost({ plugins: [output] })).toThrowError(
+    expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
+  )
 }
 
 it(
   'skips host format while preserving entry and gate work for entry-only output',
   entryOnlyIgnoresHostFormat
 )
-it('rejects output-local format on entry-only output at creation', entryOnlyRejectsLocalFormat)
+it('rejects output-local format on entry-only output at installation', entryOnlyRejectsLocalFormat)

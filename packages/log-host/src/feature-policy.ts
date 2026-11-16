@@ -71,7 +71,7 @@ export function featureControlExtensions<N extends string, F extends ILogFeature
 ): ILogControlExtensions<N, F> {
   /** The native plugin owner validates and guards every enumerable extension data property. */
   const extensions: Record<string, unknown> = {}
-  // featureScope admitted every alias as a log feature when the plugin was defined.
+  // admitInstalledFeatures admitted every alias as a log feature earlier in this installation.
   for (const alias of Object.keys(features)) {
     /** Controls come from the same native instance as this alias's installed policy implementation. */
     const runtime = outputs[alias] as ILogFeatureRuntime<object>

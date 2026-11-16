@@ -1,6 +1,6 @@
 import type { IFeatureOverlayRole } from '@migaia/plugin-host/feature-overlay'
 import { defineFeature, inspectFeatures } from '@migaia/plugin-host/features'
-import { type IFeature, type IFeatureRecord } from '@migaia/plugin-host'
+import type { IFeatureRecord } from '@migaia/plugin-host'
 import type { ILogEntry, ILogFeature, ILogFeatureDefinition } from './typing.ts'
 import { FeaturePhase, LogDeliveryPolicy } from './state-constants.ts'
 import { invalidOption, isArrayOption } from './errors.ts'
@@ -49,96 +49,64 @@ export type ILogFeatureRuntime<C extends object = Record<never, never>> = Readon
   controls: C
 }>
 
-/** Log-only policy data belongs to the native definition; scope markers carry no entry behavior. */
-export type ILogFeatureMetadata =
-  | Readonly<{ phase: Exclude<IFeatureImplementation['phase'], 'delivery'> }>
-  | Readonly<{ phase: 'delivery'; policy: LogDeliveryPolicy }>
-
-/** One log-owned role projection serves native-record validation and shared overlay composition. */
-export function logFeatureRole(
-  feature: IFeatureImplementation | ILogFeatureMetadata
-): IFeatureOverlayRole {
+/** One log-owned role projection serves installed-record admission and shared overlay composition. */
+export function logFeatureRole(feature: IFeatureImplementation): IFeatureOverlayRole {
   return {
     role: feature.phase === FeaturePhase.delivery ? feature.policy : feature.phase,
     repeatable: feature.phase === FeaturePhase.entry || feature.phase === FeaturePhase.gate
   }
 }
 
-/** Native features are the keys; this table describes log policies and grants no issuance authority. */
-const logFeatureMetadata = new WeakMap<object, ILogFeatureMetadata>()
-
-/** Describe an existing native feature; the native owner remains its sole identity authority. */
-export function registerLogFeatureMetadata(
-  feature: IFeature<any, any, any>,
-  metadata: ILogFeatureMetadata
-): void {
-  logFeatureMetadata.set(feature, Object.freeze({ ...metadata }))
-}
-
-/** Define one real native feature and attach only log-specific, immutable metadata to its identity. */
-export function defineNativeLogFeature<C extends object = Record<never, never>>(
-  metadata: ILogFeatureMetadata,
-  install: () => ILogFeatureRuntime<C>
-): ILogFeature<C> {
-  /** Only plugin-host creates, registers and later installs this opaque feature object. */
-  const feature = defineFeature(install)
-  registerLogFeatureMetadata(feature, metadata)
-  return feature
-}
-
-/** Read log policy metadata without treating presence as proof of native feature identity. */
-export function featureMetadata(feature: unknown): ILogFeatureMetadata | undefined {
-  return feature !== null && typeof feature === 'object'
-    ? logFeatureMetadata.get(feature)
-    : undefined
-}
-
-/** Admit a plugin's native root record before enforcing its log-specific scope constraints. */
-export function featureScope(
-  record: IFeatureRecord = {},
-  output = false
-): Map<string, ILogFeature<any>> {
+/**
+ * Admit the native shape of a plugin's root record when the plugin is defined. Log roles are not
+ * known here; `admitInstalledFeatures` checks them when the plugin installs.
+ */
+export function featureScope(record: IFeatureRecord = {}): void {
   if (isArrayOption(record)) throw invalidOption()
-  /** Native inspection owns exact-identity and dependency-graph admission. */
-  let roots: IFeatureRecord
   try {
-    roots = inspectFeatures(record).roots
+    // Native inspection owns exact-identity and dependency-graph admission.
+    inspectFeatures(record)
   } catch (cause) {
     // Preserve the log boundary identity while retaining the native admission diagnostic.
     throw invalidOption(cause)
   }
-  /** Record aliases supply policy names without creating a second scope registry. */
-  const selected = new Map<string, ILogFeature<any>>()
-  /** Singular slots already used by this record; a plugin applies each at most once. */
+}
+
+/**
+ * Admit one plugin's installed feature outputs and select their implementations by alias, in one
+ * pass. Runs first in the plugin's install, before it owns any resource. Throws INVALID_OPTION when
+ * an output is not a log feature, when a singular role repeats in the record, when an output plugin
+ * (`output`) holds an entry feature, or when an entry-only output (`consumesText` false) holds a
+ * format feature.
+ */
+export function admitInstalledFeatures(
+  record: IFeatureRecord,
+  outputs: Readonly<Record<string, unknown>>,
+  output = false,
+  consumesText = true
+): Map<string, IFeatureImplementation> {
+  /** This installed-policy projection is rebuilt only during installation. */
+  const selected = new Map<string, IFeatureImplementation>()
+  /** Singular roles already used by this record; a plugin applies each at most once. */
   const slots = new Set<PropertyKey>()
-  for (const [alias, feature] of Object.entries(roots)) {
-    /** Log plugin records hold only log features; the public types already require this. */
-    const metadata = featureMetadata(feature)
-    if (!metadata) throw invalidOption()
-    if (output && metadata.phase === FeaturePhase.entry) throw invalidOption()
+  for (const alias of Object.keys(record)) {
+    /** The exact instance plugin-host produced for this alias; only log features carry one. */
+    const implementation = (outputs[alias] as Partial<ILogFeatureRuntime> | undefined)
+      ?.implementation
+    if (!implementation) throw invalidOption()
+    if (
+      output &&
+      (implementation.phase === FeaturePhase.entry ||
+        (!consumesText && implementation.phase === FeaturePhase.format))
+    )
+      throw invalidOption()
     /** Format or delivery policy this feature occupies, if any. */
-    const role = logFeatureRole(metadata)
+    const role = logFeatureRole(implementation)
     if (!role.repeatable) {
       if (slots.has(role.role)) throw invalidOption()
       slots.add(role.role)
     }
-    selected.set(alias, feature as ILogFeature<any>)
-  }
-  return selected
-}
-
-/** Select implementations only from outputs already constructed by the native registration. */
-export function installedFeatureScope(
-  record: IFeatureRecord,
-  outputs: Readonly<Record<string, unknown>>
-): Map<string, IFeatureImplementation> {
-  /** This installed-policy projection is rebuilt only during configuration or installation. */
-  const selected = new Map<string, IFeatureImplementation>()
-  // featureScope admitted every alias as a log feature when the plugin was defined.
-  for (const alias of Object.keys(record)) {
-    /** Alias resolution uses the exact instance produced by plugin-host for this registration. */
-    const runtime = outputs[alias] as ILogFeatureRuntime
-    selected.set(alias, runtime.implementation)
+    selected.set(alias, implementation)
   }
   return selected
 }
@@ -149,9 +117,12 @@ export function defineLogFeature(definition: ILogFeatureDefinition): ILogFeature
   /** Capture caller getters once in declaration order before selecting supported phase fields. */
   const snapshot = { ...definition }
   if (snapshot.phase === FeaturePhase.entry && typeof snapshot.stage === 'function') {
-    /** Only the declared phase contract is captured; unrelated caller fields do not enter metadata. */
+    /**
+     * Only the declared phase contract is captured; unrelated caller fields do not enter the
+     * feature.
+     */
     const implementation = Object.freeze({ phase: FeaturePhase.entry, stage: snapshot.stage })
-    return defineNativeLogFeature({ phase: FeaturePhase.entry }, () => ({
+    return defineFeature(() => ({
       implementation,
       controls: Object.freeze({})
     }))
@@ -159,7 +130,7 @@ export function defineLogFeature(definition: ILogFeatureDefinition): ILogFeature
   if (snapshot.phase === FeaturePhase.gate && typeof snapshot.accept === 'function') {
     /** The cold definition preserves the exact predicate while native installation owns its output. */
     const implementation = Object.freeze({ phase: FeaturePhase.gate, accept: snapshot.accept })
-    return defineNativeLogFeature({ phase: FeaturePhase.gate }, () => ({
+    return defineFeature(() => ({
       implementation,
       controls: Object.freeze({})
     }))
@@ -173,7 +144,7 @@ export function defineLogFeature(definition: ILogFeatureDefinition): ILogFeature
       dim: snapshot.dim,
       arguments: snapshot.arguments
     })
-    return defineNativeLogFeature({ phase: FeaturePhase.format }, () => ({
+    return defineFeature(() => ({
       implementation,
       controls: Object.freeze({})
     }))
@@ -181,7 +152,7 @@ export function defineLogFeature(definition: ILogFeatureDefinition): ILogFeature
   throw invalidOption()
 }
 
-/** Select built-in delivery policy from an installed chain without consulting definition metadata. */
+/** Select built-in delivery policy from an installed chain. */
 export function deliveryFeature<P extends LogDeliveryPolicy>(
   features: readonly IFeatureImplementation[],
   policy: P
