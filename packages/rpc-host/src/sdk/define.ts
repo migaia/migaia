@@ -89,7 +89,8 @@ export function defineTransportPlugin<
  * Define the one host-level flow plugin. `setup` installs a readonly observer anew for each host;
  * `features` carries shared flow placements and timeout/retry call defaults. A plugin with
  * `features` must be installed before the first transport commits; an observer-only plugin may be
- * installed later. With neither field the plugin installs and does nothing.
+ * installed later. An empty `features` record counts as absent. With neither field the plugin
+ * installs and does nothing.
  */
 export function defineFlowPlugin<
   const F extends IFeatureRecord = Record<never, never>,
@@ -110,7 +111,11 @@ export function defineFlowPlugin<
       captured.setup === undefined
         ? undefined
         : new RpcFlowSetup(captured as IRpcFlowDefinition<object>).prepare,
-    shared: program && { features: program.roots, prepare: program.prepare }
+    // An empty record carries no Feature, so the plugin stays a plain late-installable observer.
+    shared:
+      program && Object.keys(program.roots).length > 0
+        ? { features: program.roots, prepare: program.prepare }
+        : undefined
   }
   /** Thin definitions omit arbitrary metadata fields; callers keep domain owners explicitly. */
   const plugin = definePlugin({

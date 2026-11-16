@@ -42,7 +42,7 @@ import {
 } from '../sdk/flow-pipelines.ts'
 import type { RpcFlowProgram, RpcTransportFlowProgram } from '../sdk/flow-program.ts'
 import type { IRpcDefinitionMetadata, IRpcSharedFlows } from '../sdk/metadata.ts'
-import { readRpcFeature, RpcDefinitionKind, RpcFeatureCategory } from '../sdk/metadata.ts'
+import { RpcDefinitionKind } from '../sdk/metadata.ts'
 import { HostIdentity, defaultRpcId } from './identity.ts'
 import { createRpcAbortError, createRpcError, createRpcLifecycleError } from './error-owner.ts'
 import { HostErrorText } from './error-text.ts'
@@ -273,16 +273,12 @@ export class RpcHost {
     /** Setup borrows the same Host lifetime and real work owners for every optional registration. */
     const context = this.#flowSetupContext(core)
     if (metadata.shared) {
-      if (
-        Object.values(metadata.shared.features).some(
-          (feature) => readRpcFeature(feature)?.category === RpcFeatureCategory.call
-        )
+      /** A record without a timeout or retry Feature contributes no call default. */
+      this.#features.setDefaults(
+        core,
+        metadata.shared.features,
+        (core as IRpcTransportSetupContext['owner']).features
       )
-        this.#features.setDefaults(
-          core,
-          metadata.shared.features,
-          (core as IRpcTransportSetupContext['owner']).features
-        )
       /** The original shared setup lends only its selected group relationship to native removal. */
       const shared = await metadata.shared.prepare(core, this.#controller.signal, context)
       this.#flow.registerShared(core, shared)
