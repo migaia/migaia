@@ -3,7 +3,8 @@ import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory
 import { createRuntime } from '@migaia/reactive'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { binaryCodec } from '@migaia/storage-host/entity'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { definePlugin } from '@migaia/storage-host/sdk'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { createStore } from '@migaia/store-light'
 import { ObservableMap } from '@migaia/store-indexed'
@@ -456,7 +457,7 @@ describe('persistence transactions through actual memory ownership', () => {
      * owner.
      */
     const host = await createStorageHost({
-      plugins: [memoryBackendPlugin({}, { notifications: memoryNotificationsFeature() })]
+      plugins: [memoryBackendPlugin({ features: { notifications: memoryNotificationsFeature() } })]
     })
     onTestFinished(() => host.dispose())
     /** This workflow observes original backend commits while ordinary fixtures remain basic. */
@@ -985,22 +986,25 @@ describe('persistence transactions through actual memory ownership', () => {
         /** Only the actual transactional flush fails; ordinary restored mirroring remains usable. */
         let failing = false
         /** Interception belongs to the real host installation window and its original pipeline. */
-        const intervention = definePlugin('persist-failure', (core) => ({
-          install: () => {
-            core.useAsyncPipeline((input, next) => {
-              if (
-                failing &&
-                stage === 'pipeline' &&
-                input.scope !== undefined &&
-                input.operation === 'set' &&
-                (input.input as { readonly key?: string }).key === 'failed-flush'
-              )
-                throw primary
-              return next(input)
-            })
-            return {}
-          }
-        }))
+        const intervention = definePlugin({
+          name: 'persist-failure',
+          setup: (core) => ({
+            install: () => {
+              core.useAsyncPipeline((input, next) => {
+                if (
+                  failing &&
+                  stage === 'pipeline' &&
+                  input.scope !== undefined &&
+                  input.operation === 'set' &&
+                  (input.input as { readonly key?: string }).key === 'failed-flush'
+                )
+                  throw primary
+                return next(input)
+              })
+              return {}
+            }
+          })
+        })
         await using host = await createStorageHost({
           plugins: [memoryBackendPlugin(), intervention]
         })

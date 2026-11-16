@@ -63,7 +63,7 @@ export async function runPersistNativeConsumerScenario(storage: INativeStore) {
   const entityHost = await createStorageHost({ plugins: [usersEntityPlugin] })
   try {
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = entityHost.extensions[usersEntityPlugin.id](storage)
+    const repo = entityHost.extensions[usersEntityPlugin.name](storage)
     /** This actual mutable unit remains changed after rollback. */
     const value = counterUnit()
     /** The default production codec must stay on the native active request chain. */
