@@ -3,7 +3,6 @@ import { type IWriteConcurrencyOptions } from '../concurrency.ts'
 import { type IRdfQuery, type IQueryWatch } from '../query-chain.ts'
 import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.ts'
 import { STORAGE_RDF_METHODS, STORAGE_RDF_WRITE_METHODS } from '../capability-constants.ts'
-import { type IBackendKind } from '../capabilities.ts'
 import { StorageContractError, StorageContractErrorCode } from '../errors.ts'
 import { StorageContractErrorText } from '../error-text.ts'
 
@@ -139,10 +138,7 @@ const RDF_GRANDFATHERED = /* @__PURE__ */ new Set([
 ])
 
 /** RDF admission uses the existing argument error and canonical diagnostic text. */
-export function invalidRdf(
-  backend: IBackendKind | undefined,
-  cause?: unknown
-): StorageContractError {
+export function invalidRdf(backend: string | undefined, cause?: unknown): StorageContractError {
   return new StorageContractError(
     StorageContractErrorCode.invalidArgument,
     { backend, cause },
@@ -151,23 +147,17 @@ export function invalidRdf(
 }
 
 /** Unicode scalar strings preserve their exact lexical value without replacement characters. */
-function assertRdfString(
-  value: unknown,
-  backend: IBackendKind | undefined
-): asserts value is string {
+function assertRdfString(value: unknown, backend: string | undefined): asserts value is string {
   if (typeof value !== 'string' || /[\uD800-\uDFFF]/u.test(value)) throw invalidRdf(backend)
 }
 
 /** Absolute IRI admission preserves spelling without URL normalization or allocation. */
-export function assertRdfIri(
-  value: unknown,
-  backend: IBackendKind | undefined
-): asserts value is string {
+export function assertRdfIri(value: unknown, backend: string | undefined): asserts value is string {
   if (typeof value !== 'string' || !RDF_IRI.test(value)) throw invalidRdf(backend)
 }
 
 /** Lowercases well-formed BCP47 tags while preserving their original, non-registry spelling. */
-function rdfLanguage(value: unknown, backend: IBackendKind | undefined): string {
+function rdfLanguage(value: unknown, backend: string | undefined): string {
   if (typeof value !== 'string') throw invalidRdf(backend)
   /** Case is the only language-tag normalization permitted for RDF literal identity. */
   const language = value.toLowerCase()
@@ -181,7 +171,7 @@ export function assertRdfLiteral(
   value: unknown,
   datatype: unknown,
   language: unknown,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): void {
   assertRdfString(value, backend)
   assertRdfIri(datatype, backend)
@@ -196,7 +186,7 @@ export function assertRdfLiteral(
 /** Validate raw RDF structure without copying terms or normalizing caller-owned fields. */
 export function assertStorageRdfTerm(
   value: unknown,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): asserts value is IRdfTerm {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw invalidRdf(backend)
   /** The supported tag determines exactly which lexical fields have meaning. */
@@ -223,7 +213,7 @@ export function assertStorageRdfTerm(
 function assertRdfPosition(
   value: unknown,
   position: keyof IQuad,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): void {
   assertStorageRdfTerm(value, backend)
   if (
@@ -238,7 +228,7 @@ function assertRdfPosition(
 /** Validate a partial ground pattern without allocating replacement terms or an input image. */
 export function assertStorageRdfPattern(
   pattern: unknown,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): asserts pattern is Partial<IQuad> {
   if (typeof pattern !== 'object' || pattern === null || Array.isArray(pattern))
     throw invalidRdf(backend)
@@ -252,7 +242,7 @@ export function assertStorageRdfPattern(
 /** A complete quad uses the same positional rules plus all four mandatory positions. */
 export function assertStorageRdfQuad(
   quad: unknown,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): asserts quad is IQuad {
   assertStorageRdfPattern(quad, backend)
   if (!quad.subject || !quad.predicate || !quad.object || !quad.graph) throw invalidRdf(backend)

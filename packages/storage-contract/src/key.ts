@@ -1,6 +1,5 @@
 import { StorageContractError, StorageContractErrorCode } from './errors.ts'
 import { isArrayBuffer } from '@migaia/utils/bytes'
-import { type IBackendKind } from './capabilities.ts'
 import { type IStorageKey } from './context.ts'
 import { StorageContractErrorText } from './error-text.ts'
 
@@ -21,7 +20,7 @@ export const KEY_DOMAIN_LIMITS = Object.freeze({
  */
 export function assertStringStorageKey(
   value: unknown,
-  backend: IBackendKind | undefined,
+  backend: string | undefined,
   label = 'key'
 ): asserts value is string {
   if (typeof value !== 'string')
@@ -100,7 +99,7 @@ function validStorageKey(
  */
 export function assertStorageKey(
   value: unknown,
-  backend: IBackendKind | undefined,
+  backend: string | undefined,
   label = 'key'
 ): asserts value is IStorageKey {
   /** State belongs to this single pure validation call, never to a backend or later operation. */

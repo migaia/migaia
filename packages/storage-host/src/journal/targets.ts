@@ -1,5 +1,4 @@
 import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.ts'
-import { type IBackendKind } from '@migaia/storage-contract'
 import { snapshotLogRecords, type ILogPayload } from './logger-runtime.ts'
 import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.ts'
 import { StorageError } from '../errors.ts'
@@ -28,10 +27,7 @@ export function storageJournalTargetWire(target: IStorageJournalTarget): ILogPay
         }
 }
 /** Both recovery and undo decode the same existing target codec and canonical lock domain. */
-export function readStorageJournalTarget(
-  input: unknown,
-  backend: IBackendKind
-): IStorageJournalTarget {
+export function readStorageJournalTarget(input: unknown, backend: string): IStorageJournalTarget {
   try {
     if (input === null || typeof input !== 'object' || Array.isArray(input))
       invalidStorageJournalRecord()
@@ -63,7 +59,7 @@ export function readStorageJournalTarget(
 /** Original physical lock identity also coalesces repeated undo images without sorting. */
 export function storageJournalTargetIdentity(
   target: IStorageJournalTarget,
-  backend: IBackendKind
+  backend: string
 ): string {
   return encodeFlatStorageKey(
     target.channel === 'metadata'

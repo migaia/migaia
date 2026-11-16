@@ -10,7 +10,6 @@ import {
   invalidConcurrencyArgument,
   type INormalizedLockKey,
   type IConcurrencyAttemptContext,
-  type IBackendKind,
   StorageContractError,
   StorageContractErrorCode,
   StorageContractErrorText
@@ -47,7 +46,7 @@ export const ConcurrencyExecutionStatus = { returned: 'returned', threw: 'threw'
 export type IConcurrencyBudget = {
   readonly cancellation: IAbortTimeoutSignal
   readonly deadlineFailure: StorageContractError
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly report: IUtilsReporter
   waitedMs: number
   logicalWaitedMs: number
@@ -140,7 +139,7 @@ export function readConcurrencyStage<
 /** Constructs lock diagnostics once at failure, detached from mutable policy/backend key views. */
 export function concurrencyLockFailure(
   code: typeof StorageContractErrorCode.lockRejected | typeof StorageContractErrorCode.lockTimeout,
-  backend: IBackendKind,
+  backend: string,
   keys: readonly ILockKey[],
   holder: IConcurrencyHolder | undefined,
   cause?: unknown

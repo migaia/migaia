@@ -873,7 +873,7 @@
     },
     "@migaia/storage-contract": {
       ".": [
-        "BACKEND_KIND_PATTERN",
+        "BACKEND_NAME_PATTERN",
         "ConcurrencyHolderState",
         "ConcurrencyLocking",
         "ConflictPolicy",
@@ -943,7 +943,7 @@
         "invalidLockArgument",
         "invalidRdf",
         "invalidVector",
-        "isBackendKind",
+        "isBackendName",
         "isCapabilityToken",
         "isChangeFeedStore",
         "isKeyValueStore",

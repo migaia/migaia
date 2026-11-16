@@ -1,4 +1,4 @@
-import type { IBackendKind, IStorageKey } from '@migaia/storage-contract'
+import type { IStorageKey } from '@migaia/storage-contract'
 import { StorageError, type IStorageChannel } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
@@ -9,7 +9,7 @@ export type IChannelPresence = ReadonlySet<IStorageChannel>
 export type IChannelMutationPlan = { readonly remove: readonly IStorageChannel[] }
 /** Backend-owned error construction retains its source and native class without sharing a registry. */
 export type IChannelConflictDetails = {
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly key: IStorageKey
   readonly existingChannel: IStorageChannel
   readonly attemptedChannel: IStorageChannel
@@ -21,7 +21,7 @@ export function planChannelWrite(
   attempted: IStorageChannel,
   existing: IChannelPresence,
   policy: 'conflict' | 'replace' = 'conflict',
-  backend: IBackendKind = STORAGE_MEMORY_BACKEND,
+  backend: string = STORAGE_MEMORY_BACKEND,
   onConflict?: (details: IChannelConflictDetails) => Error
 ): IChannelMutationPlan {
   /** Preserve the original presence iteration and removal order. */

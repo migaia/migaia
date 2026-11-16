@@ -2,7 +2,6 @@ import {
   assertOperationContext,
   StorageContractError,
   StorageContractErrorCode,
-  type IBackendKind,
   type ITransactionScope
 } from '@migaia/storage-contract'
 import {
@@ -88,7 +87,7 @@ function image(input: unknown): IStorageJournalImage {
   return value as IStorageJournalImage
 }
 /** Read one original intent; unrelated kinds are ignored by the caller, damaged owned kinds stop. */
-export function readStorageJournalIntent(input: unknown, backend: IBackendKind, redo = false) {
+export function readStorageJournalIntent(input: unknown, backend: string, redo = false) {
   try {
     const value = object(input)
     const owner = identity(value.target)
@@ -160,7 +159,7 @@ export function readStorageJournalIntent(input: unknown, backend: IBackendKind, 
 type IStorageExternalWalOptions = {
   readonly access: IStorageJournalBackendAccess
   readonly target: IStorageJournalTargetIdentity
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly binlog: IBinlogExt['binlog'] | undefined
   readonly wal: IWalExt['wal']
   readonly undo?: IUndoLogExt['undo']

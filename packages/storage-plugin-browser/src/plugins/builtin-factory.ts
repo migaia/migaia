@@ -14,7 +14,6 @@ import {
   type IStorageReactiveVisibility,
   type IStorageBackendPluginDefiner
 } from '@migaia/storage-host'
-import type { IBackendKind } from '@migaia/storage-contract'
 import { defineBackendPlugin } from '@migaia/storage-host/sdk'
 import { BROWSER_REACTIVE_POLL_INTERVAL_MS } from '../constants.ts'
 import type { IBackendConstruction } from '../backends/construction.ts'
@@ -25,7 +24,7 @@ import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 export function readBuiltInPluginId<TId extends string>(
   options: { readonly name?: TId },
   fallback: string,
-  backend: IBackendKind
+  backend: string
 ): TId {
   try {
     return (options.name ?? fallback) as TId

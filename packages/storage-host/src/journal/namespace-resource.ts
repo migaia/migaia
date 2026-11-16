@@ -4,7 +4,6 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   StorageContractError,
   StorageContractErrorCode,
-  type IBackendKind,
   type ITransactionInfo,
   type ITransactionScope
 } from '@migaia/storage-contract'
@@ -30,7 +29,7 @@ export type IBackendJournalNamespaceOptions = {
   readonly assertLive: () => void
   readonly closingSignal: INativeAbortSignal
   readonly report: (error: unknown) => void
-  readonly backend?: IBackendKind
+  readonly backend?: string
   readonly nativeAtomic: boolean
   readonly indexExclusive?: false
   readonly reserve: (hold: () => Promise<void>) => Promise<void>

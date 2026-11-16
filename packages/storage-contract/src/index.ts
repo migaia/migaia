@@ -20,7 +20,7 @@ export type {
 } from './context.ts'
 export { ConflictPolicy } from './context.ts'
 
-export type { IBackendKind, IStorageCapabilities } from './capabilities.ts'
+export type { IStorageCapabilities } from './capabilities.ts'
 export { isStorageCapabilities } from './capabilities.ts'
 
 export { type ICodec, type ICodecOutput, type ICodecStageObserver } from './codec.ts'
@@ -78,8 +78,8 @@ export {
 
 export type { IStorageResource, IStorageIterator, IStorageIteratorLifetime } from './resource.ts'
 export {
-  BACKEND_KIND_PATTERN,
-  isBackendKind,
+  BACKEND_NAME_PATTERN,
+  isBackendName,
   type IChainMethods,
   type IChainMethodsOf,
   type IWithChainMethods,

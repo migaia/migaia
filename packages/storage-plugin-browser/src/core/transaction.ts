@@ -1,4 +1,3 @@
-import type { IBackendKind } from '@migaia/storage-contract'
 import { StorageOperation } from '../constants.ts'
 import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
@@ -12,7 +11,7 @@ export { assertTransactionCallback, readTransactionConflictPolicy } from '@migai
  * Rejects work after the owning transaction callback settles. Throws the web-owned
  * `transactionFailed` error.
  */
-export const assertTransactionScopeActive = (active: boolean, backend: IBackendKind): void => {
+export const assertTransactionScopeActive = (active: boolean, backend: string): void => {
   if (active) return
   throw new StorageError(StorageBrowserErrorCode.transactionFailed, {
     backend,

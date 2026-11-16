@@ -14,7 +14,6 @@ import {
 } from '@migaia/storage-host/sdk'
 import { storageBackendOperation } from '../constants.ts'
 import { StorageErrorText } from '../error-text.ts'
-import type { IBackendKind } from '../types/capabilities.ts'
 import { isStorageErrorFamily } from './backend-errors.ts'
 import type { IBrowserBatchApi, IBackendRuntime } from './construction.ts'
 
@@ -55,7 +54,7 @@ export function observeBrowserBatch<R>(
 /** Capture entry getters once, delegating all typed identity and duplicate rules to the key owner. */
 export function snapshotBrowserBatchEntries(
   entries: Parameters<IBrowserBatchApi['setMany']>[0],
-  backend: IBackendKind,
+  backend: string,
   ttlSupported = false
 ): readonly IBrowserBatchEntry[] {
   try {
@@ -89,7 +88,7 @@ export function snapshotBrowserBatchEntries(
 
 /** Text backends expose real batch reads; multi-key writes require the host's actual WAL bridge. */
 export function createTextBatchApi(
-  backend: IBackendKind,
+  backend: string,
   runtime: IBackendRuntime,
   getStore: () => IStorageStore<never>,
   assertLive: () => void,

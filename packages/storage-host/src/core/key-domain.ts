@@ -4,7 +4,6 @@ import {
   StorageContractError,
   StorageContractErrorCode,
   assertStorageKey,
-  type IBackendKind,
   type IKeyRange,
   type IStorageKey
 } from '@migaia/storage-contract'
@@ -86,7 +85,7 @@ export const encodeFlatStorageKey = (value: IStorageKey): string =>
 /** Decode a flat key with bounded recursion and final domain validation. */
 export const decodeFlatStorageKey = (
   encoded: string,
-  backend: IBackendKind = STORAGE_MEMORY_BACKEND
+  backend: string = STORAGE_MEMORY_BACKEND
 ): IStorageKey | undefined => {
   try {
     if (!encoded.startsWith(FlatStorageKeyWire.prefix)) return undefined
@@ -149,7 +148,7 @@ export const decodeFlatStorageKey = (
 }
 
 /** Validate range shape, bounds and ordering without copying a synchronous native read's input. */
-export const assertKeyRange = (range: IKeyRange | undefined, backend: IBackendKind): void => {
+export const assertKeyRange = (range: IKeyRange | undefined, backend: string): void => {
   if (range === undefined) return
   if (typeof range !== 'object' || range === null || Array.isArray(range))
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
@@ -180,7 +179,7 @@ export const assertKeyRange = (range: IKeyRange | undefined, backend: IBackendKi
 /** Copy caller bounds only when a deferred operation can await before using the native range. */
 export const snapshotKeyRange = (
   range: IKeyRange | undefined,
-  backend: IBackendKind
+  backend: string
 ): IKeyRange | undefined => {
   assertKeyRange(range, backend)
   if (range === undefined) return

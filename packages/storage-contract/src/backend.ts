@@ -29,11 +29,11 @@ import type { IQueryStageObserver } from './query.ts'
 import type { ITransactionBuilder, IOptimisticTransactionBuilder } from './concurrency.ts'
 
 /** Canonical provider label syntax shared by base and KV admission. */
-export const BACKEND_KIND_PATTERN = /^[a-z][a-z0-9-]{0,63}$/
+export const BACKEND_NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/
 
 /** Checks diagnostic backend syntax without admitting a store or granting any capability. */
-export function isBackendKind(value: unknown): value is string {
-  return typeof value === 'string' && BACKEND_KIND_PATTERN.test(value)
+export function isBackendName(value: unknown): value is string {
+  return typeof value === 'string' && BACKEND_NAME_PATTERN.test(value)
 }
 
 /** Original fluent families accept only their own method maps; no runtime registry lives here. */

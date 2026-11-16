@@ -2,7 +2,6 @@ import { type IOperationContext } from '../context.ts'
 import { type IStorageResource } from '../resource.ts'
 import { STORAGE_BLOB_METHODS } from '../capability-constants.ts'
 import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.ts'
-import { type IBackendKind } from '../capabilities.ts'
 import { assertOperationContext } from '../operation-context.ts'
 import { assertStringStorageKey } from '../key.ts'
 import { StorageContractError, StorageContractErrorCode } from '../errors.ts'
@@ -64,7 +63,7 @@ export const blob = /* @__PURE__ */ defineStandardStorageCapability<IBlobApi, 'b
 })
 
 /** Check the supported options object without touching a body reader or native resource. */
-function assertBlobOptions(options: unknown, backend: IBackendKind | undefined): void {
+function assertBlobOptions(options: unknown, backend: string | undefined): void {
   if (
     options !== undefined &&
     (typeof options !== 'object' || options === null || Array.isArray(options))
@@ -78,7 +77,7 @@ function assertBlobOptions(options: unknown, backend: IBackendKind | undefined):
 
 /** The existing blob argument identity is shared by pure validation and byte-copy admission. */
 export function invalidBlobInput(
-  backend: IBackendKind | undefined,
+  backend: string | undefined,
   cause?: unknown
 ): StorageContractError {
   return new StorageContractError(
@@ -93,7 +92,7 @@ export function assertStorageBlobPut(
   key: string,
   body: Uint8Array | ReadableStream<Uint8Array>,
   options: Parameters<IBlobApi['put']>[2],
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): void {
   assertStringStorageKey(key, backend)
   assertBlobOptions(options, backend)
@@ -123,7 +122,7 @@ export function assertStorageBlobPut(
 export function assertStorageBlobGet(
   key: string,
   options: Parameters<IBlobApi['get']>[1],
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): void {
   assertStringStorageKey(key, backend)
   assertBlobOptions(options, backend)
@@ -146,7 +145,7 @@ export function assertStorageBlobGet(
 export function assertStorageBlobList(
   options: Parameters<IBlobApi['list']>[0],
   ctx: IOperationContext | undefined,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): void {
   assertBlobOptions(options, backend)
   /** Omission alone selects the existing default prefix. */

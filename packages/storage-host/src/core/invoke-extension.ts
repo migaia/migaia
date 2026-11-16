@@ -8,7 +8,6 @@ import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
 import { UtilsErrorCode } from '@migaia/utils/error'
 
 import type { IStorageOperationRuntime } from './operation-reporter.ts'
-import type { IBackendKind } from '@migaia/storage-contract'
 import { StorageError, type IExtensionStage } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { throwIfAborted } from './operation.ts'
@@ -16,7 +15,7 @@ import { throwIfAborted } from './operation.ts'
 /** Execute developer-provided extension code behind one stable error boundary. */
 export const invokeExtension = async <T>(
   fn: () => T | Promise<T>,
-  backend: IBackendKind,
+  backend: string,
   operation: string,
   extensionStage: IExtensionStage,
   signal: IAbortSignal | undefined,

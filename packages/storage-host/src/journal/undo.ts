@@ -1,8 +1,7 @@
 import {
   assertOperationContext,
   StorageContractError,
-  StorageContractErrorCode,
-  type IBackendKind
+  StorageContractErrorCode
 } from '@migaia/storage-contract'
 import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.ts'
 import {
@@ -88,7 +87,7 @@ export type IStorageUndoTarget = Readonly<{
 export function storageJournalUndoImages(
   target: Readonly<{ namespace: string; backendInstanceId: string; orgId: string }>,
   changes: readonly IStorageJournalChange[],
-  backend: IBackendKind
+  backend: string
 ): readonly IUndoImage[] {
   /** Only this commit's canonical identities participate; no history index or authority is added. */
   const merged = new Map<string, IUndoImage>()
@@ -120,7 +119,7 @@ export function storageJournalUndoImages(
 export function readStorageUndoRows(
   input: unknown,
   owner: Readonly<{ namespace: string; backendInstanceId: string; orgId: string }>,
-  backend: IBackendKind
+  backend: string
 ): readonly IStorageUndoRow[] {
   try {
     /** Reuse logger's one JSON snapshot validator rather than a second persistence codec. */
@@ -173,7 +172,7 @@ export function readStorageUndoRows(
 /** Undo borrows original committed images and executes only the backend's original lock builder. */
 type IStorageUndoOptions = {
   readonly access: IStorageJournalBackendAccess
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly target: Readonly<{ namespace: string; backendInstanceId: string; orgId: string }>
   readonly undo: IUndoLogExt['undo']
   readonly terminal: IStorageJournalNamespace

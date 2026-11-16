@@ -5,7 +5,6 @@ import {
   type IRecordStore,
   type IKeyValueStoreAdmission,
   inspectStoreShape,
-  type IBackendKind,
   type IStorageCapabilities,
   type IStorageCapabilitiesInspection,
   isStorageCapabilities
@@ -78,7 +77,7 @@ export const snapshotKeyValueStore = (
 ):
   | {
       readonly store: IKeyValueStore
-      readonly backend: IBackendKind
+      readonly backend: string
       readonly capabilities: IStorageCapabilities
     }
   | undefined => {
@@ -102,7 +101,7 @@ export const snapshotRecordStore = <T = unknown>(
 ):
   | {
       readonly store: IRecordStore<T>
-      readonly backend: IBackendKind
+      readonly backend: string
       readonly capabilities: IStorageCapabilities
     }
   | undefined => {

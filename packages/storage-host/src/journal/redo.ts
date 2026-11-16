@@ -2,7 +2,6 @@ import {
   StorageContractError,
   StorageContractErrorCode,
   type IOperationContext,
-  type IBackendKind,
   type ILockKey
 } from '@migaia/storage-contract'
 import {
@@ -27,7 +26,7 @@ import { createStorageOperationReporter, reportCleanupError } from '../core/oper
 /** Redo borrows the original WAL index and text draft; it owns no queue or native terminal. */
 type IStorageRedoOptions = {
   readonly access: IStorageJournalBackendAccess
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly namespace: string
   readonly logger: Partial<IBinlogExt & IWalExt>
   readonly binlogValues?: boolean

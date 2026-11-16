@@ -8,7 +8,6 @@ import {
   assertStorageBlobList,
   type IOperationContext,
   type IStorageIterator,
-  type IBackendKind,
   StorageContractError,
   StorageContractErrorCode,
   StorageContractErrorText
@@ -27,7 +26,7 @@ type IBlobGetOptions = NonNullable<Parameters<IBlobApi['get']>[1]>
  * Copies bytes retained by an accepted upload; native detached-buffer failures keep argument
  * identity.
  */
-function snapshotBlobBytes(body: Uint8Array, backend: IBackendKind | undefined): Uint8Array {
+function snapshotBlobBytes(body: Uint8Array, backend: string | undefined): Uint8Array {
   try {
     return new Uint8Array(body)
   } catch (cause) {
@@ -40,7 +39,7 @@ export function snapshotStorageBlobPut(
   key: string,
   body: Uint8Array | ReadableStream<Uint8Array>,
   options: Parameters<IBlobApi['put']>[2],
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): Readonly<{
   key: string
   body: Uint8Array | ReadableStream<Uint8Array>
@@ -64,7 +63,7 @@ export function snapshotStorageBlobPut(
 export function snapshotStorageBlobGet(
   key: string,
   options: Parameters<IBlobApi['get']>[1],
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): Readonly<{ key: string; options: IBlobGetOptions }> {
   assertStorageBlobGet(key, options, backend)
   return {
@@ -83,7 +82,7 @@ export function snapshotStorageBlobGet(
 export function snapshotStorageBlobList(
   options: Parameters<IBlobApi['list']>[0],
   ctx: IOperationContext | undefined,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): Readonly<{
   prefix: string
   after: string | undefined
@@ -102,7 +101,7 @@ export function snapshotStorageBlobList(
 /** Backend failure classification is borrowed; this helper adds no error or lifecycle owner. */
 type IBlobReaderOptions = {
   readonly report: (error: unknown) => void | PromiseLike<void>
-  readonly backend?: IBackendKind
+  readonly backend?: string
   readonly normalizeFailure?: (error: unknown) => unknown
 }
 

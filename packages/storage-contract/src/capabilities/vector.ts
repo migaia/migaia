@@ -1,5 +1,4 @@
 import { type ICodecValue } from '@migaia/serialize/codec'
-import { type IBackendKind } from '../capabilities.ts'
 import { StorageContractError, StorageContractErrorCode } from '../errors.ts'
 import { StorageContractErrorText } from '../error-text.ts'
 import { type IOperationContext } from '../context.ts'
@@ -144,7 +143,7 @@ export type IStorageVectorPoint<TPayload> = {
 const VectorMetric = { cosine: 'cosine', dot: 'dot', euclid: 'euclid' } as const
 
 /** Reject malformed supported input before a backend can read or modify its collection. */
-export function invalidVector(backend: IBackendKind | undefined): never {
+export function invalidVector(backend: string | undefined): never {
   throw new StorageContractError(
     StorageContractErrorCode.invalidArgument,
     { backend },
@@ -155,7 +154,7 @@ export function invalidVector(backend: IBackendKind | undefined): never {
 /** Shape admission accepts class options while reading only the requested public fields. */
 export function assertVectorObject(
   value: unknown,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): asserts value is object {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) invalidVector(backend)
 }
@@ -164,7 +163,7 @@ export function assertVectorObject(
 export function assertStorageVectorCollection(
   name: string,
   options?: IStorageVectorConfiguration,
-  backend?: IBackendKind
+  backend?: string
 ): void {
   if (typeof name !== 'string') invalidVector(backend)
   if (options === undefined) return
@@ -183,7 +182,7 @@ export function assertStorageVectorCollection(
 export function assertStorageVector(
   input: readonly number[],
   options?: IStorageVectorValidation,
-  backend?: IBackendKind
+  backend?: string
 ): void {
   if (options !== undefined) assertVectorObject(options, backend)
   const dimensions = options?.dimensions
@@ -209,7 +208,7 @@ export function assertStorageVector(
 /** Validate native ID lists without copying already private recommendation batches. */
 export function assertStorageVectorIds(
   ids: readonly string[],
-  backend?: IBackendKind,
+  backend?: string,
   rejectDuplicates = false
 ): void {
   if (!Array.isArray(ids) || typeof rejectDuplicates !== 'boolean') invalidVector(backend)

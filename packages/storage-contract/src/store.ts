@@ -1,10 +1,6 @@
 import { type ITransactionOptions, type IWriteConcurrencyOptions } from './concurrency.ts'
 import { StorageContractError, StorageContractErrorCode } from './errors.ts'
-import {
-  isStorageCapabilities,
-  type IBackendKind,
-  type IStorageCapabilities
-} from './capabilities.ts'
+import { isStorageCapabilities, type IStorageCapabilities } from './capabilities.ts'
 import {
   type IKeyRange,
   type IOperationContext,
@@ -13,13 +9,13 @@ import {
   type IWriteOptions
 } from './context.ts'
 import { type ITransactionScope } from './transaction.ts'
-import { isBackendKind } from './backend.ts'
+import { isBackendName } from './backend.ts'
 import { type IStorageResource, type IStorageIterator } from './resource.ts'
 import { STORAGE_KEY_VALUE_BASE_METHODS } from './capability-constants.ts'
 
 /** Runtime-neutral resource identity and facts; specialized stores need no KV methods. */
 export type IStorageBase = IStorageResource & {
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly capabilities: IStorageCapabilities
 }
 
@@ -28,7 +24,7 @@ export type IStorageBaseAdmission =
   | {
       readonly valid: true
       readonly store: IStorageBase
-      readonly backend: IBackendKind
+      readonly backend: string
       readonly capabilities: IStorageCapabilities
       readonly dispose: () => Promise<void>
       readonly receiver: object
@@ -45,7 +41,7 @@ function hasStorageBaseShape(
   /** The provider is borrowed; shape inspection neither clones facts nor invokes cleanup. */
   const candidate = store as Record<PropertyKey, unknown>
   return (
-    isBackendKind(candidate.backend) &&
+    isBackendName(candidate.backend) &&
     isStorageCapabilities(candidate.capabilities) &&
     typeof candidate.dispose === 'function' &&
     (asyncDisposeKey === undefined || typeof candidate[asyncDisposeKey] === 'function')
@@ -178,7 +174,7 @@ export type IRecordStore<TValue = unknown> = IKeyValueStore & {
 
 type IStoreShapeInspection = {
   readonly valid: boolean
-  readonly backend: IBackendKind | undefined
+  readonly backend: string | undefined
   readonly capabilities: IStorageCapabilities | undefined
   readonly dispose: (() => Promise<void>) | undefined
   readonly cause: unknown
@@ -196,7 +192,7 @@ export type IKeyValueStoreAdmission =
       /** Original provider object, without cloning or proxying its operations. */
       readonly store: IKeyValueStore
       /** Backend label captured during this inspection. */
-      readonly backend: IBackendKind
+      readonly backend: string
       /** Independent descriptor for deferred host routing, including normalized legacy flags. */
       readonly capabilities: IStorageCapabilities
       /** Original dispose method; its receiver is supplied separately for lifecycle integration. */

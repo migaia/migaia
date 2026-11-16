@@ -1,4 +1,3 @@
-import type { IBackendKind } from '../types/capabilities.ts'
 import { StorageError, createStorageTypeError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.ts'
@@ -93,10 +92,7 @@ export const lengthPrefixedNamespaceCodec: INamespaceCodec = Object.freeze({
 })
 
 /** Admit the original namespace-codec receiver; its methods remain owned by the caller. */
-export const admitNamespaceCodec = (
-  codec: unknown,
-  backend: IBackendKind = 'local'
-): INamespaceCodec => {
+export const admitNamespaceCodec = (codec: unknown, backend: string = 'local'): INamespaceCodec => {
   if (typeof codec !== 'object' || codec === null || Array.isArray(codec))
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend,
@@ -126,7 +122,7 @@ export const namespacedStorageKey = (
   namespace: string,
   key: IStorageKey,
   codec: INamespaceCodec,
-  backend: IBackendKind
+  backend: string
 ): string => {
   if (typeof key === 'string') return namespacedKey(namespace, key, codec, backend)
   if (codec.encodeStorageKey === undefined || codec.decodeStorageKey === undefined)
@@ -156,7 +152,7 @@ export const stripStorageNamespace = (
   namespace: string,
   physicalKey: string,
   codec: INamespaceCodec,
-  backend: IBackendKind
+  backend: string
 ): IStorageKey | undefined => {
   if (codec.decodeStorageKey === undefined)
     return stripNamespace(namespace, physicalKey, codec, backend)
@@ -190,7 +186,7 @@ export const namespacedKey = (
   namespace: string,
   key: string,
   codec: INamespaceCodec = lengthPrefixedNamespaceCodec,
-  backend: IBackendKind = 'local'
+  backend: string = 'local'
 ): string => {
   if (typeof namespace !== 'string' || typeof key !== 'string')
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
@@ -221,7 +217,7 @@ export const stripNamespace = (
   namespace: string,
   physicalKey: string,
   codec: INamespaceCodec = lengthPrefixedNamespaceCodec,
-  backend: IBackendKind = 'local'
+  backend: string = 'local'
 ): string | undefined => {
   if (typeof namespace !== 'string' || typeof physicalKey !== 'string')
     throw new StorageError(StorageBrowserErrorCode.invalidConfig, {

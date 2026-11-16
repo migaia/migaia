@@ -1,4 +1,3 @@
-import type { IBackendKind } from '@migaia/storage-contract'
 import type { IStorageKey } from '@migaia/storage-contract'
 import { STORAGE_HOST_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import type { IStorageHostErrorCode } from '@migaia/storage-contract/error-code'
@@ -10,7 +9,7 @@ import { StorageErrorText } from './error-text.ts'
  */
 export type IStorageErrorDetails = {
   /** Backend whose operation failed, when known. */
-  readonly backend?: IBackendKind
+  readonly backend?: string
   /** Logical key associated with this failure. */
   readonly key?: string | IStorageKey
   /** Channel already occupying a conflicting logical key. */
@@ -156,7 +155,7 @@ export class StorageError<TCode extends string = IStorageHostErrorCode> extends 
   /** Semantic failure scenario; branch on this rather than message text. */
   readonly code!: TCode
   /** Backend associated with this operation. */
-  readonly backend?: IBackendKind
+  readonly backend?: string
   /** Logical key associated with this operation. */
   readonly key?: string | IStorageKey
   /** Channel already occupying the conflicting key. */

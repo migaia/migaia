@@ -4,7 +4,6 @@ import {
   type IConcurrencyStageObserver,
   type IStorageBase,
   StorageContractErrorText,
-  type IBackendKind,
   StorageContractError,
   StorageContractErrorCode,
   TransactionBuilderMethod,
@@ -154,7 +153,7 @@ export function resolveConcurrencyPolicy(
 
 /** Internal loop wiring reads captured backend/stages from the same authentic store registration. */
 export function readTransactionConcurrency(store: IStorageBase): {
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly stages: IConcurrencyStageObserver | undefined
 } {
   /** This lookup cannot admit a structurally copied store or a transaction view as an owner. */
@@ -191,7 +190,7 @@ type IBuilderState = {
 }
 
 /** Produces the existing argument boundary without introducing backend or execution authority. */
-function invalidBuilder(backend: IBackendKind, cause?: unknown): StorageContractError {
+function invalidBuilder(backend: string, cause?: unknown): StorageContractError {
   return new StorageContractError(
     StorageContractErrorCode.invalidArgument,
     { backend, cause },
@@ -211,7 +210,7 @@ type IOptimisticBuilderOptions<TStore extends IBuilderStore> = Omit<
 /** Original store and pure configuration are shared by the derived finite builder branches. */
 type IBuilderDefinition<TStore extends IBuilderStore, TMethods extends object> = {
   readonly store: TStore
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly options: ITransactionOptions & object
   readonly methods: TMethods | undefined
   readonly optimistic: boolean
