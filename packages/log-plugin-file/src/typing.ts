@@ -1,4 +1,4 @@
-import type { ILogFeatureRecord } from '@migaia/log-host/plugin'
+import type { ILogFeatureRecord } from '@migaia/log-host/sdk'
 
 /** Borrowed file operations need no Node, Bun or Deno-specific public type declarations. */
 export type IFileWriter = {

@@ -1,4 +1,4 @@
-import type { ILogFeatureRecord } from '@migaia/log-host/plugin'
+import type { ILogFeatureRecord } from '@migaia/log-host/sdk'
 import { createFilePlugin } from './file-core.ts'
 import type { IFilePluginConfig } from './typing.ts'
 

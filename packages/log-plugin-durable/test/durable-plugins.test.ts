@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest'
 
 import { createLogHost } from '@migaia/log-host'
 
-import type { ILogPlugin, ILogPluginCore, ILogEntry } from '@migaia/log-host/plugin'
+import type { ILogPlugin, ILogPluginCore, ILogEntry } from '@migaia/log-host/sdk'
 
 import { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '../src/index.ts'
 

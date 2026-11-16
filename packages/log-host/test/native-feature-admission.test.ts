@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { defineFeature } from '@migaia/plugin-host/features'
 import { createLogHost } from '../src/index.ts'
-import { defineLogFeature, defineLogPlugin, defineOutputPlugin } from '../src/plugin.ts'
+import { defineLogFeature, defineLogPlugin, defineOutputPlugin } from '../src/sdk.ts'
 import {
   batchFeature,
   formatFeature,

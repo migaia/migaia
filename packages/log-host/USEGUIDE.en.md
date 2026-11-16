@@ -31,7 +31,7 @@ The host facade and top-level context containers are frozen. Nested user values 
 
 ```ts
 import { createLogHost, levelPlugin } from '@migaia/log-host'
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 
@@ -86,7 +86,7 @@ When delivery fails and timeout cleanup also fails, `retryable` and `retryDelay`
 
 ```ts
 import { createLogHost } from '@migaia/log-host'
-import { defineOutputPlugin } from '@migaia/log-host/plugin'
+import { defineOutputPlugin } from '@migaia/log-host/sdk'
 import { batchFeature, formatFeature } from '@migaia/log-host/features'
 
 /** The transport owns its destination while the host owns delivery policy and resources. */
@@ -169,7 +169,7 @@ Runtime logging, flush and shutdown failures use the failure channel instead of 
 ```ts doc-test=run
 import assert from 'node:assert/strict'
 import { createLogHost, levelPlugin } from '@migaia/log-host'
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import {
   batchFeature,
   formatFeature,

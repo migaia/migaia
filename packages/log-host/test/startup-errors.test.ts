@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { createLogHost } from '../src/index.ts'
-import * as sdk from '../src/plugin.ts'
+import * as sdk from '../src/sdk.ts'
 import { formatFeature } from '../src/features/format.ts'
 import { thresholdFeature } from '../src/features/threshold.ts'
 import { uuidFeature } from '../src/features/uuid.ts'

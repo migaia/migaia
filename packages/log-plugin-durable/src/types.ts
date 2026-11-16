@@ -1,4 +1,4 @@
-import type { ILogPlugin } from '@migaia/log-host/plugin'
+import type { ILogPlugin } from '@migaia/log-host/sdk'
 import type { LogRecordState, LogStage } from './state-constants.ts'
 
 /** Portable JSON data accepted by durable records. */

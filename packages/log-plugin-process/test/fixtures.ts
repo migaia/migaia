@@ -1,4 +1,4 @@
-import type { ILogPluginCore } from '@migaia/log-host/plugin'
+import type { ILogPluginCore } from '@migaia/log-host/sdk'
 
 /** Event ownership is observable separately for every injected process object. */
 export class MemoryProcess {

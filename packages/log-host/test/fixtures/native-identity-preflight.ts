@@ -10,7 +10,7 @@ import {
   timeoutFeature,
   uuidFeature
 } from '../../src/features/index.ts'
-import { defineLogFeature } from '../../src/plugin.ts'
+import { defineLogFeature } from '../../src/sdk.ts'
 import { prettyFeature } from '@migaia/log-plugin-console'
 import type { ILogEntry } from '../../src/typing.ts'
 

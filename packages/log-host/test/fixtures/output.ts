@@ -1,5 +1,5 @@
 import { deferred, type IDeferred } from '@migaia/utils/promise'
-import { defineOutputPlugin } from '../../src/plugin.ts'
+import { defineOutputPlugin } from '../../src/sdk.ts'
 import type {
   ILogEntry,
   ILogFailure,

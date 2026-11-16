@@ -6,7 +6,7 @@ import {
   type ILogEntry,
   type ILogFeature,
   LogEntryDataKey
-} from '@migaia/log-host/plugin'
+} from '@migaia/log-host/sdk'
 import { consoleProcess } from './environment.ts'
 import { ConsoleColorMode, ConsoleEnvironmentKey } from './state-constants.ts'
 import type { IPrettyOptions } from './typing.ts'

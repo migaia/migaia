@@ -1,8 +1,8 @@
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { expect, it } from 'vitest'
 import { createLogHost } from '@migaia/log-host'
 import { formatFeature } from '@migaia/log-host/features'
-import { defineLogFeature } from '@migaia/log-host/plugin'
+import { defineLogFeature } from '@migaia/log-host/sdk'
 import { consolePlugin, prettyFeature } from '../src/index.ts'
 import { MemoryConsole, MemoryStdout } from './fixtures.ts'
 

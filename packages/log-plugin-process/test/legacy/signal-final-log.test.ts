@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { createLogHost } from '@migaia/log-host'
-import type { ILogEntry, ILogPluginCore } from '@migaia/log-host/plugin'
+import type { ILogEntry, ILogPluginCore } from '@migaia/log-host/sdk'
 import { processPlugin } from '../../src/index.ts'
 import { MemoryProcess, execution, nextTurn } from '../fixtures.ts'
 

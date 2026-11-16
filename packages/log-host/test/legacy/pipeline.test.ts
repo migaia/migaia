@@ -1,4 +1,4 @@
-import { defineLogPlugin } from '../../src/plugin.ts'
+import { defineLogPlugin } from '../../src/sdk.ts'
 import { expect, it, vi } from 'vitest'
 import { createLogHost, levelPlugin, forwardPlugin, type ILogEntry } from '../../src/index.ts'
 import { thresholdFeature, uuidFeature } from '../../src/features/index.ts'

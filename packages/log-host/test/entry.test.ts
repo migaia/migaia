@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { createLogHost, levelPlugin } from '../src/index.ts'
-import { defineOutputPlugin } from '../src/plugin.ts'
-import type { ILogOutputRecord } from '../src/plugin.ts'
+import { defineOutputPlugin } from '../src/sdk.ts'
+import type { ILogOutputRecord } from '../src/sdk.ts'
 
 /** The output fixture owns its observations without nested test callbacks. */
 class EntryCapture {

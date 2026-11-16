@@ -31,7 +31,7 @@ host 门面被冻结。`ctx` 的顶层容器、上下文路径与环境标记也
 
 ```ts
 import { createLogHost, levelPlugin } from '@migaia/log-host'
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 
@@ -90,7 +90,7 @@ retry 的 `attempts` 必须显式给出正安全整数；`backoff` 可为毫秒�
 
 ```ts
 import { createLogHost } from '@migaia/log-host'
-import { defineOutputPlugin } from '@migaia/log-host/plugin'
+import { defineOutputPlugin } from '@migaia/log-host/sdk'
 import { batchFeature, formatFeature } from '@migaia/log-host/features'
 
 /** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */
@@ -173,7 +173,7 @@ await log.shutdown('manual')
 ```ts doc-test=run
 import assert from 'node:assert/strict'
 import { createLogHost, levelPlugin } from '@migaia/log-host'
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import {
   batchFeature,
   formatFeature,

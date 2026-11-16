@@ -1,5 +1,5 @@
 import { detectServerRuntime } from '@migaia/utils'
-import type { ILogPlugin } from '@migaia/log-host/plugin'
+import type { ILogPlugin } from '@migaia/log-host/sdk'
 import { ProcessGroup, processGroups } from './group.ts'
 import { PROCESS_PLUGIN_NAME } from './state-constants.ts'
 import type { IProcessCapability, IProcessPluginConfig, IProcessPolicy } from './typing.ts'

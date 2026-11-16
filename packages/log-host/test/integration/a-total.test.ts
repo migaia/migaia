@@ -1,4 +1,4 @@
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { setImmediate } from 'node:timers'
 import { expect, it } from 'vitest'
 import { createLogHost, levelPlugin, LogHostStatus, type ILogFailure } from '@migaia/log-host'

@@ -1,4 +1,4 @@
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { createLogHost, levelPlugin, type ILogEntry, type ILogPluginCore } from '@migaia/log-host'
 import {
   batchFeature,

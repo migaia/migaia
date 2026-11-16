@@ -4,7 +4,7 @@ import { inspectFeatures } from '@migaia/plugin-host/composition'
 import { prettyFeature } from '@migaia/log-plugin-console'
 import { PluginHostErrorCode, type IFeatureOutput } from '@migaia/plugin-host'
 import { createLogHost } from '../src/index.ts'
-import { defineLogFeature, defineLogPlugin, defineOutputPlugin } from '../src/plugin.ts'
+import { defineLogFeature, defineLogPlugin, defineOutputPlugin } from '../src/sdk.ts'
 import {
   batchFeature,
   filterFeature,

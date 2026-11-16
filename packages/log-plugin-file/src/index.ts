@@ -1,4 +1,4 @@
-import type { ILogFeatureRecord } from '@migaia/log-host/plugin'
+import type { ILogFeatureRecord } from '@migaia/log-host/sdk'
 import { createFilePlugin, snapshotFileOptions } from './file-core.ts'
 import { nativeFileWriter } from './native-writer.ts'
 import type { IFilePluginConfig } from './typing.ts'

@@ -1,4 +1,4 @@
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { expect, it } from 'vitest'
 import { createLogHost, forwardPlugin } from '@migaia/log-host'
 import { batchFeature, formatFeature } from '@migaia/log-host/features'

@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import * as root from '../src/index.ts'
 import * as features from '../src/features/index.ts'
 import retryDefault from '../src/features/retry.ts'
-import { defineLogPlugin, projectLogEntry } from '../src/plugin.ts'
+import { defineLogPlugin, projectLogEntry } from '../src/sdk.ts'
 
 /** Public root state and factory layout retain their exact approved names. */
 function publicExports(): void {

@@ -1,4 +1,4 @@
-import type { ILogOutputFeatureRecord } from '@migaia/log-host/plugin'
+import type { ILogOutputFeatureRecord } from '@migaia/log-host/sdk'
 import type { ConsoleColorMode } from './state-constants.ts'
 
 /** Borrowed console methods keep their receiver and native argument identity. */

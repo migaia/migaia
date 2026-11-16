@@ -1,9 +1,9 @@
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { createLogHost } from '@migaia/log-host'
 import { serializeErrorChain } from '@migaia/utils/error'
 import { formatFeature } from '@migaia/log-host/features'
-import { defineLogFeature } from '@migaia/log-host/plugin'
+import { defineLogFeature } from '@migaia/log-host/sdk'
 import { httpPlugin } from '../src/index.ts'
 
 /**

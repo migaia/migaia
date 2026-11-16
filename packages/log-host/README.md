@@ -21,7 +21,7 @@ await log.shutdown('manual')
 
 ```ts
 import { createLogHost, levelPlugin } from '@migaia/log-host'
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { thresholdFeature, uuidFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 
@@ -65,7 +65,7 @@ feature 工厂返回 `@migaia/plugin-host` 的原生 opaque 定义，不暴露 d
 | 入口                               | 用途                                                                                          |
 | ---------------------------------- | --------------------------------------------------------------------------------------------- |
 | `@migaia/log-host`                 | `createLogHost`、`levelPlugin`、`forwardPlugin`、状态、默认 reporter 与 host 类型             |
-| `@migaia/log-host/plugin`          | `defineLogFeature`、`defineLogPlugin`、`defineOutputPlugin`、`projectLogEntry` 与插件作者类型 |
+| `@migaia/log-host/sdk`             | `defineLogFeature`、`defineLogPlugin`、`defineOutputPlugin`、`projectLogEntry` 与插件作者类型 |
 | `@migaia/log-host/features`        | 七个内置 feature                                                                              |
 | `@migaia/log-host/features/<name>` | 对应 feature 的默认导出                                                                       |
 
