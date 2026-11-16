@@ -2,14 +2,8 @@
  * Author real carriers, flow plugins and executing features through the one native installation
  * owner.
  */
-export {
-  defineTransportPlugin,
-  defineFlowPlugin,
-  defineFlowFeature,
-  defineLinkPolicy
-} from './define.ts'
+export { defineTransportPlugin, defineFlowPlugin, defineFlowFeature } from './define.ts'
 export type * from './types.ts'
-export { rpcFeaturesPlugin } from './flow-program.ts'
 export { registerRpcNativeFeature, readRpcFeature, findRpcNativeFeatureOutput } from './metadata.ts'
 export type { IRpcFeatureMetadata } from './metadata.ts'
 export { defineRpcSourcePlugin } from './source.ts'

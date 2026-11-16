@@ -7,7 +7,6 @@ import type {
   IRpcFlowFeature,
   IRpcFlowInstallation,
   IRpcFlowSetupContext,
-  IRpcLinkPolicyDefinition,
   IRpcTransportSetupContext
 } from './types.ts'
 import { RpcBuiltinFeature, type IRpcBuiltinFeature } from './flow-feature.ts'
@@ -39,9 +38,7 @@ export const RpcDefinitionKind = {
   transport: 'transport',
   source: 'source',
   flow: 'flow',
-  policy: 'policy',
   feature: 'feature',
-  features: 'features',
   callFeature: 'call-feature',
   nativeFeature: 'native-feature'
 } as const
@@ -60,28 +57,28 @@ export type IRpcDefinitionMetadata = Readonly<
     }
   | {
       kind: 'flow'
-      definition: IRpcFlowDefinition<object>
-      prepare(
+      /** Present only when the definition has a `setup` observer. */
+      prepare?(
         core: IPluginHostCore,
         rootSignal: IAbortSignal,
         context: IRpcFlowSetupContext
       ): Promise<IRpcFlowInstallation<object>>
+      /** Present only when the definition carries a `features` record; such a plugin is cold-only. */
+      shared?: Readonly<{
+        /** Original caller roots supply call defaults. */
+        features: IFeatureRecord
+        prepare(
+          core: IPluginHostCore,
+          rootSignal: IAbortSignal,
+          context: IRpcFlowSetupContext
+        ): Promise<IRpcSharedFlows>
+      }>
     }
-  | { kind: 'policy'; definition: IRpcLinkPolicyDefinition }
   | {
       kind: 'feature'
       definition: IRpcFlowDefinition<object>
       /** Only package-owned factories may assign a built-in capability identity. */
       builtin?: IRpcBuiltinFeature
-    }
-  | {
-      kind: 'features'
-      features: IFeatureRecord
-      prepare(
-        core: IPluginHostCore,
-        rootSignal: IAbortSignal,
-        context: IRpcFlowSetupContext
-      ): Promise<IRpcSharedFlows>
     }
   | { kind: 'call-feature'; role: 'timeout' | 'retry' }
   | { kind: 'native-feature'; role: string }

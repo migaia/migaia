@@ -52,35 +52,31 @@
       "types": "./dist/plugins/typegen/index.d.ts",
       "default": "./dist/plugins/typegen/index.js"
     },
-    "./plugins/schema": {
+    "./features/schema": {
       "types": "./dist/features/schema/index.d.ts",
       "default": "./dist/features/schema/index.js"
     },
-    "./plugins/auth": {
+    "./features/auth": {
       "types": "./dist/features/auth/index.d.ts",
       "default": "./dist/features/auth/index.js"
     },
-    "./plugins/error-map": {
+    "./features/error-map": {
       "types": "./dist/features/error-map/index.d.ts",
       "default": "./dist/features/error-map/index.js"
     },
-    "./plugins/chunk": {
+    "./features/chunk": {
       "types": "./dist/features/chunk/index.d.ts",
       "default": "./dist/features/chunk/index.js"
     },
-    "./plugins/batch": {
+    "./features/batch": {
       "types": "./dist/features/batch/index.d.ts",
       "default": "./dist/features/batch/index.js"
     },
-    "./plugins/limits": {
+    "./features/limits": {
       "types": "./dist/features/limits/index.d.ts",
       "default": "./dist/features/limits/index.js"
     },
-    "./plugins/link-policy": {
-      "types": "./dist/plugins/link-policy/index.d.ts",
-      "default": "./dist/plugins/link-policy/index.js"
-    },
-    "./plugins/idempotency": {
+    "./features/idempotency": {
       "types": "./dist/features/idempotency/index.d.ts",
       "default": "./dist/features/idempotency/index.js"
     },

@@ -257,58 +257,45 @@ export class RpcHost {
   /** Actual SDK native hooks join this receiving owner; no second plugin-host is created here. */
   async install(core: IPluginHostCore, metadata: IRpcDefinitionMetadata): Promise<void> {
     this.#assertOpen()
-    if (
-      this.#everCommittedTransport &&
-      (metadata.kind === RpcDefinitionKind.policy || metadata.kind === RpcDefinitionKind.features)
-    )
+    if (this.#everCommittedTransport && metadata.kind === RpcDefinitionKind.flow && metadata.shared)
       throw tagRpcError(new TypeError(HostErrorText.flowStarted), RpcCoreErrorCode.invalidConfig)
     if (metadata.kind === RpcDefinitionKind.transport)
       return this.#installTransport(core, metadata.definition, metadata.flows)
     if (metadata.kind === RpcDefinitionKind.source)
       return this.#namespace(metadata.namespace).installSource(core, metadata.definition)
-    if (metadata.kind === RpcDefinitionKind.policy) {
-      this.#flow.registerControls(core, (core as IRpcTransportSetupContext['owner']).features)
-      this.#features.setDefaults(
-        core,
-        metadata.definition.features,
-        (core as IRpcTransportSetupContext['owner']).features
-      )
-      return
-    }
     if (metadata.kind === RpcDefinitionKind.feature)
       throw tagRpcError(
         new TypeError(HostErrorText.flowFeatureRequired),
         RpcCoreErrorCode.invalidConfig
       )
+    if (metadata.kind !== RpcDefinitionKind.flow)
+      throw tagRpcError(new TypeError(HostErrorText.pluginInvalid), RpcCoreErrorCode.invalidConfig)
     /** Setup borrows the same Host lifetime and real work owners for every optional registration. */
     const context = this.#flowSetupContext(core)
-    if (metadata.kind === RpcDefinitionKind.features) {
+    if (metadata.shared) {
       if (
-        Object.values(metadata.features).some(
+        Object.values(metadata.shared.features).some(
           (feature) => readRpcFeature(feature)?.category === RpcFeatureCategory.call
         )
       )
         this.#features.setDefaults(
           core,
-          metadata.features,
+          metadata.shared.features,
           (core as IRpcTransportSetupContext['owner']).features
         )
       /** The original shared setup lends only its selected group relationship to native removal. */
-      const shared = await metadata.prepare(core, this.#controller.signal, context)
+      const shared = await metadata.shared.prepare(core, this.#controller.signal, context)
       this.#flow.registerShared(core, shared)
       getPluginRuntimeIntegration(core).allowRemovalWhen(
         () => this.closed || !this.#sharedFlowsInUse(shared)
       )
-      return
     }
     /**
      * Readonly observers retain their native registration rather than becoming information-flow
      * Features.
      */
-    if (metadata.kind !== RpcDefinitionKind.flow)
-      throw tagRpcError(new TypeError(HostErrorText.pluginInvalid), RpcCoreErrorCode.invalidConfig)
-    const installed = await metadata.prepare(core, this.#controller.signal, context)
-    this.#flow.register(core, installed)
+    if (metadata.prepare)
+      this.#flow.register(core, await metadata.prepare(core, this.#controller.signal, context))
   }
 
   /** Flow setup borrows stable Root work ports while native cores retain resource ownership. */

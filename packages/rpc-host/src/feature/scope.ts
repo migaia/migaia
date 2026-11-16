@@ -118,7 +118,7 @@ class ScopedAttempt<T> {
   }
 }
 
-/** Own installation caches and the sole call > transport > link-policy precedence rule. */
+/** Own installation caches and the sole call > transport > host-default precedence rule. */
 export class FeatureScope {
   /** Original namespace cache is the only object selected by calls without overrides. */
   readonly #namespaces = new Map<

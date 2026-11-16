@@ -424,24 +424,9 @@ export class FlowRegistry {
 
   /** Namespace control addressing merges shared roots with this transport's original local aliases. */
   controls(local: Readonly<Record<string, object>>): Readonly<Record<string, object>> {
-    /**
-     * Policy controls form the lowest addressing precedence before shared and transport-local
-     * roots.
-     */
+    /** Shared roots have lower addressing precedence than transport-local roots. */
     const controls: Record<string, object> = Object.create(null)
     return Object.freeze(Object.assign(controls, this.#sharedSnapshot().controls, local))
-  }
-
-  /**
-   * Native policy removal withdraws only its own output references; RpcHost rejects policy
-   * admission after the first transport commit under the startup admission contract.
-   */
-  registerControls(core: IPluginHostCore, controls: Readonly<Record<string, object>>): void {
-    this.registerShared(core, {
-      selection: new Map(),
-      entries: new Map(),
-      controls
-    })
   }
 
   /** Global namespace observations use committed groups; Session observations use their own group. */
