@@ -91,14 +91,14 @@ Node 24+ and Deno use `nodeSqliteDriver(path)` from `/node`. Bun uses `bunSqlite
 
 ## Essential API
 
-| API                                             | Purpose                                       |
-| ----------------------------------------------- | --------------------------------------------- |
-| `sqliteBackendPlugin({ driver, table?, wal? })` | Install SQLite storage                        |
-| `store.use(kv / records / sql / ttl / counter)` | Standard values, queries, expiry and counters |
-| `store.transaction` / `store.tx()`              | Native transactions on the same connection    |
-| `store.sql` / `tx.sql`                          | Parameterized SQL                             |
-| `host.org(id).backend('sqlite')`                | Organization-scoped data                      |
-| `sqliteMaintenanceFeature()`                    | Add backup and vacuum                         |
+| API                                              | Purpose                                       |
+| ------------------------------------------------ | --------------------------------------------- |
+| `sqliteBackendPlugin({ driver, table?, wal?  })` | Install SQLite storage                        |
+| `store.use(kv / records / sql / ttl / counter)`  | Standard values, queries, expiry and counters |
+| `store.transaction` / `store.tx()`               | Native transactions on the same connection    |
+| `store.sql` / `tx.sql`                           | Parameterized SQL                             |
+| `host.org(id).backend('sqlite')`                 | Organization-scoped data                      |
+| `sqliteMaintenanceFeature()`                     | Add backup and vacuum                         |
 
 ## Contract details
 

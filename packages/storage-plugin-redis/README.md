@@ -107,7 +107,7 @@ pnpm add redis ioredis
 
 | API                                                  | 用途                                 |
 | ---------------------------------------------------- | ------------------------------------ |
-| `redisBackendPlugin({ driver, prefix? }, features?)` | 安装 Redis 存储                      |
+| `redisBackendPlugin({ driver, prefix?, features? })` | 安装 Redis 存储                      |
 | `store.use(kv / records / ttl / counter)`            | 标准数据、期限和计数                 |
 | `store.transaction` / `store.tx()`                   | WATCH/EXEC 事务和逻辑键锁            |
 | `host.org(id).backend('redis')`                      | 固定组织的数据                       |

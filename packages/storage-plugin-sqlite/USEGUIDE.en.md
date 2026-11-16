@@ -96,7 +96,10 @@ import { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features
 await using connection = nodeSqliteDriver('./example-settings.sqlite')
 await using host = await createStorageHost({
   plugins: [
-    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })
+    sqliteBackendPlugin({
+      driver: connection,
+      features: { maintenance: sqliteMaintenanceFeature() }
+    })
   ] as const
 })
 const store = host.backend('sqlite')

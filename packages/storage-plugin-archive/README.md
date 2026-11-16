@@ -26,11 +26,11 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'archive',
+    name: 'archive',
     hot: 'hot',
     cold: 'cold',
     rules: [
@@ -71,7 +71,7 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { blob } from '@migaia/storage-contract'
 
 await using host = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const hot = host.backend('hot')
 const value = await hot.getRecord('event:a')
@@ -121,7 +121,7 @@ pnpm add --workspace @migaia/storage-host @migaia/storage-contract @migaia/stora
 
 | API                                         | 用途                           |
 | ------------------------------------------- | ------------------------------ |
-| `archivePlugin({id, hot, cold, rules})`     | 安装普通扩展。                 |
+| `archivePlugin({name, hot, cold, rules})`   | 安装普通扩展。                 |
 | `host.extensions.archiveRun(options?)`      | 移动匹配记录并返回进度。       |
 | `host.extensions.archiveGet(key, options?)` | 读热值或归档值，可显式恢复。   |
 | `host.extensions.archiveSweep(ctx?)`        | 删除无引用归档对象。           |
@@ -137,4 +137,4 @@ Memory、SQLite、PostgreSQL 可作热层；IndexedDB 热层不支持在事务�
 
 ## 从嵌套扩展迁移
 
-此前草案中的 `host.extensions.archive.run()`、`.get()`、`.sweep()` 改为 `host.extensions.archiveRun()`、`archiveGet()`、`archiveSweep()`。把三种调用分别替换为当前平铺函数；配置 `id: 'history'` 时使用 `historyRun`、`historyGet`、`historySweep`。组织视图同样从 `host.org(id).extensions` 调用。参数与返回值沿用各自操作的契约，不提供旧嵌套对象或兼容别名；资源仍由宿主释放。
+此前草案中的 `host.extensions.archive.run()`、`.get()`、`.sweep()` 改为 `host.extensions.archiveRun()`、`archiveGet()`、`archiveSweep()`。把三种调用分别替换为当前平铺函数；配置 `name: 'history'` 时使用 `historyRun`、`historyGet`、`historySweep`。组织视图同样从 `host.org(id).extensions` 调用。参数与返回值沿用各自操作的契约，不提供旧嵌套对象或兼容别名；资源仍由宿主释放。

@@ -72,7 +72,7 @@ export async function save(pool: Pool, key: string, value: string) {
 | 安装数据库、完成后释放存储与订阅 | `createStorageHost` 和 `host.dispose()`           |
 | 读写文本、记录、TTL、计数与 SQL  | `host.backend('postgres')`，或 `store.use(token)` |
 | 只访问一个组织的数据             | `host.org(orgId).backend('postgres')`             |
-| 增加向量、COPY、通知或复制       | 插件第二参数中的 Feature                          |
+| 增加向量、COPY、通知或复制       | 插件选项 `features` 中的 Feature                  |
 
 “能力令牌”是 `kv`、`records`、`ttl` 等功能标识；`use` 返回对应方法。“Feature”是显式安装的附加功能。“游标”是服务返回的检查点字符串，按原样保存和传回。
 
@@ -108,7 +108,7 @@ pnpm add pg pg-copy-streams pg-logical-replication postgres
 
 | API                                                                                     | 用途                     |
 | --------------------------------------------------------------------------------------- | ------------------------ |
-| `postgresBackendPlugin(options, features?)`                                             | 安装一个 PostgreSQL 后端 |
+| `postgresBackendPlugin({ ...options, features? })`                                      | 安装一个 PostgreSQL 后端 |
 | `store.use(kv / records / ttl / counter / sql)`                                         | 使用对应标准功能         |
 | `store.transaction` / `store.tx().lock(...).run(...)`                                   | 原生事务与显式逻辑键锁   |
 | `store.sql`                                                                             | 绑定参数的应用 SQL       |

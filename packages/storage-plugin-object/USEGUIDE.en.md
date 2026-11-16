@@ -157,12 +157,10 @@ import { objectPresignFeature } from '@migaia/storage-plugin-object/features/pre
 
 const host = await createStorageHost({
   plugins: [
-    objectBackendPlugin(
-      {
-        driver: s3ObjectDriver({ config: { region: 'us-east-1' }, bucket: 'application-objects' })
-      },
-      { presign: objectPresignFeature() }
-    )
+    objectBackendPlugin({
+      driver: s3ObjectDriver({ config: { region: 'us-east-1' }, bucket: 'application-objects' }),
+      features: { presign: objectPresignFeature() }
+    })
   ]
 })
 try {

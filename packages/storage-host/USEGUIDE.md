@@ -20,10 +20,10 @@ import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 const original = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'session' })]
+  plugins: [memoryBackendPlugin({ name: 'session' })]
 })
 try {
-  const host = await original.use(memoryBackendPlugin({ id: 'drafts' }))
+  const host = await original.use(memoryBackendPlugin({ name: 'drafts' }))
   await host.detect()
   await host.backend('session').set('user', 'ada')
   await host.backend('drafts').set('title', 'First draft')
@@ -88,7 +88,7 @@ const usersEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()('us
 })
 const host = await createStorageHost({ plugins: [memoryBackendPlugin(), usersEntityPlugin] })
 try {
-  const users = host.extensions[usersEntityPlugin.id](host.backend('memory'))
+  const users = host.extensions[usersEntityPlugin.name](host.backend('memory'))
   await users.put({ id: 'u1', name: 'Ada' })
   console.log(await users.get('u1'))
 } finally {
@@ -116,7 +116,7 @@ const ordersEntityPlugin = defineEntityPlugin<IOrder>()('orders', {
 })
 const host = await createStorageHost({ plugins: [memoryBackendPlugin(), ordersEntityPlugin] })
 try {
-  const orders = host.extensions[ordersEntityPlugin.id](host.backend('memory'))
+  const orders = host.extensions[ordersEntityPlugin.name](host.backend('memory'))
   await orders.put({ id: 'o1', state: 'paid', total: 20 })
   console.log(await orders.get('o1'))
   console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())
@@ -125,7 +125,7 @@ try {
 }
 ```
 
-也可通过 `const installed = await host.use(ordersEntityPlugin)` 增量安装，再使用 `installed.extensions[ordersEntityPlugin.id](store)`。仓储借用后端，不关闭它；实体被移除或宿主 dispose 后，保留的仓储、查询及迭代器失去访问权。在原事务中使用 `orders.in(tx)`，`orders.batch(...)` 使用一次原生 record 事务。schema/codec 保留原运行时转换及 cause。index/range 只选择一次，自定义比较器配合有限 limit；提前停止 stream 时主动 dispose。
+也可通过 `const installed = await host.use(ordersEntityPlugin)` 增量安装，再使用 `installed.extensions[ordersEntityPlugin.name](store)`。仓储借用后端，不关闭它；实体被移除或宿主 dispose 后，保留的仓储、查询及迭代器失去访问权。在原事务中使用 `orders.in(tx)`，`orders.batch(...)` 使用一次原生 record 事务。schema/codec 保留原运行时转换及 cause。index/range 只选择一次，自定义比较器配合有限 limit；提前停止 stream 时主动 dispose。
 
 ### 持久化版本化记录
 
@@ -157,10 +157,10 @@ const host = await createStorageHost({
 })
 try {
   const store = host.backend('memory')
-  const original = host.extensions[originalUsersEntityPlugin.id](store)
+  const original = host.extensions[originalUsersEntityPlugin.name](store)
   await original.put({ id: 'ada', name: ' Ada ' })
   await original.put({ id: 'lin', name: ' Lin ' })
-  const users = host.extensions[migratedUsersEntityPlugin.id](store)
+  const users = host.extensions[migratedUsersEntityPlugin.name](store)
   const result = await users.migrate({ batchSize: 1 })
   console.log(result.migrated, (await users.get('ada'))?.name)
 } finally {
@@ -268,9 +268,11 @@ import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-ch
 
 const host = await createStorageHost({
   plugins: [
-    memoryBackendPlugin(undefined, {
-      notifications: memoryNotificationsFeature(),
-      changeFeed: memoryChangeFeedFeature()
+    memoryBackendPlugin({
+      features: {
+        notifications: memoryNotificationsFeature(),
+        changeFeed: memoryChangeFeedFeature()
+      }
     })
   ]
 })

@@ -27,7 +27,7 @@ import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
-const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'values' })] })
+const base = await createStorageHost({ plugins: [memoryBackendPlugin({ name: 'values' })] })
 try {
   const host = await base.use(cachePlugin({ tiers: [{ backend: 'values', ttlMs: 30000 }] }))
   await host.detect()
@@ -97,7 +97,7 @@ pnpm add --workspace @migaia/storage-plugin-cache @migaia/storage-host @migaia/s
 
 | API                                              | 用途                                    |
 | ------------------------------------------------ | --------------------------------------- |
-| `cachePlugin(options, features?)`                | 选择已有数据层与可选 Feature            |
+| `cachePlugin({ ...options, features? })`         | 选择已有数据层与可选 Feature            |
 | `getOrLoad` / `getOrLoadEntry` / `getOrLoadMany` | 读取或共享回源；Entry 形式还给出状态    |
 | `peek(key)` / `stats()`                          | 查看条目与计数，不调用加载函数          |
 | `invalidate(key \| { prefix } \| { tag })`       | 删除匹配副本                            |

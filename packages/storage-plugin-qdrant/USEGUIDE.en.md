@@ -106,14 +106,14 @@ import { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/res
 const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
 await using host = await createStorageHost({
   plugins: [
-    qdrantBackendPlugin(
-      { url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' },
-      {
+    qdrantBackendPlugin({
+      url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333',
+      features: {
         rescore: qdrantRescoreFeature({
           collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }
         })
       }
-    )
+    })
   ]
 })
 const store = host.backend('qdrant')
@@ -203,7 +203,7 @@ Organization views share physical collections without creating collections/index
 
 ## Choose native features
 
-Pass Features as the factory's second argument to add methods under store.api. None has a transaction projection.
+Pass Features in the factory's `features` option to add methods under store.api. None has a transaction projection.
 
 | Entry and factory                                     | API and limits                                                                                                                                                                                                                    |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

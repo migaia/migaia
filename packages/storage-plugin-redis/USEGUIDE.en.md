@@ -75,15 +75,16 @@ await pool.connect()
 try {
   await using host = await createStorageHost({
     plugins: [
-      redisBackendPlugin(
-        { driver: nodeRedisDriver(pool), prefix: 'example-features' },
-        {
+      redisBackendPlugin({
+        driver: nodeRedisDriver(pool),
+        prefix: 'example-features',
+        features: {
           streams: redisStreamsFeature(),
           pubsub: redisPubSubFeature(),
           scores: redisSortedSetsFeature(),
           rate: redisRateLimitFeature({ limit: 3, windowMs: 1000 })
         }
-      )
+      })
     ] as const
   })
   const store = host.backend('redis')
@@ -128,10 +129,11 @@ await pool.connect()
 try {
   await using host = await createStorageHost({
     plugins: [
-      redisBackendPlugin(
-        { driver: nodeRedisDriver(pool), prefix: 'example-history' },
-        { history: redisChangeStreamFeature({ maxLen: 1000 }) }
-      )
+      redisBackendPlugin({
+        driver: nodeRedisDriver(pool),
+        prefix: 'example-history',
+        features: { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+      })
     ] as const
   })
   const store = host.backend('redis')
@@ -173,10 +175,11 @@ await pool.connect()
 try {
   await using host = await createStorageHost({
     plugins: [
-      redisBackendPlugin(
-        { driver: nodeRedisDriver(pool), prefix: 'example-vectors' },
-        { search: rediSearchVectorFeature() }
-      )
+      redisBackendPlugin({
+        driver: nodeRedisDriver(pool),
+        prefix: 'example-vectors',
+        features: { search: rediSearchVectorFeature() }
+      })
     ] as const
   })
   const store = host.backend('redis')

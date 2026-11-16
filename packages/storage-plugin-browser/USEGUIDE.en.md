@@ -9,7 +9,7 @@ import { createStorageHost } from '@migaia/storage-host'
 import { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'
 
 const host = await createStorageHost({
-  plugins: [localStorageBackendPlugin({ id: 'preferences', namespace: 'my-app' })]
+  plugins: [localStorageBackendPlugin({ name: 'preferences', namespace: 'my-app' })]
 })
 try {
   const preferences = host.backend('preferences')
@@ -29,7 +29,7 @@ Installation completes preparation before publishing stores. Reuse a plugin defi
 | `namespace`      | `default`; nonempty logical data namespace                        |
 | `namespaceCodec` | `lengthPrefixedNamespaceCodec`; encodes namespace and logical key |
 | `storage`        | native `globalThis.localStorage` or `globalThis.sessionStorage`   |
-| `id`             | `local` or `session`; selects the host registration               |
+| `name`           | `local` or `session`; selects the host registration               |
 
 A supplied Storage port must implement `length`, `getItem`, `setItem`, `removeItem`, `key`, and `clear`. Installation probes availability while preserving existing data. Refused host access yields `BACKEND_UNAVAILABLE`; invalid configuration yields `INVALID_CONFIG`. Native quota failure yields `QUOTA_EXCEEDED`. The advertised 5 MiB limit is an estimate, not a browser quota guarantee.
 
@@ -80,9 +80,9 @@ import { indexedDbChangeFeedFeature } from '@migaia/storage-plugin-browser/featu
 
 const host = await createStorageHost({
   plugins: [
-    indexedDbBackendPlugin(
-      { dbName: 'my-app' },
-      {
+    indexedDbBackendPlugin({
+      dbName: 'my-app',
+      features: {
         indexes: indexedDbIndexesFeature(),
         keyset: indexedDbKeysetFeature(),
         ttl: indexedDbTtlFeature(),
@@ -91,7 +91,7 @@ const host = await createStorageHost({
         notifications: indexedDbNotificationsFeature(),
         changeFeed: indexedDbChangeFeedFeature()
       }
-    )
+    })
   ]
 })
 try {
@@ -130,7 +130,9 @@ import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-d
 import { indexedDbBatchFeature } from '@migaia/storage-plugin-browser/features/indexed-db-batch'
 
 const host = await createStorageHost({
-  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }, { batch: indexedDbBatchFeature() })]
+  plugins: [
+    indexedDbBackendPlugin({ dbName: 'my-app', features: { batch: indexedDbBatchFeature() } })
+  ]
 })
 try {
   const store = host.backend('indexed-db')
@@ -175,7 +177,7 @@ const host = await createStorageHost({
   plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }), usersEntityPlugin]
 })
 try {
-  const users = host.extensions[usersEntityPlugin.id](host.backend('indexed-db'))
+  const users = host.extensions[usersEntityPlugin.name](host.backend('indexed-db'))
   await users.put({ id: 'a', name: 'Ada' })
   console.log(await users.get('a'))
 } finally {
@@ -187,29 +189,26 @@ The host entity module owns schemas, versioned envelopes, migration, and project
 
 ## Optional live queries
 
-Install `@migaia/reactive` explicitly when using the following example. Pass Features as the backend plugin’s second argument.
+Install `@migaia/reactive` explicitly when using the following example. Pass Features in the backend plugin's `features` option.
 
 ```ts
 import { createRuntime } from '@migaia/reactive'
 import { records } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
-import {
-  indexedDbBackendKind,
-  indexedDbBackendPlugin
-} from '@migaia/storage-plugin-browser/indexed-db'
+import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-db'
 import { reactiveFeature } from '@migaia/storage-plugin-browser/features/reactive'
 import { indexedDbNotificationsFeature } from '@migaia/storage-plugin-browser/features/indexed-db-notifications'
 
 const runtime = createRuntime()
 const host = await createStorageHost({
   plugins: [
-    indexedDbBackendPlugin(
-      { dbName: 'my-app' },
-      {
+    indexedDbBackendPlugin({
+      dbName: 'my-app',
+      features: {
         notifications: indexedDbNotificationsFeature(),
-        reactive: reactiveFeature(indexedDbBackendKind)
+        reactive: reactiveFeature()
       }
-    )
+    })
   ]
 })
 try {
@@ -259,7 +258,9 @@ import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-d
 import { indexedDbBlobFeature } from '@migaia/storage-plugin-browser/features/blobs'
 
 const host = await createStorageHost({
-  plugins: [indexedDbBackendPlugin({ dbName: 'attachments' }, { blobs: indexedDbBlobFeature() })]
+  plugins: [
+    indexedDbBackendPlugin({ dbName: 'attachments', features: { blobs: indexedDbBlobFeature() } })
+  ]
 })
 try {
   const store = host.backend('indexed-db')

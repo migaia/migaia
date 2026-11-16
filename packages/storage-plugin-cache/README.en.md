@@ -27,7 +27,7 @@ import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
-const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'values' })] })
+const base = await createStorageHost({ plugins: [memoryBackendPlugin({ name: 'values' })] })
 try {
   const host = await base.use(cachePlugin({ tiers: [{ backend: 'values', ttlMs: 30000 }] }))
   await host.detect()
@@ -97,7 +97,7 @@ The package declares Node.js 24 or a compatible runtime. Redis, PostgreSQL and o
 
 | API                                              | Purpose                                                     |
 | ------------------------------------------------ | ----------------------------------------------------------- |
-| `cachePlugin(options, features?)`                | Select existing tiers and optional Features                 |
+| `cachePlugin({ ...options, features? })`         | Select existing tiers and optional Features                 |
 | `getOrLoad` / `getOrLoadEntry` / `getOrLoadMany` | Read or share a load; Entry also returns cache status       |
 | `peek(key)` / `stats()`                          | Inspect entries and counters without loading                |
 | `invalidate(key \| { prefix } \| { tag })`       | Delete matching copies                                      |

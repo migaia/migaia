@@ -17,7 +17,7 @@ import { createStorageHost } from '@migaia/storage-host'
 import { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'
 
 const host = await createStorageHost({
-  plugins: [localStorageBackendPlugin({ id: 'preferences', namespace: 'my-app' })]
+  plugins: [localStorageBackendPlugin({ name: 'preferences', namespace: 'my-app' })]
 })
 try {
   const preferences = host.backend('preferences')
@@ -32,16 +32,16 @@ try {
 
 ## 选择后端
 
-| 入口              | 插件                          | 默认 ID      | 数据能力                                   |
+| 入口              | 插件                          | 默认名称     | 数据能力                                   |
 | ----------------- | ----------------------------- | ------------ | ------------------------------------------ |
 | `local-storage`   | `localStorageBackendPlugin`   | `local`      | 文本与同步读写                             |
 | `session-storage` | `sessionStorageBackendPlugin` | `session`    | 文本与同步读写                             |
 | `cookies`         | `cookieBackendPlugin`         | `cookies`    | 文本与同步读写，仅 JS 可见 Cookie          |
 | `indexed-db`      | `indexedDbBackendPlugin`      | `indexed-db` | 文本、字节、记录、原生事务；索引需 Feature |
 
-各后端入口还导出不透明种类标识及精确的选项、存储类型。`plugins/*` 入口导出对应插件函数。第一个参数为原生选项，第二个可选参数为 Feature 记录。共享能力与上下文类型直接从 `@migaia/storage-contract` 导入。
+各后端入口还导出后端类型及精确的选项、存储类型。`plugins/*` 入口导出对应插件函数。插件函数只接受一个选项对象：原生选项、可选的 `name` 和可选的 `features` 记录。共享能力与上下文类型直接从 `@migaia/storage-contract` 导入。
 
-内存后端、`createStorageHost`、`defineFeature` 与后端作者接口属于 `@migaia/storage-host`。实体仓储、结构适配与存储编解码器属于 `@migaia/storage-host/entity`。
+内存后端、`createStorageHost` 与后端作者接口属于 `@migaia/storage-host`。实体仓储、结构适配与存储编解码器属于 `@migaia/storage-host/entity`。
 
 实体唯一约束写入需要真实 record 事务或后端原生原子 value 提交端点；内置浏览器后端均提供。自定义纯 value 后端未登记 `core.registerValueCommit` 时，唯一写入在 schema 执行和修改前报 `UNSUPPORTED_CAPABILITY`，普通 KV 不受影响。作者契约见 host 实体使用指南。
 
@@ -62,9 +62,9 @@ import { indexedDbChangeFeedFeature } from '@migaia/storage-plugin-browser/featu
 
 const host = await createStorageHost({
   plugins: [
-    indexedDbBackendPlugin(
-      { dbName: 'my-app' },
-      {
+    indexedDbBackendPlugin({
+      dbName: 'my-app',
+      features: {
         indexes: indexedDbIndexesFeature(),
         keyset: indexedDbKeysetFeature(),
         ttl: indexedDbTtlFeature(),
@@ -73,7 +73,7 @@ const host = await createStorageHost({
         notifications: indexedDbNotificationsFeature(),
         changeFeed: indexedDbChangeFeedFeature()
       }
-    )
+    })
   ]
 })
 try {
@@ -83,7 +83,7 @@ try {
 }
 ```
 
-只选择需要的条目。`changeFeed` 需要同时显式选择 `notifications`，但不会替调用方安装；选择 `reactiveFeature(indexedDbBackendKind)` 后的 `.live()` 也需要 `notifications`，缺少时编码拒绝，不切换为轮询。memory 的 `.live()` 同样要求显式 `memoryNotificationsFeature()`；缺少时在 adapter/query 分配前报 `@migaia/storage-host / CHANGE_CONTROLLER_NOT_ASSEMBLED`。
+只选择需要的条目。`changeFeed` 需要同时显式选择 `notifications`，但不会替调用方安装；选择 `reactiveFeature()` 后的 `.live()` 也需要 `notifications`，缺少时编码拒绝，不切换为轮询。memory 的 `.live()` 同样要求显式 `memoryNotificationsFeature()`；缺少时在 adapter/query 分配前报 `@migaia/storage-host / CHANGE_CONTROLLER_NOT_ASSEMBLED`。
 
 缺少批量、journal、通知或变更流装配时调用对应入口，报 `@migaia/storage-plugin-browser / INDEXED_DB_FEATURE_NOT_INSTALLED` 并指出所需 Feature；缺少 TTL 时 `store.use(ttl)` 由规范 capability owner 报 `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`，消息指出 `ttl`。基础 `capabilities.secondaryIndexes`、`capabilities.batch`、`capabilities.changeFeed` 均为 false。已选择变更流仍须通过原生 realm/BroadcastChannel 准入。
 
@@ -108,7 +108,9 @@ import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-d
 import { indexedDbBatchFeature } from '@migaia/storage-plugin-browser/features/indexed-db-batch'
 
 const host = await createStorageHost({
-  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }, { batch: indexedDbBatchFeature() })]
+  plugins: [
+    indexedDbBackendPlugin({ dbName: 'my-app', features: { batch: indexedDbBatchFeature() } })
+  ]
 })
 try {
   const store = host.backend('indexed-db')
@@ -136,23 +138,20 @@ try {
 import { createRuntime } from '@migaia/reactive'
 import { records } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
-import {
-  indexedDbBackendKind,
-  indexedDbBackendPlugin
-} from '@migaia/storage-plugin-browser/indexed-db'
+import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-db'
 import { reactiveFeature } from '@migaia/storage-plugin-browser/features/reactive'
 import { indexedDbNotificationsFeature } from '@migaia/storage-plugin-browser/features/indexed-db-notifications'
 
 const runtime = createRuntime()
 const host = await createStorageHost({
   plugins: [
-    indexedDbBackendPlugin(
-      { dbName: 'my-app' },
-      {
+    indexedDbBackendPlugin({
+      dbName: 'my-app',
+      features: {
         notifications: indexedDbNotificationsFeature(),
-        reactive: reactiveFeature(indexedDbBackendKind)
+        reactive: reactiveFeature()
       }
-    )
+    })
   ]
 })
 try {
@@ -202,7 +201,9 @@ import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-d
 import { indexedDbBlobFeature } from '@migaia/storage-plugin-browser/features/blobs'
 
 const host = await createStorageHost({
-  plugins: [indexedDbBackendPlugin({ dbName: 'attachments' }, { blobs: indexedDbBlobFeature() })]
+  plugins: [
+    indexedDbBackendPlugin({ dbName: 'attachments', features: { blobs: indexedDbBlobFeature() } })
+  ]
 })
 try {
   const store = host.backend('indexed-db')

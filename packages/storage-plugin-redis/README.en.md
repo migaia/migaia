@@ -107,7 +107,7 @@ The root entry loads no SDK. ioredis and node-redis provide binary commands/EXEC
 
 | API                                                  | Purpose                                     |
 | ---------------------------------------------------- | ------------------------------------------- |
-| `redisBackendPlugin({ driver, prefix? }, features?)` | Install Redis storage                       |
+| `redisBackendPlugin({ driver, prefix?, features? })` | Install Redis storage                       |
 | `store.use(kv / records / ttl / counter)`            | Standard values, expiry and counters        |
 | `store.transaction` / `store.tx()`                   | WATCH/EXEC transactions and logical locks   |
 | `host.org(id).backend('redis')`                      | Organization-scoped data                    |
