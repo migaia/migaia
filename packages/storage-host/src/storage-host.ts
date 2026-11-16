@@ -24,7 +24,7 @@ import { observeThenableRejection } from '@migaia/utils/function'
 import { createStorageTypeError, createStorageAggregateError, StorageError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.ts'
-import type { IStorageDefinitionMetadata } from './contracts.ts'
+import { readStorageFeatureFailure, type IStorageDefinitionMetadata } from './contracts.ts'
 import type { IStorageStoreCell } from './store-cell.ts'
 import type { IStorageBase, IStorageBaseAdmission } from '@migaia/storage-contract'
 import type {
@@ -436,11 +436,15 @@ export class StorageHost<P extends readonly IStorageBackendPluginHandle[] = read
       },
       (error: unknown) => {
         // Provisional trusted values are owned by PluginHost rollback, not by this local map.
+        /** Set when a Feature factory threw: names the plugin and the Feature's root key. */
+        const featureFailure = batchToken.active
+          ? readStorageFeatureFailure(error, plugins)
+          : undefined
         /** Preserve the original failure under the correct host boundary identity. */
         const primary = batchToken.active
           ? new StorageError(
               StorageHostErrorCode.backendInstallFailed,
-              { cause: error },
+              { cause: error, backend: featureFailure?.plugin, feature: featureFailure?.feature },
               StorageErrorText.backendInstallFailed
             )
           : new StorageError(

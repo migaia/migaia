@@ -9,6 +9,7 @@ import {
 } from '@migaia/plugin-host'
 import type { IStorageBase } from '@migaia/storage-contract'
 import type { IScheduler } from '@migaia/utils/scheduler'
+import { walkErrorCauses } from '@migaia/utils/error'
 import { createStorageTypeError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { installStorageFeatures, type IStorageFeatureProjection } from './feature-install.ts'
@@ -40,7 +41,103 @@ export type IStorageDefinitionMetadata = {
   readonly id: string
   /** True for `defineBackendPlugin`: the plugin must hand over a Store and gets backend hooks. */
   readonly backend: boolean
+  /** The plugin's listed Features; read only to name a Feature whose factory failed. */
+  readonly features: IFeatureRecord | undefined
 }
+/** Which plugin a failed Feature factory was running for, and its root key when it is a root. */
+export type IStorageFeatureFailure = {
+  /** Name of the plugin whose registration ran the factory. */
+  readonly plugin: string
+  /** Key under which that plugin lists the Feature; absent for a dependency-only Feature. */
+  readonly feature?: string
+}
+/** What the factory wrapper knows when a Feature factory throws. */
+type IStorageFeatureFailureRecord = {
+  /** Name of the plugin whose registration ran the factory. */
+  readonly plugin: string
+  /** The failed Feature's own definition. */
+  readonly definition: object | undefined
+}
+/**
+ * Thrown values of failed Feature factories, mapped to where they failed. The thrown value itself
+ * is rethrown unchanged; the install boundary reads this table to name the plugin and Feature.
+ */
+const featureFailures = new WeakMap<object, IStorageFeatureFailureRecord>()
+/** Lets the factory wrapper name its own definition, which exists only after it is defined. */
+type IStorageFeatureHolder = { feature?: object }
+
+/** Run one Feature factory; on failure record its plugin and definition, then rethrow unchanged. */
+function runStorageFeatureFactory(
+  factory: Function,
+  holder: IStorageFeatureHolder,
+  core: unknown,
+  dependencies: unknown
+): unknown {
+  try {
+    return Reflect.apply(factory, undefined, [core, dependencies])
+  } catch (error) {
+    recordStorageFeatureFailure(error, holder, core)
+    throw error
+  }
+}
+
+/** Remember where a thrown object came from; the first record for one thrown value is kept. */
+function recordStorageFeatureFailure(
+  error: unknown,
+  holder: IStorageFeatureHolder,
+  core: unknown
+): void {
+  if ((typeof error !== 'object' && typeof error !== 'function') || error === null) return
+  if (featureFailures.has(error)) return
+  /** Every storage registration exposes its plugin name to its Features under this key. */
+  const readPluginName = (core as { featureExpose?: { getBackendId?: unknown } } | null)
+    ?.featureExpose?.getBackendId
+  if (typeof readPluginName !== 'function') return
+  /** The registration's own name; no user code runs in this read. */
+  const plugin: unknown = readPluginName()
+  if (typeof plugin !== 'string') return
+  featureFailures.set(error, { plugin, definition: holder.feature })
+}
+
+/**
+ * Find the Feature failure behind an install error of the batch `plugins`. The cause chain and
+ * `AggregateError.errors` are searched in order with the bounded walker; undefined means no Feature
+ * factory threw it. The root key is looked up in the failing plugin's own definition, so it is
+ * absent for a Feature that is only a dependency of a listed root.
+ */
+export function readStorageFeatureFailure(
+  error: unknown,
+  plugins: readonly object[]
+): IStorageFeatureFailure | undefined {
+  for (const candidate of walkErrorCauses(error)) {
+    if ((typeof candidate !== 'object' && typeof candidate !== 'function') || candidate === null)
+      continue
+    /** Recorded only for values thrown by a storage Feature factory. */
+    const record = featureFailures.get(candidate)
+    if (record === undefined) continue
+    /** Key under which the failing plugin lists the failed definition. */
+    const feature = findStorageFeatureRootKey(record, plugins)
+    return feature === undefined ? { plugin: record.plugin } : { plugin: record.plugin, feature }
+  }
+  return undefined
+}
+
+/** Names are unique within one batch, so the first definition of that name is the failing one. */
+function findStorageFeatureRootKey(
+  record: IStorageFeatureFailureRecord,
+  plugins: readonly object[]
+): string | undefined {
+  for (const plugin of plugins) {
+    /** Storage facts of one batch entry; undefined for a definition storage did not make. */
+    const metadata = storageDefinitions.get(plugin)
+    if (metadata?.id !== record.plugin) continue
+    for (const [key, definition] of Object.entries(metadata.features ?? {}))
+      if (definition === record.definition) return key
+    return undefined
+  }
+  return undefined
+}
+
 /** Storage's private additions attached only after a native hook observes the caller output. */
 type IStorageNativeProjectionFields = Readonly<Record<PropertyKey, unknown>>
 
@@ -110,7 +207,16 @@ function createNativeDescriptorProjection(value: unknown, hooks: IStorageDescrip
 export const defineStorageFeature: IStorageFeatureDefiner<never> = ((
   factory: Function,
   dependencies?: IFeatureRecord
-) => defineNativeFeature(factory as never, dependencies as never)) as never
+) => {
+  /** Filled right after definition so the wrapper can name this Feature when its factory fails. */
+  const holder: IStorageFeatureHolder = {}
+  holder.feature = defineNativeFeature(
+    ((core: unknown, resolved: unknown) =>
+      runStorageFeatureFactory(factory, holder, core, resolved)) as never,
+    dependencies as never
+  )
+  return holder.feature
+}) as never
 /** Installation-local native additions come from the original facade, never public object fields. */
 type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly registerJournalRuntime: IStoragePluginCore['registerJournalRuntime']
@@ -212,7 +318,7 @@ function defineStoragePlugin(
     (core) => createStorageNativeRegistration(context, core as unknown as IStorageNativeCore),
     features as never
   )
-  storageDefinitions.set(definition, { id: name, backend })
+  storageDefinitions.set(definition, { id: name, backend, features })
   return definition
 }
 

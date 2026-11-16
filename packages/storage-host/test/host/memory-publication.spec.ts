@@ -2,6 +2,7 @@ import { memoryNotificationsFeature } from '../../src/features/memory-notificati
 import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
+import { walkErrorCauses } from '@migaia/utils/error'
 import { createStorageHost } from '../../src/index.ts'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import { definePlugin } from '../../src/sdk.ts'
@@ -180,4 +181,26 @@ it('publishes completed transactions and preserves exact multiple-backend public
   expect(host.dispose()).toBe(closing)
   await closing
   stop()
+})
+
+it('names the plugin and Feature key when a Feature factory fails during install', async () => {
+  /** The exact thrown value must stay reachable, unchanged, on the install error's cause chain. */
+  const failure = new TypeError('feature factory failure fixture')
+  /** A Feature whose factory fails the way a Feature installed on the wrong backend would. */
+  const brokenFeature = defineMemoryFeature(() => {
+    throw failure
+  })
+  /** Captured so the cause chain can be searched for the original thrown value. */
+  const rejection = await createStorageHost({
+    plugins: [memoryBackendPlugin({ name: 'main', features: { broken: brokenFeature } })]
+  }).then(
+    () => undefined,
+    (error: unknown) => error
+  )
+  expect(rejection).toMatchObject({
+    code: 'BACKEND_INSTALL_FAILED',
+    backend: 'main',
+    feature: 'broken'
+  })
+  expect(walkErrorCauses(rejection)).toContain(failure)
 })
