@@ -4,7 +4,7 @@ import {
   defineOutputPlugin,
   type ILogOutputRecord,
   type ILogFeatureRecord
-} from '@migaia/log-host/plugin'
+} from '@migaia/log-host/sdk'
 import { ERROR_SOURCE, LogFileErrorCode, type ILogFileErrorCode } from './error-code.ts'
 import { LogFileErrorText } from './error-text.ts'
 import type { IFilePluginConfig, IFileWriter } from './typing.ts'

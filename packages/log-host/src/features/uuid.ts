@@ -1,4 +1,5 @@
-import { defineNativeLogFeature, type ILogFeatureRuntime } from '../feature-metadata.ts'
+import { defineFeature } from '@migaia/plugin-host/features'
+import type { ILogFeatureRuntime } from '../feature-metadata.ts'
 import { FeaturePhase } from '../state-constants.ts'
 import type { ILogEntry, ILogFeature } from '../typing.ts'
 
@@ -29,8 +30,6 @@ class UuidFeature {
 export function uuidFeature(options: { display?: boolean } = {}): ILogFeature {
   /** Capture definition policy while each native installation creates its own stage owner. */
   const display = options.display ?? false
-  return defineNativeLogFeature({ phase: FeaturePhase.entry }, () =>
-    new UuidFeature(display).runtime()
-  )
+  return defineFeature(() => new UuidFeature(display).runtime())
 }
 export default uuidFeature

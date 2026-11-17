@@ -1,6 +1,6 @@
 import { expectTypeOf } from 'vitest'
 import { createLogHost, levelPlugin, LogHostStatus } from '../src/index.ts'
-import { defineOutputPlugin, defineLogFeature, defineLogPlugin } from '../src/plugin.ts'
+import { defineOutputPlugin, defineLogFeature, defineLogPlugin } from '../src/sdk.ts'
 import { filterFeature, thresholdFeature, uuidFeature } from '../src/features/index.ts'
 import type { ILogPluginCore, ILogFeature, ILevelPluginExt } from '../src/typing.ts'
 import type { IPluginRemoval } from '@migaia/plugin-host'

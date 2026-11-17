@@ -27,7 +27,7 @@
       "@migaia/lifecycle": ["../../packages/lifecycle/dist/index.d.ts"],
       "@migaia/utils/promise": ["../../packages/utils/dist/promise.d.ts"],
       "@migaia/log-host": ["../../packages/log-host/dist/index.d.ts"],
-      "@migaia/log-host/plugin": ["../../packages/log-host/dist/plugin.d.ts"],
+      "@migaia/log-host/sdk": ["../../packages/log-host/dist/sdk.d.ts"],
       "@migaia/log-host/features": ["../../packages/log-host/dist/features/index.d.ts"],
       "@migaia/log-host/features/threshold": [
         "../../packages/log-host/dist/features/threshold.d.ts"

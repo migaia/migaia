@@ -1,9 +1,9 @@
-import { defineLogPlugin } from '../src/plugin.ts'
+import { defineLogPlugin } from '../src/sdk.ts'
 import { expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createLogHost } from '../src/index.ts'
-import { defineLogFeature } from '../src/plugin.ts'
+import { defineLogFeature } from '../src/sdk.ts'
 import {
   filterFeature,
   formatFeature,

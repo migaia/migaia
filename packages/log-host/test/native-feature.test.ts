@@ -4,7 +4,7 @@ import { inspectFeatures } from '@migaia/plugin-host/composition'
 import { prettyFeature } from '@migaia/log-plugin-console'
 import { PluginHostErrorCode, type IFeatureOutput } from '@migaia/plugin-host'
 import { createLogHost } from '../src/index.ts'
-import { defineLogFeature, defineLogPlugin, defineOutputPlugin } from '../src/plugin.ts'
+import { defineLogFeature, defineLogPlugin, defineOutputPlugin } from '../src/sdk.ts'
 import {
   batchFeature,
   filterFeature,
@@ -291,15 +291,17 @@ function singularPolicyPairs(): readonly ISingularPolicyPair[] {
 /** One plugin record holds each singular slot once; host plugins share one host-wide slot. */
 async function singularPoliciesAtInstallation(): Promise<void> {
   for (const features of singularPolicyPairs()) {
-    expect(() =>
-      defineOutputPlugin({
-        name: 'collision-output',
-        batchable: true,
-        defaultFormat: 'json',
-        features,
-        deliver: ignoreNativeDelivery
-      })
-    ).toThrowError(expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' }))
+    /** The cold definition is accepted; its duplicate singular role is rejected at installation. */
+    const collision = defineOutputPlugin({
+      name: 'collision-output',
+      batchable: true,
+      defaultFormat: 'json',
+      features,
+      deliver: ignoreNativeDelivery
+    })
+    expect(() => createLogHost({ plugins: [collision] })).toThrowError(
+      expect.objectContaining({ source: 'logging', code: 'INVALID_OPTION' })
+    )
     /** A committed carrier and real output define the state against which a later install checks. */
     const output = new CaptureOutput()
     /** Different aliases prevent key conflicts from masking a duplicate execution slot. */

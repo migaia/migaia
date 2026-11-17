@@ -9,7 +9,7 @@ import {
   type ILogOutputRecord,
   type ILogPluginCore,
   LogFailureSource
-} from '@migaia/log-host/plugin'
+} from '@migaia/log-host/sdk'
 import { consoleProcess } from './environment.ts'
 import { prettyFeature } from './pretty.ts'
 import { CONSOLE_PLUGIN_NAME, ConsoleFormat, ConsoleEnvironmentKey } from './state-constants.ts'

@@ -7,7 +7,7 @@ import type {
   IDefinedLogPlugin,
   ILogPluginCore
 } from './typing.ts'
-import { featureScope, installedFeatureScope } from './feature-metadata.ts'
+import { featureScope, admitInstalledFeatures } from './feature-metadata.ts'
 import {
   featureControlExtensions,
   composeFeatureExtensions,
@@ -39,7 +39,7 @@ class LogPluginDefinition<
   /** Root aliases retain the exact native feature identities. */
   readonly features: F
 
-  /** Validate only the declaring scope before any resource-owning native installation begins. */
+  /** Validate only the record's native shape; log roles are admitted when the plugin installs. */
   constructor(definition: ILogPluginDefinition<N, F, O, C>) {
     featureScope(definition.features)
     this.features = Object.freeze({ ...definition.features }) as F
@@ -50,8 +50,8 @@ class LogPluginDefinition<
   install(
     core: ILogPluginCore & { readonly features: IFeatureOutputs<F> }
   ): O & ILogControlExtensions<N, F> {
-    /** One installation prepares host-wide policy in the log-owned scope. */
-    registerLogPolicy(core, installedFeatureScope(this.features, core.features))
+    /** Admission runs first, then one installation prepares host-wide policy in the log scope. */
+    registerLogPolicy(core, admitInstalledFeatures(this.features, core.features))
     /** Application extensions install before the prepared log scope becomes visible. */
     const extensions = this.#definition.install?.(core) ?? ({} as O)
     /** Native admission still receives invalid results unchanged; valid data keeps its descriptors. */

@@ -1,5 +1,5 @@
 import { LogLevel, defaultLogFailureReporter } from '@migaia/log-host'
-import type { ILogPluginCore, IShutdownReason } from '@migaia/log-host/plugin'
+import type { ILogPluginCore, IShutdownReason } from '@migaia/log-host/sdk'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { LogProcessErrorCode } from './error-code.ts'
 import { LogProcessErrorText } from './error-text.ts'

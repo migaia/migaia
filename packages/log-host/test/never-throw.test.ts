@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { createLogHost, defaultLogFailureReporter } from '../src/index.ts'
-import { defineOutputPlugin } from '../src/plugin.ts'
+import { defineOutputPlugin } from '../src/sdk.ts'
 import { LogHost } from '../src/host.ts'
 import type { ILogEntry, ILogFailure } from '../src/typing.ts'
 import { nextTurn } from './fixtures/output.ts'

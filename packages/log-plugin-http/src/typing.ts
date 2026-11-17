@@ -1,4 +1,4 @@
-import type { ILogFeatureRecord } from '@migaia/log-host/plugin'
+import type { ILogFeatureRecord } from '@migaia/log-host/sdk'
 
 /** A fetch response needs only success, status and the existing Retry-After header reader. */
 export type IHttpResponse = {

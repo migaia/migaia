@@ -1,10 +1,10 @@
-import { defineLogPlugin } from '../src/plugin.ts'
+import { defineLogPlugin } from '../src/sdk.ts'
 import { expect, it } from 'vitest'
 import { createLogHost } from '../src/index.ts'
 import { filterFeature } from '../src/features/filter.ts'
 import { uuidFeature } from '../src/features/uuid.ts'
 import { formatFeature } from '../src/features/format.ts'
-import { projectLogEntry } from '../src/plugin.ts'
+import { projectLogEntry } from '../src/sdk.ts'
 import type { ILogEntry } from '../src/typing.ts'
 import { CaptureOutput, messageOf } from './fixtures/output.ts'
 

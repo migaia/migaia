@@ -31,7 +31,7 @@ The host facade and top-level context containers are frozen. Nested user values 
 
 ```ts
 import { createLogHost, levelPlugin } from '@migaia/log-host'
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 
@@ -64,7 +64,7 @@ Unknown tags bypass only the standard level threshold. `atLevel()` keeps the bus
 
 Entry features execute once at host ingress. Each output then follows gate, format, batch, retry, timeout and transport phases, retaining effective record declaration order within the gate phase. `defineLogPlugin({ name, features })` installs host-wide policy through native `definePlugin`. `createLogHost` has no `features` option; policies arrive through caller-declared plugins. `defineOutputPlugin` policies apply only to their own output. Both use `{ alias: feature }` records in property declaration order. The record key is the feature name: output `features.<key>` overrides the same host-wide key. Different keys retain both features even when they use the same factory; `{ a: thresholdFeature(), b: thresholdFeature() }` applies both gates. Surviving host gates precede local gates in declaration order. Entry features belong only to host-wide carriers.
 
-Each output applies at most one format, batch, retry and timeout. When an output configures one of these itself, it replaces the host-wide one of the same kind, even under a different key. One plugin record holds at most one of each, checked when the plugin is defined. Host-wide carriers cannot share a key or each supply the same kind, including during dynamic `use()`. Duplicate host aliases and invalid individual records retain `logging / INVALID_OPTION`; two global carriers contributing the same singular format, batch, retry or timeout role fail with `plugin.host / FEATURE_ROLE_CONFLICT`. The output's `defaultFormat` applies only when no explicit formatter survives.
+Each output applies at most one format, batch, retry and timeout. When an output configures one of these itself, it replaces the host-wide one of the same kind, even under a different key. One plugin record holds at most one of each, checked when the plugin is installed (`createLogHost` or `use()`). Host-wide carriers cannot share a key or each supply the same kind, including during dynamic `use()`. Duplicate host aliases and invalid individual records retain `logging / INVALID_OPTION`; two global carriers contributing the same singular format, batch, retry or timeout role fail with `plugin.host / FEATURE_ROLE_CONFLICT`. The output's `defaultFormat` applies only when no explicit formatter survives.
 
 | Feature                               | Behavior                                                                                    |
 | ------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -86,7 +86,7 @@ When delivery fails and timeout cleanup also fails, `retryable` and `retryDelay`
 
 ```ts
 import { createLogHost } from '@migaia/log-host'
-import { defineOutputPlugin } from '@migaia/log-host/plugin'
+import { defineOutputPlugin } from '@migaia/log-host/sdk'
 import { batchFeature, formatFeature } from '@migaia/log-host/features'
 
 /** The transport owns its destination while the host owns delivery policy and resources. */
@@ -111,11 +111,11 @@ await log.shutdown('manual')
 
 `deliver` receives readonly records and `{ signal, format }`. Each record carries native entry and selected text. `context.format` is the selected installed formatter implementation, rather than the cold feature token. Observe its formatter or optional pretty-rendering behavior instead of comparing token identity.
 
-Set `consumesText: false` and omit `defaultFormat` for an entry-only output. Its callback receives records containing only `entry` and a context containing only `signal`. Host formatting is skipped for that output; configuring any output-local format throws `INVALID_OPTION` at creation. Entry features, gates, batching, retry and timeout still apply. Omitting `consumesText` keeps the existing text callback types and required defaultFormat.
+Set `consumesText: false` and omit `defaultFormat` for an entry-only output. Its callback receives records containing only `entry` and a context containing only `signal`. Host formatting is skipped for that output; configuring any output-local format throws `INVALID_OPTION` when the output is installed. Entry features, gates, batching, retry and timeout still apply. Omitting `consumesText` keeps the existing text callback types and required defaultFormat.
 
 `defineLogPlugin` and `defineOutputPlugin` declare real native `features` records. Their optional `install(core)` reads native outputs through `core.features[alias]` and returns precisely inferred host and dynamic-handle extensions. Filter and threshold controls automatically use `${pluginName}_${alias}_${method}` names; plugin-host rejects duplicate complete extension names. Reusing a token never shares mutable state between plugin or host installations. A carrier control affects every output inheriting that carrier policy. The real core provides scoped config, lifecycle, scheduler, install-owned resources, sinks, failures, deferred work, flush and shutdown. Plugin-host retains rollback and resource ownership.
 
-Use `defineLogFeature()` for a complete entry, gate or format implementation, for example `defineLogFeature({ phase: 'gate', accept: () => true })`. Delivery remains limited to built-in batch/retry/timeout factories. Every factory returns an opaque native `defineFeature` token without phase, stage, setLevel or add fields. The definition accepts no feature name; the record key supplies it. Package-private metadata describes phase and scope rules and identifies only the three built-in singular delivery policies; native installation outputs own state and controls. Object literals, shallow copies and type assertions cannot manufacture plugin-host identity.
+Use `defineLogFeature()` for a complete entry, gate or format implementation, for example `defineLogFeature({ phase: 'gate', accept: () => true })`. Delivery remains limited to built-in batch/retry/timeout factories. Every factory returns an opaque native `defineFeature` token without phase, stage, setLevel or add fields. The definition accepts no feature name; the record key supplies it. The phase and the built-in delivery policy are read from each feature's installed output, so phase and scope rules are checked when the declaring plugin is installed; native installation outputs own state and controls. Object literals, shallow copies and type assertions cannot manufacture plugin-host identity.
 
 ## Errors and lifecycle
 
@@ -169,7 +169,7 @@ Runtime logging, flush and shutdown failures use the failure channel instead of 
 ```ts doc-test=run
 import assert from 'node:assert/strict'
 import { createLogHost, levelPlugin } from '@migaia/log-host'
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import {
   batchFeature,
   formatFeature,

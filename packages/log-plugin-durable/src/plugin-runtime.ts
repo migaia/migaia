@@ -1,9 +1,9 @@
 import { isOwnDurableError } from './errors.ts'
-import { LogFailureSource } from '@migaia/log-host/plugin'
+import { LogFailureSource } from '@migaia/log-host/sdk'
 import { DurableErrorField } from './errors.ts'
 import { createConcurrencyLimiter, deferred } from '@migaia/utils/promise'
 import { noop } from '@migaia/utils/function'
-import type { ILogPluginCore } from '@migaia/log-host/plugin'
+import type { ILogPluginCore } from '@migaia/log-host/sdk'
 import {
   createDurableError,
   createDurableTypeError,

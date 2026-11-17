@@ -21,7 +21,7 @@ Output has not started when `info()` returns. `flush()` drains admitted entries,
 
 ```ts
 import { createLogHost, levelPlugin } from '@migaia/log-host'
-import { defineLogPlugin } from '@migaia/log-host/plugin'
+import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { thresholdFeature, uuidFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 
@@ -65,7 +65,7 @@ An output can declare `consumesText: false` to receive entries and a cancellatio
 | Entry                              | Purpose                                                                                               |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `@migaia/log-host`                 | Host factory, level/forward plugins, status, default reporter and host types                          |
-| `@migaia/log-host/plugin`          | `defineLogFeature`, `defineLogPlugin`, `defineOutputPlugin`, shared error projection and author types |
+| `@migaia/log-host/sdk`             | `defineLogFeature`, `defineLogPlugin`, `defineOutputPlugin`, shared error projection and author types |
 | `@migaia/log-host/features`        | All seven built-in features                                                                           |
 | `@migaia/log-host/features/<name>` | The corresponding feature's default export                                                            |
 

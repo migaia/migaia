@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { defineOutputPlugin } from '../src/plugin.ts'
+import { defineOutputPlugin } from '../src/sdk.ts'
 
 it('codes an output feature record whose descriptors cannot be read', () => {
   const readFailure = new Error('descriptor read failed')

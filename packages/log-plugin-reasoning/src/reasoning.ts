@@ -4,7 +4,7 @@ import {
   type ILogPlugin,
   type ILogPluginCore,
   LogFailureSource
-} from '@migaia/log-host/plugin'
+} from '@migaia/log-host/sdk'
 import {
   DEFAULT_THINKING_LABEL,
   REASONING_PLUGIN_NAME,

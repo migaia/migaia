@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { serializeErrorChain, UTILS_SOURCE } from '@migaia/utils/error'
 import { createLogHost } from '../src/index.ts'
-import { projectLogEntry } from '../src/plugin.ts'
+import { projectLogEntry } from '../src/sdk.ts'
 import { formatFeature } from '../src/features/format.ts'
 import { CaptureOutput } from './fixtures/output.ts'
 

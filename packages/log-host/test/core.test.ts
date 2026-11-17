@@ -1,4 +1,4 @@
-import { defineLogPlugin } from '../src/plugin.ts'
+import { defineLogPlugin } from '../src/sdk.ts'
 import { expect, it } from 'vitest'
 import {
   createLogHost,
@@ -7,7 +7,7 @@ import {
   LogHostStatus,
   defaultLogFailureReporter
 } from '../src/index.ts'
-import { defineLogFeature, projectLogEntry } from '../src/plugin.ts'
+import { defineLogFeature, projectLogEntry } from '../src/sdk.ts'
 import { uuidFeature } from '../src/features/uuid.ts'
 import type { ILogEntry, ILogFailure, ILogPluginCore } from '../src/typing.ts'
 

@@ -5,7 +5,7 @@ import {
   projectLogEntry,
   type ILogOutputRecord,
   type ILogFeatureRecord
-} from '@migaia/log-host/plugin'
+} from '@migaia/log-host/sdk'
 import { ERROR_SOURCE, LogHttpErrorCode, type ILogHttpErrorCode } from './error-code.ts'
 import { LogHttpErrorText } from './error-text.ts'
 import { HTTP_PLUGIN_NAME, HttpRequest } from './state-constants.ts'

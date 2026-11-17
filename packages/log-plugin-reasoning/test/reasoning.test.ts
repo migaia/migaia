@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { createLogHost } from '@migaia/log-host'
-import type { ILogEntry, ILogPluginCore } from '@migaia/log-host/plugin'
+import type { ILogEntry, ILogPluginCore } from '@migaia/log-host/sdk'
 import { reasoningPlugin, ReasoningPhase } from '../src/index.ts'
 import { consolePlugin } from '../../log-plugin-console/src/index.ts'
 import { httpPlugin } from '../../log-plugin-http/src/index.ts'
