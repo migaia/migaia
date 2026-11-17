@@ -237,6 +237,8 @@ get 与 update 都要求 active Host。通常 get 的入口失败同步抛出，
 
 disable 与 unUse 的选项是 `{ policy?: 'reject' | 'cascade' | 'suspend'; dryRun?: boolean }`，默认 policy 为 reject、dryRun 为 false。reject 保留状态并用 DEPENDENCY_BLOCKED 的 detail.blockedBy 列出全部传递依赖者；cascade 连同必需依赖闭包处理；suspend 只处理目标，保留已激活依赖者的实例与资源。挂起时句柄及取出的 extension 抛 `PLUGIN_SUSPENDED`，stage 不运行。同一 provider 重新启用可直接恢复；同名新 provider 按 capability 的 resume 计划换绑、重启或恢复。整图释放仍按依赖者优先处理挂起注册。
 
+挂起不会通知依赖者，也不会停止它已经启动的后台工作；它在安装时拿到的提供方 Feature 输出仍可调用。提供方被 unUse 释放后，只有经由 `featureExpose` 转调的方法会抛 `REGISTRATION_REVOKED`。如果 Feature 输出自己直接持有提供方资源，宿主无法拦截这次调用，依赖者会访问到已经释放的资源。因此，凡是要访问提供方资源的 Feature 方法，都应经由 `featureExpose` 转调。
+
 `dryRun: true` 返回冻结计划 `{ policy, order, steps, edges }`，不含 ok，不执行变更。真实 unUse 的成功与失败分支均带冻结 `affected`，只含已生效步骤；失败还返回 errors。**迁移**：严格比较旧 `{ ok: true }` 的调用方应改为检查 ok 并读取 affected；宽 boolean 先按值分支，字面量 dryRun true 选择计划重载，省略或 false 选择执行重载。旧 `{ cascade: true }` 以 INVALID_OPTION 拒绝。
 
 replace(name, next) 要求同名，先安装候选，失败时旧实现继续服务。提交后新运行只含新代 stage，旧运行保留旧代租约，旧 extension 立即撤销，名称句柄指向新代；原禁用状态保留。已激活必需依赖者可用 onDependencyReplaced 换绑；缺钩子或钩子失败则连同必需闭包按依赖者优先排空释放，再按拓扑重装，保留运行时配置、原激活与禁用状态。旧代排空后释放。重装失败不撤回新 provider，失败依赖者保持卸载，抛 DEPENDENT_RESTART_FAILED，cause 为 AggregateError，顺序为重装失败、换绑错误、清理错误，detail.dependents 列出影响。清理次错经诊断保留。
