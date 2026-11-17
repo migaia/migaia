@@ -29,7 +29,7 @@ const subjects = [
 ]
 /** Hot implementations must consume installed policy objects without consulting definition metadata. */
 const forbiddenLookup =
-  /\b(?:featureImplementation|featureMetadata|featureScope|inspectFeatures|installedFeatureScope)\s*\(|\b(?:issuedFeatures|logFeatureMetadata)\s*\.\s*get\s*\(/
+  /\b(?:featureImplementation|featureScope|inspectFeatures|admitInstalledFeatures)\s*\(|\bissuedFeatures\s*\.\s*get\s*\(/
 /** A missing selector is an evidence error, not the intended metadata-lookup RED. */
 const missingSubjects: string[] = []
 /** Every matched forbidden lookup is retained with its actual owning function and source line. */

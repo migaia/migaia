@@ -132,8 +132,8 @@ function normalizeFormat(
 
 /** Read the installed default formatter; a default that is not a format feature is rejected. */
 function installedFallback(installed: unknown): ILogFormat {
-  /** Only a log feature output carries an implementation. */
-  const implementation = (installed as Partial<ILogFeatureRuntime> | undefined)?.implementation
+  /** Plugin-host guarantees an object output; only a log feature carries this field. */
+  const implementation = (installed as Partial<ILogFeatureRuntime>).implementation
   if (implementation?.phase !== FeaturePhase.format) throw invalidOption()
   return implementation
 }

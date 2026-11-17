@@ -33,7 +33,7 @@ it('rejects a missing or incomplete third-party feature definition', () => {
 })
 
 it('rejects ordinary native features in a log plugin record', () => {
-  /** A plain plugin-host feature with no log metadata. */
+  /** A plain plugin-host feature whose installed output carries no log implementation. */
   const plain = defineFeature(() => ({ value: 1 }))
   /** The record is native-valid, so the definition is accepted and installation rejects it. */
   const mixed = defineLogPlugin({
@@ -72,7 +72,7 @@ class RejectedOutput {
 }
 
 it('rejects output feature-role violations at installation, before the output opens', () => {
-  /** Each case breaks exactly one of the four record rules. */
+  /** Each case breaks exactly one record rule; the last default is not a log feature at all. */
   const cases: Record<string, unknown>[] = [
     { features: { uuid: uuidFeature() } },
     { features: { first: batchFeature(), second: batchFeature() } },
@@ -81,7 +81,8 @@ it('rejects output feature-role violations at installation, before the output op
       defaultFormat: undefined,
       features: { format: formatFeature({ format: 'json' }) }
     },
-    { defaultFormat: thresholdFeature() }
+    { defaultFormat: thresholdFeature() },
+    { defaultFormat: defineFeature(() => ({ value: 1 })) }
   ]
   for (const options of cases) {
     /** The definition call itself is accepted for every case. */
@@ -154,5 +155,32 @@ it('lets an entry-only output use gates but not a text format', async () => {
   host.log('warn', 'kept')
   await host.flush()
   expect(sink.messages).toEqual(['kept'])
+  await host.shutdown('manual')
+})
+
+it('rejects a role violation from dynamic use and keeps the host usable', async () => {
+  /** The entry-only sink proves the host still delivers after the rejected install. */
+  const sink = new EntrySink()
+  /** Host under test starts with one valid entry-only output. */
+  const host = createLogHost({
+    plugins: [
+      defineOutputPlugin({
+        name: 'entries',
+        batchable: false,
+        consumesText: false,
+        deliver: (records) => sink.receive(records)
+      })
+    ]
+  })
+  /** Counts the callbacks of the output that the dynamic install must reject. */
+  const rejected = new RejectedOutput()
+  await expect(
+    host.use(rejected.plugin({ features: { uuid: uuidFeature() } }))
+  ).rejects.toMatchObject({ source: 'logging', code: 'INVALID_OPTION' })
+  expect(rejected.installs).toBe(0)
+  host.log('info', 'kept')
+  await host.flush()
+  expect(sink.messages).toEqual(['kept'])
+  expect(rejected.deliveries).toBe(0)
   await host.shutdown('manual')
 })

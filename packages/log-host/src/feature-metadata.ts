@@ -90,9 +90,8 @@ export function admitInstalledFeatures(
   /** Singular roles already used by this record; a plugin applies each at most once. */
   const slots = new Set<PropertyKey>()
   for (const alias of Object.keys(record)) {
-    /** The exact instance plugin-host produced for this alias; only log features carry one. */
-    const implementation = (outputs[alias] as Partial<ILogFeatureRuntime> | undefined)
-      ?.implementation
+    /** Plugin-host guarantees an object output per alias; only log features carry this field. */
+    const implementation = (outputs[alias] as Partial<ILogFeatureRuntime>).implementation
     if (!implementation) throw invalidOption()
     if (
       output &&
