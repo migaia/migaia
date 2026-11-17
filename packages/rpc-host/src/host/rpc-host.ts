@@ -20,6 +20,7 @@ import {
   type IRpcEnvelope,
   type IRpcSemanticFrame
 } from '@migaia/rpc-contract/protocol'
+import { ownRpcTransportClose, RpcHostInstallation } from './installation.ts'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText, tagRpcError } from '@migaia/rpc-contract/errors'
 import { CallTable } from '../call/table.ts'
@@ -48,7 +49,6 @@ import { createRpcAbortError, createRpcError, createRpcLifecycleError } from './
 import { HostErrorText } from './error-text.ts'
 import { HostObservationKind, RpcProtocolEvent } from './state-constants.ts'
 import { deserializeHostWireError } from './error-wire-metadata.ts'
-import { ownRpcTransportClose, RpcHostInstallation } from './installation.ts'
 import type { IRpcHost, IRpcRuntimeOptions } from './public.ts'
 import { defaultRpcReporter, reportDiagnostic } from './report.ts'
 import { resolveAbortReason } from './abort-reason.ts'
@@ -276,7 +276,7 @@ export class RpcHost {
       /** A record without a timeout or retry Feature contributes no call default. */
       this.#features.setDefaults(
         core,
-        metadata.shared.features,
+        metadata.shared.roots,
         (core as IRpcTransportSetupContext['owner']).features
       )
       /** The original shared setup lends only its selected group relationship to native removal. */

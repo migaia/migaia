@@ -112,10 +112,7 @@ export function defineFlowPlugin<
         ? undefined
         : new RpcFlowSetup(captured as IRpcFlowDefinition<object>).prepare,
     // An empty record carries no Feature, so the plugin stays a plain late-installable observer.
-    shared:
-      program && Object.keys(program.roots).length > 0
-        ? { features: program.roots, prepare: program.prepare }
-        : undefined
+    shared: program && Object.keys(program.roots).length > 0 ? program : undefined
   }
   /** Thin definitions omit arbitrary metadata fields; callers keep domain owners explicitly. */
   const plugin = definePlugin({

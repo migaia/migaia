@@ -66,7 +66,7 @@ export type IRpcDefinitionMetadata = Readonly<
       /** Present only when the definition carries a `features` record; such a plugin is cold-only. */
       shared?: Readonly<{
         /** Original caller roots supply call defaults. */
-        features: IFeatureRecord
+        roots: IFeatureRecord
         prepare(
           core: IPluginHostCore,
           rootSignal: IAbortSignal,
