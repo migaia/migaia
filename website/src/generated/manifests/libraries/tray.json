@@ -646,8 +646,8 @@
             ]
           },
           {
-            "id": "错误与迁移",
-            "heading": "错误与迁移",
+            "id": "错误码",
+            "heading": "错误码",
             "blocks": [
               {
                 "type": "paragraph",
@@ -743,7 +743,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "旧四个托管类型辅助导出 IHostBaselinePlugins、IPluginWithSynchronousShared、ICanResolveReadyDefinitions、IResolveReadyTrayPlugins 已取消公开导出；外部标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导。Runtime shutdown 只接收 mode，不再接收未使用的 quiescenceMs；对应预算在 managed Host 配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
+                "text": "外部类型标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导出的类型。Runtime shutdown 只接收 mode；静默等待预算在 managed Host 上配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
               },
               {
                 "type": "paragraph",
@@ -931,7 +931,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst create = () =>\n  new AppHost({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\nconst events: string[] = []\nconst provider = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ base: '/api' })) },\n  install: () => {\n    events.push('config')\n    return {}\n  }\n})\nconst consumer = definePlugin({\n  name: 'screen',\n  features: {\n    value: defineFeature(() => ({}), { config: provider.getFeature('value') })\n  },\n  install: () => {\n    events.push('screen')\n    return {}\n  }\n})\nconst host = await createHost({\n  create,\n  plugins: [consumer] as const,\n  mutationAdmissionMs: 1000,\n  quiescenceMs: 1000,\n  shutdown: { mode: 'strict-drain' }\n})\ntry {\n  console.log('启动前：', host.pluginState('screen'), events.length)\n  const installed = await host.use(provider)\n  console.log('之后：', installed.ok, host.pluginState('screen'))\n  console.log(events.join(','))\n  const removed = await host.unUse('config')\n  console.log('移除后：', removed.ok, host.pluginState('screen'))\n} finally {\n  await host.dispose()\n}"
+                "code": "import { PluginHost, definePlugin } from '@migaia/plugin-host'\nimport { defineFeature, featuresModule } from '@migaia/plugin-host/features'\nimport { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst create = () =>\n  new AppHost({\n    modules: [featuresModule, featureDependenciesModule],\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\nconst events: string[] = []\nconst provider = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ base: '/api' })) },\n  install: () => {\n    events.push('config')\n    return {}\n  }\n})\nconst consumer = definePlugin({\n  name: 'screen',\n  features: {\n    value: defineFeature(() => ({}), { config: provider.getFeature('value') })\n  },\n  install: () => {\n    events.push('screen')\n    return {}\n  }\n})\nconst host = await createHost({\n  create,\n  plugins: [consumer] as const,\n  mutationAdmissionMs: 1000,\n  quiescenceMs: 1000,\n  shutdown: { mode: 'strict-drain' }\n})\ntry {\n  console.log('启动前：', host.pluginState('screen'), events.length)\n  const installed = await host.use(provider)\n  console.log('之后：', installed.ok, host.pluginState('screen'))\n  console.log(events.join(','))\n  const removed = await host.unUse('config')\n  console.log('移除后：', removed.ok, host.pluginState('screen'))\n} finally {\n  await host.dispose()\n}"
               },
               {
                 "type": "paragraph",
@@ -1525,8 +1525,8 @@
             ]
           },
           {
-            "id": "错误与迁移",
-            "heading": "错误与迁移",
+            "id": "错误码",
+            "heading": "错误码",
             "blocks": [
               {
                 "type": "paragraph",
@@ -1622,7 +1622,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "旧四个托管类型辅助导出 IHostBaselinePlugins、IPluginWithSynchronousShared、ICanResolveReadyDefinitions、IResolveReadyTrayPlugins 已取消公开导出；外部标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导。Runtime shutdown 只接收 mode，不再接收未使用的 quiescenceMs；对应预算在 managed Host 配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
+                "text": "外部类型标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导出的类型。Runtime shutdown 只接收 mode；静默等待预算在 managed Host 上配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
               },
               {
                 "type": "paragraph",
@@ -2353,8 +2353,8 @@
               ]
             },
             {
-              "id": "errors-and-migration",
-              "heading": "Errors and migration",
+              "id": "error-codes",
+              "heading": "Error codes",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -2468,7 +2468,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Four former public managed-type helpers are no longer exported: IHostBaselinePlugins, IPluginWithSynchronousShared, ICanResolveReadyDefinitions and IResolveReadyTrayPlugins. Use ITrayResolvedHost / ITrayHostDynamic or inferred Runtime types externally. Runtime shutdown accepts only mode; its unused quiescenceMs field was removed, with that budget configured on managed Host instead. Loader/Adapter method getters are read once, and validation/execution use that same function."
+                  "text": "For external type annotations use ITrayResolvedHost / ITrayHostDynamic or the inferred Runtime types. Runtime shutdown accepts only mode; the quiescence budget is configured on the managed Host. Loader/Adapter method getters are read once, and validation/execution use that same function."
                 },
                 {
                   "type": "paragraph",
@@ -2680,7 +2680,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst create = () =>\n  new AppHost({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\nconst events: string[] = []\nconst provider = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ base: '/api' })) },\n  install: () => {\n    events.push('config')\n    return {}\n  }\n})\nconst consumer = definePlugin({\n  name: 'screen',\n  features: {\n    value: defineFeature(() => ({}), { config: provider.getFeature('value') })\n  },\n  install: () => {\n    events.push('screen')\n    return {}\n  }\n})\nconst host = await createHost({\n  create,\n  plugins: [consumer] as const,\n  mutationAdmissionMs: 1000,\n  quiescenceMs: 1000,\n  shutdown: { mode: 'strict-drain' }\n})\ntry {\n  console.log('before:', host.pluginState('screen'), events.length)\n  const installed = await host.use(provider)\n  console.log('after:', installed.ok, host.pluginState('screen'))\n  console.log(events.join(','))\n  const removed = await host.unUse('config')\n  console.log('removed:', removed.ok, host.pluginState('screen'))\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { PluginHost, definePlugin } from '@migaia/plugin-host'\nimport { defineFeature, featuresModule } from '@migaia/plugin-host/features'\nimport { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst create = () =>\n  new AppHost({\n    modules: [featuresModule, featureDependenciesModule],\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\nconst events: string[] = []\nconst provider = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ base: '/api' })) },\n  install: () => {\n    events.push('config')\n    return {}\n  }\n})\nconst consumer = definePlugin({\n  name: 'screen',\n  features: {\n    value: defineFeature(() => ({}), { config: provider.getFeature('value') })\n  },\n  install: () => {\n    events.push('screen')\n    return {}\n  }\n})\nconst host = await createHost({\n  create,\n  plugins: [consumer] as const,\n  mutationAdmissionMs: 1000,\n  quiescenceMs: 1000,\n  shutdown: { mode: 'strict-drain' }\n})\ntry {\n  console.log('before:', host.pluginState('screen'), events.length)\n  const installed = await host.use(provider)\n  console.log('after:', installed.ok, host.pluginState('screen'))\n  console.log(events.join(','))\n  const removed = await host.unUse('config')\n  console.log('removed:', removed.ok, host.pluginState('screen'))\n} finally {\n  await host.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -3340,8 +3340,8 @@
               ]
             },
             {
-              "id": "errors-and-migration",
-              "heading": "Errors and migration",
+              "id": "error-codes",
+              "heading": "Error codes",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -3455,7 +3455,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Four former public managed-type helpers are no longer exported: IHostBaselinePlugins, IPluginWithSynchronousShared, ICanResolveReadyDefinitions and IResolveReadyTrayPlugins. Use ITrayResolvedHost / ITrayHostDynamic or inferred Runtime types externally. Runtime shutdown accepts only mode; its unused quiescenceMs field was removed, with that budget configured on managed Host instead. Loader/Adapter method getters are read once, and validation/execution use that same function."
+                  "text": "For external type annotations use ITrayResolvedHost / ITrayHostDynamic or the inferred Runtime types. Runtime shutdown accepts only mode; the quiescence budget is configured on the managed Host. Loader/Adapter method getters are read once, and validation/execution use that same function."
                 },
                 {
                   "type": "paragraph",
@@ -4340,8 +4340,8 @@
           "identity": "packages/tray/dist/hosts/typing.d.ts:ITray:export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ /** Built-in and registered custom policy forms share one selection sequence per host/policy. */ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; /** * Publishes portable data to current ready subscribers; listener failures are reported * separately. */ publish(topic: string, payload?: unknown): void; /** Adds a parent-side business listener and returns a synchronous unsubscribe receipt. */ subscribe(topic: string, listener: import('./topics.ts').ITrayTopicListener): () => void; /** * Admits an id, starts its RPC unit and initializes plugins before returning a fixed-admission * remote. */ spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; /** Captures an existing matching admission; calls still require a ready target at dispatch time. */ instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; /** * Revokes the admission before cleanup; omitted graceMs uses the 5000ms child shutdown request * budget. */ remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; /** Returns frozen current snapshots in spawn order; omitted filter accepts all current records. */ list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; /** Merges current Tray metadata with authoritative RPC discovery; unknown ids reject. */ get(id: string): Promise<ITrayInstanceDetail>; /** Serializes child cleanup and native stop for this admission; omitted shutdown grace is 5000ms. */ stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; /** * Serializes native restart and re-init using the retained config; business calls are not * replayed. */ restart(id: string): Promise<ITrayInstance>; /** Replaces the native generation; omitted config retains the prior portable config. */ replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; /** Observes registry transitions without granting authority to publish lifecycle events. */ on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; /** Streams future lifecycle records; return or an optional signal releases the watcher. */ watch(options?: Readonly<{ signal?: IAbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; /** * Rejects new work and shares one removal/parent-Host cleanup Promise; omitted child grace is * 5000ms. */ dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; /** Delegates to the same dispose() Promise. */ [Symbol.asyncDispose](): Promise<void>; }>;",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -4437,7 +4437,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "旧四个托管类型辅助导出 IHostBaselinePlugins、IPluginWithSynchronousShared、ICanResolveReadyDefinitions、IResolveReadyTrayPlugins 已取消公开导出；外部标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导。Runtime shutdown 只接收 mode，不再接收未使用的 quiescenceMs；对应预算在 managed Host 配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
+                  "text": "外部类型标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导出的类型。Runtime shutdown 只接收 mode；静默等待预算在 managed Host 上配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
                 },
                 {
                   "type": "paragraph",
@@ -5502,8 +5502,8 @@
           "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayHost:export type ITrayHost<TName extends string, TConfig, TPlugins extends ITrayPlugins, TExposes extends string, TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = ITrayHostDefinition<TName, TConfig, TPlugins, TExposes, TRouting> & Readonly<{ /** Explicit runtime after defineTrayHost has applied the coroutine default. */ runtime: ITrayRuntime; /** Compile-time marker only; runtime trust requires the exact object issued by defineTrayHost. */ [trayHostBrand]: true; }>;",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -5599,7 +5599,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "旧四个托管类型辅助导出 IHostBaselinePlugins、IPluginWithSynchronousShared、ICanResolveReadyDefinitions、IResolveReadyTrayPlugins 已取消公开导出；外部标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导。Runtime shutdown 只接收 mode，不再接收未使用的 quiescenceMs；对应预算在 managed Host 配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
+                  "text": "外部类型标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导出的类型。Runtime shutdown 只接收 mode；静默等待预算在 managed Host 上配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
                 },
                 {
                   "type": "paragraph",
@@ -8012,8 +8012,8 @@
           "identity": "packages/tray/dist/errors.d.ts:TRAY_SOURCE:export declare const TRAY_SOURCE = \"tray\";",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -8109,7 +8109,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "旧四个托管类型辅助导出 IHostBaselinePlugins、IPluginWithSynchronousShared、ICanResolveReadyDefinitions、IResolveReadyTrayPlugins 已取消公开导出；外部标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导。Runtime shutdown 只接收 mode，不再接收未使用的 quiescenceMs；对应预算在 managed Host 配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
+                  "text": "外部类型标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导出的类型。Runtime shutdown 只接收 mode；静默等待预算在 managed Host 上配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
                 },
                 {
                   "type": "paragraph",
@@ -8464,8 +8464,8 @@
           "identity": "packages/tray/dist/error-code.d.ts:TrayErrorCode:export declare const TrayErrorCode: { /** The mesh has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** The routing policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** The mesh requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick is invalid; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition is invalid; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload is not portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside the exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime could not acquire the target lease; inspect the retained admission failure or cause. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown get()/entryState() key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -8561,7 +8561,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "旧四个托管类型辅助导出 IHostBaselinePlugins、IPluginWithSynchronousShared、ICanResolveReadyDefinitions、IResolveReadyTrayPlugins 已取消公开导出；外部标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导。Runtime shutdown 只接收 mode，不再接收未使用的 quiescenceMs；对应预算在 managed Host 配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
+                  "text": "外部类型标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导出的类型。Runtime shutdown 只接收 mode；静默等待预算在 managed Host 上配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
                 },
                 {
                   "type": "paragraph",
@@ -9200,7 +9200,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst create = () =>\n  new AppHost({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\nconst events: string[] = []\nconst provider = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ base: '/api' })) },\n  install: () => {\n    events.push('config')\n    return {}\n  }\n})\nconst consumer = definePlugin({\n  name: 'screen',\n  features: {\n    value: defineFeature(() => ({}), { config: provider.getFeature('value') })\n  },\n  install: () => {\n    events.push('screen')\n    return {}\n  }\n})\nconst host = await createHost({\n  create,\n  plugins: [consumer] as const,\n  mutationAdmissionMs: 1000,\n  quiescenceMs: 1000,\n  shutdown: { mode: 'strict-drain' }\n})\ntry {\n  console.log('启动前：', host.pluginState('screen'), events.length)\n  const installed = await host.use(provider)\n  console.log('之后：', installed.ok, host.pluginState('screen'))\n  console.log(events.join(','))\n  const removed = await host.unUse('config')\n  console.log('移除后：', removed.ok, host.pluginState('screen'))\n} finally {\n  await host.dispose()\n}",
+            "import { PluginHost, definePlugin } from '@migaia/plugin-host'\nimport { defineFeature, featuresModule } from '@migaia/plugin-host/features'\nimport { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst create = () =>\n  new AppHost({\n    modules: [featuresModule, featureDependenciesModule],\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\nconst events: string[] = []\nconst provider = definePlugin({\n  name: 'config',\n  features: { value: defineFeature(() => ({ base: '/api' })) },\n  install: () => {\n    events.push('config')\n    return {}\n  }\n})\nconst consumer = definePlugin({\n  name: 'screen',\n  features: {\n    value: defineFeature(() => ({}), { config: provider.getFeature('value') })\n  },\n  install: () => {\n    events.push('screen')\n    return {}\n  }\n})\nconst host = await createHost({\n  create,\n  plugins: [consumer] as const,\n  mutationAdmissionMs: 1000,\n  quiescenceMs: 1000,\n  shutdown: { mode: 'strict-drain' }\n})\ntry {\n  console.log('启动前：', host.pluginState('screen'), events.length)\n  const installed = await host.use(provider)\n  console.log('之后：', installed.ok, host.pluginState('screen'))\n  console.log(events.join(','))\n  const removed = await host.unUse('config')\n  console.log('移除后：', removed.ok, host.pluginState('screen'))\n} finally {\n  await host.dispose()\n}",
             "import { PluginHost } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\nimport { defineLoader, loadIntoHost } from '@migaia/tray/loader'\nimport { defineAdapter } from '@migaia/tray/adapter'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst create = () =>\n  new AppHost({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\nconst host = await createHost({\n  create,\n  plugins: [],\n  mutationAdmissionMs: 1000,\n  quiescenceMs: 1000,\n  shutdown: { mode: 'strict-drain' }\n})\nlet releases = 0\nconst loader = defineLoader({\n  load: (source: number) => ({\n    value: source,\n    release: {\n      force: () => {\n        releases += 1\n      }\n    }\n  })\n})\nconst adapter = defineAdapter({\n  adapt: (value: number) => ({\n    name: 'answer' as const,\n    install: () => ({ answer: () => value })\n  })\n})\ntry {\n  const result = await loadIntoHost({\n    host,\n    source: 42,\n    loader,\n    adapter,\n    mutation: 'use',\n    timeoutMs: false\n  })\n  console.log('已提交：', result.ok, result.committed, releases)\n  if (result.ok) console.log('值：', result.view.extensions.answer())\n  await host.unUse('answer')\n  console.log('已释放：', releases)\n  const primary = new TypeError('制品转换失败')\n  try {\n    await loadIntoHost({\n      host,\n      source: 7,\n      loader,\n      adapter: defineAdapter({\n        adapt: () => {\n          throw primary\n        }\n      }),\n      mutation: 'use',\n      timeoutMs: false\n    })\n  } catch (error) {\n    console.log('已回滚：', error === primary, (error as Error & { code?: string }).code, releases)\n  }\n} finally {\n  await host.dispose()\n}",
             "import { PluginHost } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\nimport { createRuntime } from '@migaia/tray/runtime'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst create = () =>\n  new AppHost({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\nconst host = await createHost({\n  create,\n  plugins: [\n    { name: 'billing', install: () => ({ double: (value: number) => value * 2 }) }\n  ] as const,\n  mutationAdmissionMs: 1000,\n  quiescenceMs: 1000,\n  shutdown: { mode: 'strict-drain' }\n})\nconst runtime = createRuntime(host)\nconst caller = new AbortController()\nconst reason = new Error('调用方取消')\nlet finish!: () => void\nconst gate = new Promise<void>((resolve) => {\n  finish = resolve\n})\nlet observed: { readonly aborted: boolean; readonly reason: unknown } | undefined\ntry {\n  const run = runtime.run(\n    'billing',\n    { signal: caller.signal, timeoutMs: false },\n    async ({ signal, extensions }) => {\n      observed = signal\n      console.log('值：', extensions.double(21))\n      await gate\n      return '已完成'\n    }\n  )\n  caller.abort(reason)\n  console.log('已取消：', observed?.aborted, observed?.reason === reason, runtime.activeRuns)\n  finish()\n  console.log('结果：', await run, runtime.activeRuns)\n  await runtime.dispose()\n  console.log('宿主：', host.state)\n} finally {\n  finish()\n  await runtime.dispose()\n  await host.dispose()\n}",
             "import { PluginHost, type IPluginHostCore } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\nimport { createRuntime } from '@migaia/tray/runtime'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\nconst create = () =>\n  new AppHost({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n  })\nlet releases = 0\nconst host = await createHost({\n  create,\n  plugins: [\n    {\n      name: 'oneShot',\n      install: (core: IPluginHostCore<string>) => {\n        core.onDispose(() => {\n          releases += 1\n        })\n        return { answer: () => 42 }\n      }\n    }\n  ] as const,\n  mutationAdmissionMs: 1000,\n  quiescenceMs: 1000,\n  shutdown: { mode: 'strict-drain' }\n})\nconst runtime = createRuntime(host)\ntry {\n  const ticket = await runtime.run('oneShot', { timeoutMs: false }, ({ self, extensions }) => {\n    console.log('值：', extensions.answer())\n    return self.unUse()\n  })\n  console.log('凭据：', 'then' in ticket, runtime.activeRuns)\n  await ticket.completion\n  console.log('移除后：', host.plugins.includes('oneShot'), releases)\n} finally {\n  await runtime.dispose()\n  await host.dispose()\n}"
@@ -9699,8 +9699,8 @@
           "identity": "packages/tray/dist/host/typing.d.ts:ITrayHost:export type ITrayHost<THost extends ITrayHostSource, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<IResolveReadyTrayPlugins<TDefinitions>, readonly ITrayPluginConstraint<THost>[]>> = Readonly<{ /** No runtime property is emitted; each facade keeps its source and plugin tuples in declarations. */ readonly [trayHostTypes]: Readonly<{ readonly host: THost; readonly definitions: TDefinitions; readonly ready: TReady; }>; /** Frozen current definition names, including blocked definitions. */ readonly plugins: readonly string[]; /** Frozen names whose current Graph nodes are ready. */ readonly readyPlugins: readonly string[]; /** Managed facade lifecycle, independent of per-plugin readiness. */ readonly state: ITrayHostState; /** Whether the facade is currently active. */ readonly isActive: boolean; /** Retained disposal failure; ordinary mutation failures are returned in their own observations. */ readonly error: unknown | undefined; /** Current Host extension snapshot, including constructor baseline and ready managed plugins. */ readonly extensions: Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>; /** Config access delegates to the canonical PluginHost snapshot and update owner. */ readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>; /** * Reads Graph node state, using blocked for an unknown name; publication/bypass checks still * apply. */ pluginState(name: string): string; /** Subscribes to managed observations and returns a synchronous unsubscribe receipt. */ on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe; /** * Admits a definition, then reconciles its required-provider closure. Invalid admission rejects * before mutation; Graph-stage failures return an observation whose committed flag owns custody. */ use<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'use'>>; /** Removes a definition and blocks dependent consumers; an unknown name is a successful no-op. */ unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; /** Replaces the exact same-name binding; inspect committed separately from ok after failure. */ replace<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'replace'>>; /** Shares one logical shutdown Promise; bounded mode can expose continuing physical cleanup. */ dispose(): Promise<ITrayHostDisposalResult>; /** Awaits disposal while discarding the structured observation result. */ [asyncDisposeKey](): Promise<void>; }>;",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -9796,7 +9796,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "旧四个托管类型辅助导出 IHostBaselinePlugins、IPluginWithSynchronousShared、ICanResolveReadyDefinitions、IResolveReadyTrayPlugins 已取消公开导出；外部标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导。Runtime shutdown 只接收 mode，不再接收未使用的 quiescenceMs；对应预算在 managed Host 配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
+                  "text": "外部类型标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导出的类型。Runtime shutdown 只接收 mode；静默等待预算在 managed Host 上配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
                 },
                 {
                   "type": "paragraph",
@@ -10286,8 +10286,8 @@
           "identity": "packages/tray/dist/host/typing.d.ts:ITrayHostDynamic:export type ITrayHostDynamic<THost extends ITrayHostSource, TManagedBaseline extends object = object> = Omit<ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, 'extensions'> & Readonly<{ readonly extensions: Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>; }>;",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -10383,7 +10383,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "旧四个托管类型辅助导出 IHostBaselinePlugins、IPluginWithSynchronousShared、ICanResolveReadyDefinitions、IResolveReadyTrayPlugins 已取消公开导出；外部标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导。Runtime shutdown 只接收 mode，不再接收未使用的 quiescenceMs；对应预算在 managed Host 配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
+                  "text": "外部类型标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导出的类型。Runtime shutdown 只接收 mode；静默等待预算在 managed Host 上配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
                 },
                 {
                   "type": "paragraph",
@@ -11545,8 +11545,8 @@
           "identity": "packages/tray/dist/host/typing.d.ts:ITrayResolvedHost:export type ITrayResolvedHost<THost extends ITrayHostSource, TDefinitions extends readonly ITrayPluginConstraint<THost>[]> = ICanResolveReadyDefinitions<TDefinitions> extends true ? ITrayHost<THost, TDefinitions> : ITrayHostDynamic<THost>;",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -11642,7 +11642,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "旧四个托管类型辅助导出 IHostBaselinePlugins、IPluginWithSynchronousShared、ICanResolveReadyDefinitions、IResolveReadyTrayPlugins 已取消公开导出；外部标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导。Runtime shutdown 只接收 mode，不再接收未使用的 quiescenceMs；对应预算在 managed Host 配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
+                  "text": "外部类型标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导出的类型。Runtime shutdown 只接收 mode；静默等待预算在 managed Host 上配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。"
                 },
                 {
                   "type": "paragraph",

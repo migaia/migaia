@@ -15,24 +15,100 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "为日志 host 安装进程信号、崩溃捕获与优雅关闭集成。与相同版本的 `@migaia/log-host` 配合使用，进程能力可按插件注入。"
+                "text": "English"
+              },
+              {
+                "type": "paragraph",
+                "text": "让进程退出时不丢日志的插件，配合 `@migaia/log-host` 使用。收到 `SIGINT` / `SIGTERM` 时，先运行你登记的最后日志处理器，再把排队的日志送完，最后才退出进程；未捕获的异常和 Promise 拒绝会先记一条 `fatal` 日志再关闭。"
+              }
+            ]
+          },
+          {
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "容器被停止时，最后几条日志和退出原因都没留下：收到 `SIGTERM` 后进程立即退出，缓冲里的日志一起消失。根因是退出前没人等日志送完。",
+                  "崩溃前的最后一条错误没进日志系统：未捕获异常让进程直接终止，错误只在终端闪过。根因是崩溃路径没有接到日志的关闭流程上。",
+                  "多个模块各自监听信号，互相抢着退出：每个库都 `process.on('SIGTERM')`，有的先 `exit`，其他的还没收尾。根因是信号处理没有统一的所有者。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面用一个假的 process 对象演示收到 `SIGTERM` 后的顺序，不会真的退出。用 Node 24 直接运行。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin(), processPlugin()]\n})\nlog.onShutdown(() => {\n  log.info('shutdown started')\n})\nlog.info('ready')"
+                "code": "import { EventEmitter } from 'node:events'\nimport { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\n// 假的 process：只有事件、环境变量和 exit；不传 process 时使用真实进程\nconst fakeProcess = Object.assign(new EventEmitter(), {\n  env: {},\n  exit(code?: number) {\n    console.log(`process.exit(${code})`)\n  }\n})\n// 一个慢输出：每次写出要 20 毫秒\nconst output = defineOutputPlugin({\n  name: 'output',\n  batchable: false,\n  defaultFormat: 'plain',\n  async deliver(records) {\n    await new Promise((resolve) => setTimeout(resolve, 20))\n    for (const record of records) console.log(`写出：${record.entry.message}`)\n  }\n})\nconst log = createLogHost({\n  plugins: [levelPlugin(), output, processPlugin({ process: fakeProcess })]\n})\nlog.onShutdown(() => {\n  log.info('收到退出信号，正在关闭')\n})\nlog.info('服务已启动')\nfakeProcess.emit('SIGTERM')"
               },
               {
                 "type": "paragraph",
-                "text": "相同 process 对象上的多个 host 共享一组监听器；不同对象分别拥有自己的组。最后一个使用者卸载后移除该组监听器。借用的 process 不会被关闭。"
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "写出：服务已启动\n写出：收到退出信号，正在关闭\nprocess.exit(0)"
               },
               {
                 "type": "paragraph",
-                "text": "默认捕获崩溃、关闭等待预算为 3000ms、默认不拦截 `process.exit`。`SIGINT`/`SIGTERM` 触发共享 shutdown，`beforeExit` 仅等待 flush。没有宿主 process 且未注入时不安装监听器。"
+                "text": "收到信号后，`onShutdown` 里的最后一条日志也被写出，然后才调用 `exit(0)`。整个关闭过程默认最多等 3000 毫秒。"
+              }
+            ]
+          },
+          {
+            "id": "常用选项",
+            "heading": "常用选项",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["选项", "默认值", "说明"],
+                "rows": [
+                  [
+                    "`process`",
+                    "识别到的服务端进程",
+                    "需要 `env`、`on`、`removeListener`、`exit`；只借用，不替换"
+                  ],
+                  ["`captureCrashes`", "`true`", "未捕获异常和未处理拒绝先记 `fatal` 再关闭"],
+                  ["`shutdownTimeoutMs`", "`3000`", "关闭等待的上限"],
+                  [
+                    "`interceptProcessExit`",
+                    "`false`",
+                    "为 `true` 时，代码里直接调用 `process.exit` 也会先等一次有时限的 flush"
+                  ]
+                ]
               },
               {
                 "type": "paragraph",
-                "text": "同一个 process 组要求一致的配置与 scheduler 来源。失败的安装会回滚已经尝试的监听注册；清理失败保留原始错误与顺序。完整选项及错误码见 使用指南。"
+                "text": "`log.onShutdown(handler)` 登记最后日志处理器（log-host 提供）。"
+              }
+            ]
+          },
+          {
+            "id": "契约细节",
+            "heading": "契约细节",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "`SIGINT` / `SIGTERM` 触发关闭，完成后调用 `exit(0)`；`beforeExit` 只做有时限的 flush，不强制退出。没有可用的进程且没有注入时，插件不安装任何监听器。",
+                  "同一个 process 对象上的多个 host 共享一组监听器，要求三个策略选项和调度器来源一致，否则安装时以 `PLUGIN_CONFIG_CONFLICT` 拒绝；不同 process 对象互不影响。最后一个使用者移除后撤销监听，之后可以重新安装。",
+                  "部分监听注册失败时按相反顺序回滚已注册的部分；一个清理错误不会跳过其他资源，最初的错误保持在首位，原错误沿 `cause` 和 `AggregateError.errors` 可达。",
+                  "错误域是 `logging.process`（`LOG_PROCESS_ERROR_SOURCE`），错误码见 `LogProcessErrorCode`。安装冲突和失败同步抛出；运行期失败进入 host 的失败通道。"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "完整选项及错误码见 使用指南。"
               }
             ]
           }
@@ -86,24 +162,104 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Process signals, crash capture and graceful shutdown for the matching `@migaia/log-host` version. The process capability can be injected per plugin."
+                  "text": "中文"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A plugin that keeps logs from being lost when the process exits, used with `@migaia/log-host`. On `SIGINT` / `SIGTERM` it first runs the last-log handlers you registered, then delivers queued lines, and only then exits; uncaught exceptions and Promise rejections are logged as `fatal` before shutdown."
+                }
+              ]
+            },
+            {
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "When a container stops, the last lines and the exit reason are gone: the process exits right after `SIGTERM` and buffered lines disappear with it. The cause is that nobody waits for logs before exiting.",
+                    "The last error before a crash never reaches the log system: an uncaught exception ends the process and the error only flashes on the terminal. The cause is that the crash path is not connected to log shutdown.",
+                    "Several modules listen for signals and race to exit: each library calls `process.on('SIGTERM')`; one calls `exit` while the others are still cleaning up. The cause is that signal handling has no single owner."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The example uses a fake process object to show the order after `SIGTERM`, without really exiting. Run it directly with Node 24."
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin(), processPlugin()]\n})\nlog.onShutdown(() => {\n  log.info('shutdown started')\n})\nlog.info('ready')"
+                  "code": "import { EventEmitter } from 'node:events'\nimport { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\n// A fake process with events, env and exit; without process the real one is used\nconst fakeProcess = Object.assign(new EventEmitter(), {\n  env: {},\n  exit(code?: number) {\n    console.log(`process.exit(${code})`)\n  }\n})\n// A slow output: each write takes 20 ms\nconst output = defineOutputPlugin({\n  name: 'output',\n  batchable: false,\n  defaultFormat: 'plain',\n  async deliver(records) {\n    await new Promise((resolve) => setTimeout(resolve, 20))\n    for (const record of records) console.log(`written: ${record.entry.message}`)\n  }\n})\nconst log = createLogHost({\n  plugins: [levelPlugin(), output, processPlugin({ process: fakeProcess })]\n})\nlog.onShutdown(() => {\n  log.info('exit signal received, closing')\n})\nlog.info('service started')\nfakeProcess.emit('SIGTERM')"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Hosts sharing the same process object share one listener set. Different objects have independent groups. Removing the last member releases the group's listeners without closing the borrowed process capability."
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "written: service started\nwritten: exit signal received, closing\nprocess.exit(0)"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Defaults enable crash capture, allow 3000ms for graceful work, and leave `process.exit` unchanged. `SIGINT`/`SIGTERM` start a shared shutdown; `beforeExit` only waits for flushing. A host without a process capability installs no listeners."
+                  "text": "After the signal, the last line from `onShutdown` is written too, and only then is `exit(0)` called. The whole shutdown waits at most 3000 ms by default."
+                }
+              ]
+            },
+            {
+              "id": "common-options",
+              "heading": "Common options",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Option", "Default", "Description"],
+                  "rows": [
+                    [
+                      "`process`",
+                      "The detected server process",
+                      "Needs `env`, `on`, `removeListener` and `exit`; borrowed, never replaced"
+                    ],
+                    [
+                      "`captureCrashes`",
+                      "`true`",
+                      "Log uncaught exceptions and unhandled rejections as `fatal` before shutdown"
+                    ],
+                    ["`shutdownTimeoutMs`", "`3000`", "Upper bound for the shutdown wait"],
+                    [
+                      "`interceptProcessExit`",
+                      "`false`",
+                      "When `true`, a direct `process.exit` in your code also waits for one bounded flush"
+                    ]
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "Members of the same process group must use compatible configuration and the same scheduler source. Failed installation rolls back attempted listener registrations, and cleanup failures retain original error identity and order. See the usage guide for options and error codes."
+                  "text": "`log.onShutdown(handler)` registers a last-log handler (provided by log-host)."
+                }
+              ]
+            },
+            {
+              "id": "contract-details",
+              "heading": "Contract details",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "`SIGINT` / `SIGTERM` start shutdown and call `exit(0)` when it completes; `beforeExit` only runs a bounded flush and does not force an exit. With no usable process and none injected, the plugin installs no listeners.",
+                    "Hosts on the same process object share one listener group and must agree on the three policy options and the scheduler source; otherwise installation fails with `PLUGIN_CONFIG_CONFLICT`. Different process objects do not affect each other. The listeners are removed after the last user is removed, and the plugin can be installed again later.",
+                    "If registering some listeners fails, the registered ones roll back in reverse order. One cleanup error does not skip other resources; the first error stays first, and original errors remain reachable through `cause` and `AggregateError.errors`.",
+                    "The error domain is `logging.process` (`LOG_PROCESS_ERROR_SOURCE`); see `LogProcessErrorCode` for codes. Installation conflicts and failures throw synchronously; run-time failures go to the host's failure channel."
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "See the usage guide for all options and error codes."
                 }
               ]
             }
@@ -331,7 +487,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-process/dist/error-code.d.ts:LOG_PROCESS_ERROR_SOURCE:export declare const LOG_PROCESS_ERROR_SOURCE = \"logging.process\";",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "log-plugin-process-index--LOG_PROCESS_ERROR_SOURCE"
         },
@@ -442,7 +598,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-process/dist/error-code.d.ts:LogProcessErrorCode:export declare const LogProcessErrorCode: { /** The same process group has begun shutdown; do not install more hosts into that group. */ readonly runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN'; /** Same-process policy or scheduler domain differs from its existing group; use matching options. */ readonly pluginConfigConflict: 'PLUGIN_CONFIG_CONFLICT'; /** Installation and rollback both failed; the original install error remains first in errors. */ readonly processInstallRollbackFailed: 'PROCESS_INSTALL_ROLLBACK_FAILED'; /** Final uninstall attempted every restoration/removal but cleanup failed; inspect its causes. */ readonly pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED'; /** Shutdown timer cancellation or the captured exit failed; inspect ordered cleanup causes. */ readonly pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED'; };",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "log-plugin-process-index--LogProcessErrorCode"
         },
@@ -468,7 +624,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { createLogHost } from '@migaia/log-host'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\nconst log = createLogHost({\n  plugins: [\n    processPlugin({ captureCrashes: true, shutdownTimeoutMs: 3000, interceptProcessExit: false })\n  ]\n})\nlog.onShutdown(() => {\n  log.log('info', 'closing')\n})",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin(), processPlugin()]\n})\nlog.onShutdown(() => {\n  log.info('shutdown started')\n})\nlog.info('ready')"
+            "import { EventEmitter } from 'node:events'\nimport { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\n// 假的 process：只有事件、环境变量和 exit；不传 process 时使用真实进程\nconst fakeProcess = Object.assign(new EventEmitter(), {\n  env: {},\n  exit(code?: number) {\n    console.log(`process.exit(${code})`)\n  }\n})\n// 一个慢输出：每次写出要 20 毫秒\nconst output = defineOutputPlugin({\n  name: 'output',\n  batchable: false,\n  defaultFormat: 'plain',\n  async deliver(records) {\n    await new Promise((resolve) => setTimeout(resolve, 20))\n    for (const record of records) console.log(`写出：${record.entry.message}`)\n  }\n})\nconst log = createLogHost({\n  plugins: [levelPlugin(), output, processPlugin({ process: fakeProcess })]\n})\nlog.onShutdown(() => {\n  log.info('收到退出信号，正在关闭')\n})\nlog.info('服务已启动')\nfakeProcess.emit('SIGTERM')"
           ],
           "members": [],
           "composes": [],

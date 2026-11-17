@@ -280,7 +280,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 两个全局 Symbol key。升级时请让同一进程中的 reactive 副本保持同一版本：旧的 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数，也不会识别对方的归属标记。"
+                "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 两个全局 Symbol key。同一进程里有多份 reactive 副本时，它们通过这两个 key 互相计数、识别对方的归属标记。"
               },
               {
                 "type": "paragraph",
@@ -517,7 +517,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({\n  maxFlushPasses: 20, // 默认 100\n  onError: (error, context) => console.log(context.phase, (error as { code?: string }).code)\n})\nconst celsius = runtime.signal(0, { debugName: 'celsius' })\nconst fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })\n\n// 两个副作用互相写对方读取的值，换算里又多加了 1，两个值永远对不上，于是互相触发\nruntime.effect(() => { fahrenheit.value = celsius.value * 1.8 + 33 }, { debugName: 'c-to-f' })\nruntime.effect(() => { celsius.value = (fahrenheit.value - 32) / 1.8 }, { debugName: 'f-to-c' })\n\nawait new Promise((resolve) => setTimeout(resolve, 10))\nconsole.log('页面仍可响应，celsius =', Math.round(celsius.peek()))"
+                "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({\n  maxFlushPasses: 20, // 默认 100\n  onError: (error, context) => console.log(context.phase, (error as { code?: string }).code)\n})\nconst celsius = runtime.signal(0, { debugName: 'celsius' })\nconst fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })\n\n// 两个副作用互相写对方读取的值，换算里又多加了 1，两个值永远对不上，于是互相触发\nruntime.effect(\n  () => {\n    fahrenheit.value = celsius.value * 1.8 + 33\n  },\n  { debugName: 'c-to-f' }\n)\nruntime.effect(\n  () => {\n    celsius.value = (fahrenheit.value - 32) / 1.8\n  },\n  { debugName: 'f-to-c' }\n)\n\nawait new Promise((resolve) => setTimeout(resolve, 10))\nconsole.log('页面仍可响应，celsius =', Math.round(celsius.peek()))"
               },
               {
                 "type": "paragraph",
@@ -930,7 +930,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "迁移：`@migaia/reactive/internals` 已删除。旧 `internalsOf/registerSubs/registerVersion/registerDeps` 等不能通过换名导入整个tracker；按上述角色迁移到 `/extension` 的绑定能力。`tracker/scheduler/clock` 和可写集合始终仅在kernel内部。"
+                "text": "扩展只能通过上述角色使用 `/extension` 的绑定能力，不能取得整个 tracker。`tracker/scheduler/clock` 和可写集合始终只在 kernel 内部。"
               }
             ]
           },
@@ -1164,7 +1164,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
+                "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。同一进程里有多份 reactive 副本时，它们通过这两个 key 互相计数、识别对方的归属标记。"
               },
               {
                 "type": "paragraph",
@@ -1494,7 +1494,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When upgrading, keep every reactive copy in one process on the same version: the old `@morning-watch/store` namespace and the new version cannot see each other, so mixed copies neither count each other nor recognize each other's ownership marks."
+                  "text": "Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When one process holds several reactive copies, they count each other and recognize each other's ownership marks through these keys."
                 },
                 {
                   "type": "paragraph",
@@ -1743,7 +1743,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({\n  maxFlushPasses: 20, // default 100\n  onError: (error, context) => console.log(context.phase, (error as { code?: string }).code)\n})\nconst celsius = runtime.signal(0, { debugName: 'celsius' })\nconst fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })\n\n// Two effects write the value the other reads, and the conversion is off by 1, so they never agree and keep triggering each other\nruntime.effect(() => { fahrenheit.value = celsius.value * 1.8 + 33 }, { debugName: 'c-to-f' })\nruntime.effect(() => { celsius.value = (fahrenheit.value - 32) / 1.8 }, { debugName: 'f-to-c' })\n\nawait new Promise((resolve) => setTimeout(resolve, 10))\nconsole.log('the page stays responsive, celsius =', Math.round(celsius.peek()))"
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({\n  maxFlushPasses: 20, // default 100\n  onError: (error, context) => console.log(context.phase, (error as { code?: string }).code)\n})\nconst celsius = runtime.signal(0, { debugName: 'celsius' })\nconst fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })\n\n// Two effects write the value the other reads, and the conversion is off by 1, so they never agree and keep triggering each other\nruntime.effect(\n  () => {\n    fahrenheit.value = celsius.value * 1.8 + 33\n  },\n  { debugName: 'c-to-f' }\n)\nruntime.effect(\n  () => {\n    celsius.value = (fahrenheit.value - 32) / 1.8\n  },\n  { debugName: 'f-to-c' }\n)\n\nawait new Promise((resolve) => setTimeout(resolve, 10))\nconsole.log('the page stays responsive, celsius =', Math.round(celsius.peek()))"
                 },
                 {
                   "type": "paragraph",
@@ -2151,7 +2151,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Migration: `@migaia/reactive/internals` has been removed. The old `internalsOf` / `registerSubs` / `registerVersion` / `registerDeps` and similar functions cannot import the whole tracker under a new name; move each use to the matching binding capability of `/extension` described above. `tracker` / `scheduler` / `clock` and writable sets always stay inside the kernel."
+                  "text": "Extensions use only the binding capabilities of `/extension` described above, by role; they cannot reach the whole tracker. `tracker` / `scheduler` / `clock` and writable sets always stay inside the kernel."
                 }
               ]
             },
@@ -2389,7 +2389,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When migrating, upgrade every reactive copy in one process together: the old `@morning-watch/store` namespace and the new version cannot see each other, so mixed copies neither count each other nor recognize each other's ownership marks."
+                  "text": "Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When one process holds several reactive copies, they count each other and recognize each other's ownership marks through these keys."
                 },
                 {
                   "type": "paragraph",
@@ -2633,7 +2633,7 @@
             "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst room = runtime.signal('大厅')\n\nconst chat = runtime.effect(() => {\n  const name = room.value\n  console.log(`进入 ${name}`)\n  // 返回的函数会在下次重跑之前、以及 dispose() 时执行\n  return () => console.log(`离开 ${name}`)\n})\n\nroom.value = '技术交流'\nruntime.flush()\nchat.dispose() // 用户关闭聊天窗口",
             "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst first = runtime.signal('Ada')\nconst last = runtime.signal('Lovelace')\nconst initials = runtime.computed(() => `${first.value[0]}.${last.value[0]}.`)\nconst label = runtime.computed(() => `${first.value} ${last.value}（${initials.value}）`)\n\nlet effectRuns = 0\nconst header = runtime.effect(() => {\n  effectRuns += 1\n  console.log('页头显示:', label.value)\n})\n\n// 同一段同步代码里改了两个值\nfirst.value = 'Grace'\nlast.value = 'Hopper'\nawait Promise.resolve() // 等默认的微任务冲刷\nconsole.log('副作用一共执行了', effectRuns, '次')\nheader.dispose()",
             "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst orders = runtime.signal([120, 80, 45])\nlet computations = 0\nconst report = runtime.computed(() => {\n  computations += 1 // 假设这是一段昂贵的统计\n  return orders.value.reduce((sum, amount) => sum + amount, 0)\n})\n\norders.value = [...orders.peek(), 60] // 还没人读取 report\nconsole.log('没人读取时计算次数:', computations)\n\nconst panel = runtime.effect(() => console.log('报表面板:', report.value))\norders.value = [...orders.peek(), 10]\nruntime.flush()\nconsole.log('面板打开期间计算次数:', computations)\n\npanel.dispose() // 面板关闭，最后一个读者离开\norders.value = [...orders.peek(), 99]\norders.value = [...orders.peek(), 1]\nconsole.log('面板关闭后计算次数:', computations)\nconsole.log('再次读取:', report.value, '计算次数:', computations)",
-            "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({\n  maxFlushPasses: 20, // 默认 100\n  onError: (error, context) => console.log(context.phase, (error as { code?: string }).code)\n})\nconst celsius = runtime.signal(0, { debugName: 'celsius' })\nconst fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })\n\n// 两个副作用互相写对方读取的值，换算里又多加了 1，两个值永远对不上，于是互相触发\nruntime.effect(() => { fahrenheit.value = celsius.value * 1.8 + 33 }, { debugName: 'c-to-f' })\nruntime.effect(() => { celsius.value = (fahrenheit.value - 32) / 1.8 }, { debugName: 'f-to-c' })\n\nawait new Promise((resolve) => setTimeout(resolve, 10))\nconsole.log('页面仍可响应，celsius =', Math.round(celsius.peek()))",
+            "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime({\n  maxFlushPasses: 20, // 默认 100\n  onError: (error, context) => console.log(context.phase, (error as { code?: string }).code)\n})\nconst celsius = runtime.signal(0, { debugName: 'celsius' })\nconst fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })\n\n// 两个副作用互相写对方读取的值，换算里又多加了 1，两个值永远对不上，于是互相触发\nruntime.effect(\n  () => {\n    fahrenheit.value = celsius.value * 1.8 + 33\n  },\n  { debugName: 'c-to-f' }\n)\nruntime.effect(\n  () => {\n    celsius.value = (fahrenheit.value - 32) / 1.8\n  },\n  { debugName: 'f-to-c' }\n)\n\nawait new Promise((resolve) => setTimeout(resolve, 10))\nconsole.log('页面仍可响应，celsius =', Math.round(celsius.peek()))",
             "import { createRuntime } from '@migaia/reactive'\n\n// 服务端渲染：每个请求一个 Runtime，用户之间的状态互不可见\nfunction renderPage(user: string) {\n  const runtime = createRuntime()\n  const name = runtime.signal(user)\n  const greeting = runtime.computed(() => `你好，${name.value}`)\n  return { runtime, greeting }\n}\n\nconst pageA = renderPage('Ada')\nconst pageB = renderPage('Grace')\nconsole.log(pageA.greeting.value, '|', pageB.greeting.value)\n\n// 把 A 的节点拿到 B 的 Runtime 里使用，会立刻报错，而不是悄悄串数据\nconst leaked = pageB.runtime.computed(() => pageA.greeting.value)\ntry {\n  leaked.value\n} catch (error) {\n  console.log('跨 Runtime 读取:', (error as { code?: string }).code)\n}",
             "const runtime = createRuntime()\nconst count = runtime.signal(1)\ncount.value // 1，在 Computed/Effect 内读取会建立依赖\ncount.value = 2 // Object.is 判定；写入相同值不触发任何通知，也不推进版本\ncount.peek() // 2，不建立依赖\ncount.dispose()\ncount.value // 抛 NODE_DISPOSED",
             "const runtime = createRuntime({\n  maxFlushPasses: 50,\n  onError: (e, ctx) => console.error(ctx.phase, e)\n})",

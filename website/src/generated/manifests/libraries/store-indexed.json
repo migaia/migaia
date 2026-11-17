@@ -227,7 +227,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "唯一创建入口是类构造，参数统一为 `(initial, runtime?, options?)`。旧薄工厂已经移除；原 `(initial, options, runtime)` 调用迁移时交换后两参数，没有工厂别名或兼容 wrapper。"
+                "text": "唯一创建入口是类构造，参数统一为 `(initial, runtime?, options?)`。"
               },
               {
                 "type": "table",
@@ -939,7 +939,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "唯一创建入口是类构造，参数统一为 `(initial, runtime?, options?)`。旧薄工厂已经移除；原 `(initial, options, runtime)` 调用迁移时交换后两参数，没有工厂别名或兼容 wrapper。"
+                "text": "唯一创建入口是类构造，参数统一为 `(initial, runtime?, options?)`。"
               },
               {
                 "type": "table",
@@ -1526,7 +1526,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Class constructors are the only creation entry points, with `(initial, runtime?, options?)`. The former thin factories were removed. Migrate old `(initial, options, runtime)` calls by swapping the last two arguments; no factory aliases or compatibility wrappers remain."
+                  "text": "Class constructors are the only creation entry points, with `(initial, runtime?, options?)`."
                 },
                 {
                   "type": "table",
@@ -2318,7 +2318,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Class constructors are the only creation entry points, with `(initial, runtime?, options?)`. The former thin factories were removed. Migrate old `(initial, options, runtime)` calls by swapping the last two arguments; no factory aliases or compatibility wrappers remain."
+                  "text": "Class constructors are the only creation entry points, with `(initial, runtime?, options?)`."
                 },
                 {
                   "type": "table",

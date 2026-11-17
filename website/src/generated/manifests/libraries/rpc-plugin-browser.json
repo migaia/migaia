@@ -15,17 +15,30 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "将真实 Window、Worker、BroadcastChannel、可靠 RTCDataChannel 或 WebTransport 接入 RPC。应用创建原生对象；Browser owner 负责原生来源和 I/O，Host 负责会话、目录与业务调用。"
+                "text": "English · 使用指南"
               },
               {
                 "type": "paragraph",
-                "text": "English · 使用指南"
+                "text": "在浏览器里的页面、iframe、Worker、SharedWorker、BroadcastChannel、可靠有序的 WebRTC DataChannel 和 WebTransport 之间，像调用本地函数一样调用对方。这是 `@migaia/rpc-host` 的传输插件：原生对象由应用创建，本包负责收发和来源校验，host 负责调用、超时、取消和错误还原。"
               }
             ]
           },
           {
-            "id": "开始使用",
-            "heading": "开始使用",
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "`postMessage` 收到了不该处理的消息：iframe 或其他窗口发来的消息没有校验来源就执行了。根因是来源检查散落在每个 `onmessage` 里。",
+                  "页面和 Worker 之间的调用各写一套协议：Worker、iframe、SharedWorker 各自一套请求 ID 和错误格式。根因是调用逻辑和通道绑在了一起。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
             "blocks": [
               {
                 "type": "code",
@@ -133,7 +146,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "错误可能来自 `rpc.transport.browser` 或通用 RPC owner；保留 `source/code/cause/errors` 和原生 stack，不用消息文本或单一 code 猜执行结果。完整迁移验收仍 pending，详见使用指南。"
+                "text": "错误可能来自 `rpc.transport.browser` 或通用 RPC owner；保留 `source/code/cause/errors` 和原生 stack，不用消息文本或单一 code 猜执行结果。详见使用指南。"
               }
             ]
           }
@@ -151,7 +164,31 @@
               },
               {
                 "type": "paragraph",
-                "text": "应用取得真实原生资源，每个 Host 通常选择一种传输。根对象管理身份、provider 与关闭；调用进入对应 namespace。以下完整模块按公开 dist 类型检查，不把静态通过当作真实 realm、认证或整体迁移验收。"
+                "text": "应用取得真实原生资源，每个 Host 通常选择一种传输。根对象管理身份、provider 与关闭；调用进入对应 namespace。以下示例只做类型检查；真实的跨页面来源和认证需要在浏览器里验证。"
+              }
+            ]
+          },
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "按你要做的事跳到对应章节："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "Dedicated Worker",
+                  "Window 与 iframe",
+                  "SharedWorker 多端口",
+                  "BroadcastChannel 多参与者",
+                  "ServiceWorker 的发送与接收",
+                  "可靠 RTCDataChannel",
+                  "WebTransport 可靠字节流",
+                  "Feature 与介入插件",
+                  "职责与已知边界"
+                ]
               }
             ]
           },
@@ -316,11 +353,24 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Connect actual Windows, Workers, BroadcastChannels, reliable RTCDataChannels or WebTransport to RPC. Applications create native objects; Browser owns native sources/I/O, and Host owns sessions, directories and calls."
+                  "text": "中文 · Usage guide"
                 },
                 {
                   "type": "paragraph",
-                  "text": "中文 · Usage guide"
+                  "text": "Call across pages, iframes, Workers, SharedWorkers, BroadcastChannel, reliable ordered WebRTC DataChannels and WebTransport in the browser as if calling local functions. This is a transport plugin for `@migaia/rpc-host`: the application creates the native objects, this module handles sending, receiving and source checks, and the host handles calls, timeouts, cancellation and error restoration."
+                }
+              ]
+            },
+            {
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "`postMessage` handles messages it should not: a message from an iframe or another window runs without its origin being checked. The cause is origin checks scattered across every `onmessage`.",
+                    "Every channel between a page and its Workers has its own protocol: Workers, iframes and SharedWorkers each get their own request IDs and error formats. The cause is call logic tied to the channel."
+                  ]
                 }
               ]
             },
@@ -434,7 +484,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Failures may originate from `rpc.transport.browser` or shared RPC owners. Retain `source/code/cause/errors` and native stacks; text or one code alone does not establish execution outcome. Full migration acceptance remains pending. See the usage guide."
+                  "text": "Failures may originate from `rpc.transport.browser` or shared RPC owners. Retain `source/code/cause/errors` and native stacks; text or one code alone does not establish execution outcome. See the usage guide."
                 }
               ]
             }
@@ -452,7 +502,31 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Applications supply actual native resources and normally select one transport per Host. The root owns identity, providers and closure; calls use the corresponding namespace. These complete modules are typechecked against public dist, not proof of native realms, authentication or full migration acceptance."
+                  "text": "Applications supply actual native resources and normally select one transport per Host. The root owns identity, providers and closure; calls use the corresponding namespace. The examples below are only typechecked; real cross-page origins and authentication must be verified in a browser."
+                }
+              ]
+            },
+            {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Jump to the section for what you want to do:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Dedicated Worker",
+                    "Window and iframe",
+                    "SharedWorker ports",
+                    "BroadcastChannel participants",
+                    "ServiceWorker target and receiver",
+                    "Reliable RTCDataChannel",
+                    "WebTransport reliable bytes",
+                    "Features and intervention plugins",
+                    "Responsibilities and current limits"
+                  ]
                 }
               ]
             },

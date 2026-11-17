@@ -241,7 +241,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "对象订阅者只需实现 `IEventSubscriber<T, R>` 的 `handle(event)`，事件来源由 `subscribeSubscriber(channel, subscriber)` 中的 channel 决定；多事件名称由 Hub 的 `subscribe(key, listener)` 中的 key 决定。旧草案中的抽象类 `EventSubscriber`、静态 `EVENT_NAME` 与 `onCall()` 不属于当前公开契约，不把事件名重复存进 class。"
+                "text": "对象订阅者只需实现 `IEventSubscriber<T, R>` 的 `handle(event)`，事件来源由 `subscribeSubscriber(channel, subscriber)` 中的 channel 决定；多事件名称由 Hub 的 `subscribe(key, listener)` 中的 key 决定。事件名不需要重复存进 class。"
               },
               {
                 "type": "paragraph",
@@ -719,7 +719,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "对象订阅者只需实现 `IEventSubscriber.handle(event)`。旧草案的抽象 `EventSubscriber`、静态 `EVENT_NAME`（也不是 `EVENTNAME`）与 `onCall()` 不属于当前公开契约：事件来源由传入的通道决定，多事件名称由 Hub 的订阅 key 决定，不重复保存在 class 中。"
+                "text": "对象订阅者只需实现 `IEventSubscriber.handle(event)`：事件来源由传入的通道决定，多事件名称由 Hub 的订阅 key 决定，不重复保存在 class 中。"
               }
             ]
           },
@@ -1255,7 +1255,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "An object subscriber only implements `handle(event)` from `IEventSubscriber<T, R>`. The channel supplied to `subscribeSubscriber(channel, subscriber)` determines the event source; a Hub's `subscribe(key, listener)` key determines the event name. The old draft's abstract `EventSubscriber` class, static `EVENT_NAME` and `onCall()` are outside the current public contract; event names are not repeated on subscriber classes."
+                  "text": "An object subscriber only implements `handle(event)` from `IEventSubscriber<T, R>`. The channel supplied to `subscribeSubscriber(channel, subscriber)` determines the event source; a Hub's `subscribe(key, listener)` key determines the event name. Subscriber classes do not need to repeat the event name."
                 },
                 {
                   "type": "paragraph",
@@ -1767,7 +1767,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Object subscribers need only `IEventSubscriber.handle(event)`. The old draft's abstract `EventSubscriber`, static `EVENT_NAME` (nor `EVENTNAME`) and `onCall()` are outside the current API. The supplied channel determines the source. Hub subscription keys determine event names; subscriber classes do not repeat that information."
+                  "text": "Object subscribers need only `IEventSubscriber.handle(event)`. The supplied channel determines the source. Hub subscription keys determine event names; subscriber classes do not repeat that information."
                 }
               ]
             },

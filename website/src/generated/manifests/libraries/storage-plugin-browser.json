@@ -30,7 +30,45 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "为 `localStorage`、`sessionStorage`、Cookie 和 IndexedDB 提供浏览器后端。把选定后端安装到 `@migaia/storage-host`，由宿主负责准备与释放。"
+                "text": "English · 使用指南"
+              },
+              {
+                "type": "paragraph",
+                "text": "把浏览器的 `localStorage`、`sessionStorage`、Cookie 和 IndexedDB 作为 `@migaia/storage-host` 的后端插件安装，用同一套 API 读写。host 负责安装、按组织隔离和关闭；本包负责各浏览器存储的细节，例如命名空间前缀、Cookie 作用域、IndexedDB 的事务和版本升级，以及其他页面写入时的变更通知。"
+              }
+            ]
+          },
+          {
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "存满了才发现：写入超过浏览器配额时抛出各家不同的原生错误，代码只能逐个识别。本包把它们统一报告为 `storage.backend.browser / QUOTA_EXCEEDED`。",
+                  "多个应用或多个标签页的键互相覆盖：大家都往 `localStorage` 根上写 `theme`。根因是没有命名空间；本包的 Web Storage 和 Cookie 后端都按 `namespace` 加前缀。",
+                  "IndexedDB 写起来太绕：打开数据库、版本升级、事务和游标都要手写回调。本包把它包成和其他后端一样的 `set/get/putRecord/transaction`。",
+                  "另一个标签页改了数据，这个页面还显示旧值：根因是没有监听跨页面的变化；装上通知 Feature 后，后端会把其他页面的写入转成变更通知。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面在浏览器里保存一项偏好设置。示例需要支持顶层 `await` 的浏览器 ESM 环境。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'\n\nconst host = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ name: 'preferences', namespace: 'my-app' })]\n})\ntry {\n  const preferences = host.backend('preferences')\n  await preferences.set('theme', 'dark')\n  console.log(await preferences.get('theme'))\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出 `dark`。键实际写成带 `my-app` 前缀的形式，不会和同一域名下其他应用的 `theme` 冲突。释放 host 会关闭它拥有的监听器与连接，不清空浏览器里持久化的数据。"
               }
             ]
           },
@@ -42,25 +80,6 @@
                 "type": "code",
                 "language": "bash",
                 "code": "pnpm add @migaia/storage-plugin-browser @migaia/storage-host @migaia/storage-contract"
-              },
-              {
-                "type": "paragraph",
-                "text": "示例需要支持顶层 `await` 的浏览器 ESM 环境，以及所选后端对应的原生浏览器 API。"
-              }
-            ]
-          },
-          {
-            "id": "保存偏好设置",
-            "heading": "保存偏好设置",
-            "blocks": [
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'\n\nconst host = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ name: 'preferences', namespace: 'my-app' })]\n})\ntry {\n  const preferences = host.backend('preferences')\n  await preferences.set('theme', 'dark')\n  console.log(await preferences.get('theme'))\n} finally {\n  await host.dispose()\n}"
-              },
-              {
-                "type": "paragraph",
-                "text": "输出 `dark`。释放宿主会关闭其拥有的监听器与连接，不清空浏览器持久化数据。"
               }
             ]
           },
@@ -108,12 +127,12 @@
             ]
           },
           {
-            "id": "indexeddb-显式装配与迁移",
-            "heading": "IndexedDB 显式装配与迁移",
+            "id": "indexeddb-按需装配",
+            "heading": "IndexedDB 按需装配",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。以前自动启用的原生索引/backfill、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流，现在各有独立 Feature；业务没有导入并声明的实现不会因这个后端的基础入口进入构建。这是有意的行为变更，用于让应用控制浏览器产物。迁移现有应用时，为实际使用的能力逐项增加下列声明；普通存读不需要增加声明。"
+                "text": "`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。原生索引与回填、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流各有独立的 Feature；没有导入并声明的能力不会进入构建产物。普通读写不需要任何声明，用到哪项能力就加上对应的 Feature："
               },
               {
                 "type": "code",
@@ -312,12 +331,12 @@
             ]
           },
           {
-            "id": "严格索引查询迁移",
-            "heading": "严格索引查询迁移",
+            "id": "严格索引查询",
+            "heading": "严格索引查询",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "旧版 `.index(...).requirePushdown()` 在没有客户端步骤时允许全表扫描。现在显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；未迁移的旧格式记录使 readiness 保持 running；查询继续全表扫描并发出回退诊断，直到迁移状态完成且与当前定义一致。"
+                "text": "`.index(...).requirePushdown()` 要求查询必须走原生索引。显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；存在旧格式记录时 readiness 保持 running，查询继续全表扫描并发出回退诊断，直到记录转换完成且与当前定义一致。"
               }
             ]
           }
@@ -332,6 +351,33 @@
               {
                 "type": "paragraph",
                 "text": "使用选定的浏览器插件与真实宿主。示例需要原生浏览器 API；注入端口不会让 Node 进程拥有浏览器能力。"
+              }
+            ]
+          },
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "按你要做的事跳到对应章节："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "拥有具名浏览器后端",
+                  "Web Storage 选项",
+                  "Cookie scope 与到期",
+                  "IndexedDB 按需装配",
+                  "批量 KV 与结构键",
+                  "原生 IndexedDB 事务",
+                  "实体仓储",
+                  "可选实时查询",
+                  "错误与关闭",
+                  "变更通知、期限与组织视图",
+                  "原生 Blob 与 File 存储",
+                  "IndexedDB 全局日志与显式 undo"
+                ]
               }
             ]
           },
@@ -394,12 +440,12 @@
             ]
           },
           {
-            "id": "indexeddb-显式装配与迁移",
-            "heading": "IndexedDB 显式装配与迁移",
+            "id": "indexeddb-按需装配",
+            "heading": "IndexedDB 按需装配",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。以前自动启用的原生索引/backfill、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流，现在各有独立 Feature；业务没有导入并声明的实现不会因这个后端的基础入口进入构建。这是有意的行为变更，用于让应用控制浏览器产物。迁移现有应用时，为实际使用的能力逐项增加下列声明；普通存读不需要增加声明。"
+                "text": "`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。原生索引与回填、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流各有独立的 Feature；没有导入并声明的能力不会进入构建产物。普通读写不需要任何声明，用到哪项能力就加上对应的 Feature："
               },
               {
                 "type": "code",
@@ -538,13 +584,9 @@
             ]
           },
           {
-            "id": "从直接工厂迁移",
-            "heading": "从直接工厂迁移",
+            "id": "变更通知-期限与组织视图",
+            "heading": "变更通知、期限与组织视图",
             "blocks": [
-              {
-                "type": "paragraph",
-                "text": "用四个后端插件代替直接工厂，通过 `@migaia/storage-host` 安装。内存与宿主原语从该包导入，实体、结构适配与存储编解码器从其 `entity` 入口导入。旧响应式包装与宿主实时查询调用改为显式 `reactiveFeature(targetKind)` 和 `query.live()`。不提供历史工厂别名。"
-              },
               {
                 "type": "paragraph",
                 "text": "显式选择 `indexedDbNotificationsFeature()` 与 `indexedDbChangeFeedFeature()` 后，IndexedDB 通过 `store.watch(key, ctx?)` 提供原生文本失效迭代器。仅当实例已准入当前 realm 的 IndexedDB 与 BroadcastChannel 时 `capabilities.changeFeed` 为 `true`；未准入时调用报 `UNSUPPORTED_CAPABILITY`。提示携带原宿主的组织 UUID，收到提示后重新读取已提交的原生值；这不提供历史重放或每次写入一条事件的保证。迭代器复用原资源清理，使用后调用 `dispose()`。"
@@ -621,12 +663,12 @@
             ]
           },
           {
-            "id": "严格索引查询迁移",
-            "heading": "严格索引查询迁移",
+            "id": "严格索引查询",
+            "heading": "严格索引查询",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "旧版 `.index(...).requirePushdown()` 在没有客户端步骤时允许全表扫描。现在显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；未迁移的旧格式记录使 readiness 保持 running；查询继续全表扫描并发出回退诊断，直到迁移状态完成且与当前定义一致。"
+                "text": "`.index(...).requirePushdown()` 要求查询必须走原生索引。显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；存在旧格式记录时 readiness 保持 running，查询继续全表扫描并发出回退诊断，直到记录转换完成且与当前定义一致。"
               },
               {
                 "type": "paragraph",
@@ -645,7 +687,45 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Browser backends for `localStorage`, `sessionStorage`, cookies, and IndexedDB. Install the selected backend into `@migaia/storage-host`; the host owns preparation and cleanup."
+                  "text": "中文 · Usage guide"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Install the browser's `localStorage`, `sessionStorage`, cookies and IndexedDB as backend plugins of `@migaia/storage-host` and use one API for all of them. The host handles installation, per-organization isolation and shutdown; this module handles the details of each browser store, such as namespace prefixes, cookie scopes, IndexedDB transactions and version upgrades, and change notifications when other pages write."
+                }
+              ]
+            },
+            {
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "You find out the store is full only when a write fails: exceeding the browser quota throws a different native error in each browser, and code has to recognize each one. This module reports them all as `storage.backend.browser / QUOTA_EXCEEDED`.",
+                    "Apps or tabs overwrite each other's keys: everyone writes `theme` at the root of `localStorage`. The cause is no namespace; the Web Storage and cookie backends here prefix keys with `namespace`.",
+                    "IndexedDB is tedious to use: opening the database, version upgrades, transactions and cursors all need hand-written callbacks. This module wraps them in the same `set/get/putRecord/transaction` as other backends.",
+                    "Another tab changed the data, but this page still shows the old value: the cause is not listening for cross-page changes; with the notifications Feature installed, the backend turns writes from other pages into change notifications."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The example saves one preference in a browser. It needs a browser ESM environment with top-level `await`."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'\n\nconst host = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ name: 'preferences', namespace: 'my-app' })]\n})\ntry {\n  const preferences = host.backend('preferences')\n  await preferences.set('theme', 'dark')\n  console.log(await preferences.get('theme'))\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "It prints `dark`. The key is stored with the `my-app` prefix, so it does not collide with another app's `theme` on the same domain. Disposing the host closes the listeners and connections it owns without clearing data persisted in the browser."
                 }
               ]
             },
@@ -657,25 +737,6 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm add @migaia/storage-plugin-browser @migaia/storage-host @migaia/storage-contract"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Examples require an ESM browser environment with top-level `await`. Select a backend whose native browser API is available."
-                }
-              ]
-            },
-            {
-              "id": "save-preferences",
-              "heading": "Save preferences",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'\n\nconst host = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ name: 'preferences', namespace: 'my-app' })]\n})\ntry {\n  const preferences = host.backend('preferences')\n  await preferences.set('theme', 'dark')\n  console.log(await preferences.get('theme'))\n} finally {\n  await host.dispose()\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Prints `dark`. Disposing the host releases owned listeners and connections; it does not clear persistent browser data."
                 }
               ]
             },
@@ -723,16 +784,12 @@
               ]
             },
             {
-              "id": "explicit-indexeddb-assembly-and-migration",
-              "heading": "Explicit IndexedDB assembly and migration",
+              "id": "assemble-indexeddb-as-needed",
+              "heading": "Assemble IndexedDB as needed",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes/backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each require their own Feature."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Previously these capabilities were automatic. This intentional behavior change lets applications control browser output: an undeclared Feature is not imported by the basic backend entry. Migrate existing applications by selecting each capability they actually use. Basic reads and writes need no additional declaration."
+                  "text": "`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes and backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each have their own Feature; capabilities you do not import and declare stay out of the bundle. Basic reads and writes need no declaration; add the Feature for each capability you use:"
                 },
                 {
                   "type": "code",
@@ -1027,20 +1084,20 @@
               ]
             },
             {
-              "id": "strict-index-query-migration",
-              "heading": "Strict index query migration",
+              "id": "strict-index-queries",
+              "heading": "Strict index queries",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Previously, `.index(...).requirePushdown()` allowed a full scan when no client steps remained. Terminal reads now reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan."
+                  "text": "`.index(...).requirePushdown()` demands native index execution. Terminal reads reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries retain their scan fallback."
+                  "text": "Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries keep their scan fallback."
                 },
                 {
                   "type": "paragraph",
-                  "text": "IndexedDB borrowed views resolve the same private capabilities as their native store. Legacy records keep readiness running until migration completes with the matching schema fingerprint. Queries continue to scan and report fallback while readiness is not complete."
+                  "text": "IndexedDB borrowed views resolve the same private capabilities as their native store. While records in an older format remain, index readiness stays running and queries keep scanning and report the fallback, until conversion completes with the matching schema fingerprint."
                 }
               ]
             }
@@ -1055,6 +1112,33 @@
                 {
                   "type": "paragraph",
                   "text": "Use the selected browser plugin with the real host. The examples require native browser APIs; an injected port does not turn a Node process into a browser."
+                }
+              ]
+            },
+            {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Jump to the section for what you want to do:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Own named browser backends",
+                    "Web Storage options",
+                    "Cookie scope and expiry",
+                    "Assemble IndexedDB as needed",
+                    "KV batches and typed keys",
+                    "Native IndexedDB transactions",
+                    "Entity repositories",
+                    "Optional live queries",
+                    "Errors and shutdown",
+                    "Change notifications, expiry and organization views",
+                    "Native Blob and File storage",
+                    "IndexedDB global journal and explicit undo"
+                  ]
                 }
               ]
             },
@@ -1123,12 +1207,12 @@
               ]
             },
             {
-              "id": "explicit-indexeddb-assembly-and-migration",
-              "heading": "Explicit IndexedDB assembly and migration",
+              "id": "assemble-indexeddb-as-needed",
+              "heading": "Assemble IndexedDB as needed",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes/backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each require their own Feature. Previously these capabilities were automatic. This intentional behavior change lets applications control browser output: an undeclared Feature is not imported by the basic backend entry. Migrate existing applications by selecting each capability they actually use. Basic reads and writes need no additional declaration."
+                  "text": "`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes and backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each have their own Feature; capabilities you do not import and declare stay out of the bundle. Basic reads and writes need no declaration; add the Feature for each capability you use:"
                 },
                 {
                   "type": "code",
@@ -1271,13 +1355,9 @@
               ]
             },
             {
-              "id": "migration-from-direct-factories",
-              "heading": "Migration from direct factories",
+              "id": "change-notifications-expiry-and-organization-views",
+              "heading": "Change notifications, expiry and organization views",
               "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "Replace direct factories with the four backend plugins installed through `@migaia/storage-host`. Import memory and host primitives from that module, entities, schemas, and storage codecs from its `entity` entry. Replace old reactive wrappers and host live-query calls with an explicit `reactiveFeature(targetKind)` and `query.live()`. No legacy factory aliases are exported."
-                },
                 {
                   "type": "paragraph",
                   "text": "With `indexedDbNotificationsFeature()` and `indexedDbChangeFeedFeature()` selected, IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`. Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method."
@@ -1362,20 +1442,20 @@
               ]
             },
             {
-              "id": "strict-index-query-migration",
-              "heading": "Strict index query migration",
+              "id": "strict-index-queries",
+              "heading": "Strict index queries",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Previously, `.index(...).requirePushdown()` allowed a full scan when no client steps remained. Terminal reads now reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan."
+                  "text": "`.index(...).requirePushdown()` demands native index execution. Terminal reads reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries retain their scan fallback."
+                  "text": "Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries keep their scan fallback."
                 },
                 {
                   "type": "paragraph",
-                  "text": "IndexedDB borrowed views resolve the same private capabilities as their native store. Legacy records keep readiness running until migration completes with the matching schema fingerprint. Queries continue to scan and report fallback while readiness is not complete."
+                  "text": "IndexedDB borrowed views resolve the same private capabilities as their native store. While records in an older format remain, index readiness stays running and queries keep scanning and report the fallback, until conversion completes with the matching schema fingerprint."
                 },
                 {
                   "type": "paragraph",
@@ -5026,7 +5106,7 @@
           "declaredConfiguration": [],
           "identity": "packages/storage-plugin-browser/dist/features/reactive.d.ts:reactiveFeature:export declare const reactiveFeature: <T extends IStorageFeatureTarget = IStorageBackendType>() => IStorageFeature<T, IReactiveFeatureOutput>;",
           "guidance": [],
-          "usageScore": 34,
+          "usageScore": 30,
           "configuration": [],
           "fragment": "storage-plugin-browser-features/reactive--reactiveFeature"
         }

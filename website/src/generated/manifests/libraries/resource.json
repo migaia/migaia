@@ -288,12 +288,12 @@
             ]
           },
           {
-            "id": "状态类型迁移",
-            "heading": "状态类型迁移",
+            "id": "状态类型",
+            "heading": "状态类型",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`ResourceStatus.fetching` 已改为 `ResourceFetchStatus.fetching`；旧的 `IResourceStatus` / `IResourceFetchStatus` 类型改用与常量同名的 `ResourceStatus` / `ResourceFetchStatus` 键联合。运行时的状态字符串和后台刷新的数据、传输语义没有变化。"
+                "text": "`ResourceStatus` 列出 `state` 的五种状态；后台刷新是否在进行由 `ResourceFetchStatus` 表示（例如 `ResourceFetchStatus.fetching`）。两者都是“常量对象 + 同名键联合类型”：值用 `ResourceStatus.success` 这样的常量，类型直接写 `ResourceStatus`。"
               }
             ]
           },
@@ -1152,7 +1152,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "状态类型迁移：`ResourceStatus.fetching` 改为 `ResourceFetchStatus.fetching`；旧 `IResourceStatus` / `IResourceFetchStatus` 类型改用与常量同名的 `ResourceStatus` / `ResourceFetchStatus` key union。运行时的状态字符串与 SWR 数据/传输语义保持不变。"
+                "text": "`ResourceStatus` 列出 `state` 的五种状态；后台刷新是否在进行由 `ResourceFetchStatus` 表示（例如 `ResourceFetchStatus.fetching`）。两者都是“常量对象 + 同名键联合类型”：值用 `ResourceStatus.success` 这样的常量，类型直接写 `ResourceStatus`。"
               }
             ]
           },
@@ -1486,12 +1486,12 @@
               ]
             },
             {
-              "id": "state-type-migration",
-              "heading": "State type migration",
+              "id": "state-types",
+              "heading": "State types",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`ResourceStatus.fetching` became `ResourceFetchStatus.fetching`; the former `IResourceStatus` / `IResourceFetchStatus` types are replaced by the key unions `ResourceStatus` / `ResourceFetchStatus` that share their constants' names. The runtime status strings and the data and transport semantics of background refresh are unchanged."
+                  "text": "`ResourceStatus` lists the five states of `state`; whether a background refresh is running is reported by `ResourceFetchStatus` (for example `ResourceFetchStatus.fetching`). Both are a constant object plus a key union of the same name: use constants such as `ResourceStatus.success` for values and write `ResourceStatus` as the type."
                 }
               ]
             },
@@ -1826,7 +1826,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nclass HttpError extends Error {\n  readonly status: number\n  constructor(status: number) {\n    super(`HTTP ${status}`)\n    this.status = status\n  }\n}\n\nconst runtime = createRuntime()\nconst replies = [503, 404] // first a temporary gateway failure, then \"not found\"\nlet attempt = 0\n\nconst order = new Resource(\n  async () => {\n    const status = replies[attempt++]\n    console.log(`request ${attempt}: ${status}`)\n    throw new HttpError(status)\n  },\n  runtime,\n  {\n    // Retry only 503, at most 3 times; retrying a 404 would not help\n    retry: (failureCount, error) =>\n      failureCount <= 3 && error instanceof HttpError && error.status === 503,\n    retryDelay: (failureCount) => failureCount * 20 // 20 ms, 40 ms, ... growing each time\n  }\n)\n\ntry {\n  await order.promise\n} catch (error) {\n  const failure = error as HttpError & { code?: string }\n  console.log(`final failure: ${failure.message}, still an HttpError: ${failure instanceof HttpError}`)\n  console.log(`code: ${failure.code}`)\n}\norder.dispose()"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nclass HttpError extends Error {\n  readonly status: number\n  constructor(status: number) {\n    super(`HTTP ${status}`)\n    this.status = status\n  }\n}\n\nconst runtime = createRuntime()\nconst replies = [503, 404] // first a temporary gateway failure, then \"not found\"\nlet attempt = 0\n\nconst order = new Resource(\n  async () => {\n    const status = replies[attempt++]\n    console.log(`request ${attempt}: ${status}`)\n    throw new HttpError(status)\n  },\n  runtime,\n  {\n    // Retry only 503, at most 3 times; retrying a 404 would not help\n    retry: (failureCount, error) =>\n      failureCount <= 3 && error instanceof HttpError && error.status === 503,\n    retryDelay: (failureCount) => failureCount * 20 // 20 ms, 40 ms, ... growing each time\n  }\n)\n\ntry {\n  await order.promise\n} catch (error) {\n  const failure = error as HttpError & { code?: string }\n  console.log(\n    `final failure: ${failure.message}, still an HttpError: ${failure instanceof HttpError}`\n  )\n  console.log(`code: ${failure.code}`)\n}\norder.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -2327,7 +2327,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "State type migration: `ResourceStatus.fetching` became `ResourceFetchStatus.fetching`; the former `IResourceStatus` / `IResourceFetchStatus` types are replaced by the key unions `ResourceStatus` / `ResourceFetchStatus` that share their constants' names. The runtime status strings and the data and transport semantics of background refresh are unchanged."
+                  "text": "`ResourceStatus` lists the five states of `state`; whether a background refresh is running is reported by `ResourceFetchStatus` (for example `ResourceFetchStatus.fetching`). Both are a constant object plus a key union of the same name: use constants such as `ResourceStatus.success` for values and write `ResourceStatus` as the type."
                 }
               ]
             },
@@ -5609,7 +5609,7 @@
               ]
             }
           ],
-          "usageScore": 124,
+          "usageScore": 130,
           "configuration": [],
           "fragment": "resource-index--ResourceStatus"
         }

@@ -32,21 +32,201 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`contract` 定义协议、接口、可移植值和错误契约；`host` 负责 RPC 调用、会话、握手、provider、转发与取消。传输 plugin 负责原生连接、代际、编解码、分帧与 transfer；信息流 plugin 和依附于 plugin 的 feature 各自实现可选能力。"
-              },
-              {
-                "type": "paragraph",
-                "text": "一个 host 可以安装多个传输，调用按 `host.<ns>` 隔离。不建议一个 host 混用多种传输；通常每个 host 选择一种。"
-              },
-              {
-                "type": "paragraph",
                 "text": "English · 使用指南"
+              },
+              {
+                "type": "paragraph",
+                "text": "把计算挪到 Worker、子进程或另一个页面以后，调用它们的代码常常比计算本身更难写对：超时以后对端还在跑，错误到了这边只剩一句字符串，关闭时还有调用在等。`@migaia/rpc-host` 让你像调用本地函数一样调用另一边的函数，同时把超时、取消、错误和关闭都传过边界：调用方超时，对端立即收到取消信号；对端抛出的错误带着原来的 `source`、`code`、堆栈和 `cause` 回来；关闭 host 时，等待中的调用一起结束。"
+              },
+              {
+                "type": "paragraph",
+                "text": "用哪种通道由传输插件决定：协程（同一事件循环）、Worker 线程、子进程、浏览器窗口和 iframe 各有一个包，调用方式都一样。"
               }
             ]
           },
           {
-            "id": "开始使用",
-            "heading": "开始使用",
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "超时了，对端还在算：调用方等了 5 秒放弃，Worker 里的计算继续跑完，白白占着 CPU。根因是超时只发生在调用方这一侧，没有把取消传过去。",
+                  "错误过了边界就认不出来了：子进程抛出的错误到了主进程只剩 `message`，`code` 和 `cause` 都丢了，只能按字符串判断。根因是错误被序列化成了普通对象。",
+                  "关闭时调用永远挂着：Worker 被终止了，还在等结果的 Promise 永远不结束。根因是没人负责在关闭时结算待决调用。",
+                  "换一种通道就要重写调用代码：从 Worker 换成子进程，请求 ID、消息格式和超时逻辑全部重写。根因是调用逻辑和通道绑在了一起。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "为什么选它",
+            "heading": "为什么选它",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "常见的写法是 `postMessage` 加一张“请求 ID → Promise”的映射表，或者一个把方法调用转成消息的代理。它能跑通正常路径，但在下面这些地方会出问题："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "超时和取消会传到对端。 调用方超时或调用 `signal.abort()` 后，对端 provider 的 `context.signal` 随之中止，可以停下手里的工作。示例",
+                  "错误回来时还是原来的错误。 远端错误还原成原生 Error，保留 `source`、`code`、`stack`、`cause` 和 `AggregateError.errors`，按 `source/code` 判断即可。示例",
+                  "一套调用 API，换通道只换插件。 `request`、`notify`、`stream`、`group` 在协程、线程、子进程和浏览器通道上用法相同；切换通道只需换传输插件。示例",
+                  "关闭是有序的。 `host.close()` 先以 `ENDPOINT_DISPOSED` 结算所有等待中的调用，再关闭底层连接；重复调用共享同一个 Promise。示例",
+                  "认证、限流、去重等能力按需安装。 `authFeature`、`limitsFeature`、`idempotencyFeature` 等都是独立的 Feature，不装就不打包。示例"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "只是在同一个模块里调用几个函数，或者一次性把数据发给 Worker、不需要结果和取消时，直接 `postMessage` 更简单。"
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面用协程通道在同一个进程里演示：对端提供两个方法，其中 `slowReport` 要 1 秒才完成，而调用方的超时是 100 毫秒。用 Node 24 直接运行。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\ntype IReportService = {\n  double(value: number): number\n  slowReport(): Promise<string>\n}\n\nconst host = await createRpcHost<IReportService>({\n  plugins: [\n    coroutinePlugin({\n      features: { timeout: timeoutFeature({ ms: 100 }) }, // 每次调用最多等 100 毫秒\n      // 对端：真实项目里它在 Worker 或子进程里，这里放在同一个进程里便于运行\n      spawn: async ({ connect, signal }) => {\n        const worker = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: {\n            double: (value: number) => value * 2,\n            slowReport: (_input: undefined, context: { signal: AbortSignal }) =>\n              new Promise<string>((resolve, reject) => {\n                const timer = setTimeout(() => resolve('report'), 1000)\n                context.signal.addEventListener('abort', () => {\n                  clearTimeout(timer)\n                  console.log('对端收到取消，停止生成报表')\n                  reject(context.signal.reason)\n                })\n              })\n          }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            )\n        } finally {\n          await worker.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n  await host.coroutine.request('slowReport')\n} catch (error) {\n  const { source, code } = error as { source: string; code: string }\n  console.log(`调用失败：${source} / ${code}`)\n} finally {\n  await host.close()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "42\n调用失败：rpc.endpoint / DEADLINE_EXCEEDED\n对端收到取消，停止生成报表"
+              },
+              {
+                "type": "paragraph",
+                "text": "`double` 正常返回 `42`。`slowReport` 超过 100 毫秒后，调用方以 `DEADLINE_EXCEEDED` 失败，同时对端的 `context.signal` 被中止，报表生成随之停下，而不是在后台继续跑满 1 秒。调用写成 `host.coroutine.request(...)`：`coroutine` 是这个传输插件的命名空间，换成 Worker 线程时就是 `host.thread.request(...)`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "下一步：要把计算放进 Worker，看 `@migaia/rpc-plugin-thread`；放进子进程，看 `@migaia/rpc-plugin-process`；给所有调用加默认超时和重试，看安装完整策略。"
+              }
+            ]
+          },
+          {
+            "id": "手写时的隐患",
+            "heading": "手写时的隐患",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面是常见的手写 Worker 调用。它能跑，但有三个隐患（只用于说明，不必运行）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "declare const worker: {\n  postMessage(message: unknown): void\n  onmessage: ((event: { data: { id: number; result: unknown } }) => void) | null\n}\n\nconst pending = new Map<number, (value: unknown) => void>()\nlet nextId = 0\n\nworker.onmessage = (event) => {\n  pending.get(event.data.id)?.(event.data.result)\n  pending.delete(event.data.id)\n}\n\nfunction call(method: string, payload: unknown): Promise<unknown> {\n  const id = nextId++\n  worker.postMessage({ id, method, payload })\n  // 隐患 1：超时只是不再等待；Worker 里的计算照样跑完，白占 CPU\n  return Promise.race([\n    new Promise((resolve) => pending.set(id, resolve)),\n    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))\n  ])\n}\n\n// 隐患 2：Worker 里抛出的错误要自己序列化，code、cause 和堆栈通常在这里丢掉\n// 隐患 3：worker.terminate() 之后，pending 里的 Promise 永远不会结束\nvoid call('render', { page: 1 })"
+              },
+              {
+                "type": "paragraph",
+                "text": "用 rpc-host 时，超时会作为取消信号传到对端，错误按原样还原，`close()` 会结算所有等待中的调用。"
+              }
+            ]
+          },
+          {
+            "id": "三分钟心智模型",
+            "heading": "三分钟心智模型",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["概念", "一句话"],
+                "rows": [
+                  ["host", "`createRpcHost` 返回的对象；拥有连接、待决调用和关闭过程"],
+                  [
+                    "传输插件",
+                    "决定通道，例如 `coroutinePlugin`、`threadPlugin`、`processPlugin`；每个传输占一个命名空间"
+                  ],
+                  [
+                    "命名空间",
+                    "调用入口，`host.<命名空间>.request(...)`；一个 host 通常只装一种传输"
+                  ],
+                  [
+                    "provider",
+                    "用 `provide` 选项或 `host.provide()` 注册给对端调用的方法；第二个参数是带 `signal` 的上下文"
+                  ],
+                  [
+                    "Feature",
+                    "一项可选能力，例如 `timeoutFeature`、`retryFeature`、`authFeature`；写在传输插件或流插件的 `features` 里"
+                  ],
+                  [
+                    "流插件",
+                    "`defineFlowPlugin({ name, features })`，给所有命名空间装默认能力；只能在构造时安装"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "调用种类："
+              },
+              {
+                "type": "table",
+                "headers": ["调用", "完成的含义"],
+                "rows": [
+                  ["`request(method, payload?, options?)`", "等到业务结果"],
+                  ["`notify(method, payload?, options?)`", "消息发出即完成，不等对端处理"],
+                  ["`stream(method, payload?, options?)`", "返回异步迭代器，逐个读取对端交出的值"],
+                  ["`group(steps, options?)`", "对每个目标按顺序执行几步；不是跨目标事务"],
+                  ["`send(targetId, ...)` / `streamTo(targetId, ...)`", "指定一个目标调用"],
+                  ["`dispatch(targetId, ...)`", "同步返回，失败交给 reporter"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "典型场景",
+            "heading": "典型场景",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["场景", "怎么组合", "详细说明"],
+                "rows": [
+                  ["把重计算放进 Worker", "`threadPlugin`", "rpc-plugin-thread"],
+                  ["在子进程里跑隔离任务，崩溃后重启", "`processPlugin`", "rpc-plugin-process"],
+                  [
+                    "浏览器窗口、iframe、SharedWorker 之间调用",
+                    "`rpc-plugin-browser` 的工厂",
+                    "rpc-plugin-browser"
+                  ],
+                  [
+                    "把调用分给一组 Worker 或子进程",
+                    "传输的 `features: { workers: pool({ size }) }`",
+                    "rpc-plugin-pool"
+                  ],
+                  [
+                    "所有调用的默认超时和重试",
+                    "`defineFlowPlugin` + `timeoutFeature` / `retryFeature`",
+                    "安装完整策略"
+                  ],
+                  [
+                    "签名认证、拒绝重复请求",
+                    "`authFeature` + `idempotencyFeature`",
+                    "认证、签名与重复请求"
+                  ],
+                  ["控制发给对端的错误细节", "`errorMapFeature`", "映射发往对端的错误"],
+                  [
+                    "观察调用和生成类型",
+                    "`probe` / `typegen`（`@migaia/rpc-host/plugins`）",
+                    "观察与类型生成"
+                  ],
+                  ["查看多个 host 的时间线", "`@migaia/rpc-plugin-devtools`", "rpc-plugin-devtools"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "安装",
+            "heading": "安装",
             "blocks": [
               {
                 "type": "code",
@@ -55,104 +235,64 @@
               },
               {
                 "type": "paragraph",
-                "text": "`@migaia/rpc-contract` 是精确 lockstep 的 peer 依赖，必须与 host 和传输插件一起安装相同版本。它们共用应用提供的同一份 contract；开发者显式安装的重复副本不在支持范围内。"
-              },
-              {
-                "type": "paragraph",
-                "text": "错误类、错误判断和可移植值使用 `@migaia/rpc-host/contract`：它按名字转出 `RpcLifecycleError`、`RpcConstructionError`、`RpcAbortError`、`isRpcError`、`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`、`RPC_CORE_ERROR_SOURCE`、`normalizeRpcPortable`，以及 `RpcError` 等错误类型和 `IRpcPortableValue`。转出与应用提供的 contract 保持同一个对象，跨入口 `instanceof` 一致。原根入口的 contract 值与类型已迁移到此处，不保留旧转出；`createRpcHost` 仍从根入口导入。"
-              },
-              {
-                "type": "paragraph",
-                "text": "下面建立两个同一事件循环内的真实 host。父端的 timeout feature 安装在 coroutine plugin 上；子端接收本代专属 connect 句柄。输出 `42`，finally 关闭原生资源。"
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: { timeout: timeoutFeature({ ms: 1500 }) },\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            )\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
-              },
-              {
-                "type": "paragraph",
-                "text": "协程不提供 Worker 隔离。独立进程、原生线程和浏览器场景分别选择 process、thread 和 browser 的传输 plugin。"
+                "text": "`@migaia/rpc-contract` 是必须同版本安装的 peer 依赖，host 和各传输插件共用应用提供的这一份；自己再装一份重复副本不在支持范围内。传输插件按场景选择。"
               }
             ]
           },
           {
-            "id": "初始化与自定义宿主",
-            "heading": "初始化与自定义宿主",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "`createRpcHost` 在同一个原生 plugin-host 上先提交宿主级 flow plugin 及其 feature，再安装传输 plugin 及其 feature。传输开始握手时，auth 等 stage 已经可用；后续安装失败由同一生命周期 owner 回滚并释放已取得的资源。"
-              },
-              {
-                "type": "paragraph",
-                "text": "构造后可用 `const extended = await host.use(transport)` 后装传输，返回同一个冻结的原生 host，并在返回值的类型上增加命名空间。每次 `use` 独立提交或回滚；构造时那一批则一起成功或失败。改变消息流的宿主级 Feature 只能在构造的 `plugins` 中配置，后装会以 `INVALID_CONFIG` 拒绝；后装传输自动借用它们，传输自己的 `features` 随传输一起安装，仍只覆盖本命名空间。只读观察插件，包括警告订阅，可以后装。"
-              },
-              {
-                "type": "paragraph",
-                "text": "已有 `defineHost` 或 class 宿主通过 `@migaia/rpc-host/sdk` 的 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`，并把原生构造请求转交 `pipeline(name, request)`。每个传输自己声明管道，无需预列命名空间。普通原生宿主用 `defineFlowPlugin({ name, features })` 安装共享信息流，再装传输。具体接法见使用指南。"
-              }
-            ]
-          },
-          {
-            "id": "调用与归属",
-            "heading": "调用与归属",
+            "id": "常用-api",
+            "heading": "常用 API",
             "blocks": [
               {
                 "type": "table",
-                "headers": ["入口", "完成含义"],
+                "headers": ["API", "用途"],
                 "rows": [
-                  ["`host.<ns>.request(method, payload?, options?)`", "等待业务结果"],
+                  ["`createRpcHost({ plugins, provide?, forward?, onWarning? })`", "创建 host"],
+                  ["`host.<ns>.request` / `notify` / `stream` / `group`", "调用对端"],
+                  ["`host.provide(definition)`", "注册本地方法，名字重复时拒绝"],
+                  ["`host.use(...plugins)` / `host.unUse(name)`", "构造后安装或卸载传输"],
+                  ["`host.close()`", "关闭整个 host，重复调用共享一个 Promise"],
                   [
-                    "`host.<ns>.notify(method, payload?, options?)`",
-                    "等待物理发送；不等待业务确认，`targetId` 可选单个直连目标"
-                  ],
-                  [
-                    "`host.<ns>.stream(method, payload?, options?)`",
-                    "惰性迭代器；多目标时各自独立消费"
-                  ],
-                  [
-                    "`host.<ns>.streamTo(targetId, method, payload?, options?)`",
-                    "选择一个直连目标，返回一个惰性迭代器"
-                  ],
-                  [
-                    "`host.<ns>.group(steps, options?)`",
-                    "每个目标按顺序执行 `{ method, payload }`，没有跨目标事务"
-                  ],
-                  [
-                    "`host.<ns>.send(targetId, method, payload?, options?)`",
-                    "选择一个直连目标，返回标量"
-                  ],
-                  [
-                    "`host.<ns>.dispatch(targetId, method, payload?, options?)`",
-                    "同步返回 `void`，异步失败交给 reporter"
-                  ],
-                  ["`host.provide(definition)`", "增量注册本地方法；重复名拒绝"],
-                  ["`host.<ns>.peers`", "已接受的直连能力；保存的函数绑定原连接代次"],
-                  ["`host.close()`", "关闭整个 host；重复调用共享原 Promise"],
-                  ["`host.use(...plugins)`", "独立安装事务，返回带新增命名空间类型的同一 host"],
-                  ["`host.unUse(name)`", "原生卸载结果；活动信息流限制下以状态错误拒绝"]
+                    "`defineFlowPlugin({ name, features })`",
+                    "声明所有命名空间共用的默认能力（`@migaia/rpc-host/sdk`）"
+                  ]
                 ]
               },
               {
                 "type": "paragraph",
-                "text": "上述无目标调用只在所属命名空间内选择目标：零个返回空 `fulfilled/rejected`，一个返回标量，多个返回按实例身份索引的 `fulfilled/rejected`。流集合中的迭代器独立取消。根级 `host.request` 等调用入口已删除。"
+                "text": "内置 Feature 从 `@migaia/rpc-host/features` 导入，也可以从 `@migaia/rpc-host/features/<名称>` 单独导入；错误类和判断函数从 `@migaia/rpc-host/contract` 导入。完整入口见入口一览。"
+              }
+            ]
+          },
+          {
+            "id": "初始化与后装",
+            "heading": "初始化与后装",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`createRpcHost` 在同一个原生 plugin-host 上先提交流插件及其 Feature，再安装传输插件及其 Feature，所以传输开始握手时，认证等能力已经就位；后续安装失败时，已取得的资源由同一个生命周期回滚并释放。"
               },
               {
                 "type": "paragraph",
-                "text": "定向流使用 `streamTo`，目标放在第一个参数；`stream` 的 options 不再接受 `targetId`。两者复用相同的流背压、取消和代次隔离。"
+                "text": "构造后可以 `const extended = await host.use(transport)` 后装传输，返回同一个 host，类型上多出新的命名空间。每次 `use` 独立提交或回滚；构造时那一批一起成功或失败。改变消息流的流插件只能在构造的 `plugins` 里配置，后装会以 `INVALID_CONFIG` 拒绝（消息为 `RPC flow hooks cannot be installed after transport startup`）；后装的传输自动使用它们，传输自己的 `features` 只作用于本命名空间。只读的观察插件可以后装。"
               },
               {
                 "type": "paragraph",
-                "text": "`remote.host.use`、`remote.host.unUse` 和 `remote.host.inspect` 已移除，不再提供通过 RPC 管理远端宿主插件的协议；本地原生宿主的安装与释放 API 保持各自契约。"
+                "text": "已有 `defineHost` 或 class 宿主通过 `@migaia/rpc-host/sdk` 的 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`，具体接法见在已有宿主中安装 RPC。"
+              }
+            ]
+          },
+          {
+            "id": "目标选择与转发",
+            "heading": "目标选择与转发",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "不指定目标的调用只在所属命名空间内选择目标：没有目标返回空的 `fulfilled/rejected`，一个目标返回标量，多个目标返回按实例身份索引的 `fulfilled/rejected`。流集合里的每个迭代器独立取消。`host.<ns>.peers` 列出已接受的直连对端；从 `peers` 保存下来的函数绑定当时的连接，对端重连后不会自动改指新连接。"
               },
               {
                 "type": "paragraph",
-                "text": "`host.<ns>.send('b', 'c.render', value)` 先到直连 b，再由 b 查询当前目录并转发到 c。持有的 `host.<ns>.peers.c.render` 不会自动改指重连后的新代。转发可跨命名空间，且不能延长上游截止时间。"
-              },
-              {
-                "type": "paragraph",
-                "text": "在 `createRpcHost` 上用 `forward: { maxHops: 3 }` 配置各转发 host。默认 3，只接受 1–16 的整数，其他值以 `INVALID_CONFIG` 拒绝。各 host 检查自己的转发跳序；先检查环路，再检查跳数。"
+                "text": "`host.<ns>.send('b', 'c.render', value)` 先到直连的 b，再由 b 按当前目录转发给 c。转发可以跨命名空间，但不能延长上游的截止时间。`forward: { maxHops }` 默认 3，只接受 1–16 的整数；每个 host 先检查环路，再检查跳数。"
               }
             ]
           },
@@ -162,7 +302,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂都从 `@migaia/rpc-host/features` 导入。产物放入 `defineFlowPlugin({ name, features: { alias: feature } })`，再把该 plugin 放进 host 的 `plugins`；传输也用 `features: { alias: feature }`。host 配置作用于所有命名空间；传输配置只覆盖本命名空间的同种能力，每个命名空间只启用一份实现。host 级 `limitsFeature` 跨命名空间共用额度，传输级各自独立。`probe`、`typegen` 和 Devtools 只装在 host 级。原 `namespaces` 作用范围选项已删除，按传输选择范围时使用 `features`。"
+                "text": "`authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature`、`timeoutFeature`、`retryFeature` 都从 `@migaia/rpc-host/features` 导入，放进 `defineFlowPlugin({ name, features })`（作用于所有命名空间）或传输的 `features`（只覆盖本命名空间的同种能力）。每个命名空间每种能力只启用一份。host 级的 `limitsFeature` 跨命名空间共用额度，传输级的各自独立。`probe`、`typegen` 和 Devtools 只装在 host 级。"
               },
               {
                 "type": "code",
@@ -171,39 +311,19 @@
               },
               {
                 "type": "paragraph",
-                "text": "汇总入口与默认子路径导入均可 tree-shake。推荐安装 `limitsFeature`；省略它就不启用这些配额。安装 `idempotencyFeature` 后，才有 `host.<ns>.outcome(key)`。auth 默认把签名绑定对象交给 `sign/verify`；文本和字节模式只编码一层绑定。它的请求 ID 去重默认在完成后立即释放，也可选择签名窗口或毫秒 `retain`；`maxReplayEntriesPerPeer` 只限制数字保留模式，`onRejected` 接收容量拒绝原因。配置和 HMAC 示例见认证说明。"
+                "text": "汇总入口和单项子路径都可以 tree-shake。不装 `limitsFeature` 就没有配额；装了 `idempotencyFeature` 才有 `host.<ns>.outcome(key)`。auth 默认把签名绑定对象交给 `sign/verify`，完成的请求 ID 默认立即释放，也可以按签名窗口或毫秒数 `retain`；配置和 HMAC 示例见认证说明。"
               },
               {
                 "type": "paragraph",
-                "text": "`errorMapFeature` 同步决定对端能看到哪些错误信息，不改变本地原错、report、警告或日志观察。回调抛错、返回 Promise 或结果无法序列化时，报告映射失败，并按未映射时的规则发送原错误。未配置映射时，未认证对端的握手失败仍默认隐藏细节。见错误映射。"
+                "text": "`errorMapFeature` 同步决定对端能看到哪些错误信息，不改变本地的原错误、报告和观察。回调抛错、返回 Promise 或结果无法序列化时，报告映射失败，并按未映射的规则发送。未配置映射时，未认证对端的握手失败默认隐藏细节。"
               },
               {
                 "type": "paragraph",
-                "text": "自定义信息流通过 `defineFlowFeature` 的 `setup` 返回 `stages`，放进 `defineFlowPlugin` 的 `features` record 或某个传输的 `features` record；stage 接收该管道的 payload 和原生 `next(payload)`。观察事件单独放在 `observe`。frame 管道允许多次提交，各成员独立：捕获并报告一个成员失败后可以继续交出下一个；忽略失败的 `next()` Promise 会使管道拒绝。被取消的 batch 成员由原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`，其他成员照常完成。"
+                "text": "出站执行顺序固定为：plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire；入站相反。`features` 里的键名和顺序不决定执行顺序。第三方 Feature 用 `defineFlowFeature` 定义，必须声明 0–65535 的整数 `phase`；`dependencies` 决定安装顺序，`phase` 决定执行顺序。auth 保护完整消息，再由 chunk 拆成物理帧；接收端先重组，再验证。"
               },
               {
                 "type": "paragraph",
-                "text": "内置位置固定：出站 plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire；入站反向。record 的键名与插入顺序不决定执行顺序。第三方 feature 必须声明整数 `phase`（0–65535）；同一 stage point 与 layer 不允许 phase 冲突。`dependencies` 决定原生安装顺序，`phase` 决定执行顺序。第三方 stage 默认在 plaintext，高阶 SDK 作者可显式指定受支持的 `layer`。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`authFeature` 对完整消息执行保护，再由 `chunkFeature` 拆成物理帧；接收端先重组，再还原保护。probe 的 `protected` 事件对应整条消息，`frame` 事件保留实际 `chunkIndex`、`chunkCount` 和 `members`。物理 batch 的成员数在 batch frame 上观察；`envelope` 事件仍对每条逻辑消息观察一次。"
-              },
-              {
-                "type": "paragraph",
-                "text": "自定义载体可以提供可选的 `reserveWrite`，借用已有流控容量。每次逻辑写出只预留一次；chunk 的分片共用凭据，batch 保留各成员的凭据，完成后释放。`write` 的完成仍表示实际物理接纳，`close` 必须结算载体拥有的排队写入。"
-              },
-              {
-                "type": "paragraph",
-                "text": "载体支持原生二进制时，显式列在 `transfer` 中的 ArrayBuffer 始终原生转移，移交后原 buffer 被 detach；配置签名时也会计算并校验摘要。没有显式转移的小 buffer 在签名路径上可内联，原 buffer 保留可用；未配置签名时不计算二进制摘要。共享 buffer 的视图仍保持别名关系和偏移。见二进制说明。"
-              },
-              {
-                "type": "paragraph",
-                "text": "会话使用中的共享或局部信息流 Feature 不能热卸载，移除相应原生注册以 `LIFECYCLE_MUTATION` 拒绝；先关闭受影响命名空间，再冷删除。auth、chunk、batch 等改变线上格式的能力，只有两端都安装才保证能建立通信；单端配置不提供兼容保证，也不主动禁止。见后装与卸载。"
-              },
-              {
-                "type": "paragraph",
-                "text": "pool 是传输的 `pool({ size })` feature，同一池只包含同载体成员，只公开一个逻辑对端。成员打开、调度和关闭属于 pool；`host.<ns>.members` 由传输提供原生控制。"
+                "text": "会话正在使用的流能力不能热卸载，移除相应注册以 `LIFECYCLE_MUTATION` 拒绝；先关闭受影响的命名空间。auth、chunk、batch 等改变线上格式的能力，只有两端都安装才能保证通信。"
               }
             ]
           },
@@ -213,97 +333,35 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`FeatureScope` 唯一解析覆盖顺序：单次调用 `options.timeout/retry`、所在传输 plugin 的 feature、宿主级 flow plugin 里的默认值。单次值接受 timeout `{ ms }`、retry 配置对象或 `false`；不接受 feature token、执行方法或数字。`timeout: false` 不启用 feature 超时，持续等待响应；已经继承的上游剩余期限仍递减。`retry: false` 禁用重试。只有发起方的标量调用和 group 重试，stream 从不重放、只使用 timeout；转发跳不重新开始预算。"
+                "text": "timeout 和 retry 按以下顺序取值：单次调用的 `options.timeout` / `options.retry`，所在传输的 Feature，流插件里的默认值。单次调用接受 `{ ms }`、retry 配置对象或 `false`。`timeout: false` 不启用超时，但继承来的上游剩余期限仍然递减；`retry: false` 关闭重试。只有发起方的标量调用和 group 会重试，stream 从不重放；转发不重新计算预算。"
               },
               {
                 "type": "paragraph",
-                "text": "进入 provider 前剩余截止时间已经耗尽的调用，以 `DEADLINE_EXCEEDED` 拒绝，不执行 provider；`before-start` 的取消语义保持不变。"
+                "text": "进入 provider 前剩余期限已经用完的调用，以 `DEADLINE_EXCEEDED` 拒绝，provider 不会执行。所有调用种类都支持 `signal`，单向调用发出后也能把取消传到下游；provider 读取自己的 `context.signal`。取消不等于杀进程，也不回滚已经发生的业务副作用。"
               },
               {
                 "type": "paragraph",
-                "text": "所有调用种类支持 `signal`，单向调用物理发送之后也能向下游传播取消。provider 读取自己的 `context.signal`。取消不等于杀进程，也不回滚业务副作用。"
-              },
-              {
-                "type": "paragraph",
-                "text": "按 `source/code` 识别错误，保留原生类型、`stack`、`cause` 和 `AggregateError.errors`。超时或断开不证明业务未执行；非幂等操作须先对账再考虑重试。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`send`、`request` 等返回 Promise 的调用通过拒绝传播非法 `idempotencyKey`、transfer 准入被拒绝或命名空间已关闭的错误，保留各入口原有的 `source/code` 和 `cause`；非法 key 仍为 `CONTRACT_INVALID`。使用 `await` 或 `Promise.catch` 处理失败。`dispatch` 仍同步返回 `void` 并向 reporter 交付失败，`stream` 与 `streamTo` 仍返回延迟启动的异步迭代器。"
-              },
-              {
-                "type": "paragraph",
-                "text": "公开 provider 注册失败以 `INVALID_CONFIG` 拒绝，原注册错误直接保留在 `cause`；错误说明不通过调用异常的字符串转换来生成。关闭后，待决调用以 `ENDPOINT_DISPOSED` 结算，实际载体关闭会拒绝仍被挂住的写入；不要求任意业务 Promise 因关闭而强行完成。"
-              },
-              {
-                "type": "paragraph",
-                "text": "自定义 plugin 作者从 `@migaia/rpc-host/sdk` 开始。观察入口是 `/plugins/probe`；旧 `/plugin`、`/probe`、endpoint、per-session Peer 和 v1/JSON-RPC profile 已删除。rpc 家族可以直接依赖 `@migaia/rpc-contract`；只需错误码时导入 `/error-code`，不会带入协议与编解码执行代码。"
+                "text": "按 `source/code` 识别错误。未分类的 provider 异常为 `INTERNAL`，原错误保留在错误图里；标量调用直接以还原后的远端 Error 拒绝。超时或断开不能证明业务没有执行，非幂等操作重试前要先对账。返回 Promise 的调用通过拒绝传播非法 `idempotencyKey`（`CONTRACT_INVALID`）、transfer 被拒或命名空间已关闭；`dispatch` 同步返回、失败交给 reporter。provider 注册失败以 `INVALID_CONFIG` 拒绝，原错误在 `cause`。关闭后，等待中的调用以 `ENDPOINT_DISPOSED` 结算。"
               }
             ]
           },
           {
-            "id": "公开行为与迁移",
-            "heading": "公开行为与迁移",
+            "id": "子节点名字与警告",
+            "heading": "子节点名字与警告",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝；不再增加 `RpcRemoteError` 外壳，调用方须改用真实错误的 `source/code`。协程远端 `context.signal.reason` 接收原 abort reason，不合成取消码；`stream.return(value)` 返回 runtime 的真实结束结果，不回传调用者传入的 `value`。"
-              },
-              {
-                "type": "paragraph",
-                "text": "无目标调用按调用时已接受的会话选择；从 `peers` 保存的函数绑定原代次，退场后拒绝且不转向替代连接。即时 process 启动失败只保留一层 `PROCESS_CHANNEL_CLOSED`，原生 EPIPE 在 cause 图中；没有真实原生错误的 thread 关闭诊断不合成 message-port cause。"
-              },
-              {
-                "type": "paragraph",
-                "text": "自行构造的原生宿主保留 `dispose()` 的原生 cleanup summary 与共享 Promise，不再附加 RPC 清理外壳。原失败叶对象、errors 顺序、cause 可达性和 disposer 一次执行保持；`createRpcHost` 返回的 `host.close()` 则保持自己的公开关闭语义。"
-              },
-              {
-                "type": "paragraph",
-                "text": "幂等指纹使用对象自身的键序；同一 body 改变键序后是不同请求，同键冲突以 `CONTRACT_INVALID` 拒绝，原 store 的字符串指纹 ABI 保持不变。"
-              },
-              {
-                "type": "paragraph",
-                "text": "原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。"
-              },
-              {
-                "type": "paragraph",
-                "text": "auth 的默认签名输入从文本改为对象；依赖文本的回调自行规范化，或设置 `encodedType: 'string'`。完成的请求 ID 默认立即释放，需要旧行为时配置 `retain: 310_000`。本地 verifier 与凭据解析器的原始错误保留在 cause 上，对端脱敏通过同步 `errorMapFeature` 控制。"
-              },
-              {
-                "type": "paragraph",
-                "text": "配置 sign/verify 时，auth 在既有签名握手中交换并验证每个来源的新挑战；应用回调仍须签名和验证收到的完整输入。此过程不增加公开 discovery 或握手配置。"
-              },
-              {
-                "type": "paragraph",
-                "text": "verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证主体交给当前 Session；抛出或拒绝仍拒绝认证。void、字符串及其他原先被忽略的结果不会授予主体身份。"
-              },
-              {
-                "type": "paragraph",
-                "text": "原六个 `/features/{auth,batch,chunk,idempotency,limits,schema}` 入口已删除，改从 `/plugins/*` 或 `/plugins` 导入。`rpcHostPipelines` 删除第三参数与 `pipelines` 输出，改为转交真实构造请求；管道由传输声明。以下无抛出点错误码已删除，不提供替代码：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。"
-              },
-              {
-                "type": "paragraph",
-                "text": "被父端拉起的子节点优先使用真实父端指定的名字与 instanceId。父端未命名时，保留显式的子节点 `self.name`；子节点也未命名时，默认名随父端的 instanceId 更新。可按子节点握手报回的名字寻址。显式子节点名字或 instanceId 被父端覆盖时，只发出一次 `RpcWarningCode.selfIgnored`（`SELF_IGNORED`）警告。警告为 `{ code, message, data }`，`data` 只含实际被忽略的项：`parentName`/`ignoredName`、`parentInstanceId`/`ignoredInstanceId`。先交给 `onWarning` 选项，再交给宿主级 SDK 订阅插件；无人接收才用 `console.warn`。警告本身不进 report，接收者失败则报告原错并继续。冲突的父端启动事实仍为 `INVALID_CONFIG`。见警告订阅。"
+                "text": "被父端拉起的子节点优先使用父端指定的名字和 instanceId；父端未命名时保留子节点自己的 `self.name`。显式的子节点名字或 instanceId 被父端覆盖时，发出一次 `RpcWarningCode.selfIgnored`（`SELF_IGNORED`）警告，`data` 只含实际被忽略的项。警告先交给 `onWarning`，再交给 host 级订阅插件，没人接收时才 `console.warn`；警告不进 report。见警告订阅。"
               }
             ]
           },
           {
-            "id": "默认策略的安装边界",
-            "heading": "默认策略的安装边界",
+            "id": "重复调用策略",
+            "heading": "重复调用策略",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "带 `features` 的 `defineFlowPlugin` 必须放在构造时的 `plugins` 中，在首次 transport 启动前安装。之后用 `host.use(...)` 安装它会以现有 `INVALID_CONFIG` 拒绝，消息为 `RPC flow hooks cannot be installed after transport startup`；失败调用不会改变已编译的调用策略。每次调用仍可通过 timeout/retry 选项或 `false` 覆盖。合法的安装失败回滚用例必须在启动前安装策略，不能依赖后装的默认值。原生移除/释放仍由既有生命周期回执处理。"
-              }
-            ]
-          },
-          {
-            "id": "重复调用策略角色",
-            "heading": "重复调用策略角色",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "timeout/retry 角色为单例，与调用方别名无关。transport 本地声明或全局默认策略准入中的重复角色，由共享规则 owner 以 `source: plugin.host`、`code: FEATURE_ROLE_CONFLICT` 拒绝。flow 与 transport-native 角色冲突保留 `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`；别名/配置冲突保留原 RPC 错误身份。不提供旧错误别名兼容。"
+                "text": "timeout、retry 是单例角色，与名称无关。传输或流插件里重复声明同一角色，以 `plugin.host / FEATURE_ROLE_CONFLICT` 拒绝；流插件与传输自带能力冲突时，以 `rpc.endpoint / FEATURE_COMBINATION_CONFLICT` 拒绝。"
               }
             ]
           }
@@ -318,6 +376,40 @@
               {
                 "type": "paragraph",
                 "text": "README · English"
+              }
+            ]
+          },
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "按你要做的事跳到对应章节："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "安装",
+                  "注册普通方法与生成器",
+                  "选择目标并消费流",
+                  "安装完整策略",
+                  "后装与卸载传输",
+                  "在已有宿主中安装 RPC",
+                  "编写信息流与载体",
+                  "认证、签名与重复请求",
+                  "映射发往对端的错误",
+                  "二进制完整性与 transfer",
+                  "通知、分组与结果查询",
+                  "转发与持有能力",
+                  "观察与类型生成",
+                  "警告与子节点名称",
+                  "入口一览",
+                  "关闭与错误",
+                  "行为细节",
+                  "默认策略的安装边界",
+                  "重复调用策略角色"
+                ]
               }
             ]
           },
@@ -458,12 +550,12 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "已有 `defineHost` 宿主使用 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`。helper 构造时不调用回调、不创建宿主或资源；安装时才读取真实宿主，并把本次原生构造请求交还给这个宿主的 `pipeline(name, request)`。传输插件自己声明七条短名管道，安装时创建、卸载时删除，不需要预先列出命名空间，也不再有 `rpc.pipelines`。不要复制声明，或借用另一个宿主的执行权。"
+                "text": "已有 `defineHost` 宿主使用 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`。helper 构造时不调用回调、不创建宿主或资源；安装时才读取真实宿主，并把本次原生构造请求交还给这个宿主的 `pipeline(name, request)`。传输插件自己声明七条短名管道，安装时创建、卸载时删除，不需要预先列出命名空间。不要复制声明，或借用另一个宿主的执行权。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { defineHost } from '@migaia/plugin-host'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}"
+                "code": "import { defineHost } from '@migaia/plugin-host'\nimport { featuresModule } from '@migaia/plugin-host/features'\nimport { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'\nimport { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'\nimport { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  modules: [featuresModule, featureDependenciesModule, namedPipelinesModule, asyncPipelineModule],\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}"
               },
               {
                 "type": "paragraph",
@@ -518,7 +610,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂支持 host 的 `plugins` 与传输的 `features`；传输配置只覆盖本命名空间。host 级 `limitsFeature` 共用额度，传输级各自独立。`probe`、`typegen`、Devtools 只装在 host 级。删除原 `namespaces` 作用范围选项，改为把 feature 放在对应传输上。"
+                "text": "同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂支持 host 的 `plugins` 与传输的 `features`；传输配置只覆盖本命名空间。host 级 `limitsFeature` 共用额度，传输级各自独立。`probe`、`typegen`、Devtools 只装在 host 级。只想作用于某个传输时，把 Feature 放进该传输的 `features`。"
               }
             ]
           },
@@ -704,46 +796,36 @@
             ]
           },
           {
-            "id": "迁移入口",
-            "heading": "迁移入口",
+            "id": "入口一览",
+            "heading": "入口一览",
             "blocks": [
               {
                 "type": "table",
-                "headers": ["旧用法", "新用法"],
+                "headers": ["入口", "内容"],
                 "rows": [
+                  ["`@migaia/rpc-host`", "`createRpcHost`、`RpcWarningCode`、`defaultRpcReporter`"],
                   [
-                    "根级 `host.request/send/notify/stream/dispatch/group`",
-                    "`host.<ns>` 下的同名调用"
-                  ],
-                  ["`@migaia/rpc-host/plugin`", "`@migaia/rpc-host/sdk`"],
-                  ["根入口的 contract 错误类、判断函数和错误类型", "`@migaia/rpc-host/contract`"],
-                  [
-                    "`/probe` + `defineFeaturePlugin`",
-                    "`/plugins/probe` 的 `probe` / `defineProbe`"
+                    "`@migaia/rpc-host/contract`",
+                    "错误类与判断函数（`RpcLifecycleError`、`RpcConstructionError`、`RpcAbortError`、`isRpcError`、`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`）、`RPC_CORE_ERROR_SOURCE`、`normalizeRpcPortable` 与 `IRpcPortableValue`"
                   ],
                   [
-                    "`authFeature/chunkFeature/typegenFeature`",
-                    "`/plugins` 的 `auth/chunk/typegen`"
+                    "`@migaia/rpc-host/features`",
+                    "内置 Feature：`timeoutFeature`、`retryFeature`、`authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature`，以及 `createRpcIdempotencyStore`"
+                  ],
+                  ["`@migaia/rpc-host/features/<名称>`", "单个 Feature 的默认导出"],
+                  [
+                    "`@migaia/rpc-host/plugins`",
+                    "host 级观察插件 `probe`、`defineProbe` 与类型生成 `typegen`；也可从 `/plugins/probe`、`/plugins/typegen` 单独导入"
                   ],
                   [
-                    "根 `defaultTimeoutMs` / 单次数字 timeout",
-                    "plugin 的 `features` record 与单次 timeout 配置"
-                  ],
-                  ["`poolPlugin`、pool assembler", "传输 `features: { workers: pool({ size }) }`"],
-                  [
-                    "endpoint、RuntimePeer、v1、JSON-RPC profile",
-                    "单一 Host 调用 owner 与新协议，无兼容入口"
-                  ],
-                  ["根级 `outcome` / 幂等 store", "安装 `/features/idempotency`，在命名空间查询"]
+                    "`@migaia/rpc-host/sdk`",
+                    "插件和载体作者工具：`defineTransportPlugin`、`defineFlowPlugin`、`defineFlowFeature`、`rpcHostPipelines` 等"
+                  ]
                 ]
               },
               {
                 "type": "paragraph",
-                "text": "`remote.host.use`、`remote.host.unUse` 和 `remote.host.inspect` 已移除，不再提供通过 RPC 管理远端宿主插件的协议；本地原生宿主的安装与释放 API 保持各自契约。"
-              },
-              {
-                "type": "paragraph",
-                "text": "汇总入口和各单项默认子路径均可 tree-shake。错误码从 `@migaia/rpc-contract/error-code` 引入；应用使用的错误类、错误判断和类型改从 `@migaia/rpc-host/contract` 引入，根入口不再提供这些转出。`RpcConstructionError` 与 `RpcAbortError` 在此为运行时类，可以用于 `instanceof`；它们与直接 contract 导入保持同一对象。该入口同时提供 `normalizeRpcPortable` 与类型 `IRpcPortableValue`，可用于已协商 native 值的严格 own-data 域规范化；不为调用者复制或安装另一份 contract。SDK 和 limits 面向插件作者的原有类型转出保持不变。传输作者只提交原生载体与编解码能力，host 负责握手、Session、待决表与 provider 执行。"
+                "text": "错误码从 `@migaia/rpc-contract/error-code` 导入。`/contract` 转出的类与应用提供的 contract 是同一个对象，跨入口 `instanceof` 一致；`RpcConstructionError` 与 `RpcAbortError` 是运行时类，可以用于 `instanceof`。`normalizeRpcPortable` 用于对已协商的原生值做严格的自有数据规范化，不复制或安装另一份 contract。传输作者只提供原生载体与编解码能力，host 负责握手、会话、待决表与 provider 执行。"
               }
             ]
           },
@@ -770,48 +852,36 @@
             ]
           },
           {
-            "id": "公开行为与迁移",
-            "heading": "公开行为与迁移",
+            "id": "行为细节",
+            "heading": "行为细节",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝；不再增加 `RpcRemoteError` 外壳，调用方须改用真实错误的 `source/code`。协程远端 `context.signal.reason` 接收原 abort reason，不合成取消码；`stream.return(value)` 返回 runtime 的真实结束结果，不回传调用者传入的 `value`。"
+                "text": "未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝，按真实错误的 `source/code` 判断。协程对端的 `context.signal.reason` 是原始的中止原因，不合成取消码；`stream.return(value)` 返回运行时真实的结束结果，不回传调用者传入的 `value`。"
               },
               {
                 "type": "paragraph",
-                "text": "无目标调用按调用时已接受的会话选择；从 `peers` 保存的函数绑定原代次，退场后拒绝且不转向替代连接。即时 process 启动失败只保留一层 `PROCESS_CHANNEL_CLOSED`，原生 EPIPE 在 cause 图中；没有真实原生错误的 thread 关闭诊断不合成 message-port cause。"
+                "text": "不指定目标的调用按调用时已接受的会话选择；从 `peers` 保存的函数绑定原连接代次，对端退出后拒绝，不转向替代连接。子进程立即启动失败时只有一层 `PROCESS_CHANNEL_CLOSED`，原生 EPIPE 在 cause 图中；没有真实原生错误的线程关闭不会合成 message-port 原因。"
               },
               {
                 "type": "paragraph",
-                "text": "自行构造的原生宿主保留 `dispose()` 的原生 cleanup summary 与共享 Promise，不再附加 RPC 清理外壳。原失败叶对象、errors 顺序、cause 可达性和 disposer 一次执行保持；`createRpcHost` 返回的 `host.close()` 则保持自己的公开关闭语义。"
+                "text": "自行构造的原生宿主保留 `dispose()` 的原生清理摘要与共享 Promise；原失败对象、errors 顺序、cause 可达性和清理只执行一次的保证都保持。`createRpcHost` 返回的 `host.close()` 有自己的公开关闭语义。"
               },
               {
                 "type": "paragraph",
-                "text": "幂等指纹使用对象自身的键序；同一 body 改变键序后是不同请求，同键冲突以 `CONTRACT_INVALID` 拒绝，原 store 的字符串指纹 ABI 保持不变。"
+                "text": "幂等指纹使用对象自身的键序；同一 body 改变键序后是不同的请求，同一个键冲突时以 `CONTRACT_INVALID` 拒绝。"
               },
               {
                 "type": "paragraph",
-                "text": "原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。"
+                "text": "auth 默认把对象交给 `sign/verify`；回调需要文本时自行规范化，或设置 `encodedType: 'string'`。完成的请求 ID 默认立即释放，需要保留一段时间时设置 `retain`（例如 `310_000` 毫秒）。本地 verifier 与凭据解析器的原始错误保留在 `cause` 上，发给对端的脱敏由同步的 `errorMapFeature` 控制。配置 `sign/verify` 时，auth 在签名握手中交换并验证每个来源的新挑战；应用回调仍须签名和验证收到的完整输入。"
               },
               {
                 "type": "paragraph",
-                "text": "auth 默认以对象交给 sign/verify；依赖旧文本输入时自行规范化或选择 `encodedType: 'string'`。完成的请求 ID 默认立即释放，需要旧保留时长时设置 `retain: 310_000`。本地 verifier/凭据解析错误保留原 cause，对端脱敏改用同步 `errorMapFeature`。"
+                "text": "`verifyCredentials` 可以返回 `{ principalId: 非空字符串 }`，把认证主体交给当前会话；抛出或拒绝表示认证失败。返回 `void`、字符串或其他值都不会授予主体身份。"
               },
               {
                 "type": "paragraph",
-                "text": "配置 sign/verify 时，auth 在既有签名握手中交换并验证每个来源的新挑战；应用回调仍须签名和验证收到的完整输入。此过程不增加公开 discovery 或握手配置。"
-              },
-              {
-                "type": "paragraph",
-                "text": "verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证主体交给当前 Session；抛出或拒绝仍拒绝认证。void、字符串及其他原先被忽略的结果不会授予主体身份。"
-              },
-              {
-                "type": "paragraph",
-                "text": "原六个 `/features/{auth,batch,chunk,idempotency,limits,schema}` 入口已删除，改从 `/plugins/*` 或 `/plugins` 导入。`rpcHostPipelines` 删除第三参数和 `pipelines` 输出，构造请求必须传给 `domainCore(request)`；传输自己声明管道。以下无抛出点错误码已删除，不提供替代码：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`onWarning` 的被忽略身份项放在 `data`，只包含实际发生冲突的名字或 instanceId。签名的小 buffer 只有未显式 `transfer` 时才可能内联；显式转移仍移交并 detach 原 buffer。载体实现须同步采用当前清单格式。"
+                "text": "`rpcHostPipelines(getHost, pipeline)` 把构造请求转交给 `domainCore(request)`；管道由各传输自己声明。`onWarning` 收到的被忽略身份项放在 `data` 里，只含实际冲突的名字或 instanceId。签名的小 buffer 只在没有显式 `transfer` 时才可能内联；显式转移仍会移交并 detach 原 buffer。载体实现使用当前清单格式。"
               }
             ]
           },
@@ -831,7 +901,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "timeout/retry 角色为单例，与调用方别名无关。transport 本地声明或全局默认策略准入中的重复角色，由共享规则 owner 以 `source: plugin.host`、`code: FEATURE_ROLE_CONFLICT` 拒绝。flow 与 transport-native 角色冲突保留 `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`；别名/配置冲突保留原 RPC 错误身份。不提供旧错误别名兼容。"
+                "text": "timeout/retry 角色为单例，与调用方别名无关。transport 本地声明或全局默认策略准入中的重复角色，由共享规则 owner 以 `source: plugin.host`、`code: FEATURE_ROLE_CONFLICT` 拒绝。flow 与 transport-native 角色冲突保留 `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`；别名或配置冲突保留原来的 RPC 错误身份。"
               }
             ]
           }
@@ -846,15 +916,54 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`contract` defines protocol, interfaces, portable values, and errors. `host` owns RPC calls, sessions, handshake, providers, forwarding, and cancellation. Transport plugins own native connections, generations, codecs, framing, and transfer. Flow plugins and plugin-owned features implement their optional behavior."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "A host can install multiple transports with calls isolated under `host.<ns>`. Mixing transport kinds in one host is not recommended; normally choose one kind per host."
-                },
-                {
-                  "type": "paragraph",
                   "text": "中文 · Usage guide"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Once computation moves into a Worker, a child process or another page, the code that calls it is often harder to get right than the computation: after a timeout the other side keeps running, errors arrive as a bare string, and calls are still waiting when everything shuts down. `@migaia/rpc-host` lets you call functions on the other side like local functions, and carries timeouts, cancellation, errors and shutdown across the boundary: when the caller times out, the other side receives a cancellation signal at once; an error thrown there comes back with its original `source`, `code`, stack and `cause`; closing the host settles every waiting call."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A transport plugin decides the channel: coroutines (same event loop), Worker threads, child processes, browser windows and iframes each have a module, and calls look the same on all of them."
+                }
+              ]
+            },
+            {
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "After a timeout, the other side keeps computing: the caller gives up after 5 seconds, but the Worker finishes the computation anyway and holds the CPU for nothing. The cause is that the timeout exists only on the caller's side and is never sent across as cancellation.",
+                    "Errors are unrecognizable after crossing the boundary: an error thrown in a child process reaches the main process as a `message` only, without `code` or `cause`, so you can only compare strings. The cause is that the error was serialized into a plain object.",
+                    "Calls hang forever at shutdown: the Worker is terminated and the Promises waiting for results never settle. The cause is that nobody settles pending calls on shutdown.",
+                    "Switching channels means rewriting the call code: moving from a Worker to a child process means rewriting request IDs, message formats and timeout logic. The cause is that call logic is tied to the channel."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "why-choose-it",
+              "heading": "Why choose it",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The common approach is `postMessage` plus a \"request ID → Promise\" map, or a proxy that turns method calls into messages. It handles the happy path but breaks in these places:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Timeouts and cancellation reach the other side. When the caller times out or calls `signal.abort()`, the provider's `context.signal` aborts too, so it can stop its work. Example",
+                    "Errors come back as the original errors. Remote errors are restored as native Errors with `source`, `code`, `stack`, `cause` and `AggregateError.errors`, so you can branch on `source/code`. Example",
+                    "One call API; switching channels means switching plugins. `request`, `notify`, `stream` and `group` work the same over coroutines, threads, child processes and browser channels; only the transport plugin changes. Example",
+                    "Shutdown is ordered. `host.close()` first settles every waiting call with `ENDPOINT_DISPOSED`, then closes the underlying connections; repeated calls share one Promise. Example",
+                    "Authentication, limits and deduplication are optional Features. `authFeature`, `limitsFeature`, `idempotencyFeature` and others are separate Features; what you do not install is not bundled. Example"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "If you only call a few functions inside one module, or send data to a Worker once without needing a result or cancellation, plain `postMessage` is simpler."
                 }
               ]
             },
@@ -863,122 +972,247 @@
               "heading": "Start here",
               "blocks": [
                 {
+                  "type": "paragraph",
+                  "text": "The example uses the coroutine channel in one process: the other side provides two methods, and `slowReport` takes 1 second while the caller's timeout is 100 ms. Run it directly with Node 24."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\ntype IReportService = {\n  double(value: number): number\n  slowReport(): Promise<string>\n}\n\nconst host = await createRpcHost<IReportService>({\n  plugins: [\n    coroutinePlugin({\n      features: { timeout: timeoutFeature({ ms: 100 }) }, // each call waits at most 100 ms\n      // The other side: in a real project it runs in a Worker or child process;\n      // here it stays in the same process so the example can run as is\n      spawn: async ({ connect, signal }) => {\n        const worker = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: {\n            double: (value: number) => value * 2,\n            slowReport: (_input: undefined, context: { signal: AbortSignal }) =>\n              new Promise<string>((resolve, reject) => {\n                const timer = setTimeout(() => resolve('report'), 1000)\n                context.signal.addEventListener('abort', () => {\n                  clearTimeout(timer)\n                  console.log('the other side was cancelled and stopped the report')\n                  reject(context.signal.reason)\n                })\n              })\n          }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            )\n        } finally {\n          await worker.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n  await host.coroutine.request('slowReport')\n} catch (error) {\n  const { source, code } = error as { source: string; code: string }\n  console.log(`call failed: ${source} / ${code}`)\n} finally {\n  await host.close()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "42\ncall failed: rpc.endpoint / DEADLINE_EXCEEDED\nthe other side was cancelled and stopped the report"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`double` returns `42`. After 100 ms, `slowReport` fails on the caller's side with `DEADLINE_EXCEEDED`, and the other side's `context.signal` aborts, so the report stops instead of running the full second in the background. Calls are written `host.coroutine.request(...)`: `coroutine` is the namespace of this transport plugin; with Worker threads it would be `host.thread.request(...)`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Next: to move computation into a Worker, see `@migaia/rpc-plugin-thread`; into a child process, see `@migaia/rpc-plugin-process`; to give every call a default timeout and retry, see Install complete policies."
+                }
+              ]
+            },
+            {
+              "id": "pitfalls-when-writing-it-yourself",
+              "heading": "Pitfalls when writing it yourself",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Here is a common hand-written Worker call. It works, but it has three hidden problems (for illustration only; no need to run it):"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "declare const worker: {\n  postMessage(message: unknown): void\n  onmessage: ((event: { data: { id: number; result: unknown } }) => void) | null\n}\n\nconst pending = new Map<number, (value: unknown) => void>()\nlet nextId = 0\n\nworker.onmessage = (event) => {\n  pending.get(event.data.id)?.(event.data.result)\n  pending.delete(event.data.id)\n}\n\nfunction call(method: string, payload: unknown): Promise<unknown> {\n  const id = nextId++\n  worker.postMessage({ id, method, payload })\n  // Problem 1: the timeout only stops waiting; the Worker still finishes and holds the CPU\n  return Promise.race([\n    new Promise((resolve) => pending.set(id, resolve)),\n    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))\n  ])\n}\n\n// Problem 2: errors thrown in the Worker must be serialized by hand; code, cause and stack usually get lost\n// Problem 3: after worker.terminate(), the Promises in pending never settle\nvoid call('render', { page: 1 })"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "With rpc-host, the timeout reaches the other side as cancellation, errors are restored as they were, and `close()` settles every waiting call."
+                }
+              ]
+            },
+            {
+              "id": "the-three-minute-model",
+              "heading": "The three-minute model",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Concept", "In one sentence"],
+                  "rows": [
+                    [
+                      "host",
+                      "The object returned by `createRpcHost`; it owns connections, pending calls and shutdown"
+                    ],
+                    [
+                      "Transport plugin",
+                      "Decides the channel, such as `coroutinePlugin`, `threadPlugin` or `processPlugin`; each transport has one namespace"
+                    ],
+                    [
+                      "Namespace",
+                      "The call entry `host.<namespace>.request(...)`; a host usually installs one transport"
+                    ],
+                    [
+                      "provider",
+                      "A method registered for the other side through the `provide` option or `host.provide()`; its second argument is a context with `signal`"
+                    ],
+                    [
+                      "Feature",
+                      "One optional capability, such as `timeoutFeature`, `retryFeature` or `authFeature`, placed in a transport or flow plugin's `features`"
+                    ],
+                    [
+                      "Flow plugin",
+                      "`defineFlowPlugin({ name, features })` installs default capabilities for every namespace; only at construction"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Call kinds:"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Call", "What completion means"],
+                  "rows": [
+                    ["`request(method, payload?, options?)`", "The business result arrived"],
+                    [
+                      "`notify(method, payload?, options?)`",
+                      "The message was sent; the other side's handling is not awaited"
+                    ],
+                    [
+                      "`stream(method, payload?, options?)`",
+                      "An async iterator over values produced by the other side"
+                    ],
+                    [
+                      "`group(steps, options?)`",
+                      "A few steps in order per target; not a cross-target transaction"
+                    ],
+                    ["`send(targetId, ...)` / `streamTo(targetId, ...)`", "Call one chosen target"],
+                    [
+                      "`dispatch(targetId, ...)`",
+                      "Returns synchronously; failures go to the reporter"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "common-scenarios",
+              "heading": "Common scenarios",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Scenario", "How to combine", "Details"],
+                  "rows": [
+                    ["Move heavy computation into a Worker", "`threadPlugin`", "rpc-plugin-thread"],
+                    [
+                      "Run isolated work in child processes and restart them after crashes",
+                      "`processPlugin`",
+                      "rpc-plugin-process"
+                    ],
+                    [
+                      "Call between browser windows, iframes and SharedWorkers",
+                      "The `rpc-plugin-browser` factories",
+                      "rpc-plugin-browser"
+                    ],
+                    [
+                      "Spread calls over a group of Workers or child processes",
+                      "The transport's `features: { workers: pool({ size }) }`",
+                      "rpc-plugin-pool"
+                    ],
+                    [
+                      "Default timeout and retry for every call",
+                      "`defineFlowPlugin` + `timeoutFeature` / `retryFeature`",
+                      "Install complete policies"
+                    ],
+                    [
+                      "Signed authentication and duplicate rejection",
+                      "`authFeature` + `idempotencyFeature`",
+                      "Authentication, signing, and duplicate requests"
+                    ],
+                    [
+                      "Control the error details sent to the other side",
+                      "`errorMapFeature`",
+                      "Map errors sent to the peer"
+                    ],
+                    [
+                      "Observe calls and generate types",
+                      "`probe` / `typegen` (`@migaia/rpc-host/plugins`)",
+                      "Observe and generate types"
+                    ],
+                    [
+                      "See the timeline of several hosts",
+                      "`@migaia/rpc-plugin-devtools`",
+                      "rpc-plugin-devtools"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "install",
+              "heading": "Install",
+              "blocks": [
+                {
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/rpc-contract` is an exact lockstep peer dependency. Install the same version alongside the host and transport plugins. They share the application's single contract installation; explicitly installed duplicate copies are unsupported."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Import error classes, error predicates, and portable values from `@migaia/rpc-host/contract`. It forwards the named values `RpcLifecycleError`, `RpcConstructionError`, `RpcAbortError`, `isRpcError`, `isRpcErrorInstance`, `isRpcRemoteError`, `isRpcTimeoutError`, `RPC_CORE_ERROR_SOURCE`, and `normalizeRpcPortable`, plus error types such as `RpcError` and the portable-value type `IRpcPortableValue`. These exports retain the application's contract object identities and consistent cross-entry `instanceof` results. All contract values and types formerly exported at the root have moved here without compatibility exports; import `createRpcHost` from the root as before."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "This creates two real hosts in one event loop. The parent installs its timeout feature on the coroutine plugin. The child receives the generation-local connect handle. It prints `42` and releases native resources in finally."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: { timeout: timeoutFeature({ ms: 1500 }) },\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            )\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Coroutines do not provide Worker isolation. Choose the process, thread, or browser transport for those native environments."
+                  "text": "`@migaia/rpc-contract` is a peer dependency that must have the same version; the host and every transport plugin share the one copy provided by the application, and installing your own duplicate copy is not supported. Choose transport plugins by scenario."
                 }
               ]
             },
             {
-              "id": "initialization-and-custom-hosts",
-              "heading": "Initialization and custom hosts",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "`createRpcHost` first commits host-level flow plugins and their features, then installs transport plugins and their features on the same native plugin-host. Stages such as auth are available before transport handshake begins. The same lifecycle owner rolls back and releases acquired resources if a later installation fails."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "After construction, `const extended = await host.use(transport)` installs another transport and returns the same frozen native host with an added namespace in the return type. Each `use` commits or rolls back independently; the construction batch succeeds or fails together. Host Features that change message flow must be configured in the construction `plugins`; adding them later rejects with `INVALID_CONFIG`. Later transports borrow them, and their own `features` install with the transport and override only its namespace. Readonly observer plugins, including warning subscriptions, may be installed later."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "An existing `defineHost` or class owner obtains `domainCore` from SDK `rpcHostPipelines(getHost, pipeline)` and forwards the native construction request to `pipeline(name, request)`. Each transport declares its own pipelines, without an advance namespace list. Ordinary native hosts install shared flow Features through `defineFlowPlugin({ name, features })` before transports. See the usage guide."
-                }
-              ]
-            },
-            {
-              "id": "calls-and-ownership",
-              "heading": "Calls and ownership",
+              "id": "common-apis",
+              "heading": "Common APIs",
               "blocks": [
                 {
                   "type": "table",
-                  "headers": ["Entry", "Completion"],
+                  "headers": ["API", "Purpose"],
                   "rows": [
-                    ["`host.<ns>.request(method, payload?, options?)`", "Business result"],
                     [
-                      "`host.<ns>.notify(method, payload?, options?)`",
-                      "Physical send, without business acknowledgement; `targetId` selects one direct target"
+                      "`createRpcHost({ plugins, provide?, forward?, onWarning? })`",
+                      "Create a host"
+                    ],
+                    ["`host.<ns>.request` / `notify` / `stream` / `group`", "Call the other side"],
+                    [
+                      "`host.provide(definition)`",
+                      "Register local methods; duplicate names are rejected"
                     ],
                     [
-                      "`host.<ns>.stream(method, payload?, options?)`",
-                      "Lazy iterator; independent consumption for multiple targets"
+                      "`host.use(...plugins)` / `host.unUse(name)`",
+                      "Install or remove transports after construction"
                     ],
+                    ["`host.close()`", "Close the whole host; repeated calls share one Promise"],
                     [
-                      "`host.<ns>.streamTo(targetId, method, payload?, options?)`",
-                      "One lazy iterator for one direct target"
-                    ],
-                    [
-                      "`host.<ns>.group(steps, options?)`",
-                      "Ordered `{ method, payload }` steps per target, without a cross-target transaction"
-                    ],
-                    [
-                      "`host.<ns>.send(targetId, method, payload?, options?)`",
-                      "Scalar result from one direct target"
-                    ],
-                    [
-                      "`host.<ns>.dispatch(targetId, method, payload?, options?)`",
-                      "Synchronous `void`; asynchronous failures reach the reporter"
-                    ],
-                    ["`host.provide(definition)`", "Adds local methods; duplicate names reject"],
-                    [
-                      "`host.<ns>.peers`",
-                      "Accepted direct capabilities; held functions bind to the original generation"
-                    ],
-                    [
-                      "`host.close()`",
-                      "Closes the host; repeated calls share the original Promise"
-                    ],
-                    [
-                      "`host.use(...plugins)`",
-                      "Independent installation transaction; returns the same host with added namespace types"
-                    ],
-                    [
-                      "`host.unUse(name)`",
-                      "Native removal result; active flow restrictions reject with a lifecycle error"
+                      "`defineFlowPlugin({ name, features })`",
+                      "Declare default capabilities shared by every namespace (`@migaia/rpc-host/sdk`)"
                     ]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "Untargeted calls select only within their namespace: zero targets return empty `fulfilled/rejected` maps, one returns a scalar, and multiple return maps indexed by instance identity. Stream iterators cancel independently. Root call methods such as `host.request` are removed."
+                  "text": "Import built-in Features from `@migaia/rpc-host/features`, or one by one from `@migaia/rpc-host/features/<name>`; import error classes and predicates from `@migaia/rpc-host/contract`. See Entries for all entries."
+                }
+              ]
+            },
+            {
+              "id": "construction-and-later-installation",
+              "heading": "Construction and later installation",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createRpcHost` commits flow plugins and their Features on one native plugin-host before installing transport plugins and their Features, so capabilities such as authentication are in place when a transport starts its handshake. If a later installation fails, resources already acquired are rolled back and released by the same lifecycle."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Use `streamTo` for a directed stream, with the target as its first argument. `stream` options no longer accept `targetId`. Both methods share the same backpressure, cancellation, and generation isolation."
+                  "text": "After construction, `const extended = await host.use(transport)` installs another transport and returns the same host, typed with the new namespace. Each `use` commits or rolls back on its own; the construction batch succeeds or fails as a whole. Flow plugins that change the message flow can only be configured in the construction `plugins`; installing one later is rejected with `INVALID_CONFIG` (message `RPC flow hooks cannot be installed after transport startup`). Later transports use them automatically, and a transport's own `features` apply only to its namespace. Read-only observation plugins can be installed later."
                 },
                 {
                   "type": "paragraph",
-                  "text": "`remote.host.use`, `remote.host.unUse` and `remote.host.inspect` are removed. RPC no longer provides a protocol for managing a remote host's plugins; local native host installation and disposal keep their own contracts."
+                  "text": "Existing `defineHost` or class hosts obtain `domainCore` from `rpcHostPipelines(getHost, pipeline)` in `@migaia/rpc-host/sdk`; see Install RPC in an existing host."
+                }
+              ]
+            },
+            {
+              "id": "target-selection-and-forwarding",
+              "heading": "Target selection and forwarding",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Untargeted calls choose targets only within their namespace: with no target they return empty `fulfilled/rejected`, with one target a scalar, and with several targets `fulfilled/rejected` keyed by instance identity. Each iterator in a stream collection is cancelled independently. `host.<ns>.peers` lists accepted direct peers; functions saved from `peers` stay bound to that connection and do not follow a reconnected peer."
                 },
                 {
                   "type": "paragraph",
-                  "text": "`host.<ns>.send('b', 'c.render', value)` first reaches direct peer b, which reads its current directory and forwards to c. A held `host.<ns>.peers.c.render` does not retarget a later generation. Forwarding can cross namespaces and cannot extend an upstream deadline."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Configure each forwarding host with `forward: { maxHops: 3 }` in `createRpcHost`. The default is 3; integers 1–16 are supported and other values reject with `INVALID_CONFIG`. Each host checks its own forwarding ordinal; loops reject before the hop limit."
+                  "text": "`host.<ns>.send('b', 'c.render', value)` reaches the direct peer b first, and b forwards to c using its current directory. Forwarding can cross namespaces but cannot extend the upstream deadline. `forward: { maxHops }` defaults to 3 and accepts integers 1–16; each host checks for cycles first, then the hop count."
                 }
               ]
             },
@@ -988,7 +1222,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "The same `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, and `schemaFeature` factories are imported from `@migaia/rpc-host/features` and return native tokens. Put host-wide tokens in `defineFlowPlugin({ name, features: { alias: feature } })`, then pass that plugin in host `plugins`; transport `features` uses the same named record. Host placement supplies every namespace; transport placement overrides that capability only in its namespace. Each namespace has one implementation of each capability. Host `limitsFeature` shares quotas across namespaces; transport `limitsFeature` owns separate quotas. `probe`, `typegen`, and Devtools are host-only plugins. The former `namespaces` scope option is removed; select a transport with `features`."
+                  "text": "`authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, `schemaFeature`, `timeoutFeature` and `retryFeature` all come from `@migaia/rpc-host/features`. Put them into `defineFlowPlugin({ name, features })` (every namespace) or a transport's `features` (overrides the same capability for that namespace only). Each namespace enables one implementation per capability. A host-level `limitsFeature` shares quotas across namespaces; transport-level ones have their own. `probe`, `typegen` and Devtools are host-level only."
                 },
                 {
                   "type": "code",
@@ -997,139 +1231,57 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Aggregate and default subpath imports support tree-shaking. Installing `limitsFeature` is recommended; omitting it enables no such quotas. `host.<ns>.outcome(key)` exists only with `idempotencyFeature` installed. Auth passes the signing binding object to `sign/verify` by default; text and byte modes encode one binding layer. Its request-ID deduplication releases completed IDs immediately by default, with signed-window or millisecond `retain` alternatives. `maxReplayEntriesPerPeer` bounds only numeric retention mode, and `onRejected` receives capacity refusal reasons. See authentication for configuration and HMAC examples."
+                  "text": "The aggregate entry and single subpaths both tree-shake. Without `limitsFeature` there are no quotas; `host.<ns>.outcome(key)` exists only with `idempotencyFeature`. Auth passes the signing binding object to `sign/verify` by default; completed request IDs are released immediately unless you `retain` them for the signing window or a number of milliseconds. See authentication for configuration and an HMAC example."
                 },
                 {
                   "type": "paragraph",
-                  "text": "`errorMapFeature` synchronously controls the error information a peer receives without changing local originals, reports, warnings, or log observation. A throw, returned Promise, or unserializable result reports the mapping failure and sends the original error under the rules used without a mapper. Without a mapper, handshake refusals still hide details from unauthenticated peers. See error mapping."
+                  "text": "`errorMapFeature` decides synchronously what error information the other side can see, without changing the local original error, reporting or observation. If the callback throws, returns a Promise or produces something that cannot be serialized, the mapping failure is reported and the error is sent under the unmapped rules. Without a mapping, handshake failures of unauthenticated peers hide details by default."
                 },
                 {
                   "type": "paragraph",
-                  "text": "A custom flow returns `stages` from `defineFlowFeature` setup; place the feature in a `defineFlowPlugin` `features` record or in one transport's `features` record. Each stage receives its pipeline payload and native `next(payload)`; readonly events belong in the separate `observe` field. Frame pipelines allow independent submissions: after catching and reporting one member's failure, a stage can submit another. Ignoring a failed `next()` Promise rejects the pipeline. The original call settles a cancelled batch member with `CANCELLED` and its original reason on `cause`; other members complete normally."
+                  "text": "The outbound order is fixed: plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound is the reverse. Key names and their order in `features` do not decide execution order. Third-party Features are defined with `defineFlowFeature` and must declare an integer `phase` from 0 to 65535; `dependencies` decide installation order and `phase` decides execution order. Auth protects the whole message before chunk splits it into physical frames; the receiver reassembles first, then verifies."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound reverses the direction. Record keys and insertion order do not determine execution order. Custom features require an integer `phase` from 0 through 65535; duplicate phases at the same stage point and layer reject. Native `dependencies` order installation; `phase` orders execution. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`authFeature` protects each complete message before `chunkFeature` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "A custom carrier may implement optional `reserveWrite` by borrowing its existing flow-control capacity. Reserve once per logical write: chunk fragments share its receipt, while a batch retains each member's receipt until completion. `write` still completes at actual physical acceptance, and `close` must settle carrier-owned queued writes."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "When the carrier supports native binary, an ArrayBuffer explicitly listed in `transfer` always transfers natively and the original buffer detaches on handoff; signing also calculates and verifies its digest. Small buffers without an explicit transfer may be inline when signed, leaving the original usable. Without signing, binary digests are not calculated. Views sharing a buffer retain their aliases and offsets. See binary integrity."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Shared or local flow Features used by open Sessions cannot be hot-unloaded: removal of their native registration rejects with `LIFECYCLE_MUTATION`. Close affected namespace Sessions before cold removal. Capabilities such as auth, chunk, and batch change the wire format; only two-sided installation guarantees establishment. One-sided configuration has no compatibility guarantee and is not proactively prohibited. See later installation and removal."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Pool is the transport's `pool({ size })` feature. Members use one carrier kind and expose one logical peer. Pool owns member acquisition, scheduling, and closure; the transport contributes native `host.<ns>.members` controls."
+                  "text": "Flow capabilities in use by a session cannot be removed while running; removing their registration is rejected with `LIFECYCLE_MUTATION`, so close the affected namespace first. Capabilities that change the wire format, such as auth, chunk and batch, only guarantee communication when both sides install them."
                 }
               ]
             },
             {
               "id": "deadlines-cancellation-and-errors",
-              "heading": "Deadlines, cancellation, and errors",
+              "heading": "Deadlines, cancellation and errors",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`FeatureScope` alone selects call `options.timeout/retry`, then the transport's installed feature, then the default from a host-level flow plugin. Call values accept timeout `{ ms }`, retry options, or `false`. Feature tokens, execution methods, and numbers are rejected. `timeout: false` waits for the response without a feature timeout; an upstream remaining deadline still decreases. `retry: false` disables retry. Only the origin retries scalar calls and groups; streams never replay and use timeout only; forwarding does not restart the budget."
+                  "text": "Timeout and retry take their value in this order: the call's `options.timeout` / `options.retry`, the transport's Feature, then the flow plugin's default. A call accepts `{ ms }`, a retry configuration object or `false`. `timeout: false` disables the timeout, but an inherited upstream deadline still counts down; `retry: false` disables retries. Only the caller's scalar calls and groups retry; streams never replay, and forwarding does not restart the budget."
                 },
                 {
                   "type": "paragraph",
-                  "text": "A call whose remaining deadline has expired before provider entry rejects with `DEADLINE_EXCEEDED` without executing the provider. `before-start` cancellation keeps its existing semantics."
+                  "text": "A call whose remaining deadline has run out before it reaches the provider is rejected with `DEADLINE_EXCEEDED`, and the provider does not run. Every call kind accepts `signal`, and a one-way call can still pass cancellation downstream after it is sent; providers read their own `context.signal`. Cancellation does not kill a process or undo business side effects that already happened."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Every call kind supports `signal`, including cancellation propagated after a one-way physical send. Providers receive their own `context.signal`. Cancellation neither kills a process nor rolls back side effects."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Branch on `source/code`; preserve native classes, `stack`, `cause`, and `AggregateError.errors`. Timeout or disconnection does not prove that business work never executed. Reconcile uncertain non-idempotent work before retrying."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Promise-returning calls such as `send` and `request` reject invalid `idempotencyKey` values, rejected transfer admission, or a closed namespace, preserving each entry's existing `source/code` and `cause`; invalid keys still use `CONTRACT_INVALID`. Handle failures with `await` or `Promise.catch`. `dispatch` still returns `void` and reports failures, while `stream` and `streamTo` still return lazy async iterators."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Public provider registration rejects with `INVALID_CONFIG` and retains the exact registration failure directly on `cause`; diagnostic text does not invoke the thrown value's string conversion. Closing settles pending calls with `ENDPOINT_DISPOSED`, and actual carrier closure rejects held writes. Closing does not force an arbitrary business Promise to finish."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Plugin authors start at `@migaia/rpc-host/sdk`; observation lives under `/plugins/probe`. Old `/plugin`, `/probe`, endpoint, per-session Peer, and v1/JSON-RPC profile entries are removed. RPC module can depend directly on `@migaia/rpc-contract`. Import only `/error-code` when only codes are needed, without retaining protocol or codec execution code."
+                  "text": "Branch on `source/code`. Unclassified provider exceptions are `INTERNAL`, with the original error kept in the error graph; scalar calls reject with the restored remote Error. A timeout or disconnect does not prove the business work did not run; reconcile before retrying non-idempotent operations. Calls that return a Promise reject on an invalid `idempotencyKey` (`CONTRACT_INVALID`), a rejected transfer or a closed namespace; `dispatch` returns synchronously and hands failures to the reporter. A failed provider registration rejects with `INVALID_CONFIG` and the original error in `cause`. After shutdown, waiting calls settle with `ENDPOINT_DISPOSED`."
                 }
               ]
             },
             {
-              "id": "public-behavior-and-migration",
-              "heading": "Public behavior and migration",
+              "id": "child-names-and-warnings",
+              "heading": "Child names and warnings",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Unhandled provider exceptions use `INTERNAL` and retain the native exception in the error graph. Scalar calls reject with the restored remote Error directly, without an extra `RpcRemoteError`; callers must inspect the actual error's `source/code`. A coroutine provider receives the original abort reason through `context.signal.reason`, without an invented cancellation code. `stream.return(value)` returns the runtime's actual terminal result rather than echoing the caller's `value`."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Untargeted calls select the sessions accepted at call time. Functions saved from `peers` remain bound to their original generation and reject after departure rather than switching to a replacement. Immediate process startup failure has one `PROCESS_CHANNEL_CLOSED` boundary with native EPIPE reachable through its cause graph. A thread closure with no native error does not invent a message-port cause."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "An independently constructed native host retains its native `dispose()` cleanup summary and shared Promise without an additional RPC cleanup shell. Original failure leaves, errors order, cause reachability and once-only disposal remain intact. The `host.close()` returned by `createRpcHost` retains its own public close semantics."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Idempotency fingerprints follow the object's own key order. Changing key order creates a different request; reuse of the same key conflicts with `CONTRACT_INVALID`. The store's string fingerprint ABI is unchanged."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Auth changes its default signing input from text to an object. Normalize it in callbacks or set `encodedType: 'string'` when text is required. Completed request IDs release immediately by default; set `retain: 310_000` for the former behavior. Local verifier and credential resolver errors retain their original causes; synchronous `errorMapFeature` controls remote redaction."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "With sign/verify configured, auth exchanges and validates a fresh source challenge inside the existing signed handshake. Application callbacks must still sign and verify the complete input they receive. No public discovery or handshake option is added."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "verifyCredentials may return { principalId: nonemptyString } to lend the authenticated principal to the current Session. Throwing or rejection still refuses authentication. Void, string, and other formerly ignored results do not grant a principal."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "The six former `/features/{auth,batch,chunk,idempotency,limits,schema}` entries are removed; import their factories from `/plugins/*` or `/plugins`. `rpcHostPipelines` removes its third argument and `pipelines` output: forward the actual construction request instead, and let transports declare pipelines. The following unused error codes are removed without replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Launched children prefer the actual parent-supplied name and instanceId. Without a parent name, an explicit child `self.name` remains; without either name, the default follows the parent's instanceId. Address the name reported in the child's handshake. Overriding an explicit child name or instanceId emits one `RpcWarningCode.selfIgnored` (`SELF_IGNORED`) warning. Warnings have `{ code, message, data }`; `data` includes only the overridden pairs: `parentName`/`ignoredName` and `parentInstanceId`/`ignoredInstanceId`. Delivery goes first to the `onWarning` option, then host-level SDK subscribers, with `console.warn` only when no recipient exists. The warning itself is not reported; recipient failures report their originals and delivery continues. Conflicting parent startup facts still reject with `INVALID_CONFIG`. See warning subscriptions."
+                  "text": "A child started by a parent prefers the name and instanceId chosen by the parent; when the parent gives no name, the child keeps its own `self.name`. When an explicit child name or instanceId is overridden by the parent, one `RpcWarningCode.selfIgnored` (`SELF_IGNORED`) warning is emitted, and `data` holds only the items actually ignored. Warnings go to `onWarning` first, then to host-level subscription plugins, and only fall back to `console.warn` when nobody receives them; warnings are not reported. See warning subscriptions."
                 }
               ]
             },
             {
-              "id": "default-policy-installation-boundary",
-              "heading": "Default-policy installation boundary",
+              "id": "duplicate-call-policies",
+              "heading": "Duplicate call policies",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "A `defineFlowPlugin` with `features` belongs in the construction `plugins`, installed before the first transport starts. Installing it later through `host.use(...)` rejects with existing `INVALID_CONFIG` and `RPC flow hooks cannot be installed after transport startup`; rejection leaves compiled call policies unchanged. Per-call timeout/retry options and `false` overrides remain supported. Installation-rollback fixtures must install policies before startup. Native withdrawal and cleanup retain their existing lifecycle receipts."
-                }
-              ]
-            },
-            {
-              "id": "duplicate-call-policy-roles",
-              "heading": "Duplicate call-policy roles",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "Timeout/retry roles are singular, independently of caller aliases. A duplicate in transport-local declarations or global/default policy admission rejects with `source: plugin.host`, `code: FEATURE_ROLE_CONFLICT` through the shared rule owner. Flow and transport-native role conflicts retain `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`; alias/configuration conflicts keep their existing RPC identity. No compatibility error alias is provided."
+                  "text": "Timeout and retry are singleton roles regardless of their names. Declaring the same role twice in a transport or flow plugin is rejected with `plugin.host / FEATURE_ROLE_CONFLICT`; a flow plugin that conflicts with a transport's built-in capability is rejected with `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`."
                 }
               ]
             }
@@ -1144,6 +1296,40 @@
                 {
                   "type": "paragraph",
                   "text": "README · 中文"
+                }
+              ]
+            },
+            {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Jump to the section for what you want to do:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Installation",
+                    "Register functions and generators",
+                    "Select targets and consume streams",
+                    "Install complete policies",
+                    "Install and remove transports after construction",
+                    "Install RPC in an existing host",
+                    "Author flows and carriers",
+                    "Authentication, signing, and duplicate requests",
+                    "Map errors sent to the peer",
+                    "Binary integrity and transfer",
+                    "Notifications, groups, and retained outcomes",
+                    "Forward and hold capabilities",
+                    "Observe and generate types",
+                    "Warnings and child names",
+                    "Entries",
+                    "Close and retain errors",
+                    "Behavior details",
+                    "Default-policy installation boundary",
+                    "Duplicate call-policy roles"
+                  ]
                 }
               ]
             },
@@ -1284,12 +1470,12 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "An existing `defineHost` owner obtains `domainCore` from `rpcHostPipelines(getHost, pipeline)`. Creating the helper calls neither callback and creates no host or resource. Installation reads the real owner and passes the current native construction request back to that owner's `pipeline(name, request)`. Each transport declares its own seven short pipeline names, created on installation and deleted on removal. There is no advance namespace list or `rpc.pipelines` output. Do not copy declarations or borrow another host's execution authority."
+                  "text": "An existing `defineHost` owner obtains `domainCore` from `rpcHostPipelines(getHost, pipeline)`. Creating the helper calls neither callback and creates no host or resource. Installation reads the real owner and passes the current native construction request back to that owner's `pipeline(name, request)`. Each transport declares its own seven short pipeline names, created on installation and deleted on removal. There is no advance namespace list. Do not copy declarations or borrow another host's execution authority."
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}"
+                  "code": "import { defineHost } from '@migaia/plugin-host'\nimport { featuresModule } from '@migaia/plugin-host/features'\nimport { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'\nimport { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'\nimport { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  modules: [featuresModule, featureDependenciesModule, namedPipelinesModule, asyncPipelineModule],\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1344,7 +1530,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The same `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, and `schemaFeature` factories support host `plugins` and transport `features`; transport placement overrides only its namespace. Host `limitsFeature` shares quotas; transport `limitsFeature` owns separate quotas. `probe`, `typegen`, and Devtools are host-only. Remove the former `namespaces` scope option and place the feature on its transport."
+                  "text": "The same `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, and `schemaFeature` factories support host `plugins` and transport `features`; transport placement overrides only its namespace. Host `limitsFeature` shares quotas; transport `limitsFeature` owns separate quotas. `probe`, `typegen`, and Devtools are host-only. To scope a feature to one transport, place it in that transport's `features`."
                 }
               ]
             },
@@ -1534,55 +1720,39 @@
               ]
             },
             {
-              "id": "migrate-entries",
-              "heading": "Migrate entries",
+              "id": "entries",
+              "heading": "Entries",
               "blocks": [
                 {
                   "type": "table",
-                  "headers": ["Retired usage", "Replacement"],
+                  "headers": ["Entry", "Contents"],
                   "rows": [
                     [
-                      "Root `host.request/send/notify/stream/dispatch/group`",
-                      "The corresponding `host.<ns>` call"
-                    ],
-                    ["`@migaia/rpc-host/plugin`", "`@migaia/rpc-host/sdk`"],
-                    [
-                      "Contract error classes, predicates, and types from the root",
-                      "`@migaia/rpc-host/contract`"
+                      "`@migaia/rpc-host`",
+                      "`createRpcHost`, `RpcWarningCode`, `defaultRpcReporter`"
                     ],
                     [
-                      "`/probe` plus `defineFeaturePlugin`",
-                      "`probe` / `defineProbe` from `/plugins/probe`"
+                      "`@migaia/rpc-host/contract`",
+                      "Error classes and predicates (`RpcLifecycleError`, `RpcConstructionError`, `RpcAbortError`, `isRpcError`, `isRpcErrorInstance`, `isRpcRemoteError`, `isRpcTimeoutError`), `RPC_CORE_ERROR_SOURCE`, `normalizeRpcPortable` and `IRpcPortableValue`"
                     ],
                     [
-                      "`authFeature/chunkFeature/typegenFeature`",
-                      "`auth/chunk/typegen` from `/plugins`"
+                      "`@migaia/rpc-host/features`",
+                      "Built-in Features: `timeoutFeature`, `retryFeature`, `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, `schemaFeature`, plus `createRpcIdempotencyStore`"
+                    ],
+                    ["`@migaia/rpc-host/features/<name>`", "One Feature as the default export"],
+                    [
+                      "`@migaia/rpc-host/plugins`",
+                      "Host-level observation `probe`, `defineProbe` and type generation `typegen`; also importable from `/plugins/probe` and `/plugins/typegen`"
                     ],
                     [
-                      "Root `defaultTimeoutMs` or numeric call timeout",
-                      "Plugin `features` and complete timeout instances"
-                    ],
-                    [
-                      "`poolPlugin` or pool assembler",
-                      "Transport `features: { workers: pool({ size }) }`"
-                    ],
-                    [
-                      "Endpoint, RuntimePeer, v1, JSON-RPC profile",
-                      "One Host call owner and one new protocol, without compatibility entries"
-                    ],
-                    [
-                      "Root `outcome` or idempotency store",
-                      "Install `/features/idempotency`; query its namespace extension"
+                      "`@migaia/rpc-host/sdk`",
+                      "Plugin and carrier authoring tools: `defineTransportPlugin`, `defineFlowPlugin`, `defineFlowFeature`, `rpcHostPipelines` and more"
                     ]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`remote.host.use`, `remote.host.unUse` and `remote.host.inspect` are removed. RPC no longer provides a protocol for managing a remote host's plugins; local native host installation and disposal keep their own contracts."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Aggregate and individual default subpaths support tree-shaking. Import codes from `@migaia/rpc-contract/error-code`; import application error classes, predicates, and types from `@migaia/rpc-host/contract`. The root no longer forwards those symbols. `RpcConstructionError` and `RpcAbortError` are runtime classes at this entry, suitable for `instanceof`, and are the same objects as direct contract imports. The entry also supplies `normalizeRpcPortable` and `IRpcPortableValue` for strict own-data normalization with negotiated native values. It neither copies nor installs another contract module. Existing SDK and limits type exports for plugin authors are unchanged. Transport authors supply native carriers and codecs; Host owns handshake, Sessions, pending calls, and provider execution."
+                  "text": "Import error codes from `@migaia/rpc-contract/error-code`. The classes re-exported by `/contract` are the same objects as the application-provided contract, so `instanceof` agrees across entries; `RpcConstructionError` and `RpcAbortError` are runtime classes usable with `instanceof`. `normalizeRpcPortable` strictly normalizes negotiated native values as own data, without copying or installing another contract. Transport authors supply only the native carrier and codecs; the host owns the handshake, sessions, the pending table and provider execution."
                 }
               ]
             },
@@ -1609,48 +1779,36 @@
               ]
             },
             {
-              "id": "public-behavior-and-migration",
-              "heading": "Public behavior and migration",
+              "id": "behavior-details",
+              "heading": "Behavior details",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Unhandled provider exceptions use `INTERNAL` and retain the native exception in the error graph. Scalar calls reject with the restored remote Error directly, without an extra `RpcRemoteError`; callers must inspect the actual error's `source/code`. A coroutine provider receives the original abort reason through `context.signal.reason`, without an invented cancellation code. `stream.return(value)` returns the runtime's actual terminal result rather than echoing the caller's `value`."
+                  "text": "Unclassified provider exceptions use `INTERNAL` and keep the native exception in the error graph. Scalar calls reject with the restored remote Error directly; inspect the actual error's `source/code`. A coroutine provider's `context.signal.reason` is the original abort reason, with no invented cancellation code. `stream.return(value)` returns the runtime's actual terminal result rather than echoing the caller's `value`."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Untargeted calls select the sessions accepted at call time. Functions saved from `peers` remain bound to their original generation and reject after departure rather than switching to a replacement. Immediate process startup failure has one `PROCESS_CHANNEL_CLOSED` boundary with native EPIPE reachable through its cause graph. A thread closure with no native error does not invent a message-port cause."
+                  "text": "Untargeted calls select the sessions accepted at call time. Functions saved from `peers` stay bound to their original connection generation and reject after the peer leaves, rather than switching to a replacement. An immediate child-process startup failure has one `PROCESS_CHANNEL_CLOSED` boundary with the native EPIPE reachable through its cause graph. A thread closure with no native error does not invent a message-port cause."
                 },
                 {
                   "type": "paragraph",
-                  "text": "An independently constructed native host retains its native `dispose()` cleanup summary and shared Promise without an additional RPC cleanup shell. Original failure leaves, errors order, cause reachability and once-only disposal remain intact. The `host.close()` returned by `createRpcHost` retains its own public close semantics."
+                  "text": "An independently constructed native host keeps its native `dispose()` cleanup summary and shared Promise; original failures, errors order, cause reachability and once-only cleanup are preserved. The `host.close()` returned by `createRpcHost` has its own public close semantics."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Idempotency fingerprints follow the object's own key order. Changing key order creates a different request; reuse of the same key conflicts with `CONTRACT_INVALID`. The store's string fingerprint ABI is unchanged."
+                  "text": "Idempotency fingerprints follow the object's own key order. Changing the key order makes a different request; reusing the same key with a different body conflicts with `CONTRACT_INVALID`."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection."
+                  "text": "Auth passes an object to `sign/verify` by default. Normalize it yourself or set `encodedType: 'string'` when callbacks need text. Completed request IDs are released immediately by default; set `retain` (for example `310_000` ms) to keep them for a while. Local verifier and credential-resolver errors keep their original `cause`; redaction for the peer is controlled by the synchronous `errorMapFeature`. With `sign/verify` configured, auth exchanges and validates a fresh challenge per source inside the signed handshake; application callbacks must still sign and verify the complete input they receive."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Auth passes an object to sign/verify by default. Normalize it explicitly or select `encodedType: 'string'` for callbacks requiring text. Completed request IDs release immediately by default; set `retain: 310_000` for the former duration. Local verifier/resolver errors retain their original causes; use synchronous `errorMapFeature` for remote redaction."
+                  "text": "`verifyCredentials` may return `{ principalId: nonEmptyString }` to hand the authenticated principal to the current session; throwing or rejecting refuses authentication. Returning `void`, a string or any other value grants no principal."
                 },
                 {
                   "type": "paragraph",
-                  "text": "With sign/verify configured, auth exchanges and validates a fresh source challenge inside the existing signed handshake. Application callbacks must still sign and verify the complete input they receive. No public discovery or handshake option is added."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "verifyCredentials may return { principalId: nonemptyString } to lend the authenticated principal to the current Session. Throwing or rejection still refuses authentication. Void, string, and other formerly ignored results do not grant a principal."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "The six former `/features/{auth,batch,chunk,idempotency,limits,schema}` entries are removed; import their factories from `/plugins/*` or `/plugins`. `rpcHostPipelines` removes its third argument and `pipelines` output; pass the construction request to `domainCore(request)`. Transports declare their own pipelines. The following unused error codes are removed without replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Overridden identity fields in `onWarning` are under `data`, including only the name or instanceId items that actually conflict. Small signed buffers may be inline only without explicit `transfer`; explicit transfer still hands over and detaches the original buffer. Carrier implementations must adopt the current manifest format."
+                  "text": "`rpcHostPipelines(getHost, pipeline)` passes the construction request to `domainCore(request)`; each transport declares its own pipelines. Overridden identity fields given to `onWarning` are under `data`, including only the name or instanceId items that actually conflict. Small signed buffers may be inlined only without an explicit `transfer`; an explicit transfer still hands over and detaches the original buffer. Carrier implementations use the current manifest format."
                 }
               ]
             },
@@ -1670,7 +1828,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Timeout/retry roles are singular, independently of caller aliases. A duplicate in transport-local declarations or global/default policy admission rejects with `source: plugin.host`, `code: FEATURE_ROLE_CONFLICT` through the shared rule owner. Flow and transport-native role conflicts retain `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`; alias/configuration conflicts keep their existing RPC identity. No compatibility error alias is provided."
+                  "text": "Timeout/retry roles are singular, independently of caller aliases. A duplicate in transport-local declarations or global/default policy admission rejects with `source: plugin.host`, `code: FEATURE_ROLE_CONFLICT` through the shared rule owner. Flow and transport-native role conflicts retain `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`; alias or configuration conflicts keep their RPC error identity."
                 }
               ]
             }
@@ -1720,7 +1878,7 @@
             "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { limitsFeature } from '@migaia/rpc-host/features'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\n\nconst host = await createRpcHost({\n  plugins: [\n    defineFlowPlugin({\n      name: 'shared-limits',\n      features: { limits: limitsFeature({ maxGlobal: 256 }) }\n    })\n  ]\n})\ntry {\n  const extended = await host.use(threadPlugin({ spawn: new URL('./worker.ts', import.meta.url) }))\n  await extended.thread.notify('refresh')\n  await extended.thread.close()\n  await extended.unUse('thread')\n} finally {\n  await host.close()\n}",
             "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/features'\n\n/** Decide what remote callers may learn while preserving local diagnostic causes. */\nconst redact: IRpcErrorMap = (error) =>\n  new Error(\n    error instanceof Error && /credential/i.test(error.message)\n      ? 'request rejected'\n      : 'request failed'\n  )\n\nexport const host = await createRpcHost({\n  plugins: [\n    defineFlowPlugin({ name: 'error-map', features: { errorMap: errorMapFeature(redact) } })\n  ]\n})",
             "import { createRpcHost, type IRpcWarning } from '@migaia/rpc-host'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\n/** Subscribe through the native host registration lifetime. */\nconst warnings = defineFlowPlugin({\n  name: 'application-warnings',\n  setup: () => ({\n    onWarning: (warning: IRpcWarning) => console.log(warning.code, warning.data)\n  })\n})\n\nexport const host = await createRpcHost({\n  onWarning: (warning) => console.log(warning.message),\n  plugins: [warnings]\n})",
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: { timeout: timeoutFeature({ ms: 1500 }) },\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            )\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\ntype IReportService = {\n  double(value: number): number\n  slowReport(): Promise<string>\n}\n\nconst host = await createRpcHost<IReportService>({\n  plugins: [\n    coroutinePlugin({\n      features: { timeout: timeoutFeature({ ms: 100 }) }, // 每次调用最多等 100 毫秒\n      // 对端：真实项目里它在 Worker 或子进程里，这里放在同一个进程里便于运行\n      spawn: async ({ connect, signal }) => {\n        const worker = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: {\n            double: (value: number) => value * 2,\n            slowReport: (_input: undefined, context: { signal: AbortSignal }) =>\n              new Promise<string>((resolve, reject) => {\n                const timer = setTimeout(() => resolve('report'), 1000)\n                context.signal.addEventListener('abort', () => {\n                  clearTimeout(timer)\n                  console.log('对端收到取消，停止生成报表')\n                  reject(context.signal.reason)\n                })\n              })\n          }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            )\n        } finally {\n          await worker.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n  await host.coroutine.request('slowReport')\n} catch (error) {\n  const { source, code } = error as { source: string; code: string }\n  console.log(`调用失败：${source} / ${code}`)\n} finally {\n  await host.close()\n}"
           ],
           "members": [],
           "composes": [],
@@ -1877,7 +2035,7 @@
               ]
             }
           ],
-          "usageScore": 90,
+          "usageScore": 92,
           "configuration": [
             {
               "name": "plugins",
@@ -1971,9 +2129,9 @@
               "name": "signal",
               "type": "IAbortSignal",
               "optional": true,
-              "description": "未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝；不再增加 `RpcRemoteError` 外壳，调用方须改用真实错误的 `source/code`。协程远端 `context.signal.reason` 接收原 abort reason，不合成取消码；`stream.return(value)` 返回 runtime 的真实结束结果，不回传调用者传入的 `value`。",
+              "description": "未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝，按真实错误的 `source/code` 判断。协程对端的 `context.signal.reason` 是原始的中止原因，不合成取消码；`stream.return(value)` 返回运行时真实的结束结果，不回传调用者传入的 `value`。",
               "descriptionEn": "Acquisition cancellation remains the original native registration signal.",
-              "descriptionZh": "未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝；不再增加 `RpcRemoteError` 外壳，调用方须改用真实错误的 `source/code`。协程远端 `context.signal.reason` 接收原 abort reason，不合成取消码；`stream.return(value)` 返回 runtime 的真实结束结果，不回传调用者传入的 `value`。"
+              "descriptionZh": "未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝，按真实错误的 `source/code` 判断。协程对端的 `context.signal.reason` 是原始的中止原因，不合成取消码；`stream.return(value)` 返回运行时真实的结束结果，不回传调用者传入的 `value`。"
             }
           ],
           "fragment": "rpc-host-index--createRpcHost"
@@ -2039,7 +2197,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-host/dist/host/report.d.ts:defaultRpcReporter:export declare const defaultRpcReporter: (error: unknown) => void;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-host-index--defaultRpcReporter"
         },
@@ -3821,7 +3979,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-host/dist/host/warning.d.ts:RpcWarningCode:export declare const RpcWarningCode: { /** The native parent overrode an explicitly configured child name or instance address. */ readonly selfIgnored: 'SELF_IGNORED'; };\nexport type RpcWarningCode = (typeof RpcWarningCode)[keyof typeof RpcWarningCode];",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 10,
           "configuration": [],
           "fragment": "rpc-host-index--RpcWarningCode"
         }
@@ -4110,7 +4268,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/contract/types.d.ts:IRpcPortableValue:export type IRpcPortableValue = null | boolean | number | string /** Native values exist only inside the independently negotiated portable-binary profile. */ | ArrayBuffer | Uint8Array | IRpcPortableBytes | readonly IRpcPortableValue[] | IRpcPortableRecord;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-host-contract--IRpcPortableValue"
         },
@@ -4175,7 +4333,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/errors/native.d.ts:isRpcError:export declare const isRpcError: (value: unknown) => value is IRpcError;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-host-contract--isRpcError"
         },
@@ -4254,7 +4412,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/errors/native.d.ts:isRpcErrorInstance:export declare function isRpcErrorInstance(value: unknown): value is RpcError;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-host-contract--isRpcErrorInstance"
         },
@@ -4333,7 +4491,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/errors/native.d.ts:isRpcRemoteError:export declare function isRpcRemoteError(value: unknown): value is RpcRemoteError;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-host-contract--isRpcRemoteError"
         },
@@ -4412,7 +4570,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/errors/native.d.ts:isRpcTimeoutError:export declare function isRpcTimeoutError(value: unknown): value is RpcTimeoutError;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-host-contract--isRpcTimeoutError"
         },
@@ -4501,7 +4659,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/portable/normalize.d.ts:normalizeRpcPortable:export declare function normalizeRpcPortable(value: unknown, errorMetadata?: IRpcErrorWireMetadata): IRpcPortableValue;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 8,
           "configuration": [],
           "fragment": "rpc-host-contract--normalizeRpcPortable"
         },
@@ -4564,7 +4722,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/error-code.d.ts:RPC_CORE_ERROR_SOURCE:export declare const RPC_CORE_ERROR_SOURCE = \"rpc.endpoint\";",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-host-contract--RPC_CORE_ERROR_SOURCE"
         },
@@ -4677,7 +4835,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/errors/native.d.ts:RpcAbortError:export declare class RpcAbortError extends RpcError { /** Pending rollback settlement; await it to observe later resource release results. */ readonly cleanupPromise?: Promise<readonly IRpcCleanupError[]>; /** Construct diagnostics without minting an owner-created operation identity. */ constructor(message?: \"Web RPC request cancelled\", cleanupPromise?: Promise<readonly IRpcCleanupError[]>, cause?: unknown); }",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 8,
           "configuration": [],
           "fragment": "rpc-host-contract--RpcAbortError"
         },
@@ -5005,7 +5163,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/errors/native.d.ts:RpcConstructionError:export declare class RpcConstructionError extends RpcConfigurationError { /** Original resource release failures retained alongside the primary failure. */ readonly cleanupErrors: readonly IRpcCleanupError[]; /** Pending rollback settlement; await it to observe later resource release results. */ readonly cleanupPromise?: Promise<readonly IRpcCleanupError[]>; /** Construct diagnostics without minting an owner-created operation identity. */ constructor(message: string, cause: unknown, cleanupErrors: readonly IRpcCleanupError[], cleanupPromise?: Promise<readonly IRpcCleanupError[]>); }",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 8,
           "configuration": [],
           "fragment": "rpc-host-contract--RpcConstructionError"
         },
@@ -5198,7 +5356,7 @@
               ]
             }
           ],
-          "usageScore": 2,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-host-contract--RpcError"
         },
@@ -5320,7 +5478,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/errors/native.d.ts:RpcLifecycleError:export declare class RpcLifecycleError extends RpcError { /** Core cleanup translation exposes secondary failures through the standard error graph. */ readonly errors?: readonly unknown[]; /** Original resource release failures retained alongside the primary failure. */ readonly cleanupErrors?: readonly IRpcCleanupError[]; /** Construct diagnostics without minting an owner-created operation identity. */ constructor(message: string, cause?: unknown, cleanupErrors?: readonly IRpcCleanupError[]); }",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-host-contract--RpcLifecycleError"
         },
@@ -5487,7 +5645,7 @@
           "declaredConfiguration": [],
           "identity": "@migaia/rpc-host:packages/rpc-contract/dist/errors/native.d.ts:RpcRemoteError:export type { RpcRemoteError } from '@migaia/rpc-contract/errors';",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-host-contract--RpcRemoteError"
         },
@@ -5896,7 +6054,7 @@
           ],
           "identity": "packages/rpc-host/dist/features/idempotency/store.d.ts:createRpcIdempotencyStore:export declare function createRpcIdempotencyStore(options?: IRpcIdempotencyStoreOptions): IRpcIdempotencyStore;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [
             {
               "name": "retentionMs",
@@ -8226,7 +8384,7 @@
           ],
           "identity": "packages/rpc-host/dist/features/auth/index.d.ts:authFeature:export declare function authFeature(options: IRpcAuthenticationOptions): IRpcFlowFeature;",
           "guidance": [],
-          "usageScore": 38,
+          "usageScore": 42,
           "configuration": [
             {
               "name": "encrypt",
@@ -8517,7 +8675,7 @@
           ],
           "identity": "packages/rpc-host/dist/features/batch/index.d.ts:batchFeature:export declare function batchFeature(options?: IRpcBatchOptions): IRpcFlowFeature;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 14,
           "configuration": [
             {
               "name": "required",
@@ -8701,7 +8859,7 @@
           ],
           "identity": "packages/rpc-host/dist/features/chunk/index.d.ts:chunkFeature:export declare function chunkFeature(options?: IRpcChunkFeatureOptions): IRpcFlowFeature;",
           "guidance": [],
-          "usageScore": 20,
+          "usageScore": 18,
           "configuration": [
             {
               "name": "required",
@@ -9081,7 +9239,7 @@
               ]
             }
           ],
-          "usageScore": 36,
+          "usageScore": 40,
           "configuration": [],
           "fragment": "rpc-host-features/error-map--errorMapFeature"
         }
@@ -9232,7 +9390,7 @@
           ],
           "identity": "packages/rpc-host/dist/features/idempotency/index.d.ts:idempotencyFeature:export declare function idempotencyFeature(options?: IRpcIdempotencyOptions): IRpcFlowFeature<Readonly<{ outcome: IRpcOutcomeLookup; }>>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 24,
           "configuration": [
             {
               "name": "store",
@@ -9531,7 +9689,7 @@
           ],
           "identity": "packages/rpc-host/dist/features/limits/index.d.ts:limitsFeature:export declare function limitsFeature(options?: IRpcLimitsOptions): IRpcFlowFeature;",
           "guidance": [],
-          "usageScore": 42,
+          "usageScore": 48,
           "configuration": [
             {
               "name": "maxGlobal",
@@ -9601,9 +9759,9 @@
               "name": "onRejected",
               "type": "(rejection: IRpcProviderRejection) => void | Promise<void>",
               "optional": true,
-              "description": "汇总入口与默认子路径导入均可 tree-shake。推荐安装 `limitsFeature`；省略它就不启用这些配额。安装 `idempotencyFeature` 后，才有 `host.<ns>.outcome(key)`。auth 默认把签名绑定对象交给 `sign/verify`；文本和字节模式只编码一层绑定。它的请求 ID 去重默认在完成后立即释放，也可选择签名窗口或毫秒 `retain`；`maxReplayEntriesPerPeer` 只限制数字保留模式，`onRejected` 接收容量拒绝原因。配置和 HMAC 示例见认证说明。",
+              "description": "`maxReplayEntriesPerPeer` 默认 `1024`，只限制数字模式中的活动与保留身份，必须是正安全整数；满额以 `OVERLOADED` 拒绝。`false` 和 `'window'` 不受这个数值容量限制。`onRejected` 接收冻结的 `replayLedgerFull` 或 `groupReplayFull` 通知，回调失败仍按原错误及原因报告。重复请求静默丢弃，不再次执行，也不补发终态；需要把已完成结果回放给重发方时，安装 `idempotencyFeature()`。",
               "descriptionEn": "Report replay-capacity refusal through the admitted-identity diagnostic contract.",
-              "descriptionZh": "汇总入口与默认子路径导入均可 tree-shake。推荐安装 `limitsFeature`；省略它就不启用这些配额。安装 `idempotencyFeature` 后，才有 `host.<ns>.outcome(key)`。auth 默认把签名绑定对象交给 `sign/verify`；文本和字节模式只编码一层绑定。它的请求 ID 去重默认在完成后立即释放，也可选择签名窗口或毫秒 `retain`；`maxReplayEntriesPerPeer` 只限制数字保留模式，`onRejected` 接收容量拒绝原因。配置和 HMAC 示例见认证说明。"
+              "descriptionZh": "`maxReplayEntriesPerPeer` 默认 `1024`，只限制数字模式中的活动与保留身份，必须是正安全整数；满额以 `OVERLOADED` 拒绝。`false` 和 `'window'` 不受这个数值容量限制。`onRejected` 接收冻结的 `replayLedgerFull` 或 `groupReplayFull` 通知，回调失败仍按原错误及原因报告。重复请求静默丢弃，不再次执行，也不补发终态；需要把已完成结果回放给重发方时，安装 `idempotencyFeature()`。"
             },
             {
               "name": "scheduler",
@@ -9925,7 +10083,7 @@
           ],
           "identity": "packages/rpc-host/dist/features/retry.d.ts:retryFeature:export declare function retryFeature(options?: IRetryFeatureOptions): IRpcRetryFeature;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 34,
           "configuration": [
             {
               "name": "attempts",
@@ -10081,7 +10239,7 @@
           ],
           "identity": "packages/rpc-host/dist/features/schema/index.d.ts:schemaFeature:export declare function schemaFeature(options?: IRpcSchemaOptions): IRpcFlowFeature;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 10,
           "configuration": [
             {
               "name": "schemas",
@@ -10289,7 +10447,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\n\nexport const policy = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 3000 }), retry: retryFeature({ attempts: 2 }) }\n})\nexport const transport = threadPlugin({\n  spawn: new URL('./worker.ts', import.meta.url),\n  features: { timeout: timeoutFeature({ ms: 1500 }) }\n})\n\nexport const callOptions = { timeout: { ms: 100 }, retry: false } as const",
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      features: { timeout: timeoutFeature({ ms: 1500 }) },\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            )\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n} finally {\n  await host.close()\n}",
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\ntype IReportService = {\n  double(value: number): number\n  slowReport(): Promise<string>\n}\n\nconst host = await createRpcHost<IReportService>({\n  plugins: [\n    coroutinePlugin({\n      features: { timeout: timeoutFeature({ ms: 100 }) }, // 每次调用最多等 100 毫秒\n      // 对端：真实项目里它在 Worker 或子进程里，这里放在同一个进程里便于运行\n      spawn: async ({ connect, signal }) => {\n        const worker = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: {\n            double: (value: number) => value * 2,\n            slowReport: (_input: undefined, context: { signal: AbortSignal }) =>\n              new Promise<string>((resolve, reject) => {\n                const timer = setTimeout(() => resolve('report'), 1000)\n                context.signal.addEventListener('abort', () => {\n                  clearTimeout(timer)\n                  console.log('对端收到取消，停止生成报表')\n                  reject(context.signal.reason)\n                })\n              })\n          }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) =>\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            )\n        } finally {\n          await worker.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21))\n  await host.coroutine.request('slowReport')\n} catch (error) {\n  const { source, code } = error as { source: string; code: string }\n  console.log(`调用失败：${source} / ${code}`)\n} finally {\n  await host.close()\n}",
             "import { timeoutFeature, retryFeature, limitsFeature } from '@migaia/rpc-host/features'\nimport { probe } from '@migaia/rpc-host/plugins'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport timeoutFromSubpath from '@migaia/rpc-host/features/timeout'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) }\n})\nexport const capacity = limitsFeature({ maxGlobal: 256, maxPerPeer: 64 })\nexport const observation = probe({\n  stages: ['message', 'peer'],\n  emit: (view) => console.log({ ...view })\n})\nexport const deadlineFeature = timeoutFromSubpath({ ms: 100 })\nexport const perCallDeadline = { ms: 100 }"
           ],
           "members": [],
@@ -10364,7 +10522,7 @@
           ],
           "identity": "packages/rpc-host/dist/features/timeout.d.ts:timeoutFeature:export declare function timeoutFeature(options: ITimeoutFeatureOptions): IRpcTimeoutFeature;",
           "guidance": [],
-          "usageScore": 38,
+          "usageScore": 48,
           "configuration": [
             {
               "name": "ms",
@@ -11657,43 +11815,8 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/rpc-host/dist/plugins/probe/index.d.ts:probe:export declare function probe(...inputs: readonly (IRpcProbeDefinition | IRpcProbe)[]): IRpcFlowPlugin;",
-          "guidance": [
-            {
-              "id": "期限-取消与错误",
-              "heading": "期限、取消与错误",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "`FeatureScope` 唯一解析覆盖顺序：单次调用 `options.timeout/retry`、所在传输 plugin 的 feature、宿主级 flow plugin 里的默认值。单次值接受 timeout `{ ms }`、retry 配置对象或 `false`；不接受 feature token、执行方法或数字。`timeout: false` 不启用 feature 超时，持续等待响应；已经继承的上游剩余期限仍递减。`retry: false` 禁用重试。只有发起方的标量调用和 group 重试，stream 从不重放、只使用 timeout；转发跳不重新开始预算。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "进入 provider 前剩余截止时间已经耗尽的调用，以 `DEADLINE_EXCEEDED` 拒绝，不执行 provider；`before-start` 的取消语义保持不变。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "所有调用种类支持 `signal`，单向调用物理发送之后也能向下游传播取消。provider 读取自己的 `context.signal`。取消不等于杀进程，也不回滚业务副作用。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "按 `source/code` 识别错误，保留原生类型、`stack`、`cause` 和 `AggregateError.errors`。超时或断开不证明业务未执行；非幂等操作须先对账再考虑重试。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`send`、`request` 等返回 Promise 的调用通过拒绝传播非法 `idempotencyKey`、transfer 准入被拒绝或命名空间已关闭的错误，保留各入口原有的 `source/code` 和 `cause`；非法 key 仍为 `CONTRACT_INVALID`。使用 `await` 或 `Promise.catch` 处理失败。`dispatch` 仍同步返回 `void` 并向 reporter 交付失败，`stream` 与 `streamTo` 仍返回延迟启动的异步迭代器。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "公开 provider 注册失败以 `INVALID_CONFIG` 拒绝，原注册错误直接保留在 `cause`；错误说明不通过调用异常的字符串转换来生成。关闭后，待决调用以 `ENDPOINT_DISPOSED` 结算，实际载体关闭会拒绝仍被挂住的写入；不要求任意业务 Promise 因关闭而强行完成。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "自定义 plugin 作者从 `@migaia/rpc-host/sdk` 开始。观察入口是 `/plugins/probe`；旧 `/plugin`、`/probe`、endpoint、per-session Peer 和 v1/JSON-RPC profile 已删除。rpc 家族可以直接依赖 `@migaia/rpc-contract`；只需错误码时导入 `/error-code`，不会带入协议与编解码执行代码。"
-                }
-              ]
-            }
-          ],
-          "usageScore": 64,
+          "guidance": [],
+          "usageScore": 56,
           "configuration": [],
           "fragment": "rpc-host-plugins/probe--probe"
         },
@@ -12366,7 +12489,7 @@
           ],
           "identity": "packages/rpc-host/dist/plugins/typegen/index.d.ts:typegen:export declare function typegen(options: ITypegenOptions): IRpcFlowPlugin;",
           "guidance": [],
-          "usageScore": 28,
+          "usageScore": 34,
           "configuration": [
             {
               "name": "out",
@@ -13601,7 +13724,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-host/dist/sdk/flow-feature.d.ts:defineFlowFeature:export declare function defineFlowFeature<E extends object = Record<never, never>>(definition: IRpcFlowDefinition<E> & Readonly<{ phase: number; }>): IRpcFlowFeature<E>;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "rpc-host-sdk--defineFlowFeature"
         },
@@ -13628,7 +13751,7 @@
           "examples": [
             "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\n\nexport const policy = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 3000 }), retry: retryFeature({ attempts: 2 }) }\n})\nexport const transport = threadPlugin({\n  spawn: new URL('./worker.ts', import.meta.url),\n  features: { timeout: timeoutFeature({ ms: 1500 }) }\n})\n\nexport const callOptions = { timeout: { ms: 100 }, retry: false } as const",
             "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { limitsFeature } from '@migaia/rpc-host/features'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\n\nconst host = await createRpcHost({\n  plugins: [\n    defineFlowPlugin({\n      name: 'shared-limits',\n      features: { limits: limitsFeature({ maxGlobal: 256 }) }\n    })\n  ]\n})\ntry {\n  const extended = await host.use(threadPlugin({ spawn: new URL('./worker.ts', import.meta.url) }))\n  await extended.thread.notify('refresh')\n  await extended.thread.close()\n  await extended.unUse('thread')\n} finally {\n  await host.close()\n}",
-            "import { defineHost } from '@migaia/plugin-host'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}",
+            "import { defineHost } from '@migaia/plugin-host'\nimport { featuresModule } from '@migaia/plugin-host/features'\nimport { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'\nimport { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'\nimport { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  modules: [featuresModule, featureDependenciesModule, namedPipelinesModule, asyncPipelineModule],\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}",
             "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/features'\n\n/** Decide what remote callers may learn while preserving local diagnostic causes. */\nconst redact: IRpcErrorMap = (error) =>\n  new Error(\n    error instanceof Error && /credential/i.test(error.message)\n      ? 'request rejected'\n      : 'request failed'\n  )\n\nexport const host = await createRpcHost({\n  plugins: [\n    defineFlowPlugin({ name: 'error-map', features: { errorMap: errorMapFeature(redact) } })\n  ]\n})",
             "import { createRpcHost, type IRpcWarning } from '@migaia/rpc-host'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\n/** Subscribe through the native host registration lifetime. */\nconst warnings = defineFlowPlugin({\n  name: 'application-warnings',\n  setup: () => ({\n    onWarning: (warning: IRpcWarning) => console.log(warning.code, warning.data)\n  })\n})\n\nexport const host = await createRpcHost({\n  onWarning: (warning) => console.log(warning.message),\n  plugins: [warnings]\n})",
             "import { timeoutFeature, retryFeature, limitsFeature } from '@migaia/rpc-host/features'\nimport { probe } from '@migaia/rpc-host/plugins'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport timeoutFromSubpath from '@migaia/rpc-host/features/timeout'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) }\n})\nexport const capacity = limitsFeature({ maxGlobal: 256, maxPerPeer: 64 })\nexport const observation = probe({\n  stages: ['message', 'peer'],\n  emit: (view) => console.log({ ...view })\n})\nexport const deadlineFeature = timeoutFromSubpath({ ms: 100 })\nexport const perCallDeadline = { ms: 100 }"
@@ -13715,7 +13838,7 @@
               ]
             }
           ],
-          "usageScore": 104,
+          "usageScore": 108,
           "configuration": [],
           "fragment": "rpc-host-sdk--defineFlowPlugin"
         },
@@ -13887,7 +14010,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-host/dist/sdk/define.d.ts:defineTransportPlugin:export declare function defineTransportPlugin<const N extends string, const F extends IFeatureRecord = Record<never, never>, E extends object = Record<never, never>, A extends boolean = false>(definition: IRpcTransportDefinition<F, E, IRpcTransportSetupContext> & Readonly<{ namespace: N; closingWrites?: A; }>): IRpcTransportPlugin<N, E & IRpcTransportFeatureExtensions<F>, A>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "rpc-host-sdk--defineTransportPlugin"
         },
@@ -19288,7 +19411,7 @@
           "errors": ["No documented errors are declared for IRpcFlowFeature."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcFlowFeature.",
           "examples": [
-            "import { defineHost } from '@migaia/plugin-host'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}"
+            "import { defineHost } from '@migaia/plugin-host'\nimport { featuresModule } from '@migaia/plugin-host/features'\nimport { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'\nimport { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'\nimport { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  modules: [featuresModule, featureDependenciesModule, namedPipelinesModule, asyncPipelineModule],\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}"
           ],
           "members": [],
           "composes": ["IFeature"],
@@ -19527,7 +19650,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { defineHost } from '@migaia/plugin-host'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}"
+            "import { defineHost } from '@migaia/plugin-host'\nimport { featuresModule } from '@migaia/plugin-host/features'\nimport { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'\nimport { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'\nimport { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  modules: [featuresModule, featureDependenciesModule, namedPipelinesModule, asyncPipelineModule],\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}"
           ],
           "members": [],
           "composes": ["IRpcNamespacePlugin"],
@@ -27704,7 +27827,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { defineHost } from '@migaia/plugin-host'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}"
+            "import { defineHost } from '@migaia/plugin-host'\nimport { featuresModule } from '@migaia/plugin-host/features'\nimport { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'\nimport { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'\nimport { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  modules: [featuresModule, featureDependenciesModule, namedPipelinesModule, asyncPipelineModule],\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}"
           ],
           "members": [
             {
@@ -30914,7 +31037,7 @@
           "errors": ["No documented errors are declared for rpcHostPipelines."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for rpcHostPipelines.",
           "examples": [
-            "import { defineHost } from '@migaia/plugin-host'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}",
+            "import { defineHost } from '@migaia/plugin-host'\nimport { featuresModule } from '@migaia/plugin-host/features'\nimport { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'\nimport { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'\nimport { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'\nimport {\n  rpcHostPipelines,\n  defineFlowPlugin,\n  type IRpcFlowFeature,\n  type IRpcFlowPlugin,\n  type IRpcTransportPlugin\n} from '@migaia/rpc-host/sdk'\n\n/** Capture lazy authority callbacks before the real host is assigned. */\nconst rpc = rpcHostPipelines(\n  () => host,\n  (name, request) => host.pipeline(name, request)\n)\n/** One native owner supplies both stage registration and execution. */\nexport const host = defineHost({\n  modules: [featuresModule, featureDependenciesModule, namedPipelinesModule, asyncPipelineModule],\n  domainCore: rpc.domainCore,\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\n\n/** Commit reusable flow definitions before opening any transport resource. */\nexport async function installRpc(\n  features: Readonly<Record<string, IRpcFlowFeature<object>>>,\n  observers: readonly IRpcFlowPlugin[],\n  transports: readonly IRpcTransportPlugin[]\n) {\n  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))\n  await host.use(...transports)\n}",
             "import { PluginHost, type IHostCoreConstructionRequest } from '@migaia/plugin-host'\nimport { rpcHostPipelines } from '@migaia/rpc-host/sdk'\n\n/** Retain the helper's domain-core construction port. */\ntype IRpcSetup = ReturnType<typeof rpcHostPipelines>\n/** Native installation receives only this owner's declared RPC core. */\ntype IRpcCore = ReturnType<IRpcSetup['domainCore']>\n\nexport class NativeRpcHost extends PluginHost<IRpcCore, unknown, readonly []> {\n  /** The setup lends this exact owner's protected pipeline without another executor. */\n  readonly #rpc: IRpcSetup\n\n  /** Register lazy callbacks before super without reading an unconstructed this. */\n  constructor() {\n    /** The callbacks are invoked only after construction by the actual native installation. */\n    const rpc = rpcHostPipelines(\n      () => this,\n      (name, request) => this.pipeline(name, request)\n    )\n    super({\n      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n    })\n    this.#rpc = rpc\n  }\n\n  /** Each install borrows this exact constructed owner's pipeline execution authority. */\n  protected override createPluginDomainCore(request: IHostCoreConstructionRequest): IRpcCore {\n    return this.#rpc.domainCore(request)\n  }\n}"
           ],
           "members": [],
@@ -30978,7 +31101,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-host/dist/sdk/flow-pipelines.d.ts:rpcHostPipelines:export declare function rpcHostPipelines(getHost: () => object, pipeline: IRpcNativePipeline): Readonly<{ domainCore(request: IHostCoreConstructionRequest): IRpcNativePipelineCore; }>;",
           "guidance": [],
-          "usageScore": 38,
+          "usageScore": 40,
           "configuration": [],
           "fragment": "rpc-host-sdk--rpcHostPipelines"
         },
@@ -31964,7 +32087,7 @@
               "optional": false,
               "description": "Acquisition cancellation remains the original native registration signal.",
               "descriptionEn": "Acquisition cancellation remains the original native registration signal.",
-              "descriptionZh": "未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝；不再增加 `RpcRemoteError` 外壳，调用方须改用真实错误的 `source/code`。协程远端 `context.signal.reason` 接收原 abort reason，不合成取消码；`stream.return(value)` 返回 runtime 的真实结束结果，不回传调用者传入的 `value`。"
+              "descriptionZh": "未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝，按真实错误的 `source/code` 判断。协程对端的 `context.signal.reason` 是原始的中止原因，不合成取消码；`stream.return(value)` 返回运行时真实的结束结果，不回传调用者传入的 `value`。"
             },
             {
               "name": "report",

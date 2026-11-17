@@ -15,36 +15,107 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "为 `@migaia/log-host` 提供 binlog、WAL 和 undo 插件，以及可独立使用的原子日志存储。宿主是精确同版本 peer；当前两个包均为 `0.0.11`。"
+                "text": "English"
+              },
+              {
+                "type": "paragraph",
+                "text": "给 `@migaia/log-host` 增加三种需要落盘的日志：按顺序记录业务事件的 binlog、记录“开始做但还没做完”的预写日志（WAL），以及保存修改前后数据的撤销日志（undo）。它们都写到你提供的日志存储里；内存存储用于测试，`/file` 入口提供基于 SQLite 的文件存储。"
+              }
+            ]
+          },
+          {
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "进程在操作中途崩溃，重启后不知道哪些做完了：例如扣款请求已经发出，结果还没记下来。根因是“开始做”和“做完了”没有在动手之前落盘。",
+                  "需要按顺序重放业务事件，却只有散落的普通日志：普通日志可能被采样、丢弃或乱序，不能当作事件流。根因是缺少带序号、可从任意位置继续读取的事件记录。",
+                  "多步修改失败了，不知道怎么改回去：改到一半出错，只能人工对照数据恢复。根因是修改前的数据没有先保存下来。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面演示 WAL 的用法：第一次运行中一笔扣款完成了，另一笔开始后进程“崩溃”；重启后读出还没完成的那一笔。用 Node 24 直接运行。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst store = memoryLogStore()\nconst log = createLogHost({ plugins: [binlogPlugin({ store })] })\ntry {\n  await log.binlog.ready()\n  const seq = await log.binlog.append('order.created', { id: 'order-1' })\n  console.log(await log.binlog.read(seq, { limit: 1 }))\n} finally {\n  await log.shutdown('manual')\n  await store.dispose()\n}"
+                "code": "import { createLogHost } from '@migaia/log-host'\nimport { walPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\n// 日志存储由应用创建并负责释放；真实部署用 /file 入口的 fileLogStore(path)\nconst intents = memoryLogStore()\n\n// 第一次运行\nconst first = createLogHost({ plugins: [walPlugin({ store: intents })] })\nawait first.wal.ready()\nconst paid = await first.wal.begin('charge-card', { orderId: 'o1' })\nawait first.wal.complete(paid) // 这一笔做完了\nawait first.wal.begin('charge-card', { orderId: 'o2' }) // 这一笔开始后“崩溃”，没有 complete\nawait first.shutdown('manual')\n\n// 重启后\nconst restarted = createLogHost({ plugins: [walPlugin({ store: intents })] })\nawait restarted.wal.ready()\nfor (const intent of await restarted.wal.pending())\n  console.log(`未完成：${intent.kind} ${JSON.stringify(intent.payload)}`)\nawait restarted.shutdown('manual')\nawait intents.dispose()"
               },
               {
                 "type": "paragraph",
-                "text": "`binlogPlugin` 安装 `host.binlog`，`walPlugin` 安装 `host.wal`，`undoLogPlugin` 安装 `host.undo`。插件借用原始 store，卸载后归还；creator 始终负责 store 的销毁。同一 store 只能有一个已安装的 durable 插件借用。"
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "未完成：charge-card {\"orderId\":\"o2\"}"
               },
               {
                 "type": "paragraph",
-                "text": "根入口还导出 `memoryLogStore`、`snapshotLogRecords`、`assertLogInteger`、`prepareLogAppend`、`snapshotLogStoreState`、`createLogStoreIndex`、`LogRecordState`、`LogStage` 和相应记录、存储、观察及扩展类型。"
+                "text": "`begin()` 在你动手之前把意图写进存储并返回它的序号；做完后 `complete()`，放弃时 `abort()`。重启后 `pending()` 按原序号列出所有还没完成的意图，由业务决定重试还是撤销。"
+              }
+            ]
+          },
+          {
+            "id": "常用-api",
+            "heading": "常用 API",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["API", "说明"],
+                "rows": [
+                  [
+                    "`binlogPlugin({ store })` → `host.binlog`",
+                    "`append`、`appendBatch`、`read`、`lastSeq`、`truncate`、`subscribe`：带序号的业务事件"
+                  ],
+                  [
+                    "`walPlugin({ store })` → `host.wal`",
+                    "`begin`、`complete`、`abort`、`pending`：预写日志"
+                  ],
+                  [
+                    "`undoLogPlugin({ store })` → `host.undo`",
+                    "`record`、`get`、`list`、`forget`：按事务 ID 保存修改前后的数据"
+                  ],
+                  ["`memoryLogStore()`", "内存存储，用于测试"],
+                  [
+                    "`fileLogStore(path)`（`@migaia/log-plugin-durable/file`）",
+                    "基于运行时自带 SQLite 的文件存储"
+                  ]
+                ]
               },
               {
                 "type": "paragraph",
-                "text": "`@migaia/log-plugin-durable/file` 提供 `fileLogStore(path, options?)`。Node、Bun、Deno 条件使用实际 SQLite builtin；browser/default 入口可安全加载，打开文件以 `LOG_STORE_UNAVAILABLE` 拒绝。文件连接保留独占锁，关闭后才能由其它 owner 打开。"
+                "text": "每个插件安装后都要先 `await host.<名称>.ready()` 再使用。"
+              }
+            ]
+          },
+          {
+            "id": "契约细节",
+            "heading": "契约细节",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "插件只借用存储，卸载后归还；存储由创建者负责 `dispose()`。同一个存储同时只能被一个 durable 插件借用，否则报 `LOG_STORE_IN_USE`。",
+                  "`fileLogStore` 在 Node、Bun、Deno 上使用运行时自带的 SQLite；浏览器和默认入口可以加载，但打开文件以 `LOG_STORE_UNAVAILABLE` 拒绝。文件连接持有独占锁，关闭后其他使用者才能打开。",
+                  "普通日志方法和 `flush()` / `shutdown()` 的失败由 host 收口；但 durable 的 `append`、`read`、事务状态变化、`ready` 和失效句柄仍会拒绝，不能把持久化失败当成成功。错误域是 `logging.durable`（`LOG_DURABLE_ERROR_SOURCE`），错误码见 `LogDurableErrorCode`，原始故障沿 `cause` 可达。",
+                  "`binlog.subscribe` 先交付已有的历史，再跟随新记录；慢的监听器只拖慢自己。截断越过某个订阅的位置时，报告 `LOG_SUBSCRIPTION_TRUNCATED` 并停止该订阅。",
+                  "插件不替业务执行撤销：`undo` 只保存数据，怎样用这些数据恢复由业务决定。",
+                  "log-host 与本包必须是同一版本（目前都是 `0.0.11`）。"
+                ]
               },
               {
                 "type": "paragraph",
-                "text": "日志方法与宿主 flush/shutdown 的失败由宿主收口；存储 append/read、事务状态变化、ready 和失效的 durable 句柄仍可拒绝。检查 `LOG_DURABLE_ERROR_SOURCE`（`logging.durable`）与 `LogDurableErrorCode`，并沿 `cause` 读取原始故障。"
-              },
-              {
-                "type": "paragraph",
-                "text": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。"
-              },
-              {
-                "type": "paragraph",
-                "text": "详见 USEGUIDE；English。"
+                "text": "完整用法、文件存储和自定义存储适配见 使用指南。"
               }
             ]
           }
@@ -138,36 +209,107 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Binlog, write-ahead and undo plugins for `@migaia/log-host`, plus standalone atomic log stores. The host is an exact-version peer; both module currently use `0.0.11`."
+                  "text": "中文"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Adds three kinds of logs that must survive a crash to `@migaia/log-host`: a binlog of ordered business events, a write-ahead log (WAL) of work that has started but not finished, and an undo log of data before and after a change. They are written to a log store you provide; the in-memory store is for tests, and the `/file` entry provides a file store backed by SQLite."
+                }
+              ]
+            },
+            {
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "The process crashes in the middle of an operation, and after restart nobody knows what finished: for example a charge request was sent but its result was never recorded. The cause is that \"started\" and \"finished\" were not written down before doing the work.",
+                    "Business events must be replayed in order, but there are only ordinary log lines: ordinary logs can be sampled, dropped or reordered and cannot serve as an event stream. The cause is the lack of numbered records that can be read again from any position.",
+                    "A multi-step change fails and nobody knows how to undo it: the change failed half way and recovery means comparing data by hand. The cause is that the data before the change was not saved first."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The example shows the WAL: in the first run one charge completes, and the process \"crashes\" after another one starts; after restart the unfinished one is read back. Run it directly with Node 24."
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst store = memoryLogStore()\nconst log = createLogHost({ plugins: [binlogPlugin({ store })] })\ntry {\n  await log.binlog.ready()\n  const seq = await log.binlog.append('order.created', { id: 'order-1' })\n  console.log(await log.binlog.read(seq, { limit: 1 }))\n} finally {\n  await log.shutdown('manual')\n  await store.dispose()\n}"
+                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { walPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\n// The application creates and disposes the store; real deployments use fileLogStore(path) from /file\nconst intents = memoryLogStore()\n\n// First run\nconst first = createLogHost({ plugins: [walPlugin({ store: intents })] })\nawait first.wal.ready()\nconst paid = await first.wal.begin('charge-card', { orderId: 'o1' })\nawait first.wal.complete(paid) // this one finished\nawait first.wal.begin('charge-card', { orderId: 'o2' }) // \"crash\" after starting: no complete\nawait first.shutdown('manual')\n\n// After restart\nconst restarted = createLogHost({ plugins: [walPlugin({ store: intents })] })\nawait restarted.wal.ready()\nfor (const intent of await restarted.wal.pending())\n  console.log(`unfinished: ${intent.kind} ${JSON.stringify(intent.payload)}`)\nawait restarted.shutdown('manual')\nawait intents.dispose()"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`binlogPlugin` installs `host.binlog`, `walPlugin` installs `host.wal`, and `undoLogPlugin` installs `host.undo`. Plugins borrow the original store and release that borrow on uninstall. Its creator always owns disposal. Only one installed durable plugin may borrow a given store."
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "unfinished: charge-card {\"orderId\":\"o2\"}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "The root also exports `memoryLogStore`, `snapshotLogRecords`, `assertLogInteger`, `prepareLogAppend`, `snapshotLogStoreState`, `createLogStoreIndex`, `LogRecordState`, `LogStage`, and their record, storage, observation and extension types."
+                  "text": "`begin()` writes the intent to the store before you do the work and returns its sequence number; call `complete()` when done or `abort()` to give up. After a restart, `pending()` lists every unfinished intent in sequence order, and the business code decides whether to retry or undo it."
+                }
+              ]
+            },
+            {
+              "id": "common-apis",
+              "heading": "Common APIs",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["API", "Description"],
+                  "rows": [
+                    [
+                      "`binlogPlugin({ store })` → `host.binlog`",
+                      "`append`, `appendBatch`, `read`, `lastSeq`, `truncate`, `subscribe`: numbered business events"
+                    ],
+                    [
+                      "`walPlugin({ store })` → `host.wal`",
+                      "`begin`, `complete`, `abort`, `pending`: write-ahead log"
+                    ],
+                    [
+                      "`undoLogPlugin({ store })` → `host.undo`",
+                      "`record`, `get`, `list`, `forget`: before/after data per transaction ID"
+                    ],
+                    ["`memoryLogStore()`", "In-memory store for tests"],
+                    [
+                      "`fileLogStore(path)` (`@migaia/log-plugin-durable/file`)",
+                      "File store backed by the runtime's built-in SQLite"
+                    ]
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/log-plugin-durable/file` exports `fileLogStore(path, options?)`. Node, Bun and Deno conditions use the actual SQLite builtin. The browser/default entry loads safely and rejects opening with `LOG_STORE_UNAVAILABLE`. A file connection retains an exclusive lock until its owner closes it."
+                  "text": "After installing a plugin, `await host.<name>.ready()` before using it."
+                }
+              ]
+            },
+            {
+              "id": "contract-details",
+              "heading": "Contract details",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Plugins only borrow the store and return it on removal; the creator calls `dispose()`. A store can be borrowed by one durable plugin at a time; otherwise `LOG_STORE_IN_USE` is raised.",
+                    "`fileLogStore` uses the runtime's built-in SQLite on Node, Bun and Deno. The browser and default entries can be loaded, but opening a file rejects with `LOG_STORE_UNAVAILABLE`. A file connection holds an exclusive lock until it is closed.",
+                    "Failures of ordinary log methods and `flush()` / `shutdown()` are contained by the host, but durable `append`, `read`, transaction state changes, `ready` and stale handles still reject; a failed write is never reported as success. The error domain is `logging.durable` (`LOG_DURABLE_ERROR_SOURCE`); see `LogDurableErrorCode` for codes, and the original failure is reachable through `cause`.",
+                    "`binlog.subscribe` delivers existing history first, then follows new records; a slow listener only slows itself. When truncation passes a subscription's position, `LOG_SUBSCRIPTION_TRUNCATED` is reported and that subscription stops.",
+                    "The plugins do not undo anything for you: `undo` stores the data, and the business code decides how to use it.",
+                    "log-host and this module must have the same version (both `0.0.11` today)."
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "The host contains failures from ordinary logging and flush/shutdown. Durable append/read, transaction state changes, readiness and revoked handles still reject. Inspect `LOG_DURABLE_ERROR_SOURCE` (`logging.durable`) with `LogDurableErrorCode`; the original failure remains reachable through `cause`."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Standalone store `observe`/`report` callbacks are diagnostic only. The default is the host's single `defaultLogFailureReporter`. A failed custom reporter falls back to that default; failure of the default ends reporting without changing the storage result."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "See USEGUIDE; 中文."
+                  "text": "See the usage guide for full usage, the file store and custom store adapters."
                 }
               ]
             }
@@ -357,7 +499,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-durable/dist/committed-index.d.ts:assertLogInteger:export declare function assertLogInteger(value: unknown, minimum?: number): asserts value is number;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "log-plugin-durable-index--assertLogInteger"
         },
@@ -382,8 +524,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst events = memoryLogStore()\nconst intents = memoryLogStore()\nconst images = memoryLogStore()\nconst host = createLogHost({\n  plugins: [\n    binlogPlugin({ store: events }),\n    walPlugin({ store: intents }),\n    undoLogPlugin({ store: images })\n  ]\n})\ntry {\n  await Promise.all([host.binlog.ready(), host.wal.ready(), host.undo.ready()])\n  await host.binlog.append('created', { id: 'order-1' })\n  const intent = await host.wal.begin('save-order', { id: 'order-1' })\n  await host.undo.record('tx-1', [{ target: 'order-1', before: null, after: { total: 12 } }])\n  await host.wal.complete(intent)\n  await host.undo.forget('tx-1')\n} finally {\n  await host.shutdown('manual')\n  await Promise.all([events.dispose(), intents.dispose(), images.dispose()])\n}",
-            "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst store = memoryLogStore()\nconst log = createLogHost({ plugins: [binlogPlugin({ store })] })\ntry {\n  await log.binlog.ready()\n  const seq = await log.binlog.append('order.created', { id: 'order-1' })\n  console.log(await log.binlog.read(seq, { limit: 1 }))\n} finally {\n  await log.shutdown('manual')\n  await store.dispose()\n}"
+            "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst events = memoryLogStore()\nconst intents = memoryLogStore()\nconst images = memoryLogStore()\nconst host = createLogHost({\n  plugins: [\n    binlogPlugin({ store: events }),\n    walPlugin({ store: intents }),\n    undoLogPlugin({ store: images })\n  ]\n})\ntry {\n  await Promise.all([host.binlog.ready(), host.wal.ready(), host.undo.ready()])\n  await host.binlog.append('created', { id: 'order-1' })\n  const intent = await host.wal.begin('save-order', { id: 'order-1' })\n  await host.undo.record('tx-1', [{ target: 'order-1', before: null, after: { total: 12 } }])\n  await host.wal.complete(intent)\n  await host.undo.forget('tx-1')\n} finally {\n  await host.shutdown('manual')\n  await Promise.all([events.dispose(), intents.dispose(), images.dispose()])\n}"
           ],
           "members": [],
           "composes": [],
@@ -458,7 +599,7 @@
           ],
           "identity": "packages/log-plugin-durable/dist/binlog.d.ts:binlogPlugin:export declare function binlogPlugin(options: IBinlogOptions): IDurablePlugin<IBinlogExt>;",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 16,
           "configuration": [
             {
               "name": "echo",
@@ -480,9 +621,9 @@
               "name": "observe",
               "type": "ILogObserver",
               "optional": true,
-              "description": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。",
+              "description": "Every ordinary operation and native-port completion is accounted by one canonical limiter. */ readonly #limiter = createConcurrencyLimiter({ concurrency: 1 }) /** This identity releases only its own WeakMap borrow. */ readonly #identity = {} /** The owner discriminator is metadata, never transaction authority. */ readonly #owner: 'binlog' | 'wal' | 'undo' /** Initialization only rebuilds this plugin's original data index. */ readonly #initialize: IInitializer | undefined /** Revocation stops new calls without cancelling already accepted FIFO work. */ #accepting = true /** Immediate transaction ports require the actual store initialization to have completed. */ #prepared = false /** Failed initialization is retained for every later handle call. */ #initializationError: Error | undefined /** This exact Promise remains stable for the installation lifetime. */ readonly #ready: Promise<void> /** One immutable optional observer receives metadata only.",
               "descriptionEn": "Every ordinary operation and native-port completion is accounted by one canonical limiter. */ readonly #limiter = createConcurrencyLimiter({ concurrency: 1 }) /** This identity releases only its own WeakMap borrow. */ readonly #identity = {} /** The owner discriminator is metadata, never transaction authority. */ readonly #owner: 'binlog' | 'wal' | 'undo' /** Initialization only rebuilds this plugin's original data index. */ readonly #initialize: IInitializer | undefined /** Revocation stops new calls without cancelling already accepted FIFO work. */ #accepting = true /** Immediate transaction ports require the actual store initialization to have completed. */ #prepared = false /** Failed initialization is retained for every later handle call. */ #initializationError: Error | undefined /** This exact Promise remains stable for the installation lifetime. */ readonly #ready: Promise<void> /** One immutable optional observer receives metadata only.",
-              "descriptionZh": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。"
+              "descriptionZh": ""
             }
           ],
           "fragment": "log-plugin-durable-index--binlogPlugin"
@@ -562,7 +703,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-durable/dist/committed-index.d.ts:createLogStoreIndex:export declare function createLogStoreIndex(snapshot?: ILogStoreSnapshot): ILogStoreIndex;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "log-plugin-durable-index--createLogStoreIndex"
         },
@@ -2998,7 +3139,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-durable/dist/state-constants.d.ts:LogRecordState:export declare const LogRecordState: { readonly pending: 'pending'; readonly done: 'done'; readonly aborted: 'aborted'; };\nexport type LogRecordState = keyof typeof LogRecordState;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "log-plugin-durable-index--LogRecordState"
         },
@@ -3164,7 +3305,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-durable/dist/state-constants.d.ts:LogStage:export declare const LogStage: { readonly beforeLogOpen: 'beforeLogOpen'; readonly afterLogOpen: 'afterLogOpen'; readonly onLogOpenError: 'onLogOpenError'; readonly beforeLogOperation: 'beforeLogOperation'; readonly afterLogOperation: 'afterLogOperation'; readonly onLogOperationError: 'onLogOperationError'; readonly beforeLogClose: 'beforeLogClose'; readonly afterLogClose: 'afterLogClose'; readonly onLogCloseError: 'onLogCloseError'; readonly onAppend: 'onAppend'; readonly onWalPending: 'onWalPending'; };\nexport type LogStage = keyof typeof LogStage;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "log-plugin-durable-index--LogStage"
         },
@@ -3191,7 +3332,7 @@
           "examples": [
             "import { memoryLogStore, LogRecordState } from '@migaia/log-plugin-durable'\n\nawait using store = memoryLogStore({ report: (error) => console.error(error) })\nconst [seq] = await store.append([{ kind: 'created', payload: { id: 'order-1' } }])\nawait store.setState(seq, LogRecordState.done)\nconsole.log(await store.read(1, 100))",
             "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst events = memoryLogStore()\nconst intents = memoryLogStore()\nconst images = memoryLogStore()\nconst host = createLogHost({\n  plugins: [\n    binlogPlugin({ store: events }),\n    walPlugin({ store: intents }),\n    undoLogPlugin({ store: images })\n  ]\n})\ntry {\n  await Promise.all([host.binlog.ready(), host.wal.ready(), host.undo.ready()])\n  await host.binlog.append('created', { id: 'order-1' })\n  const intent = await host.wal.begin('save-order', { id: 'order-1' })\n  await host.undo.record('tx-1', [{ target: 'order-1', before: null, after: { total: 12 } }])\n  await host.wal.complete(intent)\n  await host.undo.forget('tx-1')\n} finally {\n  await host.shutdown('manual')\n  await Promise.all([events.dispose(), intents.dispose(), images.dispose()])\n}",
-            "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst store = memoryLogStore()\nconst log = createLogHost({ plugins: [binlogPlugin({ store })] })\ntry {\n  await log.binlog.ready()\n  const seq = await log.binlog.append('order.created', { id: 'order-1' })\n  console.log(await log.binlog.read(seq, { limit: 1 }))\n} finally {\n  await log.shutdown('manual')\n  await store.dispose()\n}"
+            "import { createLogHost } from '@migaia/log-host'\nimport { walPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\n// 日志存储由应用创建并负责释放；真实部署用 /file 入口的 fileLogStore(path)\nconst intents = memoryLogStore()\n\n// 第一次运行\nconst first = createLogHost({ plugins: [walPlugin({ store: intents })] })\nawait first.wal.ready()\nconst paid = await first.wal.begin('charge-card', { orderId: 'o1' })\nawait first.wal.complete(paid) // 这一笔做完了\nawait first.wal.begin('charge-card', { orderId: 'o2' }) // 这一笔开始后“崩溃”，没有 complete\nawait first.shutdown('manual')\n\n// 重启后\nconst restarted = createLogHost({ plugins: [walPlugin({ store: intents })] })\nawait restarted.wal.ready()\nfor (const intent of await restarted.wal.pending())\n  console.log(`未完成：${intent.kind} ${JSON.stringify(intent.payload)}`)\nawait restarted.shutdown('manual')\nawait intents.dispose()"
           ],
           "members": [],
           "composes": [],
@@ -3266,17 +3407,17 @@
               "name": "observe",
               "type": "ILogObserver",
               "optional": true,
-              "description": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。",
+              "description": "Every ordinary operation and native-port completion is accounted by one canonical limiter. */ readonly #limiter = createConcurrencyLimiter({ concurrency: 1 }) /** This identity releases only its own WeakMap borrow. */ readonly #identity = {} /** The owner discriminator is metadata, never transaction authority. */ readonly #owner: 'binlog' | 'wal' | 'undo' /** Initialization only rebuilds this plugin's original data index. */ readonly #initialize: IInitializer | undefined /** Revocation stops new calls without cancelling already accepted FIFO work. */ #accepting = true /** Immediate transaction ports require the actual store initialization to have completed. */ #prepared = false /** Failed initialization is retained for every later handle call. */ #initializationError: Error | undefined /** This exact Promise remains stable for the installation lifetime. */ readonly #ready: Promise<void> /** One immutable optional observer receives metadata only.",
               "descriptionEn": "Every ordinary operation and native-port completion is accounted by one canonical limiter. */ readonly #limiter = createConcurrencyLimiter({ concurrency: 1 }) /** This identity releases only its own WeakMap borrow. */ readonly #identity = {} /** The owner discriminator is metadata, never transaction authority. */ readonly #owner: 'binlog' | 'wal' | 'undo' /** Initialization only rebuilds this plugin's original data index. */ readonly #initialize: IInitializer | undefined /** Revocation stops new calls without cancelling already accepted FIFO work. */ #accepting = true /** Immediate transaction ports require the actual store initialization to have completed. */ #prepared = false /** Failed initialization is retained for every later handle call. */ #initializationError: Error | undefined /** This exact Promise remains stable for the installation lifetime. */ readonly #ready: Promise<void> /** One immutable optional observer receives metadata only.",
-              "descriptionZh": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。"
+              "descriptionZh": ""
             },
             {
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。",
+              "description": "",
               "descriptionEn": "",
-              "descriptionZh": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。"
+              "descriptionZh": ""
             }
           ],
           "fragment": "log-plugin-durable-index--memoryLogStore"
@@ -3380,7 +3521,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-durable/dist/committed-index.d.ts:prepareLogAppend:export declare function prepareLogAppend(records: readonly ILogRecordSnapshot[], head: Pick<ILogStoreSnapshot, 'lastSeq' | 'time'>, now?: number): readonly ILogRecord[];",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "log-plugin-durable-index--prepareLogAppend"
         },
@@ -3461,7 +3602,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-durable/dist/snapshot.d.ts:snapshotLogRecords:export declare function snapshotLogRecords(records: readonly ILogRecordInput[]): readonly { readonly kind: string; readonly payload: ILogPayload; }[];",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "log-plugin-durable-index--snapshotLogRecords"
         },
@@ -3564,7 +3705,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-durable/dist/committed-index.d.ts:snapshotLogStoreState:export declare function snapshotLogStoreState(head: Pick<ILogStoreSnapshot, 'lastSeq' | 'time' | 'floor'>, rows: Iterable<ILogStoreRecoveryRow>, decodePayload?: (value: unknown) => unknown): ILogStoreSnapshot;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "log-plugin-durable-index--snapshotLogStoreState"
         },
@@ -3672,9 +3813,9 @@
               "name": "observe",
               "type": "ILogObserver",
               "optional": true,
-              "description": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。",
+              "description": "Every ordinary operation and native-port completion is accounted by one canonical limiter. */ readonly #limiter = createConcurrencyLimiter({ concurrency: 1 }) /** This identity releases only its own WeakMap borrow. */ readonly #identity = {} /** The owner discriminator is metadata, never transaction authority. */ readonly #owner: 'binlog' | 'wal' | 'undo' /** Initialization only rebuilds this plugin's original data index. */ readonly #initialize: IInitializer | undefined /** Revocation stops new calls without cancelling already accepted FIFO work. */ #accepting = true /** Immediate transaction ports require the actual store initialization to have completed. */ #prepared = false /** Failed initialization is retained for every later handle call. */ #initializationError: Error | undefined /** This exact Promise remains stable for the installation lifetime. */ readonly #ready: Promise<void> /** One immutable optional observer receives metadata only.",
               "descriptionEn": "Every ordinary operation and native-port completion is accounted by one canonical limiter. */ readonly #limiter = createConcurrencyLimiter({ concurrency: 1 }) /** This identity releases only its own WeakMap borrow. */ readonly #identity = {} /** The owner discriminator is metadata, never transaction authority. */ readonly #owner: 'binlog' | 'wal' | 'undo' /** Initialization only rebuilds this plugin's original data index. */ readonly #initialize: IInitializer | undefined /** Revocation stops new calls without cancelling already accepted FIFO work. */ #accepting = true /** Immediate transaction ports require the actual store initialization to have completed. */ #prepared = false /** Failed initialization is retained for every later handle call. */ #initializationError: Error | undefined /** This exact Promise remains stable for the installation lifetime. */ readonly #ready: Promise<void> /** One immutable optional observer receives metadata only.",
-              "descriptionZh": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。"
+              "descriptionZh": ""
             }
           ],
           "fragment": "log-plugin-durable-index--undoLogPlugin"
@@ -3700,7 +3841,8 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst events = memoryLogStore()\nconst intents = memoryLogStore()\nconst images = memoryLogStore()\nconst host = createLogHost({\n  plugins: [\n    binlogPlugin({ store: events }),\n    walPlugin({ store: intents }),\n    undoLogPlugin({ store: images })\n  ]\n})\ntry {\n  await Promise.all([host.binlog.ready(), host.wal.ready(), host.undo.ready()])\n  await host.binlog.append('created', { id: 'order-1' })\n  const intent = await host.wal.begin('save-order', { id: 'order-1' })\n  await host.undo.record('tx-1', [{ target: 'order-1', before: null, after: { total: 12 } }])\n  await host.wal.complete(intent)\n  await host.undo.forget('tx-1')\n} finally {\n  await host.shutdown('manual')\n  await Promise.all([events.dispose(), intents.dispose(), images.dispose()])\n}"
+            "import { createLogHost } from '@migaia/log-host'\nimport { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\nconst events = memoryLogStore()\nconst intents = memoryLogStore()\nconst images = memoryLogStore()\nconst host = createLogHost({\n  plugins: [\n    binlogPlugin({ store: events }),\n    walPlugin({ store: intents }),\n    undoLogPlugin({ store: images })\n  ]\n})\ntry {\n  await Promise.all([host.binlog.ready(), host.wal.ready(), host.undo.ready()])\n  await host.binlog.append('created', { id: 'order-1' })\n  const intent = await host.wal.begin('save-order', { id: 'order-1' })\n  await host.undo.record('tx-1', [{ target: 'order-1', before: null, after: { total: 12 } }])\n  await host.wal.complete(intent)\n  await host.undo.forget('tx-1')\n} finally {\n  await host.shutdown('manual')\n  await Promise.all([events.dispose(), intents.dispose(), images.dispose()])\n}",
+            "import { createLogHost } from '@migaia/log-host'\nimport { walPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\n// 日志存储由应用创建并负责释放；真实部署用 /file 入口的 fileLogStore(path)\nconst intents = memoryLogStore()\n\n// 第一次运行\nconst first = createLogHost({ plugins: [walPlugin({ store: intents })] })\nawait first.wal.ready()\nconst paid = await first.wal.begin('charge-card', { orderId: 'o1' })\nawait first.wal.complete(paid) // 这一笔做完了\nawait first.wal.begin('charge-card', { orderId: 'o2' }) // 这一笔开始后“崩溃”，没有 complete\nawait first.shutdown('manual')\n\n// 重启后\nconst restarted = createLogHost({ plugins: [walPlugin({ store: intents })] })\nawait restarted.wal.ready()\nfor (const intent of await restarted.wal.pending())\n  console.log(`未完成：${intent.kind} ${JSON.stringify(intent.payload)}`)\nawait restarted.shutdown('manual')\nawait intents.dispose()"
           ],
           "members": [],
           "composes": [],
@@ -3769,7 +3911,7 @@
           ],
           "identity": "packages/log-plugin-durable/dist/wal.d.ts:walPlugin:export declare function walPlugin(options: IDurablePluginOptions): IDurablePlugin<IWalExt>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 28,
           "configuration": [
             {
               "name": "store",
@@ -3783,9 +3925,9 @@
               "name": "observe",
               "type": "ILogObserver",
               "optional": true,
-              "description": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。",
+              "description": "Every ordinary operation and native-port completion is accounted by one canonical limiter. */ readonly #limiter = createConcurrencyLimiter({ concurrency: 1 }) /** This identity releases only its own WeakMap borrow. */ readonly #identity = {} /** The owner discriminator is metadata, never transaction authority. */ readonly #owner: 'binlog' | 'wal' | 'undo' /** Initialization only rebuilds this plugin's original data index. */ readonly #initialize: IInitializer | undefined /** Revocation stops new calls without cancelling already accepted FIFO work. */ #accepting = true /** Immediate transaction ports require the actual store initialization to have completed. */ #prepared = false /** Failed initialization is retained for every later handle call. */ #initializationError: Error | undefined /** This exact Promise remains stable for the installation lifetime. */ readonly #ready: Promise<void> /** One immutable optional observer receives metadata only.",
               "descriptionEn": "Every ordinary operation and native-port completion is accounted by one canonical limiter. */ readonly #limiter = createConcurrencyLimiter({ concurrency: 1 }) /** This identity releases only its own WeakMap borrow. */ readonly #identity = {} /** The owner discriminator is metadata, never transaction authority. */ readonly #owner: 'binlog' | 'wal' | 'undo' /** Initialization only rebuilds this plugin's original data index. */ readonly #initialize: IInitializer | undefined /** Revocation stops new calls without cancelling already accepted FIFO work. */ #accepting = true /** Immediate transaction ports require the actual store initialization to have completed. */ #prepared = false /** Failed initialization is retained for every later handle call. */ #initializationError: Error | undefined /** This exact Promise remains stable for the installation lifetime. */ readonly #ready: Promise<void> /** One immutable optional observer receives metadata only.",
-              "descriptionZh": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。"
+              "descriptionZh": ""
             }
           ],
           "fragment": "log-plugin-durable-index--walPlugin"
@@ -3835,7 +3977,8 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { fileLogStore } from '@migaia/log-plugin-durable/file'\n\nawait using store = await fileLogStore('./records.sqlite')\nawait store.append([{ kind: 'persisted', payload: null }])"
+            "import { fileLogStore } from '@migaia/log-plugin-durable/file'\n\nawait using store = await fileLogStore('./records.sqlite')\nawait store.append([{ kind: 'persisted', payload: null }])",
+            "import { createLogHost } from '@migaia/log-host'\nimport { walPlugin, memoryLogStore } from '@migaia/log-plugin-durable'\n\n// 日志存储由应用创建并负责释放；真实部署用 /file 入口的 fileLogStore(path)\nconst intents = memoryLogStore()\n\n// 第一次运行\nconst first = createLogHost({ plugins: [walPlugin({ store: intents })] })\nawait first.wal.ready()\nconst paid = await first.wal.begin('charge-card', { orderId: 'o1' })\nawait first.wal.complete(paid) // 这一笔做完了\nawait first.wal.begin('charge-card', { orderId: 'o2' }) // 这一笔开始后“崩溃”，没有 complete\nawait first.shutdown('manual')\n\n// 重启后\nconst restarted = createLogHost({ plugins: [walPlugin({ store: intents })] })\nawait restarted.wal.ready()\nfor (const intent of await restarted.wal.pending())\n  console.log(`未完成：${intent.kind} ${JSON.stringify(intent.payload)}`)\nawait restarted.shutdown('manual')\nawait intents.dispose()"
           ],
           "members": [],
           "composes": [],
@@ -3908,23 +4051,23 @@
           ],
           "identity": "packages/log-plugin-durable/dist/file.browser.d.ts:fileLogStore:export declare function fileLogStore(_path: string, _options?: ILogStoreOptions): Promise<ILogStore>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 26,
           "configuration": [
             {
               "name": "observe",
               "type": "ILogObserver",
               "optional": true,
-              "description": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。",
+              "description": "Every ordinary operation and native-port completion is accounted by one canonical limiter. */ readonly #limiter = createConcurrencyLimiter({ concurrency: 1 }) /** This identity releases only its own WeakMap borrow. */ readonly #identity = {} /** The owner discriminator is metadata, never transaction authority. */ readonly #owner: 'binlog' | 'wal' | 'undo' /** Initialization only rebuilds this plugin's original data index. */ readonly #initialize: IInitializer | undefined /** Revocation stops new calls without cancelling already accepted FIFO work. */ #accepting = true /** Immediate transaction ports require the actual store initialization to have completed. */ #prepared = false /** Failed initialization is retained for every later handle call. */ #initializationError: Error | undefined /** This exact Promise remains stable for the installation lifetime. */ readonly #ready: Promise<void> /** One immutable optional observer receives metadata only.",
               "descriptionEn": "Every ordinary operation and native-port completion is accounted by one canonical limiter. */ readonly #limiter = createConcurrencyLimiter({ concurrency: 1 }) /** This identity releases only its own WeakMap borrow. */ readonly #identity = {} /** The owner discriminator is metadata, never transaction authority. */ readonly #owner: 'binlog' | 'wal' | 'undo' /** Initialization only rebuilds this plugin's original data index. */ readonly #initialize: IInitializer | undefined /** Revocation stops new calls without cancelling already accepted FIFO work. */ #accepting = true /** Immediate transaction ports require the actual store initialization to have completed. */ #prepared = false /** Failed initialization is retained for every later handle call. */ #initializationError: Error | undefined /** This exact Promise remains stable for the installation lifetime. */ readonly #ready: Promise<void> /** One immutable optional observer receives metadata only.",
-              "descriptionZh": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。"
+              "descriptionZh": ""
             },
             {
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。",
+              "description": "",
               "descriptionEn": "",
-              "descriptionZh": "独立 store 的 `observe`/`report` 仅用于诊断。默认 report 引用宿主唯一的 `defaultLogFailureReporter`；自定义 reporter 失败转交默认，默认自身失败终止诊断，不改变原始存储结果。"
+              "descriptionZh": ""
             }
           ],
           "fragment": "log-plugin-durable-file--fileLogStore"

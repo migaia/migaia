@@ -15,40 +15,101 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "按需安装的控制台输出，与相同版本的 `@migaia/log-host` 配合使用。运行时第三方依赖只有 `ansis`；控制台对象和 stdout 均可注入。"
+                "text": "English"
               },
+              {
+                "type": "paragraph",
+                "text": "`@migaia/log-host` 的控制台输出。在终端或 CI 里输出带颜色、保留原生对象和错误堆栈的可读格式；输出被重定向、交给日志采集时默认一行一条 JSON，不用为两种环境各写一套配置。"
+              }
+            ]
+          },
+          {
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "线上日志没法检索：开发时好读的彩色文本进了日志系统，变成一堆转义字符和拆散的多行堆栈。根因是输出格式没有随运行环境切换。",
+                  "对象被打成 `[object Object]`：日志库先把参数拼成字符串再交给控制台，丢掉了控制台本来能展开的对象和错误堆栈。根因是格式化发生在控制台之前。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
+            "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })\n  ]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    // 示例里固定不着色、不打时间，便于对照输出；默认按终端和环境自动决定\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'never', timestamp: false }) } })\n  ]\n})\nlog.info('user %s signed in', 'alice')\nlog.warn('disk usage at %d%%', 91)\nawait log.shutdown('manual')"
               },
               {
                 "type": "paragraph",
-                "text": "`info` 等日志方法同步返回，条目随后异步交付。`warn` 使用 `console.warn`，`error`/`fatal` 使用 `console.error`，其它 tag 使用 `console.log`。`data.silent` 条目不重复输出。"
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "[INFO] user alice signed in\n[WARN] disk usage at 91%"
               },
               {
                 "type": "paragraph",
-                "text": "`prettyFeature` 保留原始 message 占位符、参数顺序、对象和原生 Error 身份。JSON/plain 使用 host 提供的 `record.text`。默认格式遵循 `LOG_FORMAT=json|pretty`、CI、TTY 的优先级；没有任何提示时使用 JSON。显式 host/output 格式优先于此默认值。"
+                "text": "`%s`、`%d` 这些占位符由控制台自己处理，参数原样交给 `console.log` / `console.warn` / `console.error`，所以对象可以展开、错误带完整堆栈。`warn` 走 `console.warn`，`error` 和 `fatal` 走 `console.error`，其他级别走 `console.log`。"
               },
               {
                 "type": "paragraph",
-                "text": "安装后 host 另有 `raw(text)` 扩展：优先写入借用的 stdout，缺少 stdout 时使用借用的 `console.log`。写入失败进入 host 失败通道。卸载不会关闭应用提供的 console/stdout。"
+                "text": "不写 `features` 时格式自动选择：先看环境变量 `LOG_FORMAT=json|pretty`；没有设置时，在 CI 中或输出是终端则用可读格式，否则输出 JSON。要固定输出 JSON，在 `features` 里写 `format: formatFeature({ format: 'json' })`（`@migaia/log-host/features`）。"
+              }
+            ]
+          },
+          {
+            "id": "常用选项",
+            "heading": "常用选项",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["选项或 API", "说明"],
+                "rows": [
+                  [
+                    "`consolePlugin({ console?, stdout?, features? })`",
+                    "`console` 默认全局 console，`stdout` 默认识别到的 `process.stdout`；都只借用，卸载时不关闭"
+                  ],
+                  [
+                    "`prettyFeature({ color?, timestamp? })`",
+                    "可读格式。`color` 取 `auto`（默认）、`always`、`never`；`timestamp` 默认 `true`"
+                  ],
+                  ["`ConsoleColorMode`", "`color` 的取值常量"],
+                  [
+                    "`log.raw(text)`",
+                    "安装后 host 多出的方法：把原始文本直接写到 stdout（例如进度条的 `\\r`），没有 stdout 时用 `console.log`"
+                  ]
+                ]
               },
               {
                 "type": "paragraph",
-                "text": "公开值为 `consolePlugin`、`prettyFeature`、`ConsoleColorMode` 和空码表 `LogConsoleErrorCode`。本包不声明错误 source；能力抛出的原始错误由 host 收口。"
+                "text": "`color: 'auto'` 依次看 `NO_COLOR`、非零的 `FORCE_COLOR`、是否终端、是否 CI。"
+              }
+            ]
+          },
+          {
+            "id": "契约细节",
+            "heading": "契约细节",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "日志方法同步返回，交付异步进行；读取测试用的控制台或准备退出前，等待 `flush()` 或 `shutdown()`。",
+                  "作为参数传入的 Error 只交给控制台一次；`data.silent` 为真的条目（例如 reasoning 插件的完整阶段记录）不在控制台重复输出。",
+                  "`meta` 按 host 入口的浅复制规则交付：同一个对象同时作为参数和 `meta` 传入时，参数里的原对象和 `meta` 副本都会交给控制台。",
+                  "写入失败（包括 `raw`）进入 host 的失败通道，处理器收到原始错误。读取选项失败时同步抛出 `logging.console / INVALID_OPTION`，原因在 `cause`。",
+                  "`features` 的写法、host 级默认策略和覆盖规则与所有输出插件相同，见 log-host 的组合策略。"
+                ]
               },
               {
                 "type": "paragraph",
-                "text": "完整选项与覆盖示例见 使用指南。"
-              },
-              {
-                "type": "paragraph",
-                "text": "meta 保留 host 入口的浅复制语义；同一对象同时作为 args 与 meta 传入时，原 args 对象与额外 meta 副本都会交给控制台。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `console_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `console_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。"
+                "text": "公开导出：`consolePlugin`、`prettyFeature`、`ConsoleColorMode`、`LogConsoleErrorCode`。运行时第三方依赖只有 `ansis`。完整示例见 使用指南。"
               }
             ]
           }
@@ -75,7 +136,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "输出端的 format 只替换 host-wide record 中同 key 的 feature；不同 key 的两个有效 format 在实际安装时以 `INVALID_OPTION` 拒绝。没有有效显式 format 时使用输出默认值。默认值先读取 `LOG_FORMAT=json|pretty`，再按 CI、TTY 选择 pretty，否则为 JSON。plain 需要显式 `formatFeature({ format: 'plain' })`。"
+                "text": "输出自己配置的 format 替换 host 级的 format，名称不同也一样；一个插件的 `features` 里最多一个 format。没有显式 format 时使用输出默认值：先读取 `LOG_FORMAT=json|pretty`；没有设置时，在 CI 中或 stdout 是终端则用 pretty，否则为 JSON。plain 需要显式 `formatFeature({ format: 'plain' })`。"
               },
               {
                 "type": "paragraph",
@@ -87,7 +148,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "日志方法同步返回，交付异步执行；读取测试控制台或准备退出前应等待 flush/shutdown。raw 同步使用 stdout.write，缺少 stdout 时用 console.log；原始能力错误进入 host 的 onFailure，处理器收到原错误。本包的 `LogConsoleErrorCode` 是空表，不另声明错误域。"
+                "text": "日志方法同步返回，交付异步执行；读取测试控制台或准备退出前应等待 flush/shutdown。raw 同步使用 stdout.write，缺少 stdout 时用 console.log；原始能力错误进入 host 的 onFailure，处理器收到原错误。读取选项失败时同步抛出 `logging.console / INVALID_OPTION`，原因在 `cause`。"
               },
               {
                 "type": "paragraph",
@@ -95,7 +156,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `console_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `console_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。"
+                "text": "`features` 写成 `{ 名称: feature }` 记录；Feature 的控制方法以 `console_<名称>_<方法>` 挂在 host 上，例如名称为 `threshold` 时是 `console_threshold_setLevel`。host 级默认策略和覆盖规则见 log-host 的组合策略。"
               }
             ]
           }
@@ -110,40 +171,101 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "An optional console output for the matching version of `@migaia/log-host`. Its only third-party runtime dependency is `ansis`. Console and stdout capabilities can be supplied independently."
+                  "text": "中文"
                 },
+                {
+                  "type": "paragraph",
+                  "text": "Console output for `@migaia/log-host`. On a terminal or in CI it prints a readable, colored format that keeps native objects and error stacks; when output is redirected or collected by a log pipeline it prints one JSON object per line by default, so you do not need separate setups for the two environments."
+                }
+              ]
+            },
+            {
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Production logs cannot be searched: colored text that reads well in development reaches the log system as escape codes and stack traces split across lines. The cause is that the output format does not follow the environment.",
+                    "Objects print as `[object Object]`: the logger joins arguments into a string before the console sees them, losing the object expansion and error stacks the console could show. The cause is formatting before the console."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
+              "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })\n  ]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    // The example fixes no color and no timestamp so the output is easy to compare;\n    // by default both follow the terminal and the environment\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'never', timestamp: false }) } })\n  ]\n})\nlog.info('user %s signed in', 'alice')\nlog.warn('disk usage at %d%%', 91)\nawait log.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Logging methods return synchronously and deliver entries asynchronously. `warn` uses `console.warn`, `error`/`fatal` use `console.error`, and other tags use `console.log`. Entries marked `data.silent` are skipped."
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "[INFO] user alice signed in\n[WARN] disk usage at 91%"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`prettyFeature` preserves message placeholders, argument order, object identity and native Error arguments. JSON/plain delivery uses the host's `record.text`. Automatic format selection checks `LOG_FORMAT=json|pretty`, then CI and TTY, and otherwise selects JSON. Explicit host/output formatting overrides this fallback."
+                  "text": "Placeholders such as `%s` and `%d` are handled by the console itself. Arguments reach `console.log` / `console.warn` / `console.error` unchanged, so objects expand and errors keep their full stack. `warn` goes to `console.warn`, `error` and `fatal` go to `console.error`, and other levels go to `console.log`."
                 },
                 {
                   "type": "paragraph",
-                  "text": "The installed plugin adds `raw(text)` to the host. It writes unchanged text to borrowed stdout or falls back to the borrowed console's `log`. Writer failures enter the host failure channel. Removal never closes supplied console/stdout capabilities."
+                  "text": "Without `features`, the format is chosen automatically: first the `LOG_FORMAT=json|pretty` environment variable; when it is not set, the readable format is used in CI or when output is a terminal, and JSON otherwise. To always print JSON, put `format: formatFeature({ format: 'json' })` (from `@migaia/log-host/features`) in `features`."
+                }
+              ]
+            },
+            {
+              "id": "common-options",
+              "heading": "Common options",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Option or API", "Description"],
+                  "rows": [
+                    [
+                      "`consolePlugin({ console?, stdout?, features? })`",
+                      "`console` defaults to the global console and `stdout` to the detected `process.stdout`; both are borrowed and not closed on removal"
+                    ],
+                    [
+                      "`prettyFeature({ color?, timestamp? })`",
+                      "Readable format. `color` is `auto` (default), `always` or `never`; `timestamp` defaults to `true`"
+                    ],
+                    ["`ConsoleColorMode`", "Constants for `color`"],
+                    [
+                      "`log.raw(text)`",
+                      "Added to the host on install: writes raw text straight to stdout (for example a progress bar's `\\r`), or to `console.log` without stdout"
+                    ]
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "Runtime exports are `consolePlugin`, `prettyFeature`, `ConsoleColorMode` and the empty `LogConsoleErrorCode` table. The module declares no error source; the host contains original capability failures."
+                  "text": "`color: 'auto'` checks, in order, `NO_COLOR`, a non-zero `FORCE_COLOR`, whether the output is a terminal, and whether it runs in CI."
+                }
+              ]
+            },
+            {
+              "id": "contract-details",
+              "heading": "Contract details",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Log methods return synchronously and delivery is asynchronous; await `flush()` or `shutdown()` before reading a test console or exiting.",
+                    "An Error passed as an argument reaches the console once. Entries with a truthy `data.silent` (for example the reasoning plugin's completed-phase records) are not printed again.",
+                    "`meta` follows the host's shallow-copy rule: when one object is passed both as an argument and as `meta`, the console receives the original argument and the `meta` copy.",
+                    "Write failures (including `raw`) go to the host's failure channel, and handlers receive the original error. An option that cannot be read throws `logging.console / INVALID_OPTION` synchronously, with the reason in `cause`.",
+                    "How to write `features`, host-wide defaults and override rules are the same for every output plugin; see Composing policies in log-host."
+                  ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "See the usage guide for options and scope examples."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Meta retains the host entry’s shallow-copy boundary. Passing the same object in args and as meta delivers both the original argument and an additional meta copy to the console."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `console_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `console_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/sdk`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported."
+                  "text": "Public exports: `consolePlugin`, `prettyFeature`, `ConsoleColorMode` and `LogConsoleErrorCode`. The only third-party runtime dependency is `ansis`. See the usage guide for full examples."
                 }
               ]
             }
@@ -170,7 +292,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "An output format replaces only the same host-wide record key. Two effective formats under different keys reject at actual installation with `INVALID_OPTION`. The output default applies when no explicit format survives. The default reads LOG_FORMAT=json|pretty, then selects pretty for CI or TTY, otherwise JSON. Select plain explicitly with `formatFeature({ format: 'plain' })`."
+                  "text": "A format configured on the output replaces the host-wide format, even under a different name; one plugin's `features` hold at most one format. Without an explicit format the output default applies: it reads LOG_FORMAT=json|pretty first; when that is not set it selects pretty in CI or when stdout is a terminal, and JSON otherwise. Select plain explicitly with `formatFeature({ format: 'plain' })`."
                 },
                 {
                   "type": "paragraph",
@@ -182,7 +304,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Log methods return synchronously and deliver asynchronously. Await flush/shutdown before inspecting a captured console or exiting. Raw writes synchronously to stdout.write, falling back to console.log. Capability failures reach host onFailure with the original error. `LogConsoleErrorCode` is empty and this module declares no error domain."
+                  "text": "Log methods return synchronously and deliver asynchronously. Await flush/shutdown before inspecting a captured console or exiting. Raw writes synchronously to stdout.write, falling back to console.log. Capability failures reach host onFailure with the original error. An option that cannot be read throws `logging.console / INVALID_OPTION` synchronously, with the reason in `cause`."
                 },
                 {
                   "type": "paragraph",
@@ -190,7 +312,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `console_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `console_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/sdk`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported."
+                  "text": "`features` is a `{ name: feature }` record; a Feature's controls appear on the host as `console_<name>_<method>`, for example `console_threshold_setLevel` for the name `threshold`. For host-wide defaults and override rules see Composing policies in log-host."
                 }
               ]
             }
@@ -305,8 +427,38 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-console/dist/state-constants.d.ts:ConsoleColorMode:export declare const ConsoleColorMode: { /** Follow environment and TTY capabilities when no explicit policy wins. */ readonly auto: 'auto'; /** Emit ANSI even when the borrowed output is not a terminal. */ readonly always: 'always'; /** Suppress ANSI regardless of host environment. */ readonly never: 'never'; };\nexport type ConsoleColorMode = keyof typeof ConsoleColorMode;",
-          "guidance": [],
-          "usageScore": 6,
+          "guidance": [
+            {
+              "id": "常用选项",
+              "heading": "常用选项",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["选项或 API", "说明"],
+                  "rows": [
+                    [
+                      "`consolePlugin({ console?, stdout?, features? })`",
+                      "`console` 默认全局 console，`stdout` 默认识别到的 `process.stdout`；都只借用，卸载时不关闭"
+                    ],
+                    [
+                      "`prettyFeature({ color?, timestamp? })`",
+                      "可读格式。`color` 取 `auto`（默认）、`always`、`never`；`timestamp` 默认 `true`"
+                    ],
+                    ["`ConsoleColorMode`", "`color` 的取值常量"],
+                    [
+                      "`log.raw(text)`",
+                      "安装后 host 多出的方法：把原始文本直接写到 stdout（例如进度条的 `\\r`），没有 stdout 时用 `console.log`"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`color: 'auto'` 依次看 `NO_COLOR`、非零的 `FORCE_COLOR`、是否终端、是否 CI。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 8,
           "configuration": [],
           "fragment": "log-plugin-console-index--ConsoleColorMode"
         },
@@ -332,7 +484,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({\n      console: globalThis.console,\n      features: { pretty: prettyFeature({ color: 'never', timestamp: false }) }\n    })\n  ]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: { format: formatFeature({ format: 'json' }) } })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })\n  ]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    // 示例里固定不着色、不打时间，便于对照输出；默认按终端和环境自动决定\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'never', timestamp: false }) } })\n  ]\n})\nlog.info('user %s signed in', 'alice')\nlog.warn('disk usage at %d%%', 91)\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -408,8 +560,38 @@
             }
           ],
           "identity": "packages/log-plugin-console/dist/console.d.ts:consolePlugin:export declare function consolePlugin<const F extends ILogOutputFeatureRecord = Record<never, never>>(requested?: IConsoleOptions<F>): ReturnType<typeof defineOutputPlugin<typeof CONSOLE_PLUGIN_NAME, F, IConsoleExtension>>;",
-          "guidance": [],
-          "usageScore": 34,
+          "guidance": [
+            {
+              "id": "常用选项",
+              "heading": "常用选项",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["选项或 API", "说明"],
+                  "rows": [
+                    [
+                      "`consolePlugin({ console?, stdout?, features? })`",
+                      "`console` 默认全局 console，`stdout` 默认识别到的 `process.stdout`；都只借用，卸载时不关闭"
+                    ],
+                    [
+                      "`prettyFeature({ color?, timestamp? })`",
+                      "可读格式。`color` 取 `auto`（默认）、`always`、`never`；`timestamp` 默认 `true`"
+                    ],
+                    ["`ConsoleColorMode`", "`color` 的取值常量"],
+                    [
+                      "`log.raw(text)`",
+                      "安装后 host 多出的方法：把原始文本直接写到 stdout（例如进度条的 `\\r`），没有 stdout 时用 `console.log`"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`color: 'auto'` 依次看 `NO_COLOR`、非零的 `FORCE_COLOR`、是否终端、是否 CI。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 36,
           "configuration": [
             {
               "name": "console",
@@ -509,7 +691,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-plugin-console/dist/error-code.d.ts:LogConsoleErrorCode:export declare const LogConsoleErrorCode: { /** * Reading a `consolePlugin` or `prettyFeature` option threw (a throwing getter or Proxy trap). * The original error is on `cause`; pass plain option values instead. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 2,
           "configuration": [],
           "fragment": "log-plugin-console-index--LogConsoleErrorCode"
         },
@@ -535,7 +717,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({\n      console: globalThis.console,\n      features: { pretty: prettyFeature({ color: 'never', timestamp: false }) }\n    })\n  ]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: { format: formatFeature({ format: 'json' }) } })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })\n  ]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    // 示例里固定不着色、不打时间，便于对照输出；默认按终端和环境自动决定\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'never', timestamp: false }) } })\n  ]\n})\nlog.info('user %s signed in', 'alice')\nlog.warn('disk usage at %d%%', 91)\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -603,7 +785,37 @@
             }
           ],
           "identity": "packages/log-plugin-console/dist/pretty.d.ts:prettyFeature:export declare function prettyFeature(options?: IPrettyOptions): ILogFeature;",
-          "guidance": [],
+          "guidance": [
+            {
+              "id": "常用选项",
+              "heading": "常用选项",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["选项或 API", "说明"],
+                  "rows": [
+                    [
+                      "`consolePlugin({ console?, stdout?, features? })`",
+                      "`console` 默认全局 console，`stdout` 默认识别到的 `process.stdout`；都只借用，卸载时不关闭"
+                    ],
+                    [
+                      "`prettyFeature({ color?, timestamp? })`",
+                      "可读格式。`color` 取 `auto`（默认）、`always`、`never`；`timestamp` 默认 `true`"
+                    ],
+                    ["`ConsoleColorMode`", "`color` 的取值常量"],
+                    [
+                      "`log.raw(text)`",
+                      "安装后 host 多出的方法：把原始文本直接写到 stdout（例如进度条的 `\\r`），没有 stdout 时用 `console.log`"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`color: 'auto'` 依次看 `NO_COLOR`、非零的 `FORCE_COLOR`、是否终端、是否 CI。"
+                }
+              ]
+            }
+          ],
           "usageScore": 32,
           "configuration": [
             {

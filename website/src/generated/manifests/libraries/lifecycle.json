@@ -715,7 +715,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst first = new Error('flush')\nconst late = new Error('socket close')\nconst result = await mergeCleanupResults([{\n  cleanupErrors: [first],\n  physicalCompletion: Promise.resolve({ cleanupErrors: [late] })\n}])\n// result.cleanupErrors === [first, late]，两个 error 身份不变。"
+                "code": "import { mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst first = new Error('flush')\nconst late = new Error('socket close')\nconst result = await mergeCleanupResults([\n  {\n    cleanupErrors: [first],\n    physicalCompletion: Promise.resolve({ cleanupErrors: [late] })\n  }\n])\n// result.cleanupErrors === [first, late]，两个 error 身份不变。"
               },
               {
                 "type": "paragraph",
@@ -730,7 +730,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>"
+                "code": "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> &\n  Readonly<{\n    physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n  }>"
               },
               {
                 "type": "paragraph",
@@ -1013,7 +1013,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler';\nimport { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing';"
+                "code": "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'\nimport { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'"
               },
               {
                 "type": "paragraph",
@@ -1096,7 +1096,7 @@
                   "`abort()` 与 `abort(undefined)` 使用宿主默认 reason，通常是原生 `DOMException`（name 为 `AbortError`），而不是 `undefined`。",
                   "non-`undefined` explicit reason保持 `===` identity；把 structural parent signal 的 `undefined` reason转发给native child时，同样规范化为宿主 `AbortError`。",
                   "重复 `abort()` 幂等，不覆盖第一次固化的 reason。",
-                  "外部 listener throw走宿主 EventTarget error channel；`try/catch controller.abort()` 不能同步捕获它，lifecycle也不再提供 `ABORT_LISTENER_FAILED`。",
+                  "外部 listener throw走宿主 EventTarget error channel；`try/catch controller.abort()` 不能同步捕获它，lifecycle 也不为它定义错误码。",
                   "Lifecycle 自己登记的 parent/cancellation callback 经过 module-private observed-subscription：处理 already-aborted、registration-time abort、post-registration recheck和幂等remove，并把自身 callback/read/cleanup failure交给对应 operation的collect/report边界。它不代理、枚举或捕获同一 signal 上的外部 listener。"
                 ]
               },
@@ -1337,7 +1337,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  LifecycleState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
+                "code": "import { LifecycleState, LifecycleErrorPolicy, DisposeTransactionKind } from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
               },
               {
                 "type": "paragraph",
@@ -1423,7 +1423,7 @@
                     "`SCOPE_DISPOSAL_FAILED`",
                     "`throw` 策略下释放失败：单个未分类失败会被附上此码，多个失败合成的 `AggregateError` 也带此码"
                   ],
-                  ["`unitStartFailed`", "`UNIT_START_FAILED`", "由已不再导出的内部单元加载器使用"],
+                  ["`unitStartFailed`", "`UNIT_START_FAILED`", "由包内部的单元加载器使用"],
                   [
                     "`generationSuperseded`",
                     "`GENERATION_SUPERSEDED`",
@@ -1562,7 +1562,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing';\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
+                "code": "import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing'\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
               }
             ]
           },
@@ -1673,7 +1673,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing';\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
+                "code": "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
               },
               {
                 "type": "paragraph",
@@ -1718,13 +1718,9 @@
             ]
           },
           {
-            "id": "已收回内部的辅助-api",
-            "heading": "已收回内部的辅助 API",
+            "id": "无人接收的失败",
+            "heading": "无人接收的失败",
             "blocks": [
-              {
-                "type": "paragraph",
-                "text": "`createLifecycleUnit` 及其 option/result types 不再从 module 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay` 只供包内部使用，root 与 leaf 均不再暴露；`tagLifecycleError`、`createLifecycleRangeError` 等错误工厂已删除，包内统一用原生错误加 `@migaia/utils/error` 的 `attachErrorIdentity`。`/scheduler` 公开 snapshot/resolve 准入工具。错误构造器与 scheduler 算术 helper 均已收回内部，不提供兼容 alias；业务错误使用所属包的身份。"
-              },
               {
                 "type": "paragraph",
                 "text": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 交 utils 共享宿主异常队列；省略时这些诊断不外发。"
@@ -2087,7 +2083,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { boundedWait } from '@migaia/lifecycle'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\n\nconst app = createLifecycleScope()\nconst inFlight = createPendingTracker()\napp.own('db-pool', { force: () => console.log('database pool closed') })\napp.own('http', {\n  force: async () => {\n    const finished = await boundedWait(inFlight.drain(), performance.now() + 300)\n    console.log(finished ? 'all in-flight requests finished' : `${inFlight.size} request(s) still running, closing anyway`)\n  }\n})\n\n// An export request that takes 10 seconds. unref() keeps it from holding the example process open.\nvoid inFlight.track(new Promise((resolve) => setTimeout(resolve, 10_000).unref()))\nawait app.dispose()"
+                  "code": "import { boundedWait } from '@migaia/lifecycle'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\n\nconst app = createLifecycleScope()\nconst inFlight = createPendingTracker()\napp.own('db-pool', { force: () => console.log('database pool closed') })\napp.own('http', {\n  force: async () => {\n    const finished = await boundedWait(inFlight.drain(), performance.now() + 300)\n    console.log(\n      finished\n        ? 'all in-flight requests finished'\n        : `${inFlight.size} request(s) still running, closing anyway`\n    )\n  }\n})\n\n// An export request that takes 10 seconds. unref() keeps it from holding the example process open.\nvoid inFlight.track(new Promise((resolve) => setTimeout(resolve, 10_000).unref()))\nawait app.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -2115,7 +2111,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createGenerationController } from '@migaia/lifecycle/generation'\n\n// A fake search API: shorter keywords match more and answer more slowly.\nconst search = (keyword: string, signal: AbortSignal) =>\n  new Promise<string[]>((resolve, reject) => {\n    const timer = setTimeout(() => resolve([`results for ${keyword}`]), keyword.length === 1 ? 300 : 100)\n    signal.addEventListener('abort', () => {\n      clearTimeout(timer)\n      reject(signal.reason)\n    })\n  })\n\nconst requests = createGenerationController()\nlet shown: string[] = []\n\nasync function onInput(keyword: string) {\n  const request = requests.begin() // a newer input makes the previous request stale and aborts it\n  try {\n    const results = await search(keyword, request.signal)\n    if (requests.isCurrent(request.token)) shown = results\n  } catch (error) {\n    if (!requests.isCurrent(request.token)) return // replaced by newer input; ignore\n    throw error\n  }\n}\n\n// The user types \"a\" and immediately \"ab\".\nawait Promise.all([onInput('a'), onInput('ab')])\nconsole.log('page shows:', shown)"
+                  "code": "import { createGenerationController } from '@migaia/lifecycle/generation'\n\n// A fake search API: shorter keywords match more and answer more slowly.\nconst search = (keyword: string, signal: AbortSignal) =>\n  new Promise<string[]>((resolve, reject) => {\n    const timer = setTimeout(\n      () => resolve([`results for ${keyword}`]),\n      keyword.length === 1 ? 300 : 100\n    )\n    signal.addEventListener('abort', () => {\n      clearTimeout(timer)\n      reject(signal.reason)\n    })\n  })\n\nconst requests = createGenerationController()\nlet shown: string[] = []\n\nasync function onInput(keyword: string) {\n  const request = requests.begin() // a newer input makes the previous request stale and aborts it\n  try {\n    const results = await search(keyword, request.signal)\n    if (requests.isCurrent(request.token)) shown = results\n  } catch (error) {\n    if (!requests.isCurrent(request.token)) return // replaced by newer input; ignore\n    throw error\n  }\n}\n\n// The user types \"a\" and immediately \"ab\".\nawait Promise.all([onInput('a'), onInput('ab')])\nconsole.log('page shows:', shown)"
                 },
                 {
                   "type": "paragraph",
@@ -2487,7 +2483,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst first = new Error('flush')\nconst late = new Error('socket close')\nconst result = await mergeCleanupResults([{\n  cleanupErrors: [first],\n  physicalCompletion: Promise.resolve({ cleanupErrors: [late] })\n}])\n// result.cleanupErrors === [first, late]; both error objects are unchanged."
+                  "code": "import { mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst first = new Error('flush')\nconst late = new Error('socket close')\nconst result = await mergeCleanupResults([\n  {\n    cleanupErrors: [first],\n    physicalCompletion: Promise.resolve({ cleanupErrors: [late] })\n  }\n])\n// result.cleanupErrors === [first, late]; both error objects are unchanged."
                 }
               ]
             },
@@ -2498,7 +2494,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>"
+                  "code": "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> &\n  Readonly<{\n    physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n  }>"
                 },
                 {
                   "type": "paragraph",
@@ -2781,7 +2777,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// Scheduler composition helpers exported only from the leaf entry:\nimport {\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// The scheduler contract and implementations come from utils:\nimport { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'\nimport { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'"
+                  "code": "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// Scheduler composition helpers exported only from the leaf entry:\nimport { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'\n\n// The scheduler contract and implementations come from utils:\nimport { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'\nimport { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'"
                 },
                 {
                   "type": "paragraph",
@@ -2864,7 +2860,7 @@
                     "`abort()` and `abort(undefined)` use the host's default reason, usually a native `DOMException` named `AbortError`, not `undefined`.",
                     "An explicit reason other than `undefined` keeps its `===` identity. When an `undefined` reason from a structural parent signal is forwarded to a native child, it is normalised to the host `AbortError` as well.",
                     "Repeated `abort()` calls are idempotent and do not overwrite the first reason.",
-                    "An external listener that throws goes through the host EventTarget's error channel; `try/catch` around `controller.abort()` cannot catch it, and lifecycle does not provide an `ABORT_LISTENER_FAILED` error.",
+                    "An external listener that throws goes through the host EventTarget's error channel; `try/catch` around `controller.abort()` cannot catch it, and lifecycle defines no error code for it.",
                     "Parent and cancellation callbacks that lifecycle registers itself go through a module-private observed subscription. It handles a signal that is already aborted, an abort during registration, a re-check after registration and idempotent removal, and sends its own callback/read/cleanup failures to the matching operation's collect or report boundary. It does not proxy, enumerate or catch other listeners on the same signal."
                   ]
                 },
@@ -3108,7 +3104,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LifecycleState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
+                  "code": "import { LifecycleState, LifecycleErrorPolicy, DisposeTransactionKind } from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -3197,7 +3193,7 @@
                     [
                       "`unitStartFailed`",
                       "`UNIT_START_FAILED`",
-                      "Used by the internal unit loader, which is no longer exported"
+                      "Used by the module's internal unit loader"
                     ],
                     [
                       "`generationSuperseded`",
@@ -3493,13 +3489,9 @@
               ]
             },
             {
-              "id": "helpers-that-are-no-longer-public",
-              "heading": "Helpers that are no longer public",
+              "id": "failures-nobody-else-receives",
+              "heading": "Failures nobody else receives",
               "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "`createLifecycleUnit` and its option/result types are no longer exported; applications use `createGenerationController` for stale work and keep loading state in their own code. `createStringQuiescenceTracker` was replaced by `createStringLeaseRegistry`, which has real consumers. `validateSchedulerTime` and `validateSchedulerDelay` are internal and exposed neither at the root nor from a leaf; the error factories such as `tagLifecycleError` and `createLifecycleRangeError` were removed, and the module now builds native errors and attaches identity with `attachErrorIdentity` from `@migaia/utils/error`. `/scheduler` exposes the snapshot/resolve admission helpers. Error constructors and scheduler arithmetic helpers are internal with no compatibility aliases; application errors use their own module's identity."
-                },
                 {
                   "type": "paragraph",
                   "text": "The generation controller's `report?: (error: unknown) => void` receives failures nobody else can receive: a stale resource's release error when `adopt()` is called without `onReleaseError`, and timer or parent-listener cleanup errors from an asynchronous timeout. Throws and rejections from the reporter itself go to the shared host error queue from utils; without a reporter these diagnostics are not emitted."
@@ -3579,7 +3571,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing';\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
+            "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
           ],
           "members": [],
           "composes": [],
@@ -3670,7 +3662,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { boundedWait } from '@migaia/lifecycle'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\n\nconst app = createLifecycleScope()\nconst inFlight = createPendingTracker()\napp.own('db-pool', { force: () => console.log('关闭数据库连接池') })\napp.own('http', {\n  force: async () => {\n    const finished = await boundedWait(inFlight.drain(), performance.now() + 300)\n    console.log(finished ? '进行中的请求都已完成' : `还有 ${inFlight.size} 个请求没完成，继续关闭`)\n  }\n})\n\n// 一个需要 10 秒的导出请求。unref() 让它不阻止示例进程退出。\nvoid inFlight.track(new Promise((resolve) => setTimeout(resolve, 10_000).unref()))\nawait app.dispose()",
-            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler';\nimport { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing';",
+            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'\nimport { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'",
             "function boundedWait(\n  task: PromiseLike<unknown>,\n  deadlineAt: number,\n  options?: {\n    readonly scheduler?: IScheduler // 默认 systemScheduler\n    readonly reportCleanup?: (error: unknown) => void\n  }\n): Promise<boolean>",
             "const won = await boundedWait(task, deadlineAt) // true=task 先完成；false=截止时间先到（task 仍在跑）",
             "import { createServer } from 'node:http'\nimport { boundedWait } from '@migaia/lifecycle'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\n\nconst app = createLifecycleScope()\nconst inFlight = createPendingTracker()\n\n// 先登记的后释放：数据库连接池最后关闭。\napp.own('db-pool', { force: () => console.log('3. 关闭数据库连接池') })\n\nconst server = createServer((request, response) => {\n  // 每个请求都登记为“进行中的工作”，处理需要 200 毫秒。\n  void inFlight.track(\n    new Promise<void>((resolve) =>\n      setTimeout(() => {\n        response.end('订单已保存')\n        resolve()\n      }, 200)\n    )\n  )\n})\napp.own(server, {\n  force: async () => {\n    server.close() // 不再接受新连接\n    console.log('1. 停止接收新请求，等待进行中的请求')\n    const finished = await boundedWait(inFlight.drain(), performance.now() + 5_000)\n    console.log(finished ? '2. 进行中的请求都已完成' : '2. 等待超时，继续关闭')\n    server.closeAllConnections() // 断开剩下的空闲长连接\n  }\n})\nserver.listen(0)\n\n// 真实服务里写成：process.once('SIGTERM', () => void app.dispose())\nconst { port } = server.address() as { port: number }\nconst order = fetch(`http://localhost:${port}/orders`, { method: 'POST' }).then((r) => r.text())\nawait new Promise((resolve) => setTimeout(resolve, 50)) // 请求处理到一半时开始停机\nawait app.dispose()\nconsole.log('客户端收到:', await order)"
@@ -4435,7 +4427,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import {\n  LifecycleState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
+            "import { LifecycleState, LifecycleErrorPolicy, DisposeTransactionKind } from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
           "members": [
             {
@@ -4525,7 +4517,7 @@
             "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}",
             "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}",
             "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
-            "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>",
+            "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> &\n  Readonly<{\n    physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n  }>",
             "function createErrorCollector(\n  policy: 'throw' | 'collect' | 'report' | 'firstError',\n  report: ((error: unknown) => void) | undefined\n): IErrorCollector\n\ntype IErrorCollector = {\n  readonly policy: IErrorPolicy\n  add(source: string, error: unknown): void\n  finalize(message: string): readonly ICollectedError[]\n}",
             "const collector = createErrorCollector('collect', undefined)\ncollector.add('item-1', error)\nconst collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]"
           ],
@@ -5202,11 +5194,7 @@
                       "`SCOPE_DISPOSAL_FAILED`",
                       "`throw` 策略下释放失败：单个未分类失败会被附上此码，多个失败合成的 `AggregateError` 也带此码"
                     ],
-                    [
-                      "`unitStartFailed`",
-                      "`UNIT_START_FAILED`",
-                      "由已不再导出的内部单元加载器使用"
-                    ],
+                    ["`unitStartFailed`", "`UNIT_START_FAILED`", "由包内部的单元加载器使用"],
                     [
                       "`generationSuperseded`",
                       "`GENERATION_SUPERSEDED`",
@@ -6704,7 +6692,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler';\nimport { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing';",
+            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'\nimport { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'",
             "function createTerminalController(): ITerminalController\n\ntype ITerminalController = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  close(): void\n  forceTerminal(): void\n  whenTerminal(): Promise<void>\n}"
           ],
           "members": [
@@ -7114,11 +7102,7 @@
                       "`SCOPE_DISPOSAL_FAILED`",
                       "`throw` 策略下释放失败：单个未分类失败会被附上此码，多个失败合成的 `AggregateError` 也带此码"
                     ],
-                    [
-                      "`unitStartFailed`",
-                      "`UNIT_START_FAILED`",
-                      "由已不再导出的内部单元加载器使用"
-                    ],
+                    ["`unitStartFailed`", "`UNIT_START_FAILED`", "由包内部的单元加载器使用"],
                     [
                       "`generationSuperseded`",
                       "`GENERATION_SUPERSEDED`",
@@ -7213,7 +7197,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import {\n  LifecycleState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
+            "import { LifecycleState, LifecycleErrorPolicy, DisposeTransactionKind } from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
           "members": [
             {
@@ -7827,7 +7811,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import {\n  LifecycleState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
+            "import { LifecycleState, LifecycleErrorPolicy, DisposeTransactionKind } from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
           "members": [
             {
@@ -8283,7 +8267,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "const controller = createAbortController()\ncontroller.signal.addEventListener('abort', () => console.log('aborted'))\ncontroller.abort('reason')",
-            "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing';\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
+            "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
           ],
           "members": [],
           "composes": [],
@@ -8362,7 +8346,7 @@
                     "`abort()` 与 `abort(undefined)` 使用宿主默认 reason，通常是原生 `DOMException`（name 为 `AbortError`），而不是 `undefined`。",
                     "non-`undefined` explicit reason保持 `===` identity；把 structural parent signal 的 `undefined` reason转发给native child时，同样规范化为宿主 `AbortError`。",
                     "重复 `abort()` 幂等，不覆盖第一次固化的 reason。",
-                    "外部 listener throw走宿主 EventTarget error channel；`try/catch controller.abort()` 不能同步捕获它，lifecycle也不再提供 `ABORT_LISTENER_FAILED`。",
+                    "外部 listener throw走宿主 EventTarget error channel；`try/catch controller.abort()` 不能同步捕获它，lifecycle 也不为它定义错误码。",
                     "Lifecycle 自己登记的 parent/cancellation callback 经过 module-private observed-subscription：处理 already-aborted、registration-time abort、post-registration recheck和幂等remove，并把自身 callback/read/cleanup failure交给对应 operation的collect/report边界。它不代理、枚举或捕获同一 signal 上的外部 listener。"
                   ]
                 },
@@ -8392,7 +8376,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler';\nimport { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing';",
+            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'\nimport { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'",
             "function createAbortController(): IAbortController\n// type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(...); removeEventListener(...) };\n// type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void };"
           ],
           "members": [
@@ -8779,7 +8763,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "const transaction = createDisposeTransaction(\n  { kind: 'plan' },\n  { errorPolicy: 'collect', signal: controller.signal }\n)\nconst failures = await transaction.run([\n  { source: 'db', descriptor: dbDescriptor },\n  { source: 'socket', descriptor: socketDescriptor }\n])",
-            "import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing';\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
+            "import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing'\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
           ],
           "members": [],
           "composes": [],
@@ -9090,7 +9074,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>"
+                  "code": "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> &\n  Readonly<{\n    physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n  }>"
                 },
                 {
                   "type": "paragraph",
@@ -9281,7 +9265,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>"
+            "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> &\n  Readonly<{\n    physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n  }>"
           ],
           "members": [
             {
@@ -9369,7 +9353,7 @@
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
-            "import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing';\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
+            "import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/testing'\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
           ],
           "members": [
             {
@@ -9767,7 +9751,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
-            "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>"
+            "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> &\n  Readonly<{\n    physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n  }>"
           ],
           "members": [
             {
@@ -9892,7 +9876,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
-            "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>"
+            "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> &\n  Readonly<{\n    physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n  }>"
           ],
           "members": [
             {
@@ -9975,7 +9959,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst first = new Error('flush')\nconst late = new Error('socket close')\nconst result = await mergeCleanupResults([{\n  cleanupErrors: [first],\n  physicalCompletion: Promise.resolve({ cleanupErrors: [late] })\n}])\n// result.cleanupErrors === [first, late]，两个 error 身份不变。",
+            "import { mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst first = new Error('flush')\nconst late = new Error('socket close')\nconst result = await mergeCleanupResults([\n  {\n    cleanupErrors: [first],\n    physicalCompletion: Promise.resolve({ cleanupErrors: [late] })\n  }\n])\n// result.cleanupErrors === [first, late]，两个 error 身份不变。",
             "import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst ledger = createSyncStartedDisposalLedger()\n\n// 调用顺序由领域层决定；每个 callback 在 start() 的当前 stack 执行。\nledger.start('connection', () => connection.close())\nledger.start('cache', () => cache.flush())\n\nconst outcome = ledger.seal()\nif (outcome.cleanupErrors.length === 1) {\n  throw outcome.cleanupErrors[0].error\n}\n\nconst { cleanupErrors: finalErrors } = await mergeCleanupResults([outcome])\n// 合并当前快照与迟到增量；领域层决定是否 throw/aggregate/report。",
             "import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle'\n\nconst ledger = createSyncStartedDisposalLedger()\n\nfunction disposeRegistry(): void {\n  ledger.start('cache', () => cache.dispose())\n  ledger.start('worker', () => worker.dispose())\n  ledger.seal()\n}\n\ndisposeRegistry()\nconst outcome = ledger.seal()\nconst { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])"
           ],
@@ -10048,7 +10032,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst first = new Error('flush')\nconst late = new Error('socket close')\nconst result = await mergeCleanupResults([{\n  cleanupErrors: [first],\n  physicalCompletion: Promise.resolve({ cleanupErrors: [late] })\n}])\n// result.cleanupErrors === [first, late]，两个 error 身份不变。"
+                  "code": "import { mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst first = new Error('flush')\nconst late = new Error('socket close')\nconst result = await mergeCleanupResults([\n  {\n    cleanupErrors: [first],\n    physicalCompletion: Promise.resolve({ cleanupErrors: [late] })\n  }\n])\n// result.cleanupErrors === [first, late]，两个 error 身份不变。"
                 },
                 {
                   "type": "paragraph",
@@ -10668,11 +10652,7 @@
                       "`SCOPE_DISPOSAL_FAILED`",
                       "`throw` 策略下释放失败：单个未分类失败会被附上此码，多个失败合成的 `AggregateError` 也带此码"
                     ],
-                    [
-                      "`unitStartFailed`",
-                      "`UNIT_START_FAILED`",
-                      "由已不再导出的内部单元加载器使用"
-                    ],
+                    ["`unitStartFailed`", "`UNIT_START_FAILED`", "由包内部的单元加载器使用"],
                     [
                       "`generationSuperseded`",
                       "`GENERATION_SUPERSEDED`",
@@ -11008,7 +10988,7 @@
               ]
             }
           ],
-          "usageScore": 90,
+          "usageScore": 86,
           "configuration": [
             {
               "name": "parentSignal",
@@ -11038,9 +11018,9 @@
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 交 utils 共享宿主异常队列；省略时这些诊断不外发。",
+              "description": "错误策略 — 清理失败时的处理方式：`throw`（默认，全部释放后抛出）、`collect`（作为数组返回）、`report`（交给回调）。",
               "descriptionEn": "Last-boundary reporter for failures that have no caller to receive them: an `adopt()` release failure when that call passes no `onReleaseError`, and timer/parent cleanup failures raised by an asynchronous `begin({ timeoutMs })` timeout. Its own throws and rejections are contained. Without it those failures are dropped.",
-              "descriptionZh": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 交 utils 共享宿主异常队列；省略时这些诊断不外发。"
+              "descriptionZh": "错误策略 — 清理失败时的处理方式：`throw`（默认，全部释放后抛出）、`collect`（作为数组返回）、`report`（交给回调）。"
             }
           ],
           "fragment": "lifecycle-generation--createGenerationController"
@@ -11806,7 +11786,7 @@
           "declaredConfiguration": [],
           "identity": "packages/lifecycle/dist/quiescence-tracker.d.ts:createStringLeaseRegistry:export declare function createStringLeaseRegistry(): ILeaseRegistry<string>;",
           "guidance": [],
-          "usageScore": 78,
+          "usageScore": 74,
           "configuration": [],
           "fragment": "lifecycle-quiescence--createStringLeaseRegistry"
         },

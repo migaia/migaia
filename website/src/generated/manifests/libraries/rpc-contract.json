@@ -24,15 +24,23 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "contract 定义唯一线上协议、host/plugin/feature 接口、可移植值规则和 RPC 家族错误契约。host 负责会话、握手、调用、provider、转发与取消；传输 plugin 负责原生连接、代际、编解码与分帧；信息流 plugin 和依附于 plugin 的 feature 自带可选能力。"
-              },
-              {
-                "type": "paragraph",
-                "text": "本包不持有会话、连接、待决表、计时器或 IO。通常为每个 host 选择一种传输；虽然 host 支持多个命名空间，也不建议混用多种传输。"
-              },
-              {
-                "type": "paragraph",
                 "text": "English · 协议与使用指南"
+              },
+              {
+                "type": "paragraph",
+                "text": "RPC 家族共用的协议定义：线上消息的格式、host 与插件之间的接口、哪些值可以跨边界传递，以及所有 RPC 错误码。它只有数据、类型和纯校验，不持有连接、会话、计时器或 IO。"
+              },
+              {
+                "type": "paragraph",
+                "text": "大多数应用不需要直接使用它——调用 Worker、子进程或其他页面时从 `@migaia/rpc-host` 开始，错误类和判断函数也从 `@migaia/rpc-host/contract` 导入。下面这些情况才需要直接依赖本包："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "自己实现一个传输载体（例如接入新的消息通道），需要 `/interfaces` 里的载体接口。",
+                  "用其他语言实现对端，需要按 `/schema/protocol` 校验线上消息。",
+                  "只想按错误码分支，又不想把协议和编解码代码打进包里：只导入 `/error-code`。"
+                ]
               }
             ]
           },
@@ -113,7 +121,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "profile 为 `migaia.rpc/2`，协议版本为2.0，方法目录 schemaVersion 为3。握手直接交换身份、代际、方法 mode/schema，以及真实可用的 codec/扩展。业务帧共用一份 id、route 与 task，不保留 v1、旧 runtime carrier selector 或独立 JSON-RPC profile。"
+                "text": "profile 为 `migaia.rpc/2`，协议版本为2.0，方法目录 schemaVersion 为3。握手直接交换身份、代际、方法 mode/schema，以及真实可用的 codec/扩展。业务帧共用一份 id、route 与 task。"
               },
               {
                 "type": "paragraph",
@@ -135,23 +143,19 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`/error-code` 维护全 RPC 家族的 source/code；其它包不再复制错误码表。语义身份不是授权。复制或从远端恢复的错误不因此获得本地重试、退场或控制权限。"
+                "text": "`/error-code` 是全 RPC 家族 source/code 的唯一来源。语义身份不是授权。复制或从远端恢复的错误不因此获得本地重试、退场或控制权限。"
               },
               {
                 "type": "paragraph",
-                "text": "新协议传递 `{ root, nodes }` flat error graph；节点保留 source、code、name、message、stack、cause/errors索引及可选诊断数据。恢复保留支持的原生类和发送方 stack，不以接收端新 stack 覆盖它。`/errors` 的旧独立错误树工具仍用于纯投影边界，不是另一套业务协议。"
+                "text": "新协议传递 `{ root, nodes }` flat error graph；节点保留 source、code、name、message、stack、cause/errors索引及可选诊断数据。恢复保留支持的原生类和发送方 stack，不以接收端新 stack 覆盖它。`/errors` 的递归错误树工具只用于纯投影边界，不是另一套业务协议。"
               },
               {
                 "type": "paragraph",
-                "text": "线上错误最多包含 1024 个节点，1025 个节点以 `INVALID_WIRE_ERROR` 拒绝，不再按旧错误树的 64 层深度拒绝。接收端迭代还原引用；同一图内的别名指向同一个错误对象，环也保留原有引用关系。"
+                "text": "线上错误最多包含 1024 个节点，超过时以 `INVALID_WIRE_ERROR` 拒绝。接收端迭代还原引用；同一图内的别名指向同一个错误对象，环也保留原有引用关系。"
               },
               {
                 "type": "paragraph",
-                "text": "业务应用从 rpc-host 的 `createRpcHost` 开始；载体作者使用 `@migaia/rpc-host/sdk`。旧 `/v1`、`/runtime`、`/framing`、`/binary`、`/remote` 入口及其 profile 已删除，没有兼容别名。"
-              },
-              {
-                "type": "paragraph",
-                "text": "已删除的无抛出点错误码（无替代码）：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。"
+                "text": "业务应用从 rpc-host 的 `createRpcHost` 开始；载体作者使用 `@migaia/rpc-host/sdk`。"
               }
             ]
           }
@@ -174,12 +178,35 @@
             ]
           },
           {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "按你要做的事跳到对应章节："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "版本与接收边界",
+                  "握手与目录",
+                  "调用、路由与代际",
+                  "流、分组与控制",
+                  "载体、二进制与收发顺序",
+                  "可移植值与快照",
+                  "错误图与原生类型",
+                  "语法与预算依据"
+                ]
+              }
+            ]
+          },
+          {
             "id": "版本与接收边界",
             "heading": "版本与接收边界",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "所有语义消息的 `profile` 固定为 `migaia.rpc/2`。唯一协议版本为 `{ major: 2, minor: 0 }`，没有旧 v1 或 JSON-RPC 协商回退。先由载体解码，再使用 `/protocol` 的纯 normalizer检查形状；不能把收到的对象类型断言当作接纳。"
+                "text": "所有语义消息的 `profile` 固定为 `migaia.rpc/2`。唯一协议版本为 `{ major: 2, minor: 0 }`。先由载体解码，再使用 `/protocol` 的纯 normalizer检查形状；不能把收到的对象类型断言当作接纳。"
               },
               {
                 "type": "paragraph",
@@ -395,7 +422,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "旧`/v1`、`/runtime`、`/framing`、`/binary`、`/remote`入口、JSON-RPC桥转换和Content-Length profile已删除。只需要RPC调用时使用host；编写载体时使用host SDK；contract内没有独立的连接或策略执行器。"
+                "text": "只需要RPC调用时使用host；编写载体时使用host SDK；contract内没有独立的连接或策略执行器。"
               },
               {
                 "type": "paragraph",
@@ -418,15 +445,23 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Contract defines one wire protocol, host/plugin/feature interfaces, portable values, and RPC-family errors. Host owns sessions, handshake, calls, providers, forwarding, and cancellation. Transport plugins own native connections, generations, codecs, and framing. Flow plugins and plugin-owned features implement optional capabilities."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "This module owns no sessions, connections, pending tables, timers, or IO. Normally choose one transport kind per host; multiple namespaces are supported, but mixing transport kinds is not recommended."
-                },
-                {
-                  "type": "paragraph",
                   "text": "中文 · Protocol and usage guide"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The protocol definition shared by the RPC family: the wire message format, the interfaces between the host and plugins, which values may cross a boundary, and every RPC error code. It holds only data, types and pure validation, with no connections, sessions, timers or IO."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Most applications do not use it directly: to call Workers, child processes or other pages, start with `@migaia/rpc-host`, and import error classes and predicates from `@migaia/rpc-host/contract`. Depend on this module directly only when you:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "implement your own transport carrier (for example a new message channel) and need the carrier interfaces in `/interfaces`;",
+                    "implement a peer in another language and validate wire messages against `/schema/protocol`;",
+                    "want to branch on error codes without bundling protocol and codec code: import only `/error-code`."
+                  ]
                 }
               ]
             },
@@ -519,7 +554,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "The profile is `migaia.rpc/2`, protocol version2.0, and directory schemaVersion3. Handshake directly exchanges identity, generations, method modes/schemas, and actual codec/extension availability. Operational frames share id, route, and task; v1, the old runtime carrier selector, and the separate JSON-RPC profile are removed."
+                  "text": "The profile is `migaia.rpc/2`, protocol version2.0, and directory schemaVersion3. Handshake directly exchanges identity, generations, method modes/schemas, and actual codec/extension availability. Operational frames share id, route, and task."
                 },
                 {
                   "type": "paragraph",
@@ -541,7 +576,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`/error-code` owns every RPC source/code; other module no longer duplicate those tables. Diagnostic identity grants no authority. Copies and remotely restored errors do not gain local retry, retirement, or control rights."
+                  "text": "`/error-code` is the single source of every RPC source/code. Diagnostic identity grants no authority. Copies and remotely restored errors do not gain local retry, retirement, or control rights."
                 },
                 {
                   "type": "paragraph",
@@ -549,15 +584,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Wire errors allow at most 1024 nodes; a 1025-node graph is rejected with `INVALID_WIRE_ERROR`. The old 64-level error-tree rule does not apply to flat graph edges. Iterative restoration preserves aliases as the same error object within the restored graph, including cycles."
+                  "text": "Wire errors allow at most 1024 nodes; larger graphs are rejected with `INVALID_WIRE_ERROR`. Iterative restoration preserves aliases as the same error object within the restored graph, including cycles."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Applications start with rpc-host and `createRpcHost`; carrier authors use `@migaia/rpc-host/sdk`. Old `/v1`, `/runtime`, `/framing`, `/binary`, and `/remote` entries and profiles are removed without compatibility aliases."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Removed unused codes, with no replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。"
+                  "text": "Applications start with rpc-host and `createRpcHost`; carrier authors use `@migaia/rpc-host/sdk`."
                 }
               ]
             }
@@ -580,12 +611,35 @@
               ]
             },
             {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Jump to the section for what you want to do:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Version and input boundary",
+                    "Handshake and directory",
+                    "Calls, routes, and generations",
+                    "Streams, groups, and controls",
+                    "Carriers, binary, and stage order",
+                    "Portable values and snapshots",
+                    "Error graphs and native classes",
+                    "Schemas and bounds"
+                  ]
+                }
+              ]
+            },
+            {
               "id": "version-and-input-boundary",
               "heading": "Version and input boundary",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Every semantic message uses profile `migaia.rpc/2`. The only protocol version is `{ major: 2, minor: 0 }`, without legacy v1 or JSON-RPC fallback. Decode through the actual carrier, then check shapes with `/protocol` normalizers. A TypeScript assertion on received data is not admission."
+                  "text": "Every semantic message uses profile `migaia.rpc/2`. The only protocol version is `{ major: 2, minor: 0 }`. Decode through the actual carrier, then check shapes with `/protocol` normalizers. A TypeScript assertion on received data is not admission."
                 },
                 {
                   "type": "paragraph",
@@ -810,7 +864,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Old `/v1`, `/runtime`, `/framing`, `/binary`, `/remote`, JSON-RPC bridge conversion, and Content-Length profiles are removed. Applications use Host, carrier authors use its SDK, and contract contains no independent connection or policy executor."
+                  "text": "Applications use Host, carrier authors use its SDK, and contract contains no independent connection or policy executor."
                 },
                 {
                   "type": "paragraph",

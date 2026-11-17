@@ -185,7 +185,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`sharedInt32` 等价于调用 `new SharedInt32Signal`，`sharedInt32Array` 等价于调用 `new SharedInt32Array`。类也公开，供类型标注或 `instanceof` 使用。`SharedWaitMode` / `ISharedWaitMode` 已移除，没有兼容别名；旧导入需要迁移，`watch()` 不再接受模式选择参数。"
+                "text": "`sharedInt32` 等价于调用 `new SharedInt32Signal`，`sharedInt32Array` 等价于调用 `new SharedInt32Array`。类也公开，供类型标注或 `instanceof` 使用。`watch()` 没有等待模式参数。"
               },
               {
                 "type": "paragraph",
@@ -807,7 +807,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`sharedInt32` 等价于调用 `new SharedInt32Signal`，`sharedInt32Array` 等价于调用 `new SharedInt32Array`。类也公开，供类型标注或 `instanceof` 使用。`SharedWaitMode` / `ISharedWaitMode` 已移除，没有兼容别名；旧导入需要迁移，`watch()` 不再接受模式选择参数。"
+                "text": "`sharedInt32` 等价于调用 `new SharedInt32Signal`，`sharedInt32Array` 等价于调用 `new SharedInt32Array`。类也公开，供类型标注或 `instanceof` 使用。`watch()` 没有等待模式参数。"
               },
               {
                 "type": "paragraph",
@@ -1339,7 +1339,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`sharedInt32` delegates to `new SharedInt32Signal`; `sharedInt32Array` delegates to `new SharedInt32Array`. Both classes remain public for type annotations and `instanceof` checks. `SharedWaitMode` and `ISharedWaitMode` were removed without compatibility aliases. Migrate old imports; `watch()` has no wait-mode argument."
+                  "text": "`sharedInt32` delegates to `new SharedInt32Signal`; `sharedInt32Array` delegates to `new SharedInt32Array`. Both classes are public for type annotations and `instanceof` checks. `watch()` has no wait-mode argument."
                 },
                 {
                   "type": "paragraph",
@@ -2037,7 +2037,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`sharedInt32` delegates to `new SharedInt32Signal`; `sharedInt32Array` delegates to `new SharedInt32Array`. Both classes remain public for type annotations and `instanceof` checks. `SharedWaitMode` and `ISharedWaitMode` were removed without compatibility aliases. Migrate old imports; `watch()` has no wait-mode argument."
+                  "text": "`sharedInt32` delegates to `new SharedInt32Signal`; `sharedInt32Array` delegates to `new SharedInt32Array`. Both classes are public for type annotations and `instanceof` checks. `watch()` has no wait-mode argument."
                 },
                 {
                   "type": "paragraph",

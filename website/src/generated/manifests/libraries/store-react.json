@@ -541,8 +541,8 @@
             ]
           },
           {
-            "id": "错误与迁移",
-            "heading": "错误与迁移",
+            "id": "错误码",
+            "heading": "错误码",
             "blocks": [
               {
                 "type": "table",
@@ -610,7 +610,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。"
+                "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。需要 React/react-dom 19 及以上；`retain` 只接收一个 disposeOnRelease 参数。"
               }
             ]
           },
@@ -1313,8 +1313,8 @@
             ]
           },
           {
-            "id": "错误与迁移",
-            "heading": "错误与迁移",
+            "id": "错误码",
+            "heading": "错误码",
             "blocks": [
               {
                 "type": "table",
@@ -1382,7 +1382,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。"
+                "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。需要 React/react-dom 19 及以上；`retain` 只接收一个 disposeOnRelease 参数。"
               }
             ]
           },
@@ -1977,8 +1977,8 @@
               ]
             },
             {
-              "id": "errors-and-migration",
-              "heading": "Errors and migration",
+              "id": "error-codes",
+              "heading": "Error codes",
               "blocks": [
                 {
                   "type": "table",
@@ -2049,7 +2049,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Feature assertions include apiName and path in the message. Enabling wasm without ready suggests ensureWasm or equivalent initialization. fallback is not error UI, and readiness states are not error codes. The minimum React/react-dom version moved to 19. The no-op prepareForRender method and ineffective second retain argument were removed; retain takes only disposeOnRelease."
+                  "text": "Feature assertions include apiName and path in the message. Enabling wasm without ready suggests ensureWasm or equivalent initialization. fallback is not error UI, and readiness states are not error codes. React/react-dom 19 or later is required; `retain` takes a single disposeOnRelease argument."
                 }
               ]
             },
@@ -2797,8 +2797,8 @@
               ]
             },
             {
-              "id": "errors-and-migration",
-              "heading": "Errors and migration",
+              "id": "error-codes",
+              "heading": "Error codes",
               "blocks": [
                 {
                   "type": "table",
@@ -2869,7 +2869,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Feature assertions include apiName and path in the message. Enabling wasm without ready suggests ensureWasm or equivalent initialization. fallback is not error UI, and readiness states are not error codes. The minimum React/react-dom version moved to 19. The no-op prepareForRender method and ineffective second retain argument were removed; retain takes only disposeOnRelease."
+                  "text": "Feature assertions include apiName and path in the message. Enabling wasm without ready suggests ensureWasm or equivalent initialization. fallback is not error UI, and readiness states are not error codes. React/react-dom 19 or later is required; `retain` takes a single disposeOnRelease argument."
                 }
               ]
             },
@@ -3266,8 +3266,8 @@
           "identity": "packages/store-react/dist/errors.d.ts:createStoreReactAggregateError:export declare function createStoreReactAggregateError(code: IStoreReactErrorCode, errors: readonly unknown[], message: string): AggregateError;",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "table",
@@ -3335,7 +3335,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。"
+                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。需要 React/react-dom 19 及以上；`retain` 只接收一个 disposeOnRelease 参数。"
                 }
               ]
             }
@@ -3451,8 +3451,8 @@
           "identity": "packages/store-react/dist/errors.d.ts:createStoreReactError:export declare function createStoreReactError(code: IStoreReactErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "table",
@@ -3520,7 +3520,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。"
+                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。需要 React/react-dom 19 及以上；`retain` 只接收一个 disposeOnRelease 参数。"
                 }
               ]
             }
@@ -4661,8 +4661,8 @@
           "identity": "packages/store-react/dist/error-code.d.ts:IStoreReactErrorCode:export type IStoreReactErrorCode = (typeof StoreReactErrorCode)[keyof typeof StoreReactErrorCode];",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "table",
@@ -4730,7 +4730,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。"
+                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。需要 React/react-dom 19 及以上；`retain` 只接收一个 disposeOnRelease 参数。"
                 }
               ]
             }
@@ -5037,8 +5037,8 @@
           "identity": "packages/store-react/dist/provider-registry.d.ts:IStoreToken:export type IStoreToken<T> = Readonly<{ /** Unique symbol used for registration; equal debug labels do not make tokens interchangeable. */ key: symbol; /** Human-readable error label, not a lookup key. */ debugName: string; /** Type-only value association; factory-created tokens contain no runtime payload here. */ readonly [STORE_TOKEN_VALUE]?: (value: T) => T; }>;",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "table",
@@ -5106,7 +5106,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。"
+                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。需要 React/react-dom 19 及以上；`retain` 只接收一个 disposeOnRelease 参数。"
                 }
               ]
             }
@@ -5640,8 +5640,8 @@
           "identity": "packages/store-react/dist/errors.d.ts:STORE_REACT_SOURCE:export declare const STORE_REACT_SOURCE = \"store.react\";",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "table",
@@ -5709,7 +5709,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。"
+                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。需要 React/react-dom 19 及以上；`retain` 只接收一个 disposeOnRelease 参数。"
                 }
               ]
             }
@@ -5925,8 +5925,8 @@
               ]
             },
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "table",
@@ -5994,7 +5994,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。"
+                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。需要 React/react-dom 19 及以上；`retain` 只接收一个 disposeOnRelease 参数。"
                 }
               ]
             }
@@ -6390,8 +6390,8 @@
           "identity": "packages/store-react/dist/error-code.d.ts:StoreReactErrorCode:export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign package identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * A non-Error readiness rejection is normalized before rendering can continue. Inspect `cause` * for the original reason; Error rejections, including frozen Errors, retain their identity * instead of receiving this code. */ readonly readyRejected: 'READY_REJECTED'; };",
           "guidance": [
             {
-              "id": "错误与迁移",
-              "heading": "错误与迁移",
+              "id": "错误码",
+              "heading": "错误码",
               "blocks": [
                 {
                   "type": "table",
@@ -6459,7 +6459,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。"
+                  "text": "feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。需要 React/react-dom 19 及以上；`retain` 只接收一个 disposeOnRelease 参数。"
                 }
               ]
             }

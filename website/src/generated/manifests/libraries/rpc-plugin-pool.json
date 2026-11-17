@@ -15,21 +15,30 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "把同一种 transport 的多个真实成员呈现为一个逻辑对端 `pool`。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`rpc-contract` 定义纯协议与接口，`rpc-host` 拥有会话、provider、调用结算与取消；transport plugin 获取并监管原生资源。auth、chunk、batch、probe 等 flow plugin 处理消息流。`pool` 是安装在 transport 上的 feature，负责成员选择、有限 FIFO、扩缩容和排空；timeout、retry 也是完整 feature。"
-              },
-              {
-                "type": "paragraph",
                 "text": "English · 使用指南"
+              },
+              {
+                "type": "paragraph",
+                "text": "把同一种传输的多个 Worker 或子进程组成一个池，对调用方只呈现一个逻辑对端 `pool`。本包是装在传输插件上的 Feature：负责把调用分给空闲成员、在都忙时用有上限的先进先出队列排队、扩缩成员数量，以及关闭时排空。"
               }
             ]
           },
           {
-            "id": "开始使用",
-            "heading": "开始使用",
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "一个 Worker 不够用，多个 Worker 又要自己分配任务：手写的轮询分配不知道哪个成员忙，慢任务堆在一个成员上。根因是没有按空闲程度调度。",
+                  "高峰时请求无限堆积：所有成员都忙时，新请求在内存里越排越长。根因是排队没有上限。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
             "blocks": [
               {
                 "type": "paragraph",
@@ -114,6 +123,26 @@
               {
                 "type": "paragraph",
                 "text": "Contract 定义纯协议与接口，Host 拥有会话、provider 和调用结算，transport 获取并监管真实原生资源。flow plugin 通过消息介入点提供 auth、chunk、batch、probe。`pool` 是 transport 的完整 feature：只拥有同载体成员调度、FIFO、扩缩容和排空；timeout/retry feature 各自拥有调用策略。"
+              }
+            ]
+          },
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "按你要做的事跳到对应章节："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "安装在 transport 上",
+                  "一个逻辑目标",
+                  "容量、队列与取消",
+                  "流、扩缩容与排空",
+                  "错误与观察"
+                ]
               }
             ]
           },
@@ -230,15 +259,24 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Present several real members of one transport as a single logical peer named `pool`."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`rpc-contract` defines pure protocol rules and interfaces. `rpc-host` owns sessions, providers, call settlement, and cancellation; transport plugins acquire and supervise native resources. Flow plugins such as auth, chunk, batch, and probe process message flow. The `pool` transport feature owns member selection, bounded FIFO, resize, and drain. Timeout and retry are also complete features."
-                },
-                {
-                  "type": "paragraph",
                   "text": "中文 · Usage guide"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Group several Workers or child processes of one transport into a pool that callers see as one logical peer, `pool`. This module is a Feature installed on a transport plugin: it hands calls to idle members, queues them in a bounded first-in-first-out queue when every member is busy, scales the member count, and drains on shutdown."
+                }
+              ]
+            },
+            {
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "One Worker is not enough, and several Workers mean distributing work by hand: hand-written round-robin does not know which member is busy, so slow tasks pile up on one member. The cause is scheduling without regard to idleness.",
+                    "Requests pile up without limit at peak: when every member is busy, new requests queue in memory longer and longer. The cause is an unbounded queue."
+                  ]
                 }
               ]
             },
@@ -341,6 +379,26 @@
                 {
                   "type": "paragraph",
                   "text": "Contract defines pure protocol rules and interfaces. Host owns sessions, providers, and call settlement; transports acquire and supervise real native resources. Flow plugins provide auth, chunk, batch, and probe at message hooks. The complete `pool` transport feature owns only same-carrier member scheduling, FIFO, resize, and drain. Timeout/retry features own their respective call policies."
+                }
+              ]
+            },
+            {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Jump to the section for what you want to do:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Install on the transport",
+                    "One logical target",
+                    "Capacity, queues, and cancellation",
+                    "Streams, resize, and drain",
+                    "Errors and observation"
+                  ]
                 }
               ]
             },
@@ -1086,7 +1144,7 @@
               ]
             }
           ],
-          "usageScore": 154,
+          "usageScore": 152,
           "configuration": [
             {
               "name": "size",

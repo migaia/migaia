@@ -26,22 +26,223 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "异步日志 host。日志调用同步返回，条目随后按顺序经过异步管线与输出策略。控制台、HTTP、文件、进程收尾、reasoning 和持久日志由独立插件提供。"
+                "text": "English"
+              },
+              {
+                "type": "paragraph",
+                "text": "写日志本身很简单，难的是日志之外的事：日志后端慢了会不会拖慢请求，进程退出时还没发出去的日志去哪了，日志服务挂了会不会把业务一起带崩。`@migaia/log-host` 把这些交给一个 host：日志调用立即返回，条目在后台按顺序交给各个输出插件；关闭时先把排队的日志送完再释放资源；交付失败走单独的失败通道，不进入业务代码。控制台、HTTP、文件、进程收尾和持久日志都是独立的插件包，按需安装。"
               }
             ]
           },
           {
-            "id": "快速开始",
-            "heading": "快速开始",
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
             "blocks": [
               {
-                "type": "code",
-                "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 拥有插件安装、日志交付与最终释放。 */\nconst log = createLogHost({ plugins: [levelPlugin(), consolePlugin()] })\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')"
+                "type": "list",
+                "items": [
+                  "日志拖慢了请求：每条日志都 `await` 一次网络请求，日志服务一慢，接口响应跟着变慢。根因是日志写在请求的关键路径上。",
+                  "进程退出时最后几条日志丢了：发布新版本、容器被回收时，正在发送和还在缓冲区里的日志直接消失，偏偏它们记录了退出原因。根因是没人在退出前等日志送完。",
+                  "日志服务出错把业务带崩：日志请求失败变成未处理的 Promise 拒绝，或者抛进了业务代码的 `try/catch`。根因是日志失败和业务失败走的是同一条路。",
+                  "每个输出各写一套批量和重试：控制台、HTTP、文件各自实现缓冲、重试和超时，规则不一致，修一个漏一个。根因是这些策略没有统一的所有者。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "为什么选它",
+            "heading": "为什么选它",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "日志调用不等待交付，关闭时也不丢。 `info()` 同步返回，条目进入有上限的队列（默认 10000 条）；`shutdown()` 先停止接收新日志，再排空每个输出的队列和批次，最后释放插件。示例",
+                  "交付失败不进入业务控制流，也不会被悄悄吞掉。 日志方法、`flush()` 和 `shutdown()` 都不会因为交付失败而抛出或拒绝；失败交给 `onFailure()` 监听器，没有监听器时交给 `report`。示例",
+                  "批量、重试、超时由 host 统一提供，输出可以单独覆盖。 在一个策略插件里声明一次默认策略，所有输出继承；某个输出需要不同的批量大小时，只在它自己的 `features` 里写同名项。示例",
+                  "错误对象的整条原因链都保留下来。 JSON 格式和 HTTP 输出共用同一个错误投影，`source`、`code`、`stack`、`cause` 和 `AggregateError` 的每个分支都会写进日志。示例"
+                ]
               },
               {
                 "type": "paragraph",
-                "text": "`info()` 返回时输出尚未开始。`flush()` 等待已接纳的条目、异步交付与插件缓冲区；默认等待预算为 3000 毫秒。`shutdown()` 先运行最后日志处理器，再停止准入、排空并释放插件。并发 shutdown 返回同一个 Promise。"
+                "text": "只在本地调试时打印几行、不关心退出和失败的脚本，直接用 `console.log` 更简单。"
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面用一个“慢的日志后端”演示：每批写入要 50 毫秒。用 Node 24 直接运行。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\n\n// 一个慢的日志后端：每批写入要 50 毫秒\nconst remote = defineOutputPlugin({\n  name: 'remote',\n  batchable: false,\n  defaultFormat: 'plain',\n  async deliver(records) {\n    await new Promise((resolve) => setTimeout(resolve, 50))\n    for (const record of records) console.log(`后端收到：${record.entry.message}`)\n  }\n})\n\nconst log = createLogHost({ plugins: [levelPlugin(), remote] })\nlog.info('订单已创建')\nlog.warn('库存偏低')\nconsole.log('日志调用已经返回，请求继续处理')\n\n// 进程退出前调用：先把排队的日志送完，再释放插件\nawait log.shutdown('manual')\nconsole.log('已关闭')"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "日志调用已经返回，请求继续处理\n后端收到：订单已创建\n后端收到：库存偏低\n已关闭"
+              },
+              {
+                "type": "paragraph",
+                "text": "`info()` 和 `warn()` 返回时，后端还没收到任何东西，所以第一行先打印。`shutdown()` 等两条日志都送到后端才完成。`levelPlugin()` 给 host 加上 `debug`、`info`、`warn`、`error`、`fatal` 这些方法；`defineOutputPlugin` 声明一个输出，`deliver` 收到的是已经格式化好的记录。"
+              },
+              {
+                "type": "paragraph",
+                "text": "真实项目里通常直接安装现成的输出插件，例如 `@migaia/log-plugin-console` 的 `consolePlugin()`。下一步：要给所有输出加批量和重试，看输出策略与作用域；要在进程收到退出信号时自动收尾，看 `@migaia/log-plugin-process`。"
+              }
+            ]
+          },
+          {
+            "id": "手写时的隐患",
+            "heading": "手写时的隐患",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面是常见的手写日志函数。它能跑，但有三个隐患（只用于说明，不必运行）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "async function sendLog(message: string) {\n  await fetch('https://logs.example.invalid', { method: 'POST', body: JSON.stringify({ message }) })\n}\n\n// 隐患 1：在请求路径上 await，日志服务一慢，每个请求都跟着变慢\nawait sendLog('order created')\n\n// 隐患 2：不 await 时，发送失败变成未处理的 Promise 拒绝；进程退出时正在发送的日志直接丢失\nvoid sendLog('stock low')\n\n// 隐患 3：再加一个文件输出，就要再写一遍批量、重试和超时，两边的规则很快变得不一致"
+              },
+              {
+                "type": "paragraph",
+                "text": "用 log-host 时，日志调用只负责把条目放进队列：交付在后台进行，失败进入失败通道，`shutdown()` 负责在退出前送完，批量和重试由 host 统一提供。"
+              }
+            ]
+          },
+          {
+            "id": "三分钟心智模型",
+            "heading": "三分钟心智模型",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "一条日志从调用到落地，依次经过下面几步："
+              },
+              {
+                "type": "paragraph",
+                "text": "1. entry：在 host 入口执行一次，例如给条目加 UUID。 2. gate：每个输出各自判断要不要这条日志，例如级别门槛和自定义过滤。 3. format：把条目变成文本（`json` 或 `plain`）。不消费文本的输出跳过这一步。 4. batch / retry / timeout：按输出缓冲成批、失败重试、限制单次交付时长。 5. deliver：输出插件把记录写到真正的去处。"
+              },
+              {
+                "type": "table",
+                "headers": ["概念", "一句话"],
+                "rows": [
+                  ["host", "`createLogHost` 返回的对象，拥有队列、插件和关闭过程"],
+                  [
+                    "输出插件",
+                    "日志的去处，用 `defineOutputPlugin` 声明，或者安装现成的 `log-plugin-*` 包"
+                  ],
+                  [
+                    "策略插件",
+                    "用 `defineLogPlugin({ name, features })` 声明 host 级默认策略，所有输出继承"
+                  ],
+                  [
+                    "Feature",
+                    "一项策略，例如 `thresholdFeature()`、`batchFeature()`；写在 `features` 记录里，键名就是它的名字"
+                  ],
+                  [
+                    "覆盖规则",
+                    "输出自己的 `features` 里同名的项覆盖 host 级同名项；format、batch、retry、timeout 每个输出只取一个"
+                  ],
+                  [
+                    "`flush()` / `shutdown()`",
+                    "等已接收的日志送完（有时限）/ 送完后释放插件，重复调用共享同一个 Promise"
+                  ],
+                  [
+                    "失败通道",
+                    "`onFailure()` 监听交付失败；没有监听器时交给创建 host 时传入的 `report`"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "典型场景",
+            "heading": "典型场景",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["场景", "怎么组合", "详细说明"],
+                "rows": [
+                  [
+                    "输出到控制台，开发时着色、线上输出 JSON",
+                    "`consolePlugin()` + `formatFeature`",
+                    "log-plugin-console"
+                  ],
+                  [
+                    "批量发送到日志服务，失败重试",
+                    "`httpPlugin()` + `batchFeature` + `retryFeature`",
+                    "log-plugin-http"
+                  ],
+                  ["追加写入文件并轮转", "`filePlugin()`", "log-plugin-file"],
+                  ["收到退出信号时送完日志再退出", "`processPlugin()`", "log-plugin-process"],
+                  [
+                    "按级别过滤，运行时调整门槛",
+                    "`thresholdFeature` + `filterFeature`",
+                    "级别、过滤与条目"
+                  ],
+                  ["只给某一个输出换批量大小", "输出 `features` 里写同名项", "输出策略与作用域"],
+                  ["把日志转交给另一个 host", "`forwardPlugin({ targets })`", "转发与动态配置"],
+                  [
+                    "记录可重放的业务事件、预写日志和撤销日志",
+                    "`binlogPlugin` / `walPlugin` / `undoLogPlugin`",
+                    "log-plugin-durable"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "安装",
+            "heading": "安装",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm add @migaia/log-host"
+              },
+              {
+                "type": "paragraph",
+                "text": "host 不内置任何输出，按需安装 `@migaia/log-plugin-*`。它不依赖第三方运行时包，底层能力来自 `@migaia/plugin-host`、`@migaia/middleware-pipeline`、`@migaia/lifecycle`、`@migaia/event-subscriber` 与 `@migaia/utils`。"
+              }
+            ]
+          },
+          {
+            "id": "常用-api",
+            "heading": "常用 API",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["API", "用途"],
+                "rows": [
+                  ["`createLogHost({ plugins, report?, maxPending? })`", "创建 host"],
+                  [
+                    "`levelPlugin()`",
+                    "添加 `debug` / `info` / `warn` / `error` / `fatal` / `atLevel` 方法"
+                  ],
+                  ["`log.flush()` / `log.shutdown(reason)`", "等待送达 / 送完后关闭"],
+                  ["`log.onFailure(listener)`", "监听交付失败，返回撤销函数"],
+                  [
+                    "`defineLogPlugin({ name, features })`",
+                    "声明 host 级默认策略（`@migaia/log-host/sdk`）"
+                  ],
+                  [
+                    "`defineOutputPlugin({ name, batchable, defaultFormat, deliver })`",
+                    "声明一个输出（`@migaia/log-host/sdk`）"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "内置 Feature：`thresholdFeature`、`filterFeature`、`uuidFeature`、`formatFeature`、`batchFeature`、`retryFeature`、`timeoutFeature`，从 `@migaia/log-host/features` 一起导入，或从 `@migaia/log-host/features/<名称>` 单独导入。完整用法见 USEGUIDE。"
               }
             ]
           },
@@ -52,23 +253,23 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('低于门槛，被过滤')\nlog.info('通过')\nawait log.shutdown('manual')"
               },
               {
                 "type": "paragraph",
-                "text": "内置 feature：`thresholdFeature`、`filterFeature`、`uuidFeature`、`formatFeature`、`batchFeature`、`retryFeature`、`timeoutFeature`。支持汇总入口 `./features` 和各自的默认导出，例如 `./features/retry`。"
+                "text": "Feature 工厂返回 `@migaia/plugin-host` 的原生定义，不暴露内部字段或控制方法。`features` 一律写成 `{ 名称: feature }` 记录。每次插件安装各自创建状态；控制方法以 `${插件名}_${名称}_${方法}` 的形式挂在 host 上，例如 `log.policy_threshold_setLevel('warn')`。"
               },
               {
                 "type": "paragraph",
-                "text": "feature 工厂返回 `@migaia/plugin-host` 的原生 opaque 定义，不暴露 descriptor 字段或控制方法。`defineLogPlugin` 基于 `definePlugin` 组装普通 host-wide 插件；`createLogHost` 只通过 `plugins` 接收策略。`features` 一律使用 `{ alias: feature }` record。每次插件安装独立创建状态，控制通过 `${pluginName}_${alias}_${method}` 扩展调用，例如 `log.policy_threshold_setLevel('warn')`。"
+                "text": "输出插件的 `features` 只作用于它自己。输出里同名的项覆盖 host 级同名项；format、batch、retry、timeout 这四类每个输出只取一个，输出自己配了哪一类，就替换 host 级的同类项，名称不同也一样。名称不同的 gate 都会执行，即使来自同一个工厂。输出可以把某一类写成 `false`，表示不继承 host 级的这一类。"
               },
               {
                 "type": "paragraph",
-                "text": "输出插件的 features 只作用于自身。同 key 的输出级 feature 覆盖 host-wide feature；format、batch、retry、timeout 这四类每个输出只取一个，输出自己配了哪一类，就替换 host-wide 的同类 feature（即使 key 不同）。不同 key 的 gate 都会执行，即使来自同一工厂。一个插件的 record 里同类 format/batch/retry/timeout 只能有一个；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类 format/batch/retry/timeout，违反时以既有 `INVALID_OPTION` 拒绝。执行按 entry、gate、format、batch、retry、timeout、输出阶段组织，gate 保留有效 record 声明顺序。没有有效显式 format 时才采用输出默认格式。"
+                "text": "一个插件的记录里同类 format、batch、retry、timeout 最多一个，违反时以 `logging / INVALID_OPTION` 拒绝。两个 host 级策略插件各自提供同一类时，以 `plugin.host / FEATURE_ROLE_CONFLICT` 拒绝。这些检查在安装插件时进行（`createLogHost` 或 `use()`），被拒的插件整批回滚，host 仍可继续写日志。没有显式 format 时采用输出的 `defaultFormat`。"
               },
               {
                 "type": "paragraph",
-                "text": "输出可声明 `consumesText: false`，只接收原条目与取消信号，跳过 host 格式阶段；该输出不能配置 format 或 defaultFormat。条目处理、gate 与交付策略照常执行。"
+                "text": "输出可以声明 `consumesText: false`，只接收原始条目和取消信号，跳过格式化；这样的输出不能配置 format，也不写 `defaultFormat`。"
               }
             ]
           },
@@ -79,11 +280,12 @@
               {
                 "type": "list",
                 "items": [
-                  "日志方法不抛出运行期交付错误；`flush()` 与 `shutdown()` 总是兑现。失败通过 `onFailure()` 观察；没有监听器时交给 `report`。",
-                  "监听器失败以 `HOOK_FAILED` 交给 reporter，原错误保留在 `cause`。reporter 自身失败会被收住，不递归报告。",
-                  "非法创建配置同步抛带 `source`、`code` 的错误。`use()`、`unUse()` 是配置操作，可以拒绝。",
-                  "durable 的 append、commit、read 与失效句柄仍按存储契约拒绝；日志的非 throw 保证不覆盖事务操作。",
-                  "待处理条目默认上限 10000，超出时丢弃最旧的未处理条目并报告 `QUEUE_OVERFLOW`。"
+                  "日志方法不抛出交付错误，`flush()` 与 `shutdown()` 总是兑现。失败通过 `onFailure()` 观察；没有监听器时交给 `report`。",
+                  "监听器自身失败以 `HOOK_FAILED` 交给 `report`，原错误在 `cause`。`report` 自身失败会被收住，不递归报告。",
+                  "非法的创建配置同步抛出带 `source`、`code` 的错误；`use()`、`unUse()` 是配置操作，可以拒绝。",
+                  "`flush()` 默认最多等 3000 毫秒，到期报告 `LIFECYCLE_DEADLINE` 后兑现，不代表所有日志都已送达。",
+                  "待处理条目默认上限 10000 条，超出时丢弃最旧的未处理条目，并报告 `QUEUE_OVERFLOW`。",
+                  "durable 插件的 append、commit、read 仍按存储契约拒绝；“日志方法不抛出”的保证不覆盖这些事务操作。"
                 ]
               }
             ]
@@ -94,31 +296,19 @@
             "blocks": [
               {
                 "type": "table",
-                "headers": ["入口", "用途"],
+                "headers": ["入口", "内容"],
                 "rows": [
                   [
                     "`@migaia/log-host`",
-                    "`createLogHost`、`levelPlugin`、`forwardPlugin`、状态、默认 reporter 与 host 类型"
+                    "`createLogHost`、`levelPlugin`、`forwardPlugin`、状态常量、默认 reporter 与 host 类型"
                   ],
                   [
                     "`@migaia/log-host/sdk`",
                     "`defineLogFeature`、`defineLogPlugin`、`defineOutputPlugin`、`projectLogEntry` 与插件作者类型"
                   ],
-                  ["`@migaia/log-host/features`", "七个内置 feature"],
-                  ["`@migaia/log-host/features/<name>`", "对应 feature 的默认导出"]
+                  ["`@migaia/log-host/features`", "七个内置 Feature"],
+                  ["`@migaia/log-host/features/<名称>`", "单个内置 Feature"]
                 ]
-              },
-              {
-                "type": "paragraph",
-                "text": "host 不内置输出端，不依赖第三方运行时包。底层能力来自 `@migaia/plugin-host`、`@migaia/middleware-pipeline`、`@migaia/lifecycle`、`@migaia/event-subscriber` 与 `@migaia/utils`。"
-              },
-              {
-                "type": "paragraph",
-                "text": "完整用法见 USEGUIDE.md。"
-              },
-              {
-                "type": "paragraph",
-                "text": "输出 Feature 可使用 `false` 禁用继承角色。本地 format、batch、retry、timeout 替换对应全局角色，entry 与 gate 按别名替换。两个全局载体重复提供同一单例角色时，以 `plugin.host / FEATURE_ROLE_CONFLICT` 拒绝；重复宿主别名与单个记录格式错误仍使用 `logging / INVALID_OPTION`。全局默认值通过共享 overlay 在策略安装提交或移除后通知已安装输出。"
               }
             ]
           }
@@ -126,6 +316,24 @@
       },
       "guide": {
         "sections": [
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["你想做的事", "看这里"],
+                "rows": [
+                  ["创建 host，写第一条日志，退出前送完", "建立 host"],
+                  ["按级别过滤，运行时调整门槛或加过滤器", "级别、过滤与条目"],
+                  ["给所有输出统一批量、重试、超时，或只改某一个输出", "输出策略与作用域"],
+                  ["把日志写到自己的去处", "编写输出插件"],
+                  ["观察交付失败，保留错误原因链", "错误投影与失败通道"],
+                  ["把日志转交给另一个 host，运行时增删插件", "转发与动态配置"]
+                ]
+              }
+            ]
+          },
           {
             "id": "建立-host",
             "heading": "建立 host",
@@ -186,7 +394,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类，动态 `use()` 同样检查。违反时以既有 `INVALID_OPTION` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。"
+                "text": "format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，动态 `use()` 同样检查。重复的 host 级名称和单个记录格式错误以 `logging / INVALID_OPTION` 拒绝；两个 host 级载体各自提供同一类 format、batch、retry 或 timeout 时，以 `plugin.host / FEATURE_ROLE_CONFLICT` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。"
               },
               {
                 "type": "table",
@@ -299,49 +507,271 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "An asynchronous logging host. Log calls return synchronously; entries then pass through an ordered asynchronous pipeline and output policies. Separate plugins provide console, HTTP, file, process shutdown, reasoning and durable logging."
+                  "text": "中文"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Writing a log line is easy. The hard parts are around it: does a slow log backend slow down your requests, where do unsent lines go when the process exits, and can a failing log service take your business code down with it? `@migaia/log-host` hands these to one host. Log calls return at once and entries go to each output plugin in the background, in order. On shutdown the host delivers what is queued before it releases resources. Delivery failures go to a separate failure channel instead of into your code. Console, HTTP, file, process shutdown and durable logs are separate plugin module that you install as needed."
                 }
               ]
             },
             {
-              "id": "quick-start",
-              "heading": "Quick start",
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
               "blocks": [
                 {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** The host owns plugin installation, delivery and terminal cleanup. */\nconst log = createLogHost({ plugins: [levelPlugin(), consolePlugin()] })\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Output has not started when `info()` returns. `flush()` drains admitted entries, tracked asynchronous work and plugin buffers within a default 3000 ms wait budget. `shutdown()` runs final-log handlers, closes admission, drains and releases plugins. Concurrent shutdown calls share the same Promise."
+                  "type": "list",
+                  "items": [
+                    "Logging slows down requests: every log line awaits a network call, so when the log service is slow, your responses are slow too. The cause is logging on the request's critical path.",
+                    "The last lines are lost at exit: during a deploy or when a container is recycled, lines being sent or still buffered disappear, and those are the lines that explain why the process stopped. The cause is that nobody waits for logs before exiting.",
+                    "A log service failure breaks the business code: a failed log request becomes an unhandled Promise rejection, or lands in the business `try/catch`. The cause is that log failures and business failures share one path.",
+                    "Every output reimplements batching and retries: console, HTTP and file each have their own buffering, retry and timeout, with different rules, and a fix in one is missed in the others. The cause is that these policies have no single owner."
+                  ]
                 }
               ]
             },
             {
-              "id": "compose-policies",
-              "heading": "Compose policies",
+              "id": "why-choose-it",
+              "heading": "Why choose it",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Log calls do not wait for delivery, and nothing is lost on shutdown. `info()` returns synchronously and the entry goes into a bounded queue (10000 entries by default). `shutdown()` stops accepting new lines, drains each output's queue and batches, then releases the plugins. Example",
+                    "Delivery failures stay out of your control flow without being swallowed. Log methods, `flush()` and `shutdown()` never throw or reject because delivery failed. Failures go to `onFailure()` listeners, or to `report` when there is no listener. Example",
+                    "The host provides batching, retry and timeout once, and each output can override them. Declare default policies once in a policy plugin and every output inherits them. When one output needs a different batch size, write an entry with the same name in that output's own `features`. Example",
+                    "The whole cause chain of an error is kept. The JSON format and the HTTP output share one error projection, so `source`, `code`, `stack`, `cause` and every `AggregateError` branch reach the log. Example"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "For a local script that prints a few lines and does not care about exit or failures, plain `console.log` is simpler."
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The example below uses a slow log backend: each write takes 50 ms. Run it directly with Node 24."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\n\n// A slow log backend: each write takes 50 ms\nconst remote = defineOutputPlugin({\n  name: 'remote',\n  batchable: false,\n  defaultFormat: 'plain',\n  async deliver(records) {\n    await new Promise((resolve) => setTimeout(resolve, 50))\n    for (const record of records) console.log(`backend received: ${record.entry.message}`)\n  }\n})\n\nconst log = createLogHost({ plugins: [levelPlugin(), remote] })\nlog.info('order created')\nlog.warn('stock is low')\nconsole.log('log calls returned; the request goes on')\n\n// Call before the process exits: deliver queued lines, then release the plugins\nawait log.shutdown('manual')\nconsole.log('closed')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "log calls returned; the request goes on\nbackend received: order created\nbackend received: stock is low\nclosed"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "When `info()` and `warn()` return, the backend has received nothing yet, so the first line prints first. `shutdown()` completes only after both lines reach the backend. `levelPlugin()` adds `debug`, `info`, `warn`, `error` and `fatal` to the host; `defineOutputPlugin` declares an output, and `deliver` receives records that are already formatted."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Real projects usually install a ready-made output plugin, such as `consolePlugin()` from `@migaia/log-plugin-console`. Next: to add batching and retry to every output, see Output scopes and delivery; to finish logging automatically when the process receives an exit signal, see `@migaia/log-plugin-process`."
+                }
+              ]
+            },
+            {
+              "id": "pitfalls-when-writing-it-yourself",
+              "heading": "Pitfalls when writing it yourself",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Here is a common hand-written log function. It works, but it has three hidden problems (for illustration only; no need to run it):"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "async function sendLog(message: string) {\n  await fetch('https://logs.example.invalid', { method: 'POST', body: JSON.stringify({ message }) })\n}\n\n// Problem 1: awaiting on the request path; when the log service is slow, every request is slow\nawait sendLog('order created')\n\n// Problem 2: without await, a failed send is an unhandled Promise rejection,\n// and lines still being sent are lost when the process exits\nvoid sendLog('stock low')\n\n// Problem 3: adding a file output means writing batching, retry and timeout again,\n// and the two sets of rules soon drift apart"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "With log-host, a log call only puts the entry into the queue: delivery happens in the background, failures go to the failure channel, `shutdown()` delivers everything before exit, and the host provides batching and retry once."
+                }
+              ]
+            },
+            {
+              "id": "the-three-minute-model",
+              "heading": "The three-minute model",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A log entry goes through these steps from the call to its destination:"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "1. entry: runs once at the host entry, for example to add a UUID. 2. gate: each output decides whether it wants the entry, for example a level threshold or a custom filter. 3. format: turns the entry into text (`json` or `plain`). Outputs that do not consume text skip this step. 4. batch / retry / timeout: per output, buffer entries into batches, retry failures and limit how long one delivery may take. 5. deliver: the output plugin writes the records to their real destination."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Concept", "In one sentence"],
+                  "rows": [
+                    [
+                      "host",
+                      "The object returned by `createLogHost`; it owns the queue, the plugins and shutdown"
+                    ],
+                    [
+                      "Output plugin",
+                      "Where logs go; declare one with `defineOutputPlugin` or install a `log-plugin-*` module"
+                    ],
+                    [
+                      "Policy plugin",
+                      "`defineLogPlugin({ name, features })` declares host-wide default policies that every output inherits"
+                    ],
+                    [
+                      "Feature",
+                      "One policy, such as `thresholdFeature()` or `batchFeature()`, written in a `features` record whose key is its name"
+                    ],
+                    [
+                      "Override rule",
+                      "An entry with the same name in an output's own `features` overrides the host-wide one; each output takes at most one format, batch, retry and timeout"
+                    ],
+                    [
+                      "`flush()` / `shutdown()`",
+                      "Wait (with a time limit) until accepted lines are delivered / deliver, then release the plugins; repeated calls share one Promise"
+                    ],
+                    [
+                      "Failure channel",
+                      "`onFailure()` listens for delivery failures; with no listener they go to the `report` passed to the host"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "common-scenarios",
+              "heading": "Common scenarios",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Scenario", "How to combine", "Details"],
+                  "rows": [
+                    [
+                      "Console output, colored in development and JSON in production",
+                      "`consolePlugin()` + `formatFeature`",
+                      "log-plugin-console"
+                    ],
+                    [
+                      "Send batches to a log service and retry failures",
+                      "`httpPlugin()` + `batchFeature` + `retryFeature`",
+                      "log-plugin-http"
+                    ],
+                    ["Append to a file and rotate it", "`filePlugin()`", "log-plugin-file"],
+                    [
+                      "Deliver queued lines before exiting on a signal",
+                      "`processPlugin()`",
+                      "log-plugin-process"
+                    ],
+                    [
+                      "Filter by level and change the threshold at run time",
+                      "`thresholdFeature` + `filterFeature`",
+                      "Levels and entry policies"
+                    ],
+                    [
+                      "Change the batch size of one output only",
+                      "Same-name entry in that output's `features`",
+                      "Output scopes and delivery"
+                    ],
+                    [
+                      "Hand entries to another host",
+                      "`forwardPlugin({ targets })`",
+                      "Forwarding and configuration"
+                    ],
+                    [
+                      "Record replayable business events, write-ahead and undo logs",
+                      "`binlogPlugin` / `walPlugin` / `undoLogPlugin`",
+                      "log-plugin-durable"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "install",
+              "heading": "Install",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm add @migaia/log-host"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The host has no built-in output; install the `@migaia/log-plugin-*` module you need. It has no third-party runtime dependency; its building blocks come from `@migaia/plugin-host`, `@migaia/middleware-pipeline`, `@migaia/lifecycle`, `@migaia/event-subscriber` and `@migaia/utils`."
+                }
+              ]
+            },
+            {
+              "id": "common-apis",
+              "heading": "Common APIs",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["API", "Purpose"],
+                  "rows": [
+                    ["`createLogHost({ plugins, report?, maxPending? })`", "Create a host"],
+                    [
+                      "`levelPlugin()`",
+                      "Add `debug` / `info` / `warn` / `error` / `fatal` / `atLevel`"
+                    ],
+                    [
+                      "`log.flush()` / `log.shutdown(reason)`",
+                      "Wait for delivery / deliver, then close"
+                    ],
+                    [
+                      "`log.onFailure(listener)`",
+                      "Listen for delivery failures; returns an unsubscribe function"
+                    ],
+                    [
+                      "`defineLogPlugin({ name, features })`",
+                      "Declare host-wide default policies (`@migaia/log-host/sdk`)"
+                    ],
+                    [
+                      "`defineOutputPlugin({ name, batchable, defaultFormat, deliver })`",
+                      "Declare an output (`@migaia/log-host/sdk`)"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Built-in Features: `thresholdFeature`, `filterFeature`, `uuidFeature`, `formatFeature`, `batchFeature`, `retryFeature` and `timeoutFeature`. Import them together from `@migaia/log-host/features`, or one by one from `@migaia/log-host/features/<name>`. See the usage guide for the full API."
+                }
+              ]
+            },
+            {
+              "id": "composing-policies",
+              "heading": "Composing policies",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** Host policies are output defaults; entry enrichment executes once per entry. */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** Host-wide policies are every output's defaults; entry policies run once. */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('below the threshold, filtered')\nlog.info('accepted')\nawait log.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Built-ins are `thresholdFeature`, `filterFeature`, `uuidFeature`, `formatFeature`, `batchFeature`, `retryFeature` and `timeoutFeature`. Import them together from `./features` or use individual default exports such as `./features/retry`."
+                  "text": "Feature factories return native `@migaia/plugin-host` definitions and expose no internal fields or control methods. `features` is always a `{ name: feature }` record. Each plugin installation creates its own state; control methods appear on the host as `${pluginName}_${name}_${method}`, for example `log.policy_threshold_setLevel('warn')`."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Feature factories return opaque native `@migaia/plugin-host` definitions without descriptor fields or controls. `defineLogPlugin` uses `definePlugin` to assemble an ordinary host-wide plugin; `createLogHost` receives policies only through `plugins`. Every `features` declaration uses a `{ alias: feature }` record. Each plugin installation owns independent state. Controls are plugin extensions named `${pluginName}_${alias}_${method}`, for example `log.policy_threshold_setLevel('warn')`."
+                  "text": "An output plugin's `features` apply only to that output. A same-name entry in an output overrides the host-wide entry. Each output takes at most one format, batch, retry and timeout: when an output configures one of these kinds, it replaces the host-wide entry of that kind even under a different name. Gates with different names all run, even when they come from the same factory. An output can set a kind to `false` so it does not inherit the host-wide entry of that kind."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Features on an output plugin apply only to that output. An output feature replaces the host-wide feature with the same key, and an output that configures its own format, batch, retry or timeout replaces the host-wide one of that kind even under a different key. Gates under different keys both execute, including two instances of the same factory. One plugin record holds at most one format, batch, retry and timeout; host-wide carriers cannot share a key or each supply the same one of those four kinds. Duplicate host aliases and invalid individual records retain `logging / INVALID_OPTION`; two global carriers contributing the same singular format, batch, retry or timeout role fail with `plugin.host / FEATURE_ROLE_CONFLICT`. Execution follows entry, gate, format, batch, retry, timeout and transport phases, retaining effective record order within the gate phase. The output default format applies only when no explicit format survives."
+                  "text": "One plugin's record may hold at most one format, batch, retry and timeout; otherwise it is rejected with `logging / INVALID_OPTION`. Two host-wide policy plugins that each provide the same kind are rejected with `plugin.host / FEATURE_ROLE_CONFLICT`. These checks run when the plugin is installed (`createLogHost` or `use()`); the rejected batch rolls back and the host keeps logging. Without an explicit format, the output's `defaultFormat` applies."
                 },
                 {
                   "type": "paragraph",
-                  "text": "An output can declare `consumesText: false` to receive entries and a cancellation signal while skipping host formatting. It cannot configure a format or defaultFormat. Entry processing, gates and delivery policies still apply."
+                  "text": "An output can declare `consumesText: false` to receive only the raw entry and the abort signal and skip formatting; such an output cannot configure a format and omits `defaultFormat`."
                 }
               ]
             },
@@ -352,11 +782,12 @@
                 {
                   "type": "list",
                   "items": [
-                    "Log methods contain runtime delivery errors. `flush()` and `shutdown()` always fulfill. Observe failures with `onFailure()`; otherwise the host calls `report`.",
-                    "Listener failures reach the reporter as `HOOK_FAILED`, with the original on `cause`. Reporter failures are contained without recursive reporting.",
-                    "Invalid creation options throw identified errors synchronously. Configuration operations `use()` and `unUse()` may reject.",
-                    "Durable append, commit, read and invalid-handle operations keep their storage rejection contract. The logging guarantee does not mask transaction failures.",
-                    "The default pending-entry capacity is 10000. Overflow drops the oldest unprocessed entry and reports `QUEUE_OVERFLOW`."
+                    "Log methods never throw delivery errors; `flush()` and `shutdown()` always fulfill. Observe failures with `onFailure()`; with no listener they go to `report`.",
+                    "A listener that fails is reported as `HOOK_FAILED` with the original error in `cause`. A failing `report` is contained and never reported recursively.",
+                    "Invalid creation options throw synchronously with `source` and `code`. `use()` and `unUse()` are configuration operations and may reject.",
+                    "`flush()` waits at most 3000 ms by default; when the time is up it reports `LIFECYCLE_DEADLINE` and fulfills, which does not mean every line was delivered.",
+                    "At most 10000 entries wait by default; beyond that the oldest unprocessed entry is dropped and `QUEUE_OVERFLOW` is reported.",
+                    "Durable plugins' append, commit and read still reject under their storage contract; the \"log methods never throw\" guarantee does not cover these transactional operations."
                   ]
                 }
               ]
@@ -367,34 +798,19 @@
               "blocks": [
                 {
                   "type": "table",
-                  "headers": ["Entry", "Purpose"],
+                  "headers": ["Entry", "Contents"],
                   "rows": [
                     [
                       "`@migaia/log-host`",
-                      "Host factory, level/forward plugins, status, default reporter and host types"
+                      "`createLogHost`, `levelPlugin`, `forwardPlugin`, status constants, the default reporter and host types"
                     ],
                     [
                       "`@migaia/log-host/sdk`",
-                      "`defineLogFeature`, `defineLogPlugin`, `defineOutputPlugin`, shared error projection and author types"
+                      "`defineLogFeature`, `defineLogPlugin`, `defineOutputPlugin`, `projectLogEntry` and plugin-author types"
                     ],
-                    ["`@migaia/log-host/features`", "All seven built-in features"],
-                    [
-                      "`@migaia/log-host/features/<name>`",
-                      "The corresponding feature's default export"
-                    ]
+                    ["`@migaia/log-host/features`", "The seven built-in Features"],
+                    ["`@migaia/log-host/features/<name>`", "One built-in Feature"]
                   ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "The host includes no output transport or third-party runtime dependency. It uses `@migaia/plugin-host`, `@migaia/middleware-pipeline`, `@migaia/lifecycle`, `@migaia/event-subscriber` and `@migaia/utils`."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "See USEGUIDE.en.md for complete usage."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Output feature selections accept `false` to disable an inherited role. A local singular format, batch, retry or timeout replaces that whole inherited role; entry and gate selections replace the matching alias. Host defaults are published through the shared overlay and propagated to installed outputs on committed policy installation or removal."
                 }
               ]
             }
@@ -402,6 +818,36 @@
         },
         "guide": {
           "sections": [
+            {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["What you want to do", "Where to look"],
+                  "rows": [
+                    ["Create a host, write the first line, deliver before exit", "Create a host"],
+                    [
+                      "Filter by level, change the threshold or add filters at run time",
+                      "Levels and entry policies"
+                    ],
+                    [
+                      "Share batching, retry and timeout across outputs, or change one output",
+                      "Output scopes and delivery"
+                    ],
+                    ["Write logs to your own destination", "Define an output"],
+                    [
+                      "Observe delivery failures and keep error cause chains",
+                      "Errors and lifecycle"
+                    ],
+                    [
+                      "Hand entries to another host, add or remove plugins at run time",
+                      "Forwarding and configuration"
+                    ]
+                  ]
+                }
+              ]
+            },
             {
               "id": "create-a-host",
               "heading": "Create a host",
@@ -606,8 +1052,8 @@
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')",
             "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')",
             "import { createLogHost } from '@migaia/log-host'\n\n/** 单独的 reporter 接收无人处理的失败和失败监听器自身的异常。 */\nconst log = createLogHost({ report: (error) => console.error(error) })\n/** 撤销函数只移除这一监听器。 */\nconst off = log.onFailure(({ source, error }) => console.error(source, error))\nlog.log('audit', 'event')\nawait log.flush()\noff()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 拥有插件安装、日志交付与最终释放。 */\nconst log = createLogHost({ plugins: [levelPlugin(), consolePlugin()] })\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\n\n// 一个慢的日志后端：每批写入要 50 毫秒\nconst remote = defineOutputPlugin({\n  name: 'remote',\n  batchable: false,\n  defaultFormat: 'plain',\n  async deliver(records) {\n    await new Promise((resolve) => setTimeout(resolve, 50))\n    for (const record of records) console.log(`后端收到：${record.entry.message}`)\n  }\n})\n\nconst log = createLogHost({ plugins: [levelPlugin(), remote] })\nlog.info('订单已创建')\nlog.warn('库存偏低')\nconsole.log('日志调用已经返回，请求继续处理')\n\n// 进程退出前调用：先把排队的日志送完，再释放插件\nawait log.shutdown('manual')\nconsole.log('已关闭')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('低于门槛，被过滤')\nlog.info('通过')\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -736,7 +1182,7 @@
               ]
             }
           ],
-          "usageScore": 88,
+          "usageScore": 92,
           "configuration": [
             {
               "name": "plugins",
@@ -983,7 +1429,7 @@
               ]
             }
           ],
-          "usageScore": 6,
+          "usageScore": 8,
           "configuration": [
             {
               "name": "targets",
@@ -1603,8 +2049,8 @@
           "examples": [
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 每个 host 独立拥有上下文、插件与交付队列。 */\nconst log = createLogHost({\n  context: ['orders'],\n  topic: 'api',\n  maxPending: 10000,\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.info('created', { orderId: 'o1' })\nlog.log('audit', 'arbitrary tags remain valid')\nawait log.flush()\nawait log.shutdown('manual')",
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 拥有插件安装、日志交付与最终释放。 */\nconst log = createLogHost({ plugins: [levelPlugin(), consolePlugin()] })\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\n\n// 一个慢的日志后端：每批写入要 50 毫秒\nconst remote = defineOutputPlugin({\n  name: 'remote',\n  batchable: false,\n  defaultFormat: 'plain',\n  async deliver(records) {\n    await new Promise((resolve) => setTimeout(resolve, 50))\n    for (const record of records) console.log(`后端收到：${record.entry.message}`)\n  }\n})\n\nconst log = createLogHost({ plugins: [levelPlugin(), remote] })\nlog.info('订单已创建')\nlog.warn('库存偏低')\nconsole.log('日志调用已经返回，请求继续处理')\n\n// 进程退出前调用：先把排队的日志送完，再释放插件\nawait log.shutdown('manual')\nconsole.log('已关闭')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('低于门槛，被过滤')\nlog.info('通过')\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -1652,7 +2098,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-host/dist/level.d.ts:levelPlugin:export declare function levelPlugin(): ILogPlugin<ILevelPluginExt>;",
           "guidance": [],
-          "usageScore": 64,
+          "usageScore": 68,
           "configuration": [],
           "fragment": "log-host-index--levelPlugin"
         },
@@ -2472,7 +2918,7 @@
           ],
           "identity": "packages/log-host/dist/features/batch.d.ts:batchFeature:export declare function batchFeature(options?: IBatchOptions): ILogFeature;",
           "guidance": [],
-          "usageScore": 20,
+          "usageScore": 24,
           "configuration": [
             {
               "name": "maxSize",
@@ -2621,7 +3067,7 @@
           ],
           "identity": "packages/log-host/dist/features/filter.d.ts:filterFeature:export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature<IFilterControls>;",
           "guidance": [],
-          "usageScore": 20,
+          "usageScore": 22,
           "configuration": [
             {
               "name": "filters",
@@ -2736,15 +3182,15 @@
           ],
           "identity": "packages/log-host/dist/features/format.d.ts:formatFeature:export declare function formatFeature(options: { format: 'json' | 'plain'; }): ILogFeature;",
           "guidance": [],
-          "usageScore": 20,
+          "usageScore": 22,
           "configuration": [
             {
               "name": "format",
               "type": "'json' | 'plain'",
               "optional": false,
-              "description": "format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类，动态 `use()` 同样检查。违反时以既有 `INVALID_OPTION` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。",
+              "description": "format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，动态 `use()` 同样检查。重复的 host 级名称和单个记录格式错误以 `logging / INVALID_OPTION` 拒绝；两个 host 级载体各自提供同一类 format、batch、retry 或 timeout 时，以 `plugin.host / FEATURE_ROLE_CONFLICT` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。",
               "descriptionEn": "",
-              "descriptionZh": "format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类，动态 `use()` 同样检查。违反时以既有 `INVALID_OPTION` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。"
+              "descriptionZh": "format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，动态 `use()` 同样检查。重复的 host 级名称和单个记录格式错误以 `logging / INVALID_OPTION` 拒绝；两个 host 级载体各自提供同一类 format、batch、retry 或 timeout 时，以 `plugin.host / FEATURE_ROLE_CONFLICT` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。"
             }
           ],
           "fragment": "log-host-features/format--formatFeature"
@@ -2855,7 +3301,7 @@
           ],
           "identity": "packages/log-host/dist/features/retry.d.ts:retryFeature:export declare function retryFeature(options: IRetryFeatureOptions): ILogFeature;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 8,
           "configuration": [
             {
               "name": "attempts",
@@ -2917,7 +3363,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('低于门槛，被过滤')\nlog.info('通过')\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -2979,7 +3425,7 @@
           ],
           "identity": "packages/log-host/dist/features/threshold.d.ts:thresholdFeature:export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature<IThresholdControls>;",
           "guidance": [],
-          "usageScore": 38,
+          "usageScore": 42,
           "configuration": [
             {
               "name": "level",
@@ -3146,7 +3592,7 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('低于门槛，被过滤')\nlog.info('通过')\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -3341,7 +3787,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineLogPlugin.",
           "examples": [
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('低于门槛，被过滤')\nlog.info('通过')\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -3399,7 +3845,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-host/dist/log-plugin.d.ts:defineLogPlugin:export declare function defineLogPlugin<const N extends string, const F extends ILogFeatureRecord = Record<never, never>, O extends Record<string, unknown> = Record<never, never>, C extends IPluginConfig = IPluginConfig>(requested: ILogPluginDefinition<N, F, O, C>): NoInfer<IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, C, F>>;",
           "guidance": [],
-          "usageScore": 36,
+          "usageScore": 38,
           "configuration": [],
           "fragment": "log-host-sdk--defineLogPlugin"
         },
@@ -3424,7 +3870,8 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\n\n// 一个慢的日志后端：每批写入要 50 毫秒\nconst remote = defineOutputPlugin({\n  name: 'remote',\n  batchable: false,\n  defaultFormat: 'plain',\n  async deliver(records) {\n    await new Promise((resolve) => setTimeout(resolve, 50))\n    for (const record of records) console.log(`后端收到：${record.entry.message}`)\n  }\n})\n\nconst log = createLogHost({ plugins: [levelPlugin(), remote] })\nlog.info('订单已创建')\nlog.warn('库存偏低')\nconsole.log('日志调用已经返回，请求继续处理')\n\n// 进程退出前调用：先把排队的日志送完，再释放插件\nawait log.shutdown('manual')\nconsole.log('已关闭')"
           ],
           "members": [],
           "composes": [],
@@ -3482,7 +3929,7 @@
           "declaredConfiguration": [],
           "identity": "packages/log-host/dist/output.d.ts:defineOutputPlugin:export declare function defineOutputPlugin<const N extends string, const F extends ILogOutputFeatureRecord = Record<never, never>, O extends Record<string, unknown> = Record<never, never>>(requested: IOutputDefinition<O, F> & { name: N; }): IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, IPluginConfig, IEnabledLogFeatures<F>>;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 40,
           "configuration": [],
           "fragment": "log-host-sdk--defineOutputPlugin"
         },

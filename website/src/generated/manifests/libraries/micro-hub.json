@@ -119,7 +119,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { localStorageHost } from '@migaia/storage-plugin-browser/local-storage'\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: localStorageHost({ namespace: 'shop' }) })]\n})"
+                "code": "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'\n\n// 持久化用的 store 来自 storage-host 的一个后端；hub 只借用它，关闭 storage 由应用负责\nconst storage = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ namespace: 'shop' })]\n})\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: storage.backend('local') })]\n})"
               }
             ]
           },
@@ -130,7 +130,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { getMicroHub } from '@migaia/micro-hub'\nimport { cart } from 'cart/contract'\n\n// owner：购物车应用\nconst app = getMicroHub().connect('cart')\nconst owned = app.own(cart, { persist: ['items'] })\nowned.handle('checkout', async ({ coupon }) => {\n  const orderId = await submitOrder(owned.state.items.get(), coupon)\n  owned.events.checkedOut.emit({ orderId })\n  return { orderId }\n})\n\n// 使用方：商品应用\nconst product = getMicroHub().connect('product')\nconst view = product.use(cart)\nview.commands.add({ id: 'sku-1', price: 42 })          // product 在 writers 里，可以写\nview.computed.total.subscribe(() => render(view.computed.total.get()))\nview.events.checkedOut.on(({ orderId }) => toast(orderId))\nconst { orderId } = await view.requests.checkout({}, { waitForOwner: 3000 })\n\n// 卸载时\nawait product.disconnect()"
+                "code": "import { getMicroHub } from '@migaia/micro-hub'\nimport { cart } from 'cart/contract'\n\n// owner：购物车应用\nconst app = getMicroHub().connect('cart')\nconst owned = app.own(cart, { persist: ['items'] })\nowned.handle('checkout', async ({ coupon }) => {\n  const orderId = await submitOrder(owned.state.items.get(), coupon)\n  owned.events.checkedOut.emit({ orderId })\n  return { orderId }\n})\n\n// 使用方：商品应用\nconst product = getMicroHub().connect('product')\nconst view = product.use(cart)\nview.commands.add({ id: 'sku-1', price: 42 }) // product 在 writers 里，可以写\nview.computed.total.subscribe(() => render(view.computed.total.get()))\nview.events.checkedOut.on(({ orderId }) => toast(orderId))\nconst { orderId } = await view.requests.checkout({}, { waitForOwner: 3000 })\n\n// 卸载时\nawait product.disconnect()"
               }
             ]
           },
@@ -160,7 +160,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'\n\nprovideMicroApp(document.querySelector('#checkout-slot')!, app)   // 主应用\n\nclass CheckoutElement extends HTMLElement {\n  connectedCallback() {\n    consumeMicroApp(this, (app) => this.render(app.use(cart)))   // 子应用\n  }\n}"
+                "code": "import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'\n\nprovideMicroApp(document.querySelector('#checkout-slot')!, app) // 主应用\n\nclass CheckoutElement extends HTMLElement {\n  connectedCallback() {\n    consumeMicroApp(this, (app) => this.render(app.use(cart))) // 子应用\n  }\n}"
               },
               {
                 "type": "paragraph",
@@ -254,6 +254,33 @@
               {
                 "type": "paragraph",
                 "text": "English"
+              }
+            ]
+          },
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "按你要做的事跳到对应章节："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "目录",
+                  "1. Hub",
+                  "2. 契约",
+                  "3. 应用句柄",
+                  "4. 状态",
+                  "5. 事件与请求",
+                  "6. 持久化",
+                  "7. 共享异步值",
+                  "8. Web Components",
+                  "9. 生命周期与并发",
+                  "10. 公开常量",
+                  "错误码"
+                ]
               }
             ]
           },
@@ -454,7 +481,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意 `IKeyValueStore`，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageHost({ namespace })` 或 `@migaia/storage-plugin-browser/indexed-db` 的 `indexedDbHost({ dbName })`。这两个工厂名字带 `Host`，但只返回一个 store，不会创建 storage-plugin-browser 的 host；micro-hub 也不使用 storage-plugin-browser 的 `./plugins/*`（它们只能装进 storage host）。hub 只借用这个 store，不会释放它。"
+                "text": "`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意键值 store。浏览器里通常先用 `createStorageHost` 装一个后端插件，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageBackendPlugin({ namespace })`，再把 `storage.backend('local')` 传进来。hub 只借用这个 store，不会释放它；storage host 由应用自己在退出时 `dispose()`。"
               },
               {
                 "type": "paragraph",
@@ -727,7 +754,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { localStorageHost } from '@migaia/storage-plugin-browser/local-storage'\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: localStorageHost({ namespace: 'shop' }) })]\n})"
+                  "code": "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'\n\n// The persistence store is one storage-host backend; the hub borrows it and the app closes storage\nconst storage = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ namespace: 'shop' })]\n})\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: storage.backend('local') })]\n})"
                 }
               ]
             },
@@ -738,7 +765,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { getMicroHub } from '@migaia/micro-hub'\nimport { cart } from 'cart/contract'\n\n// Owner: the cart app\nconst app = getMicroHub().connect('cart')\nconst owned = app.own(cart, { persist: ['items'] })\nowned.handle('checkout', async ({ coupon }) => {\n  const orderId = await submitOrder(owned.state.items.get(), coupon)\n  owned.events.checkedOut.emit({ orderId })\n  return { orderId }\n})\n\n// Consumer: the product app\nconst product = getMicroHub().connect('product')\nconst view = product.use(cart)\nview.commands.add({ id: 'sku-1', price: 42 })          // product is in writers, so it may write\nview.computed.total.subscribe(() => render(view.computed.total.get()))\nview.events.checkedOut.on(({ orderId }) => toast(orderId))\nconst { orderId } = await view.requests.checkout({}, { waitForOwner: 3000 })\n\n// On unmount\nawait product.disconnect()"
+                  "code": "import { getMicroHub } from '@migaia/micro-hub'\nimport { cart } from 'cart/contract'\n\n// Owner: the cart app\nconst app = getMicroHub().connect('cart')\nconst owned = app.own(cart, { persist: ['items'] })\nowned.handle('checkout', async ({ coupon }) => {\n  const orderId = await submitOrder(owned.state.items.get(), coupon)\n  owned.events.checkedOut.emit({ orderId })\n  return { orderId }\n})\n\n// Consumer: the product app\nconst product = getMicroHub().connect('product')\nconst view = product.use(cart)\nview.commands.add({ id: 'sku-1', price: 42 }) // product is in writers, so it may write\nview.computed.total.subscribe(() => render(view.computed.total.get()))\nview.events.checkedOut.on(({ orderId }) => toast(orderId))\nconst { orderId } = await view.requests.checkout({}, { waitForOwner: 3000 })\n\n// On unmount\nawait product.disconnect()"
                 }
               ]
             },
@@ -768,7 +795,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'\n\nprovideMicroApp(document.querySelector('#checkout-slot')!, app)   // shell\n\nclass CheckoutElement extends HTMLElement {\n  connectedCallback() {\n    consumeMicroApp(this, (app) => this.render(app.use(cart)))   // child app\n  }\n}"
+                  "code": "import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'\n\nprovideMicroApp(document.querySelector('#checkout-slot')!, app) // shell\n\nclass CheckoutElement extends HTMLElement {\n  connectedCallback() {\n    consumeMicroApp(this, (app) => this.render(app.use(cart))) // child app\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -871,6 +898,33 @@
                 {
                   "type": "paragraph",
                   "text": "中文"
+                }
+              ]
+            },
+            {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Jump to the section for what you want to do:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Contents",
+                    "1. Hub",
+                    "2. Contracts",
+                    "3. App handle",
+                    "4. State",
+                    "5. Events and requests",
+                    "6. Persistence",
+                    "7. Shared asynchronous values",
+                    "8. Web Components",
+                    "9. Lifecycle and concurrency",
+                    "10. Public constants",
+                    "Error codes"
+                  ]
                 }
               ]
             },
@@ -1098,7 +1152,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`persist({ store, debounceMs?, keyPrefix? })` requires `state()`. `store` is any `IKeyValueStore`, for example `localStorageHost({ namespace })` from `@migaia/storage-plugin-browser/local-storage` or `indexedDbHost({ dbName })` from `@migaia/storage-plugin-browser/indexed-db`. Despite the `Host` in their names, these two factories return only a store and do not create a storage-plugin-browser host. micro-hub does not use storage-plugin-browser's `./plugins/*`, which can only be installed into a storage host. The hub borrows the store and never releases it."
+                  "text": "`persist({ store, debounceMs?, keyPrefix? })` requires `state()`. `store` is any key-value store. In a browser you usually create a storage host with one backend plugin, for example `localStorageBackendPlugin({ namespace })` from `@migaia/storage-plugin-browser/local-storage`, and pass `storage.backend('local')`. The hub borrows the store and never releases it; the app disposes the storage host itself when it shuts down."
                 },
                 {
                   "type": "paragraph",
@@ -1349,7 +1403,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { localStorageHost } from '@migaia/storage-plugin-browser/local-storage'\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: localStorageHost({ namespace: 'shop' }) })]\n})"
+            "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'\n\n// 持久化用的 store 来自 storage-host 的一个后端；hub 只借用它，关闭 storage 由应用负责\nconst storage = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ namespace: 'shop' })]\n})\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: storage.backend('local') })]\n})"
           ],
           "members": [],
           "composes": [],
@@ -1941,7 +1995,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { getMicroHub } from '@migaia/micro-hub'\nimport { cart } from 'cart/contract'\n\n// owner：购物车应用\nconst app = getMicroHub().connect('cart')\nconst owned = app.own(cart, { persist: ['items'] })\nowned.handle('checkout', async ({ coupon }) => {\n  const orderId = await submitOrder(owned.state.items.get(), coupon)\n  owned.events.checkedOut.emit({ orderId })\n  return { orderId }\n})\n\n// 使用方：商品应用\nconst product = getMicroHub().connect('product')\nconst view = product.use(cart)\nview.commands.add({ id: 'sku-1', price: 42 })          // product 在 writers 里，可以写\nview.computed.total.subscribe(() => render(view.computed.total.get()))\nview.events.checkedOut.on(({ orderId }) => toast(orderId))\nconst { orderId } = await view.requests.checkout({}, { waitForOwner: 3000 })\n\n// 卸载时\nawait product.disconnect()"
+            "import { getMicroHub } from '@migaia/micro-hub'\nimport { cart } from 'cart/contract'\n\n// owner：购物车应用\nconst app = getMicroHub().connect('cart')\nconst owned = app.own(cart, { persist: ['items'] })\nowned.handle('checkout', async ({ coupon }) => {\n  const orderId = await submitOrder(owned.state.items.get(), coupon)\n  owned.events.checkedOut.emit({ orderId })\n  return { orderId }\n})\n\n// 使用方：商品应用\nconst product = getMicroHub().connect('product')\nconst view = product.use(cart)\nview.commands.add({ id: 'sku-1', price: 42 }) // product 在 writers 里，可以写\nview.computed.total.subscribe(() => render(view.computed.total.get()))\nview.events.checkedOut.on(({ orderId }) => toast(orderId))\nconst { orderId } = await view.requests.checkout({}, { waitForOwner: 3000 })\n\n// 卸载时\nawait product.disconnect()"
           ],
           "members": [],
           "composes": [],
@@ -5855,7 +5909,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { localStorageHost } from '@migaia/storage-plugin-browser/local-storage'\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: localStorageHost({ namespace: 'shop' }) })]\n})"
+            "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'\n\n// 持久化用的 store 来自 storage-host 的一个后端；hub 只借用它，关闭 storage 由应用负责\nconst storage = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ namespace: 'shop' })]\n})\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: storage.backend('local') })]\n})"
           ],
           "members": [],
           "composes": [],
@@ -6136,7 +6190,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { localStorageHost } from '@migaia/storage-plugin-browser/local-storage'\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: localStorageHost({ namespace: 'shop' }) })]\n})"
+            "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'\n\n// 持久化用的 store 来自 storage-host 的一个后端；hub 只借用它，关闭 storage 由应用负责\nconst storage = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ namespace: 'shop' })]\n})\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: storage.backend('local') })]\n})"
           ],
           "members": [],
           "composes": [],
@@ -6224,17 +6278,17 @@
               "name": "debounceMs",
               "type": "number",
               "optional": true,
-              "description": "`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意 `IKeyValueStore`，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageHost({ namespace })` 或 `@migaia/storage-plugin-browser/indexed-db` 的 `indexedDbHost({ dbName })`。这两个工厂名字带 `Host`，但只返回一个 store，不会创建 storage-plugin-browser 的 host；micro-hub 也不使用 storage-plugin-browser 的 `./plugins/*`（它们只能装进 storage host）。hub 只借用这个 store，不会释放它。",
+              "description": "`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意键值 store。浏览器里通常先用 `createStorageHost` 装一个后端插件，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageBackendPlugin({ namespace })`，再把 `storage.backend('local')` 传进来。hub 只借用这个 store，不会释放它；storage host 由应用自己在退出时 `dispose()`。",
               "descriptionEn": "Quiet period before a write; default 0 writes after each commit.",
-              "descriptionZh": "`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意 `IKeyValueStore`，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageHost({ namespace })` 或 `@migaia/storage-plugin-browser/indexed-db` 的 `indexedDbHost({ dbName })`。这两个工厂名字带 `Host`，但只返回一个 store，不会创建 storage-plugin-browser 的 host；micro-hub 也不使用 storage-plugin-browser 的 `./plugins/*`（它们只能装进 storage host）。hub 只借用这个 store，不会释放它。"
+              "descriptionZh": "`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意键值 store。浏览器里通常先用 `createStorageHost` 装一个后端插件，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageBackendPlugin({ namespace })`，再把 `storage.backend('local')` 传进来。hub 只借用这个 store，不会释放它；storage host 由应用自己在退出时 `dispose()`。"
             },
             {
               "name": "keyPrefix",
               "type": "string",
               "optional": true,
-              "description": "`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意 `IKeyValueStore`，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageHost({ namespace })` 或 `@migaia/storage-plugin-browser/indexed-db` 的 `indexedDbHost({ dbName })`。这两个工厂名字带 `Host`，但只返回一个 store，不会创建 storage-plugin-browser 的 host；micro-hub 也不使用 storage-plugin-browser 的 `./plugins/*`（它们只能装进 storage host）。hub 只借用这个 store，不会释放它。",
+              "description": "`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意键值 store。浏览器里通常先用 `createStorageHost` 装一个后端插件，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageBackendPlugin({ namespace })`，再把 `storage.backend('local')` 传进来。hub 只借用这个 store，不会释放它；storage host 由应用自己在退出时 `dispose()`。",
               "descriptionEn": "Prefix prepended to every storage key; default `micro-hub:`.",
-              "descriptionZh": "`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意 `IKeyValueStore`，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageHost({ namespace })` 或 `@migaia/storage-plugin-browser/indexed-db` 的 `indexedDbHost({ dbName })`。这两个工厂名字带 `Host`，但只返回一个 store，不会创建 storage-plugin-browser 的 host；micro-hub 也不使用 storage-plugin-browser 的 `./plugins/*`（它们只能装进 storage host）。hub 只借用这个 store，不会释放它。"
+              "descriptionZh": "`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意键值 store。浏览器里通常先用 `createStorageHost` 装一个后端插件，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageBackendPlugin({ namespace })`，再把 `storage.backend('local')` 传进来。hub 只借用这个 store，不会释放它；storage host 由应用自己在退出时 `dispose()`。"
             }
           ],
           "fragment": "micro-hub-persist--persist"
@@ -6540,7 +6594,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { localStorageHost } from '@migaia/storage-plugin-browser/local-storage'\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: localStorageHost({ namespace: 'shop' }) })]\n})"
+            "import { createMicroHub } from '@migaia/micro-hub'\nimport { events } from '@migaia/micro-hub/events'\nimport { state } from '@migaia/micro-hub/state'\nimport { persist } from '@migaia/micro-hub/persist'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'\n\n// 持久化用的 store 来自 storage-host 的一个后端；hub 只借用它，关闭 storage 由应用负责\nconst storage = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ namespace: 'shop' })]\n})\n\ncreateMicroHub({\n  plugins: [events(), state(), persist({ store: storage.backend('local') })]\n})"
           ],
           "members": [],
           "composes": [],
@@ -6698,7 +6752,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'\n\nprovideMicroApp(document.querySelector('#checkout-slot')!, app)   // 主应用\n\nclass CheckoutElement extends HTMLElement {\n  connectedCallback() {\n    consumeMicroApp(this, (app) => this.render(app.use(cart)))   // 子应用\n  }\n}"
+            "import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'\n\nprovideMicroApp(document.querySelector('#checkout-slot')!, app) // 主应用\n\nclass CheckoutElement extends HTMLElement {\n  connectedCallback() {\n    consumeMicroApp(this, (app) => this.render(app.use(cart))) // 子应用\n  }\n}"
           ],
           "members": [],
           "composes": [],
@@ -6852,7 +6906,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'\n\nprovideMicroApp(document.querySelector('#checkout-slot')!, app)   // 主应用\n\nclass CheckoutElement extends HTMLElement {\n  connectedCallback() {\n    consumeMicroApp(this, (app) => this.render(app.use(cart)))   // 子应用\n  }\n}"
+            "import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'\n\nprovideMicroApp(document.querySelector('#checkout-slot')!, app) // 主应用\n\nclass CheckoutElement extends HTMLElement {\n  connectedCallback() {\n    consumeMicroApp(this, (app) => this.render(app.use(cart))) // 子应用\n  }\n}"
           ],
           "members": [],
           "composes": [],

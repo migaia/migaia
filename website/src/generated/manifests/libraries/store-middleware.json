@@ -222,7 +222,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "旧 middlewarePlugin/IStoreMiddleware/IMiddlewareContext 已移除，改用 `IStoreMiddlewarePlugin` 的 install(core) 与 core.usePipeline。旧 tolerantClone 名在两入口都已删除；ClonePolicy、immutableSnapshotClone、opaqueReferenceClone、diagnosticClone 以及 IClonePolicyMode 都归窄入口。IMutationGuard/IMutationPolicy 直接从 store-light 导入，没有本包别名。原 store-devtools 的 StoreDevtoolsCommand/IStoreDevtoolsCommand 迁移到本包 ReduxDevToolsCommand/IReduxDevToolsCommand，协议字符串不变。"
+                "text": "中间件插件实现 `IStoreMiddlewarePlugin`，在 `install(core)` 中通过 `core.usePipeline` 接入。ClonePolicy、immutableSnapshotClone、opaqueReferenceClone、diagnosticClone 以及 IClonePolicyMode 从窄入口导入。IMutationGuard/IMutationPolicy 直接从 store-light 导入。Redux DevTools 命令常量是本包的 ReduxDevToolsCommand/IReduxDevToolsCommand。"
               }
             ]
           },
@@ -976,7 +976,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "旧 middlewarePlugin/IStoreMiddleware/IMiddlewareContext 已移除，改用 `IStoreMiddlewarePlugin` 的 install(core) 与 core.usePipeline。旧 tolerantClone 名在两入口都已删除；ClonePolicy、immutableSnapshotClone、opaqueReferenceClone、diagnosticClone 以及 IClonePolicyMode 都归窄入口。IMutationGuard/IMutationPolicy 直接从 store-light 导入，没有本包别名。原 store-devtools 的 StoreDevtoolsCommand/IStoreDevtoolsCommand 迁移到本包 ReduxDevToolsCommand/IReduxDevToolsCommand，协议字符串不变。"
+                "text": "中间件插件实现 `IStoreMiddlewarePlugin`，在 `install(core)` 中通过 `core.usePipeline` 接入。ClonePolicy、immutableSnapshotClone、opaqueReferenceClone、diagnosticClone 以及 IClonePolicyMode 从窄入口导入。IMutationGuard/IMutationPolicy 直接从 store-light 导入。Redux DevTools 命令常量是本包的 ReduxDevToolsCommand/IReduxDevToolsCommand。"
               }
             ]
           },
@@ -1607,7 +1607,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The old middlewarePlugin/IStoreMiddleware/IMiddlewareContext adapters were removed; use `IStoreMiddlewarePlugin`, install(core), and core.usePipeline. tolerantClone no longer exists at either entry. ClonePolicy, immutableSnapshotClone, opaqueReferenceClone, diagnosticClone, and IClonePolicyMode belong to the narrow entry. Import IMutationGuard/IMutationPolicy directly from store-light; this module has no aliases. The former store-devtools StoreDevtoolsCommand/IStoreDevtoolsCommand imports move to ReduxDevToolsCommand/IReduxDevToolsCommand here without changing protocol strings."
+                  "text": "Middleware plugins implement `IStoreMiddlewarePlugin` and attach in `install(core)` through `core.usePipeline`. Import ClonePolicy, immutableSnapshotClone, opaqueReferenceClone, diagnosticClone and IClonePolicyMode from the narrow entry. Import IMutationGuard/IMutationPolicy directly from store-light. The Redux DevTools command constants are this module's ReduxDevToolsCommand/IReduxDevToolsCommand."
                 }
               ]
             },
@@ -2438,7 +2438,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The old middlewarePlugin/IStoreMiddleware/IMiddlewareContext adapters were removed; use `IStoreMiddlewarePlugin`, install(core), and core.usePipeline. tolerantClone no longer exists at either entry. ClonePolicy, immutableSnapshotClone, opaqueReferenceClone, diagnosticClone, and IClonePolicyMode belong to the narrow entry. Import IMutationGuard/IMutationPolicy directly from store-light; this module has no aliases. The former store-devtools StoreDevtoolsCommand/IStoreDevtoolsCommand imports move to ReduxDevToolsCommand/IReduxDevToolsCommand here without changing protocol strings."
+                  "text": "Middleware plugins implement `IStoreMiddlewarePlugin` and attach in `install(core)` through `core.usePipeline`. Import ClonePolicy, immutableSnapshotClone, opaqueReferenceClone, diagnosticClone and IClonePolicyMode from the narrow entry. Import IMutationGuard/IMutationPolicy directly from store-light. The Redux DevTools command constants are this module's ReduxDevToolsCommand/IReduxDevToolsCommand."
                 }
               ]
             },

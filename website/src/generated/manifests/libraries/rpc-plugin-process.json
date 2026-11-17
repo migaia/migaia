@@ -21,17 +21,30 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "将真实子进程、本机连接与监听器接入 RPC。Process owner 负责原生启动、字节/消息 I/O、监督与资源释放；Host 负责会话、方法目录和业务调用。"
+                "text": "English · 使用指南"
               },
               {
                 "type": "paragraph",
-                "text": "English · 使用指南"
+                "text": "在子进程里运行需要隔离的任务，并像调用本地函数一样调用它；也可以连接本机已有的服务进程或监听本机连接。这是 `@migaia/rpc-host` 的传输插件：host 负责调用、超时、取消和错误还原，本包负责启动子进程、监管它、在崩溃后按策略重启，并在关闭时回收。"
               }
             ]
           },
           {
-            "id": "开始使用",
-            "heading": "开始使用",
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "一个任务的内存泄漏或崩溃拖垮了主进程：第三方解析库在主进程里出问题，整个服务一起重启。根因是不可信或不稳定的代码没有进程级隔离。",
+                  "子进程崩溃后反复重启，或者成了孤儿进程：没有退避的重启把机器打满，父进程退出后子进程还在跑。根因是没有统一的监管和回收。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
             "blocks": [
               {
                 "type": "code",
@@ -127,7 +140,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "按 `source/code/cause` 处理错误并保留原生原因。完整迁移验收尚未完成；上述差异不作为已实现保证。详细配置见使用指南。"
+                "text": "按 `source/code/cause` 处理错误并保留原生原因。详细配置见使用指南。"
               }
             ]
           }
@@ -146,6 +159,26 @@
               {
                 "type": "paragraph",
                 "text": "一个 Host 通常选择一种传输。根对象管理 `self/provide/close`，业务调用在 namespace 下；Process 的默认 namespace 为 `process`。下面所有 TypeScript 模块按当前公开 dist 做类型检查，不代表真实环境和认证验收已完成。"
+              }
+            ]
+          },
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "按你要做的事跳到对应章节："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "双向本机连接",
+                  "完整 feature 实例与 probe",
+                  "选项与期限",
+                  "原生成员与普通 PluginHost",
+                  "关闭与错误"
+                ]
               }
             ]
           },
@@ -246,7 +279,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`@migaia/rpc-contract` 只负责纯数据、类型、错误与协议准入；业务 schema 和策略归实际 plugin/feature，原生资源归 Process，调用生命周期归 Host。完整迁移验收尚未闭合。"
+                "text": "`@migaia/rpc-contract` 只负责纯数据、类型、错误与协议准入；业务 schema 和策略归实际 plugin/feature，原生资源归 Process，调用生命周期归 Host。"
               }
             ]
           }
@@ -261,11 +294,24 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Connect real child processes, local connections and listeners to RPC. Process owns native launch, byte/message I/O, supervision and resource release; Host owns sessions, method directories and calls."
+                  "text": "中文 · Usage guide"
                 },
                 {
                   "type": "paragraph",
-                  "text": "中文 · Usage guide"
+                  "text": "Run work that needs isolation in a child process and call it like a local function; you can also connect to an existing local service process or listen for local connections. This is a transport plugin for `@migaia/rpc-host`: the host handles calls, timeouts, cancellation and error restoration, and this module starts the child process, supervises it, restarts it under a policy after crashes, and reclaims it on shutdown."
+                }
+              ]
+            },
+            {
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "One task's memory leak or crash brings down the main process: a third-party parser fails inside the main process and the whole service restarts. The cause is that untrusted or unstable code has no process-level isolation.",
+                    "A crashed child restarts in a loop, or is left behind as an orphan: restarts without backoff saturate the machine, and children keep running after the parent exits. The cause is no unified supervision and reclamation."
+                  ]
                 }
               ]
             },
@@ -379,7 +425,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Inspect `source/code/cause` and retain native causes. Full migration acceptance remains pending; these differences are not implementation guarantees. See the usage guide."
+                  "text": "Inspect `source/code/cause` and retain native causes. See the usage guide."
                 }
               ]
             }
@@ -398,6 +444,26 @@
                 {
                   "type": "paragraph",
                   "text": "A Host normally selects one transport kind. The root owns `self/provide/close`; calls live under a namespace, `process` by default. These complete TypeScript modules are checked against current public dist, not proof of native-environment or authentication acceptance."
+                }
+              ]
+            },
+            {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Jump to the section for what you want to do:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Bidirectional local connections",
+                    "Complete feature instances and probe",
+                    "Options and deadlines",
+                    "Native members and ordinary PluginHost",
+                    "Closure and errors"
+                  ]
                 }
               ]
             },
@@ -498,7 +564,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/rpc-contract` owns pure data, types, errors and protocol admission. Actual plugins/features own business schema and policy, Process owns native resources, and Host owns call lifetime. Full migration acceptance remains pending."
+                  "text": "`@migaia/rpc-contract` owns pure data, types, errors and protocol admission. Actual plugins/features own business schema and policy, Process owns native resources, and Host owns call lifetime."
                 }
               ]
             }

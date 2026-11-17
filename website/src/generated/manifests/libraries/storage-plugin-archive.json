@@ -188,12 +188,12 @@
             ]
           },
           {
-            "id": "从嵌套扩展迁移",
-            "heading": "从嵌套扩展迁移",
+            "id": "扩展函数的名字",
+            "heading": "扩展函数的名字",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "此前草案中的 `host.extensions.archive.run()`、`.get()`、`.sweep()` 改为 `host.extensions.archiveRun()`、`archiveGet()`、`archiveSweep()`。把三种调用分别替换为当前平铺函数；配置 `name: 'history'` 时使用 `historyRun`、`historyGet`、`historySweep`。组织视图同样从 `host.org(id).extensions` 调用。参数与返回值沿用各自操作的契约，不提供旧嵌套对象或兼容别名；资源仍由宿主释放。"
+                "text": "归档插件在宿主上发布三个平铺函数：`host.extensions.archiveRun()`、`archiveGet()`、`archiveSweep()`。名字前缀取插件的 `name`：配置 `name: 'history'` 时是 `historyRun`、`historyGet`、`historySweep`。组织视图从 `host.org(id).extensions` 调用同样的函数。资源由宿主释放。"
               }
             ]
           }
@@ -611,12 +611,12 @@
               ]
             },
             {
-              "id": "migrating-nested-extension-calls",
-              "heading": "Migrating nested extension calls",
+              "id": "extension-function-names",
+              "heading": "Extension function names",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Earlier drafts used `host.extensions.archive.run()`, `.get()` and `.sweep()`. Replace them with `host.extensions.archiveRun()`, `archiveGet()` and `archiveSweep()`. A `name: 'history'` configuration uses `historyRun`, `historyGet` and `historySweep`. Organization views expose the same flat functions through `host.org(id).extensions`. Arguments and results retain each operation's contract. There is no old nested object or compatibility alias; the host still owns resource cleanup."
+                  "text": "The archive plugin publishes three flat functions on the host: `host.extensions.archiveRun()`, `archiveGet()` and `archiveSweep()`. The prefix is the plugin `name`: with `name: 'history'` they are `historyRun`, `historyGet` and `historySweep`. Organization views call the same functions through `host.org(id).extensions`. The host releases the resources."
                 }
               ]
             }

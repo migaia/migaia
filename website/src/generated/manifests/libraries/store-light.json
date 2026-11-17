@@ -233,7 +233,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "请求、数据、取消和共享 Promise 由 `@migaia/resource` 的一个实例负责，StoreResource 只在其上加值的所有权、渲染 capture、版本租约和恰好一次的释放。迁移说明（`StoreResourceDataKind`、`StoreResourceKind`、`retain()` 的移除）见 USEGUIDE 末尾。"
+                "text": "请求、数据、取消和共享 Promise 由 `@migaia/resource` 的一个实例负责，StoreResource 只在其上加值的所有权、渲染 capture、版本租约和恰好一次的释放。"
               },
               {
                 "type": "paragraph",
@@ -607,7 +607,7 @@
                     "`(S) => IReactiveStore<S>`",
                     "`shape: IStoreDefinition<S>`；`options?: ICreateStoreOptions`",
                     "同步",
-                    "同步创建；shape 中任意字段是非 `mode: 'sync'` 的 `FieldBuilder`（`mode: 'async'` 或历史无 mode 的 Builder）会在读取属性描述符阶段直接抛错，不会执行任何 I/O，提示改用 `createAsyncStore`"
+                    "同步创建；shape 中任意字段是非 `mode: 'sync'` 的 `FieldBuilder`（例如 `mode: 'async'`）会在读取属性描述符阶段直接抛错，不会执行任何 I/O，提示改用 `createAsyncStore`"
                   ],
                   [
                     "`createAsyncStore(shape, options?)`",
@@ -823,7 +823,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "同步 vs 异步字段：所有 Builder 显式给出 `mode: 'sync'` 或 `mode: 'async'`。同步 Builder 可传任一创建入口；异步 Builder 仅传 `createAsyncStore()`。无 mode 的旧形式不再接受。"
+                "text": "同步 vs 异步字段：所有 Builder 显式给出 `mode: 'sync'` 或 `mode: 'async'`。同步 Builder 可传任一创建入口；异步 Builder 仅传 `createAsyncStore()`。"
               },
               {
                 "type": "paragraph",
@@ -1332,7 +1332,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Q：`createStore()` 报 \"only accepts synchronous fields\"，但我看代码是同步的。 检查 `FieldBuilder.mode` 是否显式为 `'sync'`；异步字段使用 `'async'` 并交给 `createAsyncStore()`。无 mode 的历史形式已移除。"
+                "text": "Q：`createStore()` 报 \"only accepts synchronous fields\"，但我看代码是同步的。 检查 `FieldBuilder.mode` 是否显式为 `'sync'`；异步字段使用 `'async'` 并交给 `createAsyncStore()`。"
               },
               {
                 "type": "paragraph",
@@ -1371,26 +1371,26 @@
             ]
           },
           {
-            "id": "迁移说明-请求统一交给-resource",
-            "heading": "迁移说明：请求统一交给 Resource",
+            "id": "storeresource-与-resource-的分工",
+            "heading": "StoreResource 与 Resource 的分工",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "StoreLight 现在只适配一个 `@migaia/resource` 实例。它保留实际值的身份、渲染 capture、资源与版本租约以及值的释放，删除了自己重复的请求/数据控制器和请求协调器。`StoreResourceDataKind` 及其类型已删除；需要原生 Resource 状态时用 `ResourceStatus` / `ResourceFetchStatus`。`StoreResourceKind` 仍是门面内部的词汇；`readSnapshot()` 仍返回 `value`/`version`/`token`，没有公开的 kind 属性。"
+                "text": "请求、数据、取消和共享 Promise 由一个 `@migaia/resource` 实例负责；StoreResource 在其上保留实际值的身份、渲染 capture、资源与版本租约以及值的释放。需要原生请求状态时读 `ResourceStatus` / `ResourceFetchStatus`；`readSnapshot()` 返回 `value`/`version`/`token`。"
               },
               {
                 "type": "paragraph",
-                "text": "加载中的重复读取抛出的是同一个 Promise，它以原始值完成。`retry()` 或强制取消会让被取代的 Promise 立即以原生 `AbortError` 失败，`source` 为 `@migaia/resource`，`code` 为 `REQUEST_ABORTED`；以前，忽略中止信号的加载函数会让这个 Promise 一直挂起，直到它自己完成。手动驱动重试时要处理旧 Promise 的拒绝。迟到的返回值只释放一次。刷新失败时恢复旧数据；旧版本的租约会把它的释放推迟到租约释放之后。等待时钟结算的已加载值仍归资源所有，结算失败时也会被释放。临时 capture 的定时器准入失败时，已建立的部分 capture 和定时器会被释放，并作为释放过程的附带问题上报；已经加载成功的值仍可读，并会通知订阅者。不引入任何异步上下文机制。"
+                "text": "加载中的重复读取抛出的是同一个 Promise，它以原始值完成。`retry()` 或强制取消会让被取代的 Promise 立即以原生 `AbortError` 失败，`source` 为 `@migaia/resource`，`code` 为 `REQUEST_ABORTED`，即使加载函数忽略了中止信号也是如此；手动驱动重试时要处理旧 Promise 的拒绝。迟到的返回值只释放一次。刷新失败时恢复旧数据；旧版本的租约会把它的释放推迟到租约释放之后。等待时钟结算的已加载值仍归资源所有，结算失败时也会被释放。临时 capture 的定时器准入失败时，已建立的部分 capture 和定时器会被释放，并作为释放过程的附带问题上报；已经加载成功的值仍可读，并会通知订阅者。"
               }
             ]
           },
           {
-            "id": "迁移说明-公开-api-收敛",
-            "heading": "迁移说明：公开 API 收敛",
+            "id": "字段-builder-与租约方法",
+            "heading": "字段 Builder 与租约方法",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "根入口不再导出 `StoreResourceKind` 和 `IStoreResourceKind`；所有权词汇留在内部，公开的资源只暴露快照和完成方法。`ILegacyFieldBuilder` 已删除，改用 `mode: 'async'` 的 `IAsyncFieldBuilder`。`IFieldBuilder` 仍是显式 sync/async Builder 的联合类型，store-wasm 的再导出也一样。`resource.retain()` 改为 `retainResource()`，`resource.retain(version)` 改为 `retainVersion(version)`。没有保留兼容别名。外部使用情况未知，应作为破坏性 API 变更发布。"
+                "text": "字段 Builder 都显式声明模式：同步字段用 `mode: 'sync'`，异步字段用 `mode: 'async'` 的 `IAsyncFieldBuilder`；`IFieldBuilder` 是两者的联合类型，store-wasm 也再导出它。锁定整个资源用 `retainResource()`，锁定某个版本用 `retainVersion(version)`。公开的资源只暴露快照和完成方法，所有权的内部分类不对外导出。"
               }
             ]
           }
@@ -1652,7 +1652,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Requests, data, cancellation and the shared Promise are handled by one instance of `@migaia/resource`; StoreResource only adds value ownership, render captures, version leases and exactly-once release on top. Migration notes (removal of `StoreResourceDataKind`, `StoreResourceKind` and `retain()`) are at the end of the USEGUIDE."
+                  "text": "Requests, data, cancellation and the shared Promise are handled by one instance of `@migaia/resource`; StoreResource only adds value ownership, render captures, version leases and exactly-once release on top."
                 },
                 {
                   "type": "paragraph",
@@ -2266,7 +2266,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Sync vs async fields: every builder states `mode: 'sync'` or `mode: 'async'` explicitly. Sync builders work with either entry point; async builders only with `createAsyncStore()`. The legacy form without a mode is no longer accepted."
+                  "text": "Sync vs async fields: every builder states `mode: 'sync'` or `mode: 'async'` explicitly. Sync builders work with either entry point; async builders only with `createAsyncStore()`."
                 },
                 {
                   "type": "paragraph",
@@ -2781,7 +2781,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q: `createStore()` says \"only accepts synchronous fields\", but the code looks synchronous. Check that `FieldBuilder.mode` is explicitly `'sync'`; async fields use `'async'` and go to `createAsyncStore()`. The legacy form without a mode has been removed."
+                  "text": "Q: `createStore()` says \"only accepts synchronous fields\", but the code looks synchronous. Check that `FieldBuilder.mode` is explicitly `'sync'`; async fields use `'async'` and go to `createAsyncStore()`."
                 },
                 {
                   "type": "paragraph",
@@ -2820,26 +2820,26 @@
               ]
             },
             {
-              "id": "migration-note-requests-handed-to-resource",
-              "heading": "Migration note: requests handed to Resource",
+              "id": "how-storeresource-and-resource-divide-the-work",
+              "heading": "How StoreResource and Resource divide the work",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "StoreLight now adapts one `@migaia/resource` instance. It keeps the identity of actual values, render captures, resource and version leases and value release, and deletes its own duplicate request/data controller and request coordinator. `StoreResourceDataKind` and its type are removed; use `ResourceStatus` / `ResourceFetchStatus` for native Resource state. `StoreResourceKind` remains internal facade vocabulary; `readSnapshot()` still returns `value`/`version`/`token` and has no public kind property."
+                  "text": "One `@migaia/resource` instance handles requests, data, cancellation and the shared Promise. StoreResource keeps, on top of it, the identity of actual values, render captures, resource and version leases, and value release. Read `ResourceStatus` / `ResourceFetchStatus` when you need the native request state; `readSnapshot()` returns `value`/`version`/`token`."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Repeated reads while loading throw the same Promise, which resolves with the original value. `retry()` or a forced cancellation rejects the superseded Promise at once with a native `AbortError`, source `@migaia/resource`, code `REQUEST_ABORTED`; previously a loader that ignored the abort could keep that Promise pending until it finished on its own. Handle the old Promise's rejection when driving retries by hand. Late returned values are released once. A failed refresh restores the old data; an old version lease delays its release until the lease is released. Loaded values still waiting for clock settlement remain owned and are released if settlement fails. When admitting the provisional-capture timer fails, the partial captures and timers are released and reported as release housekeeping; a value that loaded successfully stays readable and notifies subscribers. No async-context mechanism is introduced."
+                  "text": "Repeated reads while loading throw the same Promise, which resolves with the original value. `retry()` or a forced cancellation rejects the superseded Promise at once with a native `AbortError`, source `@migaia/resource`, code `REQUEST_ABORTED`, even when the loader ignores the abort; handle the old Promise's rejection when you drive retries by hand. Late returned values are released once. A failed refresh restores the old data; an old version lease delays its release until the lease is released. Loaded values still waiting for clock settlement remain owned and are released if settlement fails. When admitting the provisional-capture timer fails, the partial captures and timers are released and reported as release housekeeping; a value that loaded successfully stays readable and notifies subscribers."
                 }
               ]
             },
             {
-              "id": "migration-note-public-api-convergence",
-              "heading": "Migration note: public API convergence",
+              "id": "field-builders-and-lease-methods",
+              "heading": "Field builders and lease methods",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "The root entry no longer exports `StoreResourceKind` or `IStoreResourceKind`; the ownership vocabulary stays internal, and public resources expose snapshots and completion methods. `ILegacyFieldBuilder` is removed: use `IAsyncFieldBuilder` with `mode: 'async'`. `IFieldBuilder` remains the union of explicit sync/async builders, including its store-wasm re-export. Replace `resource.retain()` with `retainResource()` and `resource.retain(version)` with `retainVersion(version)`. No compatibility alias remains. External usage is unknown; publish this as a breaking API change."
+                  "text": "Every field builder states its mode: sync fields use `mode: 'sync'`, async fields use an `IAsyncFieldBuilder` with `mode: 'async'`; `IFieldBuilder` is the union of both, and store-wasm re-exports it. Lock the whole resource with `retainResource()` and one version with `retainVersion(version)`. Public resources expose only snapshots and completion methods; the internal ownership classification is not exported."
                 }
               ]
             }

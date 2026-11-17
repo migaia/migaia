@@ -461,7 +461,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "SsrWireType 是 { json: 'json', text: 'text', bytes: 'bytes' }，ISsrWireType 为值联合。json 比较 codec type，text/bytes 比较 chunk kind，不能把这三个词混为同一层。内部等待标签 SsrWorkOutcome/ISsrWorkOutcome 已从根入口收回，不增加 wrapper 或兼容 alias；awaitResources 仍直接返回失败数组。"
+                "text": "SsrWireType 是 { json: 'json', text: 'text', bytes: 'bytes' }，ISsrWireType 为值联合。json 比较 codec type，text/bytes 比较 chunk kind，不能把这三个词混为同一层。awaitResources 直接返回失败数组。"
               }
             ]
           },
@@ -1141,7 +1141,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "SsrWireType 是 { json: 'json', text: 'text', bytes: 'bytes' }，ISsrWireType 为值联合。json 比较 codec type，text/bytes 比较 chunk kind，不能把这三个词混为同一层。内部等待标签 SsrWorkOutcome/ISsrWorkOutcome 已从根入口收回，不增加 wrapper 或兼容 alias；awaitResources 仍直接返回失败数组。"
+                "text": "SsrWireType 是 { json: 'json', text: 'text', bytes: 'bytes' }，ISsrWireType 为值联合。json 比较 codec type，text/bytes 比较 chunk kind，不能把这三个词混为同一层。awaitResources 直接返回失败数组。"
               }
             ]
           },
@@ -1707,7 +1707,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "SsrWireType is { json: 'json', text: 'text', bytes: 'bytes' }, and ISsrWireType is its value union. Json is a codec-type comparison, while text/bytes identify chunk kinds. Internal wait outcomes SsrWorkOutcome/ISsrWorkOutcome were removed from the root without a compatibility alias. awaitResources still returns its failure array directly."
+                  "text": "SsrWireType is { json: 'json', text: 'text', bytes: 'bytes' }, and ISsrWireType is its value union. Json is a codec-type comparison, while text/bytes identify chunk kinds. awaitResources returns its failure array directly."
                 }
               ]
             },
@@ -2425,7 +2425,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "SsrWireType is { json: 'json', text: 'text', bytes: 'bytes' }, and ISsrWireType is its value union. Json is a codec-type comparison, while text/bytes identify chunk kinds. Internal wait outcomes SsrWorkOutcome/ISsrWorkOutcome were removed from the root without a compatibility alias. awaitResources still returns its failure array directly."
+                  "text": "SsrWireType is { json: 'json', text: 'text', bytes: 'bytes' }, and ISsrWireType is its value union. Json is a codec-type comparison, while text/bytes identify chunk kinds. awaitResources returns its failure array directly."
                 }
               ]
             },

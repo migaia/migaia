@@ -222,39 +222,34 @@
             ]
           },
           {
-            "id": "后端作者入口迁移",
-            "heading": "后端作者入口迁移",
+            "id": "后端作者入口",
+            "heading": "后端作者入口",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "子路径已经收敛：原来的 `/authoring/*` 和 `/vector/mmr` 合并为 `/sdk`；`/journal` 改为 `/plugins/journal`；`/entity/<名称>` 改为 `/entity/features/<名称>`；memory 后端从根入口移到 `/plugins/memory`。旧路径直接删除，不保留别名。"
-              },
-              {
-                "type": "paragraph",
-                "text": "应用只调用 `backend()` 时无需导入作者工具。实现后端时，运行时工具从以下入口获取；类型、能力 token、定义和纯校验继续从 contract 获取。"
-              },
-              {
-                "type": "paragraph",
-                "text": "表中的 `/sdk` 均以 `@migaia/storage-host` 开头。"
+                "text": "只调用 `backend()` 的应用不需要作者工具。自己实现后端时，运行时工具都从 `@migaia/storage-host/sdk` 导入；类型、能力 token、定义和纯校验函数从 `@migaia/storage-contract` 导入。"
               },
               {
                 "type": "table",
-                "headers": ["原 contract 运行时用途", "当前入口"],
+                "headers": ["用途", "入口"],
                 "rows": [
                   ["查询创建与条件执行", "`@migaia/storage-host/sdk`"],
-                  ["并发策略与事务执行", "`/sdk`"],
-                  ["键编码、输入快照、资源管理", "`/sdk`"],
-                  ["能力发布与数据转换", "`/sdk`"],
-                  ["SQL、SPARQL 与数据通道工具", "`/sdk`、相应通道入口"]
+                  ["并发策略与事务执行", "`@migaia/storage-host/sdk`"],
+                  ["键编码、输入快照、资源管理", "`@migaia/storage-host/sdk`"],
+                  ["能力发布与数据转换", "`@migaia/storage-host/sdk`"],
+                  ["SQL、SPARQL 与数据通道工具", "`@migaia/storage-host/sdk`、相应通道入口"],
+                  ["日志插件", "`@migaia/storage-host/plugins/journal`"],
+                  ["内存后端", "`@migaia/storage-host/plugins/memory`"],
+                  ["实体 Feature", "`@migaia/storage-host/entity/features/<名称>`"]
                 ]
               },
               {
                 "type": "paragraph",
-                "text": "完整路径和依赖说明见 storage-contract。旧 contract 根入口不保留这些运行时导出。"
+                "text": "完整路径和依赖说明见 storage-contract。"
               },
               {
                 "type": "paragraph",
-                "text": "实体插件：`defineEntityPlugin` 无别名替代 `defineEntity`。以 `xxxEntityPlugin` 命名实例，在 record 中选择不透明原生 `/entity/features/*`，经 storage host plugins 或 `host.use` 安装，再通过 `host.extensions[xxxEntityPlugin.name](store)` 获取仓储。每实体只安装一次 Feature，仓储复用已安装工厂并随实体/宿主失效；插件 ID 可不同于持久化实体命名空间。缺失或重复角色在安装时拒绝。详见实体仓储。"
+                "text": "实体插件用 `defineEntityPlugin` 声明，实例习惯以 `xxxEntityPlugin` 命名。在它的 `features` 里选择 `/entity/features/*` 中需要的 Feature，经 `createStorageHost` 的 `plugins` 或 `host.use` 安装，再用 `host.extensions[xxxEntityPlugin.name](store)` 取得仓储。每个实体的 Feature 只安装一次，仓储复用已安装的工厂，并随实体或宿主释放而失效；插件 ID 可以和持久化的实体命名空间不同。缺少或重复的角色在安装时拒绝。详见实体仓储。"
               }
             ]
           },
@@ -264,11 +259,11 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前宿主的 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。"
+                "text": "基础宿主不导入日志运行时、通知控制器或变更迭代器。这些能力由业务显式选择，只做基础读写的应用不会打包用不到的代码。"
               },
               {
                 "type": "paragraph",
-                "text": "日志配置写在从 `@migaia/storage-host/plugins/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。"
+                "text": "日志配置写在从 `@migaia/storage-host/plugins/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。"
               },
               {
                 "type": "paragraph",
@@ -294,12 +289,16 @@
             ]
           },
           {
-            "id": "严格索引查询迁移",
-            "heading": "严格索引查询迁移",
+            "id": "严格索引查询",
+            "heading": "严格索引查询",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "旧版 `.index(...).requirePushdown()` 在没有客户端步骤时允许全表扫描。现在显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；未迁移的旧格式记录使 readiness 保持 running；查询继续全表扫描并发出回退诊断，直到迁移状态完成且与当前定义一致。"
+                "text": "`.index(...).requirePushdown()` 要求查询必须走原生索引。如果显式索引来源规划为 `fullScan`，或者原生索引准备遇到竞争、只能扫描，终端读取会以 `@migaia/storage-contract / QUERY_NOT_PUSHABLE` 拒绝。需要原生索引时，同时装配 `entityIndexesFeature()` 和后端的索引 Feature；可以接受全表扫描时去掉 `requirePushdown()`。普通查询仍保留扫描回退。"
+              },
+              {
+                "type": "paragraph",
+                "text": "IndexedDB 的借用视图与原生 store 共用能力身份。存在旧格式记录时，索引 readiness 保持 running，查询继续全表扫描并发出回退诊断，直到记录转换完成且与当前定义一致。"
               }
             ]
           }
@@ -504,7 +503,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "后端实现者的运行时导入变更见 README 迁移表 与 contract 入口表。"
+                "text": "实现后端时的导入入口见 README 的后端作者入口 与 contract 入口表。"
               }
             ]
           },
@@ -514,7 +513,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前宿主的 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。"
+                "text": "基础宿主不导入日志运行时、通知控制器或变更迭代器。这些能力由业务显式选择，只做基础读写的应用不会打包用不到的代码。"
               },
               {
                 "type": "paragraph",
@@ -548,12 +547,12 @@
             ]
           },
           {
-            "id": "严格索引查询迁移",
-            "heading": "严格索引查询迁移",
+            "id": "严格索引查询",
+            "heading": "严格索引查询",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "旧版 `.index(...).requirePushdown()` 在没有客户端步骤时允许全表扫描。现在显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；未迁移的旧格式记录使 readiness 保持 running；查询继续全表扫描并发出回退诊断，直到迁移状态完成且与当前定义一致。"
+                "text": "`.index(...).requirePushdown()` 要求查询必须走原生索引。显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；存在旧格式记录时 readiness 保持 running，查询继续全表扫描并发出回退诊断，直到记录转换完成且与当前定义一致。"
               },
               {
                 "type": "paragraph",
@@ -795,39 +794,37 @@
               ]
             },
             {
-              "id": "moving-backend-authoring-imports",
-              "heading": "Moving backend authoring imports",
+              "id": "backend-authoring-entries",
+              "heading": "Backend authoring entries",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Subpaths are consolidated: the former `/authoring/*` and `/vector/mmr` entries are merged into `/sdk`; `/journal` becomes `/plugins/journal`; `/entity/<name>` becomes `/entity/features/<name>`; the memory backend moves from the root entry to `/plugins/memory`. The old paths are removed with no aliases."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Applications that only call `backend()` do not need authoring tools. Backend implementations now import runtime tools from these entries; types, capability tokens, definitions and pure validators remain in contract."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Paths beginning `/sdk` below are prefixed with `@migaia/storage-host`."
+                  "text": "Applications that only call `backend()` need no authoring tools. When you implement a backend, runtime tools come from `@migaia/storage-host/sdk`; types, capability tokens, definitions and pure validators come from `@migaia/storage-contract`."
                 },
                 {
                   "type": "table",
-                  "headers": ["Former contract runtime use", "Current entry"],
+                  "headers": ["Use", "Entry"],
                   "rows": [
                     ["Query creation and condition execution", "`@migaia/storage-host/sdk`"],
-                    ["Concurrency policy and transaction execution", "`/sdk`"],
-                    ["Key encoding, input snapshots and resources", "`/sdk`"],
-                    ["Capability publication and value conversion", "`/sdk`"],
-                    ["SQL, SPARQL and channel tools", "`/sdk`, and the respective channel entry"]
+                    ["Concurrency policy and transaction execution", "`@migaia/storage-host/sdk`"],
+                    ["Key encoding, input snapshots and resources", "`@migaia/storage-host/sdk`"],
+                    ["Capability publication and value conversion", "`@migaia/storage-host/sdk`"],
+                    [
+                      "SQL, SPARQL and channel tools",
+                      "`@migaia/storage-host/sdk`, and the respective channel entry"
+                    ],
+                    ["Journal plugin", "`@migaia/storage-host/plugins/journal`"],
+                    ["Memory backend", "`@migaia/storage-host/plugins/memory`"],
+                    ["Entity Features", "`@migaia/storage-host/entity/features/<name>`"]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "See storage-contract for full paths and dependencies. The old contract root no longer exports these runtime tools."
+                  "text": "See storage-contract for full paths and dependencies."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Entity plugins: `defineEntityPlugin` replaces `defineEntity` without an alias. Declare a named `xxxEntityPlugin` with a record of opaque native `/entity/features/*` values, install it through storage-host plugins or `host.use`, then obtain repositories from `host.extensions[xxxEntityPlugin.name](store)`. Feature installation runs once per entity; repositories reuse installed factory outputs and expire with entity/host disposal. Plugin IDs can differ from the persisted entity namespace. Missing roles and duplicate roles reject at install. See entity setup."
+                  "text": "Declare entity plugins with `defineEntityPlugin`; instances are usually named `xxxEntityPlugin`. Pick the Features you need from `/entity/features/*` in its `features` record, install it through the `createStorageHost` plugins or `host.use`, then obtain repositories from `host.extensions[xxxEntityPlugin.name](store)`. Feature installation runs once per entity; repositories reuse installed factory outputs and expire with entity or host disposal. Plugin IDs can differ from the persisted entity namespace. Missing and duplicate roles reject at install. See entity setup."
                 }
               ]
             },
@@ -837,11 +834,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "The base host does not import journal runtime, notification controllers or change iterators. Previously the host's journal option loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code."
+                  "text": "The base host does not import the journal runtime, notification controllers or change iterators. Applications select these capabilities, so code that only reads and writes does not bundle them."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/plugins/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract."
+                  "text": "Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/plugins/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`."
                 },
                 {
                   "type": "paragraph",
@@ -867,20 +864,20 @@
               ]
             },
             {
-              "id": "strict-index-query-migration",
-              "heading": "Strict index query migration",
+              "id": "strict-index-queries",
+              "heading": "Strict index queries",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Previously, `.index(...).requirePushdown()` allowed a full scan when no client steps remained. Terminal reads now reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan."
+                  "text": "`.index(...).requirePushdown()` demands native index execution. Terminal reads reject with `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or when native preparation contention leaves only a scan."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries retain their scan fallback."
+                  "text": "Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries keep their scan fallback."
                 },
                 {
                   "type": "paragraph",
-                  "text": "IndexedDB borrowed views resolve the same private capabilities as their native store. Legacy records keep readiness running until migration completes with the matching schema fingerprint. Queries continue to scan and report fallback while readiness is not complete."
+                  "text": "IndexedDB borrowed views resolve the same private capabilities as their native store. While records in an older format remain, index readiness stays running and queries keep scanning and report the fallback, until conversion completes with the matching schema fingerprint."
                 }
               ]
             }
@@ -1103,7 +1100,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "For backend implementations, see the README migration table and contract entry table."
+                  "text": "For backend implementations, see the README backend authoring entries and contract entry table."
                 }
               ]
             },
@@ -1113,7 +1110,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "The base host does not import journal runtime, notification controllers or change iterators. Previously the host's journal option loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code."
+                  "text": "The base host does not import the journal runtime, notification controllers or change iterators. Applications select these capabilities, so code that only reads and writes does not bundle them."
                 },
                 {
                   "type": "paragraph",
@@ -1147,20 +1144,20 @@
               ]
             },
             {
-              "id": "strict-index-query-migration",
-              "heading": "Strict index query migration",
+              "id": "strict-index-queries",
+              "heading": "Strict index queries",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Previously, `.index(...).requirePushdown()` allowed a full scan when no client steps remained. Terminal reads now reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan."
+                  "text": "`.index(...).requirePushdown()` demands native index execution. Terminal reads reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries retain their scan fallback."
+                  "text": "Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries keep their scan fallback."
                 },
                 {
                   "type": "paragraph",
-                  "text": "IndexedDB borrowed views resolve the same private capabilities as their native store. Legacy records keep readiness running until migration completes with the matching schema fingerprint. Queries continue to scan and report fallback while readiness is not complete."
+                  "text": "IndexedDB borrowed views resolve the same private capabilities as their native store. While records in an older format remain, index readiness stays running and queries keep scanning and report the fallback, until conversion completes with the matching schema fingerprint."
                 },
                 {
                   "type": "paragraph",
@@ -1381,7 +1378,7 @@
           ],
           "identity": "packages/storage-host/dist/storage-host.d.ts:createStorageHost:export declare function createStorageHost<const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []>(options?: IStorageHostCreateOptions<TPlugins>): Promise<IStorageHost<TPlugins>>;",
           "guidance": [],
-          "usageScore": 146,
+          "usageScore": 148,
           "configuration": [
             {
               "name": "plugins",
@@ -30176,7 +30173,7 @@
           ],
           "identity": "packages/storage-host/dist/vector/mmr.d.ts:mmr:export declare function mmr(options: IStorageMmrOptions): IVectorReranker<unknown, true>;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 0,
           "configuration": [
             {
               "name": "lambda",

@@ -490,12 +490,12 @@
             ]
           },
           {
-            "id": "迁移-排查与开发命令",
-            "heading": "迁移、排查与开发命令",
+            "id": "排查与开发命令",
+            "heading": "排查与开发命令",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "旧 array(number(),n,g) 改为 array(n,g)，删除未使用 item 参数，编码仍固定 f64，没有兼容入口。WasmFieldMode/IWasmFieldMode 已收回，统一复用 store-light 的 StoreFieldMode.sync；类型只表达同步分支时用 typeof StoreFieldMode.sync，不能把含 async 的完整 IStoreFieldMode 联合当作等价旧别名。"
+                "text": "数值数组写作 `array(n, g)`，元素固定按 f64 编码。字段模式复用 store-light 的 `StoreFieldMode.sync`；只表达同步分支的类型写 `typeof StoreFieldMode.sync`，完整的 `IStoreFieldMode` 联合还包含 async。"
               },
               {
                 "type": "paragraph",
@@ -1141,12 +1141,12 @@
             ]
           },
           {
-            "id": "迁移-排查与开发命令",
-            "heading": "迁移、排查与开发命令",
+            "id": "排查与开发命令",
+            "heading": "排查与开发命令",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "旧 array(number(),n,g) 改为 array(n,g)，删除未使用 item 参数，编码仍固定 f64，没有兼容入口。WasmFieldMode/IWasmFieldMode 已收回，统一复用 store-light 的 StoreFieldMode.sync；类型只表达同步分支时用 typeof StoreFieldMode.sync，不能把含 async 的完整 IStoreFieldMode 联合当作等价旧别名。"
+                "text": "数值数组写作 `array(n, g)`，元素固定按 f64 编码。字段模式复用 store-light 的 `StoreFieldMode.sync`；只表达同步分支的类型写 `typeof StoreFieldMode.sync`，完整的 `IStoreFieldMode` 联合还包含 async。"
               },
               {
                 "type": "paragraph",
@@ -1697,12 +1697,12 @@
               ]
             },
             {
-              "id": "migration-troubleshooting-and-development-commands",
-              "heading": "Migration, troubleshooting, and development commands",
+              "id": "troubleshooting-and-development-commands",
+              "heading": "Troubleshooting and development commands",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Replace the old array(number(),n,g) with array(n,g). The unused item argument was removed, encoding remains f64, and no compatibility entry remains. WasmFieldMode/IWasmFieldMode were withdrawn in favor of store-light StoreFieldMode.sync. Use typeof StoreFieldMode.sync for a sync-only type; the full IStoreFieldMode union includes async and is not an equivalent alias."
+                  "text": "Numeric arrays are written `array(n, g)`, with elements always encoded as f64. Field modes reuse store-light's `StoreFieldMode.sync`; write `typeof StoreFieldMode.sync` for a sync-only type, because the full `IStoreFieldMode` union also includes async."
                 },
                 {
                   "type": "paragraph",
@@ -2408,12 +2408,12 @@
               ]
             },
             {
-              "id": "migration-troubleshooting-and-development-commands",
-              "heading": "Migration, troubleshooting, and development commands",
+              "id": "troubleshooting-and-development-commands",
+              "heading": "Troubleshooting and development commands",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Replace the old array(number(),n,g) with array(n,g). The unused item argument was removed, encoding remains f64, and no compatibility entry remains. WasmFieldMode/IWasmFieldMode were withdrawn in favor of store-light StoreFieldMode.sync. Use typeof StoreFieldMode.sync for a sync-only type; the full IStoreFieldMode union includes async and is not an equivalent alias."
+                  "text": "Numeric arrays are written `array(n, g)`, with elements always encoded as f64. Field modes reuse store-light's `StoreFieldMode.sync`; write `typeof StoreFieldMode.sync` for a sync-only type, because the full `IStoreFieldMode` union also includes async."
                 },
                 {
                   "type": "paragraph",
@@ -2632,7 +2632,7 @@
               ]
             }
           ],
-          "usageScore": 172,
+          "usageScore": 166,
           "configuration": [],
           "fragment": "store-wasm-index--array"
         },
@@ -3951,7 +3951,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-wasm/dist/number.d.ts:number:export declare function number(): IFieldBuilder<IWasmNumberField>;",
           "guidance": [],
-          "usageScore": 312,
+          "usageScore": 306,
           "configuration": [],
           "fragment": "store-wasm-index--number"
         },

@@ -15,15 +15,24 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "把真实 RPC 观察保存为有界事件、累计统计、watch 和独立录制。"
-              },
-              {
-                "type": "paragraph",
-                "text": "Contract 定义纯协议与接口，Host 拥有会话、provider 和调用结算，transport 获取真实载体。Devtools 是借统一 probe 的 flow plugin，只读消费观察，不创建业务连接。timeout、retry 等 feature 则安装在所属 plugin 上，拥有调用策略。"
-              },
-              {
-                "type": "paragraph",
                 "text": "English · 使用指南"
+              },
+              {
+                "type": "paragraph",
+                "text": "把 RPC 调用的观察结果保存下来：有上限的事件记录、累计统计、实时订阅和独立的录制。它是 `@migaia/rpc-host` 的只读观察插件，只消费 host 的观察事件，不建立业务连接，也不改变调用。"
+              }
+            ]
+          },
+          {
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "线上偶发的慢调用没法复现：只有一行“超时了”，不知道是哪个对端、在哪一步慢。根因是调用过程没有可以回看的记录。",
+                  "多个 host 之间的调用链看不清：主进程、Worker、子进程各有日志，拼不成一条时间线。根因是观察数据没有统一收集。"
+                ]
               }
             ]
           },
@@ -116,6 +125,20 @@
               {
                 "type": "paragraph",
                 "text": "Contract 提供纯事件/接口契约；Host 拥有业务会话和调用；transport 提供真实载体。Devtools 是 flow plugin，通过统一 probe 的 observe 入口借用真实事件；timeout/retry feature 则拥有调用策略。应用持有 collector，不创建第二个观察连接。一个 Host 可有不同 namespace 的 transport；示例仅使用 coroutine。"
+              }
+            ]
+          },
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "按你要做的事跳到对应章节："
+              },
+              {
+                "type": "list",
+                "items": ["观察真实调用", "捕获、脱敏、查询与服务", "录制与 NDJSON", "清理与边界"]
               }
             ]
           },
@@ -217,15 +240,24 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Retain real RPC observations as bounded events, cumulative statistics, watches, and independent recordings."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Contract defines pure protocol rules and interfaces. Host owns sessions, providers, and call settlement; transports acquire real carriers. Devtools is a flow plugin consuming readonly observation through the canonical probe implementation, without a business connection. Features such as timeout and retry attach to their owning plugin and execute call policies."
-                },
-                {
-                  "type": "paragraph",
                   "text": "中文 · Usage guide"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Keep observations of RPC calls: a bounded event record, cumulative statistics, live subscriptions and separate recordings. It is a read-only observation plugin for `@migaia/rpc-host`: it only consumes the host's observation events, opens no business connection and does not change calls."
+                }
+              ]
+            },
+            {
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Occasional slow calls in production cannot be reproduced: there is one line saying \"timed out\", with no idea which peer or which step was slow. The cause is no record of the call to look back at.",
+                    "Calls across several hosts are hard to follow: the main process, Workers and child processes each have logs that do not form one timeline. The cause is observation data that is not collected in one place."
+                  ]
                 }
               ]
             },
@@ -330,6 +362,25 @@
                 {
                   "type": "paragraph",
                   "text": "Contract provides pure event/interface contracts. Host owns business sessions and calls; transports provide real carriers. Devtools is a flow plugin borrowing real events at the canonical probe observe hook; timeout/retry features execute call policies. The application owns the collector without a second observation connection. A Host may have distinct transport namespaces; this example uses only coroutine."
+                }
+              ]
+            },
+            {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Jump to the section for what you want to do:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Observe real calls",
+                    "Capture, redaction, queries, and service",
+                    "Recording and NDJSON",
+                    "Cleanup and boundaries"
+                  ]
                 }
               ]
             },

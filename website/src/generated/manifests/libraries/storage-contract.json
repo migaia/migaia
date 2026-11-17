@@ -15,7 +15,23 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "运行时中立的存储契约。根入口只拥有类型、能力 token/定义、错误、枚举式常量和纯校验；执行、资源与作者快照由 `@migaia/storage-host/sdk` 拥有。基础包不依赖 host、浏览器存储或数据库客户端。"
+                "text": "English · 使用指南"
+              },
+              {
+                "type": "paragraph",
+                "text": "存储家族共用的契约：键值、记录、查询、事务、向量、RDF、blob 等接口类型，能力 token，错误类型和纯校验函数。它不执行任何存储操作，也不依赖 storage-host、浏览器存储或数据库客户端。"
+              },
+              {
+                "type": "paragraph",
+                "text": "应用通常不需要直接从这里开始——读写数据从 `@migaia/storage-host` 开始，用 `host.backend(name)` 拿到存储。下面这些情况才直接用到本包："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "写和存储打交道的通用代码，只想依赖接口类型（例如 `IKeyValueStore`、`IRecordStore`），不绑定具体后端。",
+                  "判断某个存储有没有某项能力（`asRecordStore`、`asChangeFeedStore` 等），或按 `source: 'storage.contract'` 的错误码分支。",
+                  "实现自己的后端，并用 `/conformance` 里的契约用例验证它。"
+                ]
               }
             ]
           },
@@ -26,46 +42,10 @@
               {
                 "type": "list",
                 "items": [
-                  "`@migaia/storage-contract`：存储/codec/context/query/transaction 类型、标准 token、定义身份和纯校验。",
-                  "`@migaia/storage-contract/conformance`：由消费者现有 runner 执行的后端契约组；不内置 runner，也不依赖 host。",
-                  "后端和 host 向内依赖本包。运行时作者 API 从下表入口导入；根入口不保留旧名称重导出或兼容别名。"
+                  "`@migaia/storage-contract`：存储、codec、上下文、查询和事务类型，标准能力 token，定义身份和纯校验。",
+                  "`@migaia/storage-contract/conformance`：后端契约用例组，由你现有的测试运行器执行；不内置运行器，也不依赖 host。",
+                  "后端和 host 向内依赖本包。执行查询、事务、锁、快照等运行时作者工具都在 `@migaia/storage-host/sdk`，见 storage-host 的后端作者入口。"
                 ]
-              },
-              {
-                "type": "table",
-                "headers": ["host 入口后缀", "既有作者能力"],
-                "rows": [
-                  [
-                    "`/sdk`",
-                    "provideCapabilities、hasStorageCapability、useStorageCapability、readTransactionImplementation"
-                  ],
-                  [
-                    "`/sdk`",
-                    "createRecordQuery、createVectorQuery、createRdfQuery、条件编译与快照"
-                  ],
-                  ["`/sdk`", "ConcurrencyPolicy、lockKey、runWithConcurrency、锁身份与快照"],
-                  [
-                    "`/sdk`",
-                    "createTransactionOwner、createTransactionBuilder、事务执行与游标派生"
-                  ],
-                  ["`/sdk`", "键快照、有序键/组织编码、批次键 capture/projection"],
-                  ["`/sdk`", "snapshotOperationContext、snapshotSyncWriteOptions"],
-                  ["`/sdk`", "store/capabilities 的 snapshot 准入"],
-                  ["`/sdk`", "createStorageIteratorLifetime"],
-                  ["`/sdk`", "sqlFragment、createSqlTag、deriveStorageSqlQuery"],
-                  ["`/sdk`", "sparqlFragment、createSparqlTag"],
-                  ["`/sdk`", "term、RDF 快照/编码、组织图映射"],
-                  ["`/sdk`", "向量输入快照、recommendStorageVector"],
-                  ["`/sdk`", "snapshotStorageTtlTarget"],
-                  ["`/sdk`", "snapshotStorageCounterIncrement"],
-                  ["`/sdk`", "blob 输入快照、body reader 与 object 资源"],
-                  ["`/sdk`", "fromValueCodec、snapshotCodec"],
-                  ["`/sdk`", "createMigrationPlan、迁移执行与 envelope 恢复"]
-                ]
-              },
-              {
-                "type": "paragraph",
-                "text": "这些入口属于 `@migaia/storage-host`。`/sdk` 继续拥有既有有限后端接点；共享模板捕获仅是 SQL/SPARQL 的内部模块，不是公开子路径。使用步骤见 USEGUIDE 与 host 指南。"
               }
             ]
           },
@@ -151,7 +131,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`IStorageCapabilities.batch` 声明完整 KV 批量写与计数前缀删除；省略表示不支持。共享 conformance 将未声明的 batch 组记为不适用。`secondaryIndexes`、`changeFeed` 的旧省略形状可通过 guard；需要独立规范化说明的 host 快照把这两项补 false。"
+                "text": "`IStorageCapabilities.batch` 声明完整 KV 批量写与计数前缀删除；省略表示不支持。共享 conformance 将未声明的 batch 组记为不适用。省略 `secondaryIndexes`、`changeFeed` 也能通过 guard，host 快照把这两项按 false 处理。"
               }
             ]
           },
@@ -175,7 +155,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`StorageContractError` 保持 `source: 'storage.contract'`、公开 code、原 `cause`、原 stack 与扩展 details。未改名或新增错误码。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。"
+                "text": "`StorageContractError` 保持 `source: 'storage.contract'`、公开 code、原 `cause`、原 stack 与扩展 details。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。"
               },
               {
                 "type": "paragraph",
@@ -188,16 +168,16 @@
             ]
           },
           {
-            "id": "序列化结果迁移",
-            "heading": "序列化结果迁移",
+            "id": "序列化字节顺序",
+            "heading": "序列化字节顺序",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "存储 codec 使用的 `@migaia/serialize` 格式编码器现按对象自身的属性枚举顺序输出字段，不再按字段名排序。相同字段和值、不同插入顺序的对象，编码字节可能不同；解码后的字段和值不变。依赖旧排序字节的快照、签名输入或缓存键应按新顺序重新生成，不能把旧字节顺序当作存储契约。"
+                "text": "存储 codec 使用的 `@migaia/serialize` 格式编码器按对象自身的属性枚举顺序输出字段。字段和值相同、插入顺序不同的对象，编码出的字节可能不同，解码后的字段和值一样。不要把编码字节当作签名输入或缓存键的稳定来源。"
               },
               {
                 "type": "paragraph",
-                "text": "递归 `Map`、`Set` 值改用 `@migaia/serialize/codecs/collections-json` 的 `defineCollectionsJsonCodec`，再从 `@migaia/storage-host/sdk` 使用 `fromValueCodec` 适配。普通 JSON codec 不隐式开启集合编码；新写入格式的旧消费者需同步迁移。格式细节见 serialize 指南。"
+                "text": "递归的 `Map`、`Set` 值使用 `@migaia/serialize/codecs/collections-json` 的 `defineCollectionsJsonCodec`，再用 `@migaia/storage-host/sdk` 的 `fromValueCodec` 适配。普通 JSON codec 不会自动编码集合；写入方和读取方要使用同一种格式。格式细节见 serialize 指南。"
               }
             ]
           }
@@ -212,6 +192,28 @@
               {
                 "type": "paragraph",
                 "text": "先区分纯校验与执行拥有者。类型、token、定义和错误从 `@migaia/storage-contract` 导入；需要保存可变输入、运行查询或管理资源时，使用 README 的 host 入口表。"
+              }
+            ]
+          },
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "按你要做的事跳到对应章节："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "校验键而不复制",
+                  "校验操作意图",
+                  "识别能力而不取得资源",
+                  "定义 token 与实现",
+                  "codec 与原方法 receiver",
+                  "原错误与进度报告",
+                  "后端 conformance"
+                ]
               }
             ]
           },
@@ -339,7 +341,23 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Runtime-neutral storage contracts. The root owns types, capability tokens/definitions, errors, enum-like constants and pure validators. Execution, resources and authoring snapshots belong to `@migaia/storage-host/sdk`. This module does not depend on host, browser storage or database clients."
+                  "text": "中文 · Usage guide"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The contract shared by the storage family: interface types for key-value, records, queries, transactions, vectors, RDF and blobs, capability tokens, error types and pure validators. It performs no storage operation and does not depend on storage-host, browser storage or database clients."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Applications usually do not start here: to read and write data, start with `@migaia/storage-host` and get a store with `host.backend(name)`. You use this module directly when you:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "write generic storage code that depends only on interface types (such as `IKeyValueStore` or `IRecordStore`), without binding to a backend;",
+                    "check whether a store has a capability (`asRecordStore`, `asChangeFeedStore` and others), or branch on error codes with `source: 'storage.contract'`;",
+                    "implement your own backend and verify it with the contract cases in `/conformance`."
+                  ]
                 }
               ]
             },
@@ -350,41 +368,10 @@
                 {
                   "type": "list",
                   "items": [
-                    "`@migaia/storage-contract`: storage, codec, context, query and transaction types; standard tokens; definition identity; pure validation.",
-                    "`@migaia/storage-contract/conformance`: backend contract groups run by the consumer's existing runner. It supplies no runner and imports no host runtime.",
-                    "Host and backends depend inward on this module. Runtime authoring APIs use the entries below; the root retains no old runtime re-export or compatibility alias."
+                    "`@migaia/storage-contract`: storage, codec, context, query and transaction types; standard capability tokens; definition identity; pure validation.",
+                    "`@migaia/storage-contract/conformance`: backend contract case groups run by your existing test runner. It supplies no runner and imports no host runtime.",
+                    "Host and backends depend inward on this module. Runtime authoring tools for queries, transactions, locks and snapshots live in `@migaia/storage-host/sdk`; see backend authoring entries in storage-host."
                   ]
-                },
-                {
-                  "type": "table",
-                  "headers": ["Host entry suffix", "Existing responsibility"],
-                  "rows": [
-                    [
-                      "`/sdk`",
-                      "Publication, original store has/use, transaction implementation lookup"
-                    ],
-                    ["`/sdk`", "Record/vector/RDF queries, condition compilation and snapshots"],
-                    ["`/sdk`", "Policies, lock factories, the concurrency loop and lock snapshots"],
-                    ["`/sdk`", "Transaction owner, builder, execution and iterator derivation"],
-                    [
-                      "`/sdk`",
-                      "Key copies, ordered/organization encoding and batch capture/projection"
-                    ],
-                    ["`/sdk`", "Operation and reduced sync-write snapshots"],
-                    ["`/sdk`", "Store admission and capability descriptor snapshots"],
-                    ["`/sdk`", "Original iterator lifetime"],
-                    ["`/sdk`", "Fragments, native tags and terminal binding"],
-                    ["`/sdk`", "Term factories, snapshots, encoding and organization graphs"],
-                    ["`/sdk`", "Vector input snapshots and recommendation synthesis"],
-                    ["`/sdk`", "Original scalar input helpers"],
-                    ["`/sdk`", "Input snapshots, upload readers and object resources"],
-                    ["`/sdk`", "Value-codec adapter and original codec admission"],
-                    ["`/sdk`", "Migration plans, execution and envelope recovery"]
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "All these entries belong to `@migaia/storage-host`. `/sdk` retains its finite backend ports. Shared template capture remains a private SQL/SPARQL module. See the usage guide and host guide."
                 }
               ]
             },
@@ -470,7 +457,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`IStorageCapabilities.batch` declares complete KV batch writes and counted prefix deletion. Omission means unsupported, and shared conformance marks that group not applicable. Legacy omissions of secondaryIndexes/changeFeed pass pure shape admission; host descriptor snapshots normalize those two flags to false."
+                  "text": "`IStorageCapabilities.batch` declares complete KV batch writes and counted prefix deletion. Omission means unsupported, and shared conformance marks that group not applicable. Omitting `secondaryIndexes` or `changeFeed` also passes the guard; host snapshots treat both as false."
                 }
               ]
             },
@@ -494,7 +481,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`StorageContractError` retains source `storage.contract`, its public code, original cause and stack, and extension details. No code was added or renamed. `INVALID_ARGUMENT` denotes argument shape, `INVALID_KEY` denotes the typed-key domain, and `UNSUPPORTED_CAPABILITY` denotes missing requested behavior. Runtime owners reuse the existing lifecycle, query, concurrency and migration codes."
+                  "text": "`StorageContractError` retains source `storage.contract`, its public code, original cause and stack, and extension details. `INVALID_ARGUMENT` denotes argument shape, `INVALID_KEY` denotes the typed-key domain, and `UNSUPPORTED_CAPABILITY` denotes missing requested behavior. Runtime owners reuse the existing lifecycle, query, concurrency and migration codes."
                 },
                 {
                   "type": "paragraph",
@@ -507,16 +494,16 @@
               ]
             },
             {
-              "id": "migrating-serialized-output",
-              "heading": "Migrating serialized output",
+              "id": "serialized-byte-order",
+              "heading": "Serialized byte order",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "The `@migaia/serialize` format encoders used by storage codecs now emit fields in the object's own property enumeration order instead of sorting field names. Objects with equal fields and values but different insertion orders can produce different bytes. Decoded fields and values are unchanged. Regenerate snapshots, signature inputs or cache keys that depend on the former sorted bytes."
+                  "text": "The `@migaia/serialize` format encoders used by storage codecs emit fields in the object's own property enumeration order. Objects with equal fields and values but different insertion orders can produce different bytes, while the decoded fields and values are the same. Do not treat encoded bytes as a stable source for signature inputs or cache keys."
                 },
                 {
                   "type": "paragraph",
-                  "text": "For recursive `Map` and `Set` values, select `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` and adapt it with `fromValueCodec` from `@migaia/storage-host/sdk`. Plain JSON does not enable collection encoding implicitly. Older consumers must migrate together before reading the new format. See the serialize guide."
+                  "text": "For recursive `Map` and `Set` values, use `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` and adapt it with `fromValueCodec` from `@migaia/storage-host/sdk`. Plain JSON does not encode collections automatically; writers and readers must use the same format. See the serialize guide."
                 }
               ]
             }
@@ -531,6 +518,28 @@
                 {
                   "type": "paragraph",
                   "text": "Import types, tokens, definitions, errors and pure validators from `storage.contract`. Input retention, query execution and resources use the host entry table."
+                }
+              ]
+            },
+            {
+              "id": "find-by-scenario",
+              "heading": "Find by scenario",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Jump to the section for what you want to do:"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Validate a key without copying",
+                    "Validate operation intent",
+                    "Inspect capabilities without acquiring a resource",
+                    "Define a token and implementation",
+                    "Codec receiver ownership",
+                    "Original errors and progress",
+                    "Backend conformance"
+                  ]
                 }
               ]
             },
@@ -746,7 +755,7 @@
           "declaredConfiguration": [],
           "identity": "packages/storage-contract/dist/change-feed.d.ts:asChangeFeedStore:export declare function asChangeFeedStore<S extends Omit<IKeyValueStore, 'use'>>(store: S): IWithChangeFeedCapabilities<S> & ITextChangeFeedApi;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "storage-contract-index--asChangeFeedStore"
         },
@@ -811,7 +820,7 @@
           "declaredConfiguration": [],
           "identity": "packages/storage-contract/dist/store.d.ts:asRecordStore:export declare const asRecordStore: <T = unknown>(store: IKeyValueStore) => IRecordStore<T>;",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "storage-contract-index--asRecordStore"
         },
@@ -961,7 +970,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`StorageContractError` 保持 `source: 'storage.contract'`、公开 code、原 `cause`、原 stack 与扩展 details。未改名或新增错误码。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。"
+                  "text": "`StorageContractError` 保持 `source: 'storage.contract'`、公开 code、原 `cause`、原 stack 与扩展 details。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。"
                 },
                 {
                   "type": "paragraph",
@@ -8193,7 +8202,7 @@
           "declaredConfiguration": [],
           "identity": "packages/storage-contract/dist/store.d.ts:IKeyValueStore:export type IKeyValueStore = IStorageBase & { /** Reads the string-value channel; a missing key resolves to null. The provider interprets ctx. */ get(key: string, ctx?: IOperationContext): Promise<string | null>; /** Writes a string value with optional operation timing and conflict options. */ set(key: string, value: string, ctx?: IWriteOptions): Promise<void>; /** Removes one string-channel entry without accessing record keys. */ remove(key: string, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>; /** Resolves whether a string-channel key exists. */ has(key: string, ctx?: IOperationContext): Promise<boolean>; /** Lists currently visible string-channel keys. Opaque provider entries may remain invisible. */ keys(ctx?: IOperationContext): Promise<string[]>; /** Clears only this store's string values. */ clearValues(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>; /** Clears this store's public value channels; structured extensions also clear bytes and records. */ clearAll(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>; /** * Exists only on synchronous backends. Asynchronous backends such as IndexedDB expose * `undefined`. */ readonly sync?: ISyncKeyValueStore; };",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "storage-contract-index--IKeyValueStore"
         },
@@ -16707,7 +16716,7 @@
           "declaredConfiguration": [],
           "identity": "packages/storage-contract/dist/store.d.ts:IRecordStore:export type IRecordStore<TValue = unknown> = IKeyValueStore & { /** Reads bytes by string key, resolving to null when missing. */ getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>; /** * Writes bytes using optional timing and conflict options; data ownership belongs to the provider * contract. */ setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>; /** * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed * without mutation; asynchronous backends resolve only after the deletion commits. */ removeBytes(key: string, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>; /** Clears the byte channel without clearing string values or records. */ clearBytes(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>; /** Reads a structured record by storage key, resolving to undefined when missing. */ getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>; /** Writes a record and resolves its key; omitting key requests provider-defined key generation. */ putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>; /** Deletes one structured record. */ deleteRecord(key: IStorageKey, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>; /** Clears records while leaving the other public channels intact. */ clearRecords(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>; /** Clears string values, bytes, and records owned by this store. */ clearAll(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>; /** Optional backend-owned metadata channel used by resumable maintenance migrations. */ readonly metadata?: { /** Reads backend-owned maintenance metadata; a missing value resolves to undefined. */ get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; /** Writes backend-owned maintenance metadata under a string key. */ set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; /** Removes one maintenance metadata entry. */ delete(key: string, ctx?: IOperationContext): Promise<void>; }; /** * Iterates matching key/record pairs; omitted range requests the provider's unbounded record * scan. */ iterateRecords(range?: IKeyRange, ctx?: IOperationContext): IStorageIterator<[IStorageKey, TValue]>; /** * Executes work with a provider-owned transaction scope and returns its result; isolation is * implementation-defined. */ transaction<TResult>(run: (tx: ITransactionScope<TValue>) => TResult, ctx?: ITransactionOptions): Promise<Awaited<TResult>>; };",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "storage-contract-index--IRecordStore"
         },
@@ -29410,7 +29419,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`StorageContractError` 保持 `source: 'storage.contract'`、公开 code、原 `cause`、原 stack 与扩展 details。未改名或新增错误码。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。"
+                  "text": "`StorageContractError` 保持 `source: 'storage.contract'`、公开 code、原 `cause`、原 stack 与扩展 details。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。"
                 },
                 {
                   "type": "paragraph",

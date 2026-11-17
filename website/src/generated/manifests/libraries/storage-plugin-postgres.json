@@ -381,7 +381,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "准入与迁移： 旧版本仅接受 `FOR ALL TABLES`；现在统一通过 `pg_publication_tables` 接受显式表、schema 与全部表三种 publication，只要覆盖 feed 的实际表和四种操作。原有启用全部操作的 `FOR ALL TABLES` 部署无需修改。缺表或关闭操作现在以 `UNSUPPORTED_CAPABILITY` 拒绝，并在错误文本中指出表或操作；修正部署后重新检测。旧版本可能接受但不完整发布操作的配置，现在必须补齐四种操作。"
+                "text": "publication 准入： 通过 `pg_publication_tables` 检查，显式表、schema 与全部表（`FOR ALL TABLES`）三种 publication 都接受，只要覆盖 feed 用到的实际表和 insert、update、delete、truncate 四种操作。缺表或关闭了某种操作时以 `UNSUPPORTED_CAPABILITY` 拒绝，错误文本指出缺的表或操作；修正部署后重新检测。"
               },
               {
                 "type": "paragraph",
@@ -832,7 +832,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Admission and migration: older versions accepted only `FOR ALL TABLES`. Admission now uses `pg_publication_tables` uniformly for explicit-table, schema-wide and all-table publications covering every feed table and all four operations. Existing `FOR ALL TABLES` deployments with all operations enabled need no change. Missing tables or disabled operations raise `UNSUPPORTED_CAPABILITY` with the missing table or operation in the message; repair deployment and detect again. Previously accepted configurations that omitted operation types must enable all four."
+                  "text": "Publication admission: checked through `pg_publication_tables`. Explicit-table, schema-wide and all-table (`FOR ALL TABLES`) publications are all accepted when they cover every table the feed uses and all four operations: insert, update, delete and truncate. A missing table or a disabled operation raises `UNSUPPORTED_CAPABILITY`, and the message names the missing table or operation; repair the deployment and detect again."
                 },
                 {
                   "type": "paragraph",
