@@ -52,7 +52,7 @@ All packages are published to GitHub Packages under the `@migaia` scope. Add thi
 @migaia:registry=https://npm.pkg.github.com
 ```
 
-GitHub Packages requires you to sign in before installing, with a token that has at least the `read:packages` scope. Keep the token in an environment variable or in your user-level `~/.npmrc`, never in the repository.
+No `@migaia` package is public yet: they are all private packages on GitHub Packages, and downloading them requires signing in with a GitHub token. The token needs that has at least the `read:packages` scope. Keep the token in an environment variable or in your user-level `~/.npmrc`, never in the repository.
 
 ### 2. Install what you need
 
@@ -164,7 +164,7 @@ Not sure where to start? Begin with the problem you have:
 | [`serialize`](./packages/serialize/README.en.md)                           | Encode application data for storage or transmission and decode it when reading.                                                                                 |
 | [`wasm`](./packages/wasm/README.en.md)                                     | Allocate reusable byte buffers and transcode between JSON and MessagePack.                                                                                      |
 
-The repository also holds server backend plugins that are not released yet: [`postgres`](./packages/storage-plugin-postgres/README.en.md), [`redis`](./packages/storage-plugin-redis/README.en.md), [`qdrant`](./packages/storage-plugin-qdrant/README.en.md), [`sparql`](./packages/storage-plugin-sparql/README.en.md) and [`object`](./packages/storage-plugin-object/README.en.md) (file system and S3), plus [`cache`](./packages/storage-plugin-cache/README.en.md) (multi-tier caching) and [`archive`](./packages/storage-plugin-archive/README.en.md) (hot and cold archiving), which combine existing backends.
+The repository also holds server backend plugins: [`postgres`](./packages/storage-plugin-postgres/README.en.md), [`redis`](./packages/storage-plugin-redis/README.en.md), [`qdrant`](./packages/storage-plugin-qdrant/README.en.md), [`sparql`](./packages/storage-plugin-sparql/README.en.md) and [`object`](./packages/storage-plugin-object/README.en.md) (file system and S3), plus [`cache`](./packages/storage-plugin-cache/README.en.md) (multi-tier caching) and [`archive`](./packages/storage-plugin-archive/README.en.md) (hot and cold archiving), which combine existing backends. Like every other `@migaia` package they are not public yet: they are private packages, and downloading them requires a GitHub token.
 
 </details>
 

@@ -52,7 +52,7 @@ migaia 把这些规则做成一组小而独立的包。每个包只负责一件�
 @migaia:registry=https://npm.pkg.github.com
 ```
 
-GitHub Packages 安装时需要登录，令牌至少需要 `read:packages` 权限。请把令牌放在环境变量或用户目录的 `~/.npmrc` 中，不要提交到仓库。
+所有 `@migaia` 包暂未公开，目前都是 GitHub Packages 上的私有包，必须用 GitHub 令牌登录才能下载。令牌至少需要 `read:packages` 权限。请把令牌放在环境变量或用户目录的 `~/.npmrc` 中，不要提交到仓库。
 
 ### 2. 安装需要的包
 
@@ -164,7 +164,7 @@ close database
 | [`serialize`](./packages/serialize/README.md)                           | 把应用数据编码为可存储或传输的格式，并在读取时解码。                                     |
 | [`wasm`](./packages/wasm/README.md)                                     | 分配可复用的字节缓冲区，并在 JSON 与 MessagePack 之间转码。                              |
 
-仓库里还有几个服务端后端插件，暂未发布：[`postgres`](./packages/storage-plugin-postgres/README.md)、[`redis`](./packages/storage-plugin-redis/README.md)、[`qdrant`](./packages/storage-plugin-qdrant/README.md)、[`sparql`](./packages/storage-plugin-sparql/README.md)、[`object`](./packages/storage-plugin-object/README.md)（文件系统与 S3），以及组合已有后端的 [`cache`](./packages/storage-plugin-cache/README.md)（多级缓存）和 [`archive`](./packages/storage-plugin-archive/README.md)（冷热归档）。
+仓库里还有几个服务端后端插件：[`postgres`](./packages/storage-plugin-postgres/README.md)、[`redis`](./packages/storage-plugin-redis/README.md)、[`qdrant`](./packages/storage-plugin-qdrant/README.md)、[`sparql`](./packages/storage-plugin-sparql/README.md)、[`object`](./packages/storage-plugin-object/README.md)（文件系统与 S3），以及组合已有后端的 [`cache`](./packages/storage-plugin-cache/README.md)（多级缓存）和 [`archive`](./packages/storage-plugin-archive/README.md)（冷热归档）。它们和其他 `@migaia` 包一样暂未公开，目前是私有包，需要 GitHub 令牌才能下载。
 
 </details>
 
