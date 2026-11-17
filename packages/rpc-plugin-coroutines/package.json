@@ -1,6 +1,6 @@
 {
   "name": "@migaia/rpc-plugin-coroutines",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "private": true,
   "description": "Cooperative coroutine transport plugin for RPC hosts.",
   "license": "MIT",
