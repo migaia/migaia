@@ -11,13 +11,13 @@ export const logHostReference: ILibraryReference = {
       example:
         "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({ plugins: [levelPlugin(), consolePlugin()] })\nlog.info('request complete', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')"
     },
-    plugin: {
+    sdk: {
       summary: {
         en: 'Author output plugins and entry/gate/format descriptors; reuse canonical error projection.',
         zh: '编写输出插件及条目、门槛、格式描述符，复用规范错误投影。'
       },
       example:
-        "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\n\nconst output = defineOutputPlugin({\n  name: 'audit', batchable: false, consumesText: false,\n  deliver(records) { for (const record of records) console.log(record.entry.message) }\n})\nconst log = createLogHost({ plugins: [output] })\nlog.log('audit', 'saved')\nawait log.shutdown('manual')"
+        "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\n\nconst output = defineOutputPlugin({\n  name: 'audit', batchable: false, consumesText: false,\n  deliver(records) { for (const record of records) console.log(record.entry.message) }\n})\nconst log = createLogHost({ plugins: [output] })\nlog.log('audit', 'saved')\nawait log.shutdown('manual')"
     },
     features: {
       summary: {
@@ -323,7 +323,7 @@ export const logHostReference: ILibraryReference = {
         zh: '返回冻结且可被宿主识别的条目、门槛或格式阶段描述符。'
       },
       example:
-        "import { createLogHost } from '@migaia/log-host'\nimport { defineLogFeature } from '@migaia/log-host/plugin'\n\nconst redact = defineLogFeature({\n  kind: 'redact', phase: 'entry',\n  stage(entry) { return { ...entry, message: entry.message.replace(/secret/gu, '[redacted]') } }\n})\nconst log = createLogHost({ features: [redact] })\nlog.log('audit', 'secret')\nawait log.shutdown('manual')"
+        "import { createLogHost } from '@migaia/log-host'\nimport { defineLogFeature } from '@migaia/log-host/sdk'\n\nconst redact = defineLogFeature({\n  kind: 'redact', phase: 'entry',\n  stage(entry) { return { ...entry, message: entry.message.replace(/secret/gu, '[redacted]') } }\n})\nconst log = createLogHost({ features: [redact] })\nlog.log('audit', 'secret')\nawait log.shutdown('manual')"
     },
     defineOutputPlugin: {
       role: 'operation',
@@ -342,7 +342,7 @@ export const logHostReference: ILibraryReference = {
         zh: '返回可安装输出插件，保留 install() 扩展推导并使用宿主交付策略。'
       },
       example:
-        "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\n\nconst output = defineOutputPlugin({\n  name: 'audit', batchable: false, consumesText: false,\n  deliver(records) { for (const record of records) console.log(record.entry.message) }\n})\nconst log = createLogHost({ plugins: [output] })\nlog.log('audit', 'saved')\nawait log.shutdown('manual')"
+        "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\n\nconst output = defineOutputPlugin({\n  name: 'audit', batchable: false, consumesText: false,\n  deliver(records) { for (const record of records) console.log(record.entry.message) }\n})\nconst log = createLogHost({ plugins: [output] })\nlog.log('audit', 'saved')\nawait log.shutdown('manual')"
     },
     projectLogEntry: {
       role: 'operation',
@@ -361,7 +361,7 @@ export const logHostReference: ILibraryReference = {
         zh: '返回条目的线上错误投影；省略 error.raw，并序列化有界原始错误链。'
       },
       example:
-        "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin, projectLogEntry } from '@migaia/log-host/plugin'\n\nconst audit = defineOutputPlugin({\n  name: 'audit', batchable: false, consumesText: false,\n  deliver(records) { for (const record of records) console.log(JSON.stringify(projectLogEntry(record.entry))) }\n})\nconst log = createLogHost({ plugins: [audit] })\nlog.log('audit', 'saved')\nawait log.shutdown('manual')"
+        "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin, projectLogEntry } from '@migaia/log-host/sdk'\n\nconst audit = defineOutputPlugin({\n  name: 'audit', batchable: false, consumesText: false,\n  deliver(records) { for (const record of records) console.log(JSON.stringify(projectLogEntry(record.entry))) }\n})\nconst log = createLogHost({ plugins: [audit] })\nlog.log('audit', 'saved')\nawait log.shutdown('manual')"
     },
     LogLevel: {
       role: 'constant',
