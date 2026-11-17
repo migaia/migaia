@@ -60,7 +60,7 @@ if (await isProcessChild()) {
 
 ## 协议与扩展职责
 
-使用唯一的 `migaia.rpc/2` 协议。`@migaia/rpc-contract/protocol` 提供纯协议数据与准入；`/interfaces` 提供能力类型，`/errors` 与 `/error-code` 提供错误契约。Contract 不执行 I/O、业务 schema 或监督。业务校验由 `/plugins/schema` 负责；自定义载体作者使用 `@migaia/rpc-host/sdk`，复用 canonical carrier，而不是返回另一个 Host 或端点。
+使用唯一的 `migaia.rpc/2` 协议。`@migaia/rpc-contract/protocol` 提供纯协议数据与准入；`/interfaces` 提供能力类型，`/errors` 与 `/error-code` 提供错误契约。Contract 不执行 I/O、业务 schema 或监督。业务校验由 `/features/schema` 负责；自定义载体作者使用 `@migaia/rpc-host/sdk`，复用 canonical carrier，而不是返回另一个 Host 或端点。
 
 ## 当前边界
 

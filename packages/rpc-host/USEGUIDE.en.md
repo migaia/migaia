@@ -399,7 +399,7 @@ A launched child with actual native parent facts (process, thread, coroutine, de
 | Root `defaultTimeoutMs` or numeric call timeout             | Plugin `features` and complete timeout instances                        |
 | `poolPlugin` or pool assembler                              | Transport `features: { workers: pool({ size }) }`                       |
 | Endpoint, RuntimePeer, v1, JSON-RPC profile                 | One Host call owner and one new protocol, without compatibility entries |
-| Root `outcome` or idempotency store                         | Install `/plugins/idempotency`; query its namespace extension           |
+| Root `outcome` or idempotency store                         | Install `/features/idempotency`; query its namespace extension          |
 
 `remote.host.use`, `remote.host.unUse` and `remote.host.inspect` are removed. RPC no longer provides a protocol for managing a remote host's plugins; local native host installation and disposal keep their own contracts.
 

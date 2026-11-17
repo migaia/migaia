@@ -174,7 +174,7 @@ Optional extensions such as outcome require their actual plugin. Automatic claim
 
 ## Responsibilities and current limits
 
-Contract owns pure protocol/capability types/error contracts, Host owns calls/sessions, and Browser owns native sources/I/O. `/plugins/schema` performs business validation. Custom carrier authors use canonical carriers from `@migaia/rpc-host/sdk`, without another Host or codec.
+Contract owns pure protocol/capability types/error contracts, Host owns calls/sessions, and Browser owns native sources/I/O. `/features/schema` performs business validation. Custom carrier authors use canonical carriers from `@migaia/rpc-host/sdk`, without another Host or codec.
 
 Native origin/source checks do not establish completed auth verification/principal/session wiring. Host close/drain, restart downtime and parts of observer diagnostic compatibility retain known differences; this guide does not claim they are closed. Mixing transports usually adds routing/permission ambiguity; prefer separate Hosts.
 

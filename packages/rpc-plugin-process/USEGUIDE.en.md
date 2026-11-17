@@ -91,7 +91,7 @@ The caller eventually awaits `host.close()`. A standalone `flowControlFeature` i
 
 Spawn accepts the main entry, a path/URL, short options or a complete native recipe. See README for self-spawn. Native `supervision` retains restart, health and stop policy; reconnection does not replay unconfirmed work. stdout belongs to stdio RPC; application logs use stderr.
 
-Automatic verification/principal, session/scope across reconnects and parts of native auth wiring remain incomplete. A token, environment value, claimed identity or client ID is not admission proof. Select actual `/plugins/auth`, `/plugins/schema`, `/plugins/chunk`, `/plugins/batch` and `/plugins/typegen` when needed. These are neither Contract internals nor transport configuration fields. Flow plugins install before transport startup; adding them afterward rejects.
+Automatic verification/principal, session/scope across reconnects and parts of native auth wiring remain incomplete. A token, environment value, claimed identity or client ID is not admission proof. Select actual `/features/auth`, `/features/schema`, `/features/chunk`, `/features/batch` and `/plugins/typegen` when needed. These are neither Contract internals nor transport configuration fields. Flow plugins install before transport startup; adding them afterward rejects.
 
 ## Native members and ordinary PluginHost
 

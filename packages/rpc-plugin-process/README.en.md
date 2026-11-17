@@ -60,7 +60,7 @@ Use `host.process.request/notify/stream/group` and targeted `host.process.send`.
 
 ## Protocol and extension ownership
 
-The sole profile is `migaia.rpc/2`. `@migaia/rpc-contract/protocol` provides pure protocol data and admission; `/interfaces` provides capability types, and `/errors` plus `/error-code` provide error contracts. Contract performs no I/O, business schema validation or supervision. `/plugins/schema` owns business validation. Custom carrier authors use `@migaia/rpc-host/sdk` and canonical carriers rather than returning another Host or endpoint.
+The sole profile is `migaia.rpc/2`. `@migaia/rpc-contract/protocol` provides pure protocol data and admission; `/interfaces` provides capability types, and `/errors` plus `/error-code` provide error contracts. Contract performs no I/O, business schema validation or supervision. `/features/schema` owns business validation. Custom carrier authors use `@migaia/rpc-host/sdk` and canonical carriers rather than returning another Host or endpoint.
 
 ## Current boundaries
 

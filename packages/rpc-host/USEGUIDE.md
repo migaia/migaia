@@ -399,7 +399,7 @@ export const host = await createRpcHost({
 | 根 `defaultTimeoutMs` / 单次数字 timeout              | plugin 的 `features` record 与单次 timeout 配置 |
 | `poolPlugin`、pool assembler                          | 传输 `features: { workers: pool({ size }) }`    |
 | endpoint、RuntimePeer、v1、JSON-RPC profile           | 单一 Host 调用 owner 与新协议，无兼容入口       |
-| 根级 `outcome` / 幂等 store                           | 安装 `/plugins/idempotency`，在命名空间查询     |
+| 根级 `outcome` / 幂等 store                           | 安装 `/features/idempotency`，在命名空间查询    |
 
 `remote.host.use`、`remote.host.unUse` 和 `remote.host.inspect` 已移除，不再提供通过 RPC 管理远端宿主插件的协议；本地原生宿主的安装与释放 API 保持各自契约。
 

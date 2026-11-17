@@ -174,7 +174,7 @@ export async function observeFrame(target: Window, origin: string) {
 
 ## 职责与已知边界
 
-`rpc-contract` 提供纯协议/能力类型/错误契约，Host 管理调用与会话，Browser 管理原生来源和 I/O；业务 schema 交给 `/plugins/schema`。自定义载体作者使用 `@migaia/rpc-host/sdk` 的 canonical carrier，不再创建第二个 Host 或并行 codec。
+`rpc-contract` 提供纯协议/能力类型/错误契约，Host 管理调用与会话，Browser 管理原生来源和 I/O；业务 schema 交给 `/features/schema`。自定义载体作者使用 `@migaia/rpc-host/sdk` 的 canonical carrier，不再创建第二个 Host 或并行 codec。
 
 原生 origin/source 校验不等于 auth verifier/principal/session 已全部接通。Host-close/drain、重启 downtime 与部分 observer 诊断兼容性仍有保留差异；本指南不承诺对应旧行为均已闭合。多种 transport 混装通常增加路由和权限歧义，优先独立 Host。
 

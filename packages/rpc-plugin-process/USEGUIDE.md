@@ -91,7 +91,7 @@ export async function openWorker(entry: URL) {
 
 `spawn` 可选主入口、路径/URL、短启动配置或完整原生 recipe。主入口自派生写法见 README。原生 `supervision` 保留重启、健康检查和停止策略；恢复连接不重放未确认业务。stdio 的 stdout 属于 RPC，应用日志使用 stderr。
 
-自动 verifier/principal、跨重连 session/scope 与部分 native auth 接线尚有缺口。不要用 token、环境值、自报身份或客户端 ID 代替实际准入。需要业务认证、schema、分片、合批或类型生成时，选择实际的 `/plugins/auth`、`/plugins/schema`、`/plugins/chunk`、`/plugins/batch`、`/plugins/typegen`；它们不是 Contract 内部或传输配置字段。flow 插件必须在传输开始前安装，启动后追加会拒绝。
+自动 verifier/principal、跨重连 session/scope 与部分 native auth 接线尚有缺口。不要用 token、环境值、自报身份或客户端 ID 代替实际准入。需要业务认证、schema、分片、合批或类型生成时，选择实际的 `/features/auth`、`/features/schema`、`/features/chunk`、`/features/batch`、`/plugins/typegen`；它们不是 Contract 内部或传输配置字段。flow 插件必须在传输开始前安装，启动后追加会拒绝。
 
 ## 原生成员与普通 PluginHost
 
