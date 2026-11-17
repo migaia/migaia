@@ -161,8 +161,8 @@
                 "headers": ["API", "用途"],
                 "rows": [
                   [
-                    "`sparqlBackendPlugin({ endpoint, id? }, features?)`",
-                    "安装一个端点，id 默认 sparql。"
+                    "`sparqlBackendPlugin({ endpoint, name?, features? })`",
+                    "安装一个端点，name 默认 sparql。"
                   ],
                   ["`oxigraphEndpoint(store)` / `httpEndpoint(options)`", "适配本地或远程端点。"],
                   ["`store.use(rdf)`", "`add`、`delete`、`match`。"],
@@ -334,7 +334,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin(\n      { endpoint: oxigraphEndpoint(new Store()) },\n      {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    )\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))"
+                "code": "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin({\n      endpoint: oxigraphEndpoint(new Store()),\n      features: {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    })\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))"
               },
               {
                 "type": "paragraph",
@@ -572,8 +572,8 @@
                   "headers": ["API", "Purpose"],
                   "rows": [
                     [
-                      "`sparqlBackendPlugin({ endpoint, id? }, features?)`",
-                      "Install an endpoint; id defaults to sparql."
+                      "`sparqlBackendPlugin({ endpoint, name?, features? })`",
+                      "Install an endpoint; name defaults to sparql."
                     ],
                     [
                       "`oxigraphEndpoint(store)` / `httpEndpoint(options)`",
@@ -748,7 +748,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin(\n      { endpoint: oxigraphEndpoint(new Store()) },\n      {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    )\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))"
+                  "code": "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin({\n      endpoint: oxigraphEndpoint(new Store()),\n      features: {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    })\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))"
                 },
                 {
                   "type": "paragraph",
@@ -1138,6 +1138,71 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "storage-plugin-sparql-index--ISparqlAbortSignal"
+        },
+        {
+          "name": "ISparqlBackend",
+          "kind": "type",
+          "signature": "export type ISparqlBackend = IStorageBackendType<ISparqlStore, ISparqlEndpoint>;",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-sparql/dist/plugin.d.ts",
+          "purpose": "The SPARQL engine as a type: its non-KV Store and the caller-owned endpoint.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISparqlBackend.",
+          "advanced": "No additional advanced behavior is declared for ISparqlBackend.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ISparqlBackend."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISparqlBackend.",
+          "examples": [],
+          "members": [],
+          "composes": ["IStorageBackendType"],
+          "aliasOf": "ISparqlBackend",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISparqlBackend = IStorageBackendType<ISparqlStore, ISparqlEndpoint>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ISparqlBackend when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ISparqlBackend does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The SPARQL engine as a type: its non-KV Store and the caller-owned endpoint."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISparqlBackend from @migaia/storage-plugin-sparql, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISparqlBackend when its type contract and declared inputs match the result you need. Choose a different public symbol when ISparqlBackend does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISparqlBackend."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ISparqlBackend."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sparql/dist/plugin.d.ts:ISparqlBackend:export type ISparqlBackend = IStorageBackendType<ISparqlStore, ISparqlEndpoint>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sparql-index--ISparqlBackend"
         },
         {
           "name": "ISparqlEndpoint",
@@ -1539,7 +1604,7 @@
           "name": "ISparqlOptions",
           "kind": "type",
           "signature": "export type ISparqlOptions = { readonly endpoint: ISparqlEndpoint; };",
-          "declarationLine": 7,
+          "declarationLine": 8,
           "source": "packages/storage-plugin-sparql/dist/plugin.d.ts",
           "purpose": "Installation captures one caller-owned native endpoint.",
           "core": "endpoint: Borrow the application-created native endpoint without close ownership or a replacement client.",
@@ -2307,103 +2372,32 @@
           "fragment": "storage-plugin-sparql-index--ISparqlUpdateHookPayload"
         },
         {
-          "name": "sparqlBackendKind",
-          "kind": "const",
-          "signature": "export declare const sparqlBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", ISparqlStore, ISparqlEndpoint, {}>;",
-          "declarationLine": 6,
-          "source": "packages/storage-plugin-sparql/dist/plugin.d.ts",
-          "purpose": "Authenticate selected native RDF Features against the exact store and borrowed endpoint kind.",
-          "core": "Authenticate selected native RDF Features against the exact store and borrowed endpoint kind.",
-          "advanced": "",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "aliasOf": "sparqlBackendKind",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const sparqlBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", ISparqlStore, ISparqlEndpoint, {}>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Authenticate selected native RDF Features against the exact store and borrowed endpoint kind."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import sparqlBackendKind from @migaia/storage-plugin-sparql, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use sparqlBackendKind when its const contract and declared inputs match the result you need. Choose a different public symbol when sparqlBackendKind does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Authenticate selected native RDF Features against the exact store and borrowed endpoint kind."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-sparql/dist/plugin.d.ts:sparqlBackendKind:export declare const sparqlBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", ISparqlStore, ISparqlEndpoint, {}>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-sparql-index--sparqlBackendKind"
-        },
-        {
           "name": "sparqlBackendPlugin",
           "kind": "function",
-          "signature": "export declare function sparqlBackendPlugin<const TId extends string = 'sparql', const F extends IStorageFeatureRecord = {}>(options: ISparqlOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof sparqlBackendKind, NoInfer<F>, ISparqlStore>): IStorageBackendPlugin<typeof sparqlBackendKind, NoInfer<TId>, F, ISparqlStore>;",
-          "declarationLine": 11,
+          "signature": "export declare function sparqlBackendPlugin<const TId extends string = 'sparql', const F extends IStorageFeatureRecord = {}>(options: ISparqlOptions & { /** Plugin name and backend lookup key; `'sparql'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISparqlBackend, NoInfer<F>, ISparqlStore>; }): IStorageBackendPlugin<ISparqlBackend, NoInfer<TId>, F, ISparqlStore>;",
+          "declarationLine": 12,
           "source": "packages/storage-plugin-sparql/dist/plugin.d.ts",
           "purpose": "Capture the caller-owned endpoint and install native RDF through original host lifecycle, query and transaction owners.",
           "core": "features: Exact-kind root Features, optionally Graph Store and ontology.\nA lazy exact-id backend plugin; the factory performs no native I/O.\nendpoint: Caller-owned query/update endpoint with genuine optional graphStore/atomicUpdate ports.\nid: Application-assigned backend identifier used by host.backend.\nsparql is the default backend identifier.",
           "advanced": "",
           "parameters": [
-            "options: ISparqlOptions & { readonly id?: TId; }",
-            "features: F & IStorageFeatureStoreCompatibility<typeof sparqlBackendKind, NoInfer<F>, ISparqlStore> (optional)"
+            "options: ISparqlOptions & { /** Plugin name and backend lookup key; `'sparql'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISparqlBackend, NoInfer<F>, ISparqlStore>; }"
           ],
           "parameterDetails": [
             {
               "name": "options",
-              "type": "ISparqlOptions & { readonly id?: TId; }",
+              "type": "ISparqlOptions & { /** Plugin name and backend lookup key; `'sparql'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISparqlBackend, NoInfer<F>, ISparqlStore>; }",
               "optional": false
-            },
-            {
-              "name": "features",
-              "type": "F & IStorageFeatureStoreCompatibility<typeof sparqlBackendKind, NoInfer<F>, ISparqlStore>",
-              "optional": true
             }
           ],
-          "returns": "IStorageBackendPlugin<typeof sparqlBackendKind, NoInfer<TId>, F, ISparqlStore>",
+          "returns": "IStorageBackendPlugin<ISparqlBackend, NoInfer<TId>, F, ISparqlStore>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
             "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\n\nawait using host = await createStorageHost({\n  plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })]\n})\nconst store = host.backend('sparql')\nconst quad = {\n  subject: term.iri('urn:example:alice'),\n  predicate: term.iri('urn:example:name'),\n  object: term.literal('Alice'),\n  graph: term.defaultGraph\n}\nawait store\n  .use(rdf)\n  .add([quad, { ...quad, subject: term.iri('urn:example:bob'), object: term.literal('Bob') }])\nconst selected = store\n  .use(rdf)\n  .match({ predicate: quad.predicate })\n  .where((value) => value.object.value === 'Alice')\nconsole.log(await selected.count())\nconsole.log(await selected.delete())\nconsole.log(await store.use(rdf).match({}).count())",
             "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { ConcurrencyPolicy } from '@migaia/storage-host/sdk'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\n\nawait using host = await createStorageHost({\n  plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })]\n})\nconst store = host.backend('sparql')\nconst quad = {\n  subject: term.iri('urn:example:alice'),\n  predicate: term.iri('urn:example:name'),\n  object: term.literal('Alice'),\n  graph: term.defaultGraph\n}\nawait store.use(rdf).add([quad])\nawait store\n  .tx()\n  .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 }))\n  .run(async (scope) => {\n    scope.use(rdf).expect([quad])\n    await scope.use(rdf).delete([quad])\n    await scope.use(rdf).add([{ ...quad, object: term.literal('Ada') }])\n  })\nconsole.log((await store.use(rdf).match({}).all()).map((value) => value.object.value).join(','))",
             "import { createStorageHost } from '@migaia/storage-host'\nimport { sparql } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { httpEndpoint } from '@migaia/storage-plugin-sparql/http'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin({\n      endpoint: httpEndpoint({\n        queryUrl: process.env.SPARQL_QUERY_URL ?? 'http://127.0.0.1:3030/storage/sparql',\n        updateUrl: process.env.SPARQL_UPDATE_URL ?? 'http://127.0.0.1:3030/storage/update',\n        graphStoreUrl: process.env.SPARQL_GRAPH_STORE_URL ?? 'http://127.0.0.1:3030/storage/data'\n      })\n    })\n  ]\n})\nconst query = host.backend('sparql').use(sparql)\nconst subject = term.iri('urn:example:' + crypto.randomUUID())\nconst predicate = term.iri('urn:example:name')\nconst value = term.literal('Alice')\nawait query`INSERT DATA { ${subject} ${predicate} ${value} }`.update()\nconsole.log(await query`ASK { ${subject} ${predicate} ${value} }`.ask())",
-            "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin(\n      { endpoint: oxigraphEndpoint(new Store()) },\n      {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    )\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))",
+            "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin({\n      endpoint: oxigraphEndpoint(new Store()),\n      features: {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    })\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))",
             "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\n\nawait using host = await createStorageHost({\n  plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })]\n})\nconst store = host.backend('sparql')\nconst quad = {\n  subject: term.iri('urn:example:alice'),\n  predicate: term.iri('urn:example:name'),\n  object: term.literal('Alice'),\n  graph: term.defaultGraph\n}\nawait store.use(rdf).add([quad])\nconsole.log(await store.use(rdf).match({ subject: quad.subject }).count())"
           ],
           "members": [],
@@ -2411,24 +2405,19 @@
           "aliasOf": "sparqlBackendPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function sparqlBackendPlugin<const TId extends string = 'sparql', const F extends IStorageFeatureRecord = {}>(options: ISparqlOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof sparqlBackendKind, NoInfer<F>, ISparqlStore>): IStorageBackendPlugin<typeof sparqlBackendKind, NoInfer<TId>, F, ISparqlStore>;"
+            "export declare function sparqlBackendPlugin<const TId extends string = 'sparql', const F extends IStorageFeatureRecord = {}>(options: ISparqlOptions & { /** Plugin name and backend lookup key; `'sparql'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISparqlBackend, NoInfer<F>, ISparqlStore>; }): IStorageBackendPlugin<ISparqlBackend, NoInfer<TId>, F, ISparqlStore>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
-                "type": "ISparqlOptions & { readonly id?: TId; }",
+                "type": "ISparqlOptions & { /** Plugin name and backend lookup key; `'sparql'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISparqlBackend, NoInfer<F>, ISparqlStore>; }",
                 "optional": false
-              },
-              {
-                "name": "features",
-                "type": "F & IStorageFeatureStoreCompatibility<typeof sparqlBackendKind, NoInfer<F>, ISparqlStore>",
-                "optional": true
               }
             ]
           ],
           "overloadReturns": [
-            "IStorageBackendPlugin<typeof sparqlBackendKind, NoInfer<TId>, F, ISparqlStore>"
+            "IStorageBackendPlugin<ISparqlBackend, NoInfer<TId>, F, ISparqlStore>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2466,10 +2455,16 @@
           ],
           "declaredConfiguration": [
             {
-              "name": "id",
+              "name": "name",
               "type": "TId",
               "optional": true,
-              "description": ""
+              "description": "Plugin name and backend lookup key; `'sparql'` when omitted."
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<ISparqlBackend, NoInfer<F>, ISparqlStore>",
+              "optional": true,
+              "description": "Features installed on this backend."
             },
             {
               "name": "endpoint",
@@ -2478,25 +2473,33 @@
               "description": "Native input methods are captured without granting the backend ownership of the endpoint. */ export function captureEndpoint(endpoint: ISparqlEndpoint): ISparqlEndpoint { /** Only supported endpoint methods are admitted; subsequent requests keep the original receiver. */ const query = endpoint.query, update = endpoint.update, atomic = endpoint.atomicUpdate if ( typeof query !== 'function' || typeof update !== 'function' || (atomic !== undefined && typeof atomic !== 'function') ) throw invalidArgument() return endpoint } /** Install one physical endpoint and the original owners for admission, resources and transaction policy. / /** One fixed organization view borrows native storage and its existing capability installer. */ type ISparqlOrganizationProjection = { store: ISparqlStore installer: ICapabilityInstallPort drop: () => Promise<void> } /** Physical endpoint state is passed explicitly to named native and organization jobs. */ type ISparqlBackendContext = { /** Original endpoint belongs to this physical namespace."
             }
           ],
-          "identity": "packages/storage-plugin-sparql/dist/plugin.d.ts:sparqlBackendPlugin:export declare function sparqlBackendPlugin<const TId extends string = 'sparql', const F extends IStorageFeatureRecord = {}>(options: ISparqlOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof sparqlBackendKind, NoInfer<F>, ISparqlStore>): IStorageBackendPlugin<typeof sparqlBackendKind, NoInfer<TId>, F, ISparqlStore>;",
+          "identity": "packages/storage-plugin-sparql/dist/plugin.d.ts:sparqlBackendPlugin:export declare function sparqlBackendPlugin<const TId extends string = 'sparql', const F extends IStorageFeatureRecord = {}>(options: ISparqlOptions & { /** Plugin name and backend lookup key; `'sparql'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISparqlBackend, NoInfer<F>, ISparqlStore>; }): IStorageBackendPlugin<ISparqlBackend, NoInfer<TId>, F, ISparqlStore>;",
           "guidance": [],
           "usageScore": 68,
           "configuration": [
             {
-              "name": "id",
+              "name": "name",
               "type": "TId",
               "optional": true,
-              "description": "`sparqlBackendPlugin({ endpoint, id? }, features?)` — 安装一个端点，id 默认 sparql。",
-              "descriptionEn": "",
-              "descriptionZh": "`sparqlBackendPlugin({ endpoint, id? }, features?)` — 安装一个端点，id 默认 sparql。"
+              "description": "`sparqlBackendPlugin({ endpoint, name?, features? })` — 安装一个端点，name 默认 sparql。",
+              "descriptionEn": "Plugin name and backend lookup key; `'sparql'` when omitted.",
+              "descriptionZh": "`sparqlBackendPlugin({ endpoint, name?, features? })` — 安装一个端点，name 默认 sparql。"
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<ISparqlBackend, NoInfer<F>, ISparqlStore>",
+              "optional": true,
+              "description": "`sparqlBackendPlugin({ endpoint, name?, features? })` — 安装一个端点，name 默认 sparql。",
+              "descriptionEn": "Features installed on this backend.",
+              "descriptionZh": "`sparqlBackendPlugin({ endpoint, name?, features? })` — 安装一个端点，name 默认 sparql。"
             },
             {
               "name": "endpoint",
               "type": "ISparqlEndpoint",
               "optional": false,
-              "description": "`sparqlBackendPlugin({ endpoint, id? }, features?)` — 安装一个端点，id 默认 sparql。",
+              "description": "`sparqlBackendPlugin({ endpoint, name?, features? })` — 安装一个端点，name 默认 sparql。",
               "descriptionEn": "Native input methods are captured without granting the backend ownership of the endpoint. */ export function captureEndpoint(endpoint: ISparqlEndpoint): ISparqlEndpoint { /** Only supported endpoint methods are admitted; subsequent requests keep the original receiver. */ const query = endpoint.query, update = endpoint.update, atomic = endpoint.atomicUpdate if ( typeof query !== 'function' || typeof update !== 'function' || (atomic !== undefined && typeof atomic !== 'function') ) throw invalidArgument() return endpoint } /** Install one physical endpoint and the original owners for admission, resources and transaction policy. / /** One fixed organization view borrows native storage and its existing capability installer. */ type ISparqlOrganizationProjection = { store: ISparqlStore installer: ICapabilityInstallPort drop: () => Promise<void> } /** Physical endpoint state is passed explicitly to named native and organization jobs. */ type ISparqlBackendContext = { /** Original endpoint belongs to this physical namespace.",
-              "descriptionZh": "`sparqlBackendPlugin({ endpoint, id? }, features?)` — 安装一个端点，id 默认 sparql。"
+              "descriptionZh": "`sparqlBackendPlugin({ endpoint, name?, features? })` — 安装一个端点，name 默认 sparql。"
             }
           ],
           "fragment": "storage-plugin-sparql-index--sparqlBackendPlugin"
@@ -2523,7 +2526,7 @@
         {
           "name": "graphStoreFeature",
           "kind": "function",
-          "signature": "export declare function graphStoreFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", import(\"../types.ts\").ISparqlStore, import(\"../endpoint.ts\").ISparqlEndpoint, {}>, IGraphStoreOutput, {}>;",
+          "signature": "export declare function graphStoreFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISparqlBackend, IGraphStoreOutput, {}>;",
           "declarationLine": 19,
           "source": "packages/storage-plugin-sparql/dist/features/graph-store.d.ts",
           "purpose": "Expose root-only graph read, replacement, merge and deletion without a transaction projection or preparation phase.",
@@ -2531,21 +2534,21 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", import(\"../types.ts\").ISparqlStore, import(\"../endpoint.ts\").ISparqlEndpoint, {}>, IGraphStoreOutput, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISparqlBackend, IGraphStoreOutput, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin(\n      { endpoint: oxigraphEndpoint(new Store()) },\n      {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    )\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))"
+            "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin({\n      endpoint: oxigraphEndpoint(new Store()),\n      features: {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    })\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/graph-store",
           "overloadSignatures": [
-            "export declare function graphStoreFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", import(\"../types.ts\").ISparqlStore, import(\"../endpoint.ts\").ISparqlEndpoint, {}>, IGraphStoreOutput, {}>;"
+            "export declare function graphStoreFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISparqlBackend, IGraphStoreOutput, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", import(\"../types.ts\").ISparqlStore, import(\"../endpoint.ts\").ISparqlEndpoint, {}>, IGraphStoreOutput, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISparqlBackend, IGraphStoreOutput, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2582,7 +2585,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-sparql/dist/features/graph-store.d.ts:graphStoreFeature:export declare function graphStoreFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", import(\"../types.ts\").ISparqlStore, import(\"../endpoint.ts\").ISparqlEndpoint, {}>, IGraphStoreOutput, {}>;",
+          "identity": "packages/storage-plugin-sparql/dist/features/graph-store.d.ts:graphStoreFeature:export declare function graphStoreFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISparqlBackend, IGraphStoreOutput, {}>;",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -3112,7 +3115,7 @@
         {
           "name": "ontologyFeature",
           "kind": "function",
-          "signature": "export declare function ontologyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", import(\"../types.ts\").ISparqlStore, import(\"../endpoint.ts\").ISparqlEndpoint, {}>, IOntologyOutput, {}>;",
+          "signature": "export declare function ontologyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISparqlBackend, IOntologyOutput, {}>;",
           "declarationLine": 19,
           "source": "packages/storage-plugin-sparql/dist/features/ontology.d.ts",
           "purpose": "Expose complete RDF document import and export through the original graph port and genuine parser and writer.",
@@ -3120,21 +3123,21 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", import(\"../types.ts\").ISparqlStore, import(\"../endpoint.ts\").ISparqlEndpoint, {}>, IOntologyOutput, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISparqlBackend, IOntologyOutput, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin(\n      { endpoint: oxigraphEndpoint(new Store()) },\n      {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    )\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))"
+            "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin({\n      endpoint: oxigraphEndpoint(new Store()),\n      features: {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    })\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/ontology",
           "overloadSignatures": [
-            "export declare function ontologyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", import(\"../types.ts\").ISparqlStore, import(\"../endpoint.ts\").ISparqlEndpoint, {}>, IOntologyOutput, {}>;"
+            "export declare function ontologyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISparqlBackend, IOntologyOutput, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", import(\"../types.ts\").ISparqlStore, import(\"../endpoint.ts\").ISparqlEndpoint, {}>, IOntologyOutput, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISparqlBackend, IOntologyOutput, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3171,7 +3174,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-sparql/dist/features/ontology.d.ts:ontologyFeature:export declare function ontologyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sparql\", import(\"../types.ts\").ISparqlStore, import(\"../endpoint.ts\").ISparqlEndpoint, {}>, IOntologyOutput, {}>;",
+          "identity": "packages/storage-plugin-sparql/dist/features/ontology.d.ts:ontologyFeature:export declare function ontologyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISparqlBackend, IOntologyOutput, {}>;",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -3199,16 +3202,16 @@
         {
           "name": "httpEndpoint",
           "kind": "function",
-          "signature": "export declare function httpEndpoint(options: ISparqlHttpOptions): ISparqlEndpoint;",
+          "signature": "export declare function httpEndpoint(requested: ISparqlHttpOptions): ISparqlEndpoint;",
           "declarationLine": 18,
           "source": "packages/storage-plugin-sparql/dist/http.d.ts",
           "purpose": "Use native fetch, full status/body errors and one-send modifications without mutation redirects.",
           "core": "A native endpoint without raw atomicUpdate; host detection owns readiness.\nqueryUrl: Absolute native query URL supplied by application deployment, without embedded credentials.\nupdateUrl: Absolute native update URL pointing at the same application-selected logical dataset.\ngraphStoreUrl: Optional native single-graph route required by graph and ontology Features.\nOmitted: no graph protocol is advertised.\nauth: One deployment-issued Basic or Bearer authentication scheme, never included in diagnostic payloads.\nNo authorization header is sent.\nauth.basic: Deployment-issued user and password for the Basic authorization header.\nOmitted when no Basic credentials are supplied.\nauth.basic.user: User name issued by the endpoint deployment, not an application storage key.\nNo Basic scheme unless the complete credentials are selected.\nauth.basic.password: Password issued by the endpoint deployment; never logged or placed in URLs.\nauth.bearer: Bearer token issued by deployment; mutually exclusive with Basic credentials.\nNo Bearer scheme when omitted.",
           "advanced": "",
-          "parameters": ["options: ISparqlHttpOptions"],
+          "parameters": ["requested: ISparqlHttpOptions"],
           "parameterDetails": [
             {
-              "name": "options",
+              "name": "requested",
               "type": "ISparqlHttpOptions",
               "optional": false
             }
@@ -3223,12 +3226,12 @@
           "composes": [],
           "exportPath": "./http",
           "overloadSignatures": [
-            "export declare function httpEndpoint(options: ISparqlHttpOptions): ISparqlEndpoint;"
+            "export declare function httpEndpoint(requested: ISparqlHttpOptions): ISparqlEndpoint;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "options",
+                "name": "requested",
                 "type": "ISparqlHttpOptions",
                 "optional": false
               }
@@ -3319,7 +3322,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-plugin-sparql/dist/http.d.ts:httpEndpoint:export declare function httpEndpoint(options: ISparqlHttpOptions): ISparqlEndpoint;",
+          "identity": "packages/storage-plugin-sparql/dist/http.d.ts:httpEndpoint:export declare function httpEndpoint(requested: ISparqlHttpOptions): ISparqlEndpoint;",
           "guidance": [],
           "usageScore": 22,
           "configuration": [
@@ -3533,7 +3536,7 @@
           "examples": [
             "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\n\nawait using host = await createStorageHost({\n  plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })]\n})\nconst store = host.backend('sparql')\nconst quad = {\n  subject: term.iri('urn:example:alice'),\n  predicate: term.iri('urn:example:name'),\n  object: term.literal('Alice'),\n  graph: term.defaultGraph\n}\nawait store\n  .use(rdf)\n  .add([quad, { ...quad, subject: term.iri('urn:example:bob'), object: term.literal('Bob') }])\nconst selected = store\n  .use(rdf)\n  .match({ predicate: quad.predicate })\n  .where((value) => value.object.value === 'Alice')\nconsole.log(await selected.count())\nconsole.log(await selected.delete())\nconsole.log(await store.use(rdf).match({}).count())",
             "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { ConcurrencyPolicy } from '@migaia/storage-host/sdk'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\n\nawait using host = await createStorageHost({\n  plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })]\n})\nconst store = host.backend('sparql')\nconst quad = {\n  subject: term.iri('urn:example:alice'),\n  predicate: term.iri('urn:example:name'),\n  object: term.literal('Alice'),\n  graph: term.defaultGraph\n}\nawait store.use(rdf).add([quad])\nawait store\n  .tx()\n  .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 }))\n  .run(async (scope) => {\n    scope.use(rdf).expect([quad])\n    await scope.use(rdf).delete([quad])\n    await scope.use(rdf).add([{ ...quad, object: term.literal('Ada') }])\n  })\nconsole.log((await store.use(rdf).match({}).all()).map((value) => value.object.value).join(','))",
-            "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin(\n      { endpoint: oxigraphEndpoint(new Store()) },\n      {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    )\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))",
+            "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\n\nawait using host = await createStorageHost({\n  plugins: [\n    sparqlBackendPlugin({\n      endpoint: oxigraphEndpoint(new Store()),\n      features: {\n        graphs: graphStoreFeature(),\n        ontology: ontologyFeature()\n      }\n    })\n  ]\n})\nconst store = host.backend('sparql')\nconst target = { graph: term.iri('urn:example:people') }\nconst document = {\n  format: 'text/turtle' as const,\n  text: '<urn:example:alice> <urn:example:name> \"Alice\" .'\n}\nawait store.api.graphStore.putGraph(target, document)\nconsole.log(await store.api.graphStore.hasGraph(target))\nconsole.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))\nconsole.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))\nawait store.api.graphStore.removeGraph(target)\nconsole.log(await store.api.graphStore.hasGraph(target))",
             "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/sdk'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\n\nawait using host = await createStorageHost({\n  plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })]\n})\nconst store = host.backend('sparql')\nconst quad = {\n  subject: term.iri('urn:example:alice'),\n  predicate: term.iri('urn:example:name'),\n  object: term.literal('Alice'),\n  graph: term.defaultGraph\n}\nawait store.use(rdf).add([quad])\nconsole.log(await store.use(rdf).match({ subject: quad.subject }).count())"
           ],
           "members": [],

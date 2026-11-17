@@ -66,7 +66,7 @@
                   ["`connectToParent: true`", "仅在真实线程子端连接父端，与 `spawn` 互斥"],
                   ["`name`", "原生安装/注册名称；默认 `thread`"],
                   ["`namespace`", "调用命名空间；默认 `thread`"],
-                  ["`features`", "完整 timeout、retry 或 pool feature 实例"],
+                  ["`features`", "`{ localName: nativeFeature }`，接收 timeout、retry 或 pool"],
                   ["`expose`", "普通 PluginHost 安装时选择公开的本地 Feature 方法"],
                   ["`report`", "原生诊断报告回调"]
                 ]
@@ -87,7 +87,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "单次调用传 `signal`，以及完整的 `timeoutFeature({ ms })`、`retryFeature({ attempts })` 实例或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。"
+                "text": "单次调用传 `signal`，以及 timeout `{ ms }`、retry `{ attempts }` 配置或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。"
               },
               {
                 "type": "paragraph",
@@ -127,12 +127,12 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "父入口使用真实 `worker.js`，并将完整策略实例装在 transport 的 `features`。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。"
+                "text": "父入口使用真实 `worker.js`，并将原生策略 token 放入 transport 的 `features` record。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })]\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
+                "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) }\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: { ms: 500 },\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
               },
               {
                 "type": "paragraph",
@@ -159,7 +159,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`timeoutFeature`、`retryFeature` 只能是完整 feature 实例或 `false`。优先级为单次调用、transport 安装值、链路策略 plugin。上例单次调用使用 500 ms timeout，并关闭该次 retry；没有选中的策略就不自动启用。原生启动、health、stop 与业务调用的期限各有原 owner，不能用业务 timeout 推断它们的时钟。"
+                "text": "单次 `timeout`、`retry` 接收策略配置对象或 `false`；传输的 `features` record 接收原生 feature token。优先级为单次调用、transport 安装值、链路策略 plugin。上例单次调用使用 500 ms timeout，并关闭该次 retry；没有选中的策略就不自动启用。原生启动、health、stop 与业务调用的期限各有原 owner，不能用业务 timeout 推断它们的时钟。"
               },
               {
                 "type": "paragraph",
@@ -276,7 +276,7 @@
                     ],
                     ["`name`", "Native installation/registration name; defaults to `thread`"],
                     ["`namespace`", "Call namespace; defaults to `thread`"],
-                    ["`features`", "Complete timeout, retry, or pool feature instances"],
+                    ["`features`", "`{ localName: nativeFeature }` for timeout, retry, or pool"],
                     [
                       "`expose`",
                       "Select local Feature methods when installed on an ordinary PluginHost"
@@ -300,11 +300,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Calls accept `signal`, complete `timeoutFeature({ ms })` and `retryFeature({ attempts })` instances, or `false`. Selection precedence is per-call options, transport features, then link-policy plugin. An absent policy adds no automatic timeout or retry. Cancellation is cooperative and cannot preempt a synchronous loop."
+                  "text": "Calls accept `signal`, timeout `{ ms }`, retry `{ attempts }`, or `false`. Selection precedence is per-call options, transport features, then the default from a host-level flow plugin. An absent policy adds no automatic timeout or retry. Cancellation is cooperative and cannot preempt a synchronous loop."
                 },
                 {
                   "type": "paragraph",
-                  "text": "The native Thread `spec.limits.callWallTimeMs` is a separate hard cap. Explicit `timeout: false` disables the optional business timeout without extending that cap. A complete timeout instance uses the actual launch spec and its original scheduler."
+                  "text": "The native Thread `spec.limits.callWallTimeMs` is a separate hard cap. Explicit `timeout: false` disables the optional business timeout without extending that cap. An independent timeout execution uses the actual launch spec and its original scheduler."
                 },
                 {
                   "type": "paragraph",
@@ -340,12 +340,12 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "The parent uses a real `worker.js` and installs complete policies in transport `features`. When declaring remote methods, retain `typeof plugins` as well, so namespaces and member controls retain their types."
+                  "text": "The parent uses a real `worker.js` and installs native policy tokens in the transport `features` record. When declaring remote methods, retain `typeof plugins` as well, so namespaces and member controls retain their types."
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })]\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
+                  "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) }\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: { ms: 500 },\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
                 },
                 {
                   "type": "paragraph",
@@ -372,7 +372,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`timeoutFeature` and `retryFeature` accept complete feature instances or `false`. Precedence is per-call, installed transport policy, then link-policy plugin. The example chooses a 500 ms call timeout and disables retry for that call. No selected policy means no automatic policy. Native startup, health, stop, and business deadlines keep their respective owners; business timeout does not configure those clocks."
+                  "text": "Per-call `timeout` and `retry` accept policy options or `false`; the transport `features` record accepts native feature tokens. Precedence is per-call, installed transport policy, then the default from a host-level flow plugin. The example chooses a 500 ms call timeout and disables retry for that call. No selected policy means no automatic policy. Native startup, health, stop, and business deadlines keep their respective owners; business timeout does not configure those clocks."
                 },
                 {
                   "type": "paragraph",
@@ -578,7 +578,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "单次调用传 `signal`，以及完整的 `timeoutFeature({ ms })`、`retryFeature({ attempts })` 实例或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。"
+                  "text": "单次调用传 `signal`，以及 timeout `{ ms }`、retry `{ attempts }` 配置或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。"
                 },
                 {
                   "type": "paragraph",
@@ -602,7 +602,7 @@
         {
           "name": "IThreadCommonOptions",
           "kind": "type",
-          "signature": "export type IThreadCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]; /** Local connection policy remains independent from native launch/bootstrap objects. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;",
+          "signature": "export type IThreadCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>; /** Local connection policy remains independent from native launch/bootstrap objects. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;",
           "declarationLine": 12,
           "source": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts",
           "purpose": "Cold native registration and scope; Host owns identity, providers and protocol execution.",
@@ -646,10 +646,10 @@
               "name": "features",
               "kind": "property",
               "optional": true,
-              "signature": "features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[];",
+              "signature": "features?: Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>;",
               "description": null,
               "parameterDetails": [],
-              "returns": "readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]"
+              "returns": "Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>"
             },
             {
               "name": "connect",
@@ -680,7 +680,7 @@
           "aliasOf": "IThreadCommonOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IThreadCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]; /** Local connection policy remains independent from native launch/bootstrap objects. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;"
+            "export type IThreadCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>; /** Local connection policy remains independent from native launch/bootstrap objects. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -719,7 +719,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts:IThreadCommonOptions:export type IThreadCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]; /** Local connection policy remains independent from native launch/bootstrap objects. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;",
+          "identity": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts:IThreadCommonOptions:export type IThreadCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>; /** Local connection policy remains independent from native launch/bootstrap objects. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1434,27 +1434,27 @@
         {
           "name": "threadPlugin",
           "kind": "function",
-          "signature": "export declare function threadPlugin<const N extends string = typeof THREAD_NAMESPACE, E extends object = Record<never, never>, const TFeatures extends readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[] = readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]>(options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "signature": "export declare function threadPlugin<const N extends string = typeof THREAD_NAMESPACE, E extends object = Record<never, never>, const TFeatures extends Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>> = Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>>(options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "declarationLine": 38,
           "source": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts",
           "purpose": "One cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint.",
           "core": "Cold SDK transport definition. Installation publishes host.thread calls and actual native extensions; construction alone acquires no resource.\nname: Local native registration name, separate from accepted remote identity.\nOmitted: the native registration default.\nnamespace: Unique Host property exposing this transport calls and extensions.\nOmitted: the factory namespace.\nexpose: Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.\nOmitted: no ordinary Feature output selected.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nfeatures: Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.\nOmitted: no optional policy installed by this field.\nspawn: Current entry, explicit entry, short options, or original full native source. No complete callable object is a raw source.\nAbsent in parent/connect/listen modes.\nconnectToParent: true only in the genuine native child, using actual first-frame authority.\nAbsent outside parent connection mode.\nAdopt the actual parent bootstrap source.\nChoose this only inside the genuine Worker launched by threadPlugin; the native bootstrap supplies the parent identity and channel. Use spawn in the parent.\nOne cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint.",
           "advanced": "Original source ownership retains native control, generation, replacement and cleanup.\nUse the actual native runtime selected by the application.",
           "parameters": [
-            "options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>"
+            "options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>"
           ],
           "parameterDetails": [
             {
               "name": "options",
-              "type": "IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>",
+              "type": "IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>",
               "optional": false
             }
           ],
-          "returns": "IRpcTransportPlugin<N, IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>, true>",
+          "returns": "IRpcTransportPlugin<N, IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>, true>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })]\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}",
+            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) }\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: { ms: 500 },\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}",
             "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\n\nawait createRpcHost({\n  plugins: [threadPlugin({ connectToParent: true })],\n  provide: {\n    values: async function* (end: number) {\n      for (let value = 0; value < end; value += 1) yield value\n    },\n    wait: (value: number) => value,\n    bytes: (value: Uint8Array) => value.byteLength\n  }\n})",
             "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [threadPlugin({ spawn: true })] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
           ],
@@ -1463,19 +1463,19 @@
           "aliasOf": "threadPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function threadPlugin<const N extends string = typeof THREAD_NAMESPACE, E extends object = Record<never, never>, const TFeatures extends readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[] = readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]>(options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>, true>;"
+            "export declare function threadPlugin<const N extends string = typeof THREAD_NAMESPACE, E extends object = Record<never, never>, const TFeatures extends Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>> = Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>>(options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>, true>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
-                "type": "IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>",
+                "type": "IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>",
                 "optional": false
               }
             ]
           ],
           "overloadReturns": [
-            "IRpcTransportPlugin<N, IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>, true>"
+            "IRpcTransportPlugin<N, IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>, true>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -1520,7 +1520,7 @@
             },
             {
               "name": "features",
-              "type": "readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]",
+              "type": "Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>",
               "optional": true,
               "description": ""
             },
@@ -1567,7 +1567,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts:threadPlugin:export declare function threadPlugin<const N extends string = typeof THREAD_NAMESPACE, E extends object = Record<never, never>, const TFeatures extends readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[] = readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]>(options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "identity": "packages/rpc-plugin-thread/dist/threads/plugin.d.ts:threadPlugin:export declare function threadPlugin<const N extends string = typeof THREAD_NAMESPACE, E extends object = Record<never, never>, const TFeatures extends Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>> = Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>>(options: IThreadPluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "guidance": [
             {
               "id": "调用策略与生命周期",
@@ -1575,7 +1575,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "单次调用传 `signal`，以及完整的 `timeoutFeature({ ms })`、`retryFeature({ attempts })` 实例或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。"
+                  "text": "单次调用传 `signal`，以及 timeout `{ ms }`、retry `{ attempts }` 配置或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。"
                 },
                 {
                   "type": "paragraph",
@@ -1604,11 +1604,11 @@
             },
             {
               "name": "features",
-              "type": "readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]",
+              "type": "Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>",
               "optional": true,
-              "description": "父入口使用真实 `worker.js`，并将完整策略实例装在 transport 的 `features`。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。",
+              "description": "父入口使用真实 `worker.js`，并将原生策略 token 放入 transport 的 `features` record。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。",
               "descriptionEn": "",
-              "descriptionZh": "父入口使用真实 `worker.js`，并将完整策略实例装在 transport 的 `features`。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。"
+              "descriptionZh": "父入口使用真实 `worker.js`，并将原生策略 token 放入 transport 的 `features` record。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。"
             },
             {
               "name": "spawn",

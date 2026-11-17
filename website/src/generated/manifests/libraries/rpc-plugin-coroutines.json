@@ -62,7 +62,7 @@
                   ["`spawn: task`", "创建一个受监管的协作任务"],
                   ["`connectToParent: connect`", "使用该次任务收到的准确 opaque 句柄，不是布尔值"],
                   ["`name` / `namespace`", "原生注册名与调用命名空间；默认 `coroutine`"],
-                  ["`features`", "完整 timeout、retry 或 pool feature"],
+                  ["`features`", "`{ localName: nativeFeature }`，接收 timeout、retry 或 pool"],
                   [
                     "`supervisor`",
                     "原生 restart/terminalPolicy/startupTimeoutMs/stop/budget/heartbeat 策略"
@@ -90,11 +90,11 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "调用选项使用完整 `timeoutFeature({ ms })`、`retryFeature({ attempts })` 或 `false`。优先级是单次调用、transport feature、链路策略 plugin；没有选中的策略时不自动启用。业务超时不替代原生启动或停止预算。"
+                "text": "调用选项使用 timeout `{ ms }`、retry `{ attempts }` 配置或 `false`。优先级是单次调用、transport feature、链路策略 plugin；没有选中的策略时不自动启用。业务超时不替代原生启动或停止预算。"
               },
               {
                 "type": "paragraph",
-                "text": "同载体多任务使用 `coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })`，pool 来自独立 rpc-plugin-pool。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 Devtools。"
+                "text": "同载体多任务使用 `coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })`，pool 来自独立 rpc-plugin-pool。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 Devtools。"
               },
               {
                 "type": "paragraph",
@@ -145,7 +145,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { echo(value: string): string; values(end: number): AsyncIterable<number> }\n\nfunction taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({\n      spawn: task,\n      features: [timeoutFeature({ ms: 1000 }), retryFeature({ attempts: 2 })],\n      supervisor: { startupTimeoutMs: 1500 }\n    })\n  ] as const\n}\n\ntype ITaskHost = IRpcHost<IWorkerApi, ReturnType<typeof taskPlugins>>\n\nexport function open(task: ICoroutineUserTask) {\n  const plugins = taskPlugins(task)\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport function call(host: ITaskHost, target: string, signal: AbortSignal) {\n  return host.coroutine.send(target, 'echo', 'hello', {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport async function firstValue(host: ITaskHost, target: string) {\n  const stream = host.coroutine.peers[target].values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function replace(host: ITaskHost, target: string, task: ICoroutineUserTask) {\n  return host.coroutine.members.replace(target, { task })\n}\n\nexport function pooled(task: ICoroutineUserTask) {\n  return coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })\n}"
+                "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { echo(value: string): string; values(end: number): AsyncIterable<number> }\n\nfunction taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({\n      spawn: task,\n      features: { timeout: timeoutFeature({ ms: 1000 }), retry: retryFeature({ attempts: 2 }) },\n      supervisor: { startupTimeoutMs: 1500 }\n    })\n  ] as const\n}\n\ntype ITaskHost = IRpcHost<IWorkerApi, ReturnType<typeof taskPlugins>>\n\nexport function open(task: ICoroutineUserTask) {\n  const plugins = taskPlugins(task)\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport function call(host: ITaskHost, target: string, signal: AbortSignal) {\n  return host.coroutine.send(target, 'echo', 'hello', {\n    signal,\n    timeout: { ms: 500 },\n    retry: false\n  })\n}\n\nexport async function firstValue(host: ITaskHost, target: string) {\n  const stream = host.coroutine.peers[target].values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function replace(host: ITaskHost, target: string, task: ICoroutineUserTask) {\n  return host.coroutine.members.replace(target, { task })\n}\n\nexport function pooled(task: ICoroutineUserTask) {\n  return coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })\n}"
               },
               {
                 "type": "paragraph",
@@ -153,7 +153,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "策略顺序为单次 options、transport feature、链路策略 plugin。单次 timeout/retry 只能给完整实例或 false；示例选择 500 ms 超时并关闭本次 retry。没有策略不会隐式新增一个超时或重试循环。supervisor.startupTimeoutMs 属于原生任务启动，与业务 timeout 是不同预算。"
+                "text": "策略顺序为单次 options、transport feature、链路策略 plugin。单次 timeout/retry 接收策略配置对象或 false；示例选择 500 ms 超时并关闭本次 retry。没有策略不会隐式新增一个超时或重试循环。supervisor.startupTimeoutMs 属于原生任务启动，与业务 timeout 是不同预算。"
               },
               {
                 "type": "paragraph",
@@ -257,7 +257,7 @@
                       "`name` / `namespace`",
                       "Native registration name and call namespace; default `coroutine`"
                     ],
-                    ["`features`", "Complete timeout, retry, or pool features"],
+                    ["`features`", "`{ localName: nativeFeature }` for timeout, retry, or pool"],
                     [
                       "`supervisor`",
                       "Original restart/terminalPolicy/startupTimeoutMs/stop/budget/heartbeat policies"
@@ -288,11 +288,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Call options use complete `timeoutFeature({ ms })` and `retryFeature({ attempts })` instances, or `false`. Precedence is per-call, transport feature, then link-policy plugin. No selected policy means no automatic policy. Business timeout does not configure native startup or stop budgets."
+                  "text": "Call options use timeout `{ ms }`, retry `{ attempts }`, or `false`. Precedence is per-call, transport feature, then the default from a host-level flow plugin. No selected policy means no automatic policy. Business timeout does not configure native startup or stop budgets."
                 },
                 {
                   "type": "paragraph",
-                  "text": "For several same-carrier tasks, use `coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })` with rpc-plugin-pool. Flow plugins go in Host `plugins`; Devtools observes messages through the canonical probe implementation."
+                  "text": "For several same-carrier tasks, use `coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })` with rpc-plugin-pool. Flow plugins go in Host `plugins`; Devtools observes messages through the canonical probe implementation."
                 },
                 {
                   "type": "paragraph",
@@ -343,7 +343,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { echo(value: string): string; values(end: number): AsyncIterable<number> }\n\nfunction taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({\n      spawn: task,\n      features: [timeoutFeature({ ms: 1000 }), retryFeature({ attempts: 2 })],\n      supervisor: { startupTimeoutMs: 1500 }\n    })\n  ] as const\n}\n\ntype ITaskHost = IRpcHost<IWorkerApi, ReturnType<typeof taskPlugins>>\n\nexport function open(task: ICoroutineUserTask) {\n  const plugins = taskPlugins(task)\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport function call(host: ITaskHost, target: string, signal: AbortSignal) {\n  return host.coroutine.send(target, 'echo', 'hello', {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport async function firstValue(host: ITaskHost, target: string) {\n  const stream = host.coroutine.peers[target].values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function replace(host: ITaskHost, target: string, task: ICoroutineUserTask) {\n  return host.coroutine.members.replace(target, { task })\n}\n\nexport function pooled(task: ICoroutineUserTask) {\n  return coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })\n}"
+                  "code": "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { echo(value: string): string; values(end: number): AsyncIterable<number> }\n\nfunction taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({\n      spawn: task,\n      features: { timeout: timeoutFeature({ ms: 1000 }), retry: retryFeature({ attempts: 2 }) },\n      supervisor: { startupTimeoutMs: 1500 }\n    })\n  ] as const\n}\n\ntype ITaskHost = IRpcHost<IWorkerApi, ReturnType<typeof taskPlugins>>\n\nexport function open(task: ICoroutineUserTask) {\n  const plugins = taskPlugins(task)\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport function call(host: ITaskHost, target: string, signal: AbortSignal) {\n  return host.coroutine.send(target, 'echo', 'hello', {\n    signal,\n    timeout: { ms: 500 },\n    retry: false\n  })\n}\n\nexport async function firstValue(host: ITaskHost, target: string) {\n  const stream = host.coroutine.peers[target].values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function replace(host: ITaskHost, target: string, task: ICoroutineUserTask) {\n  return host.coroutine.members.replace(target, { task })\n}\n\nexport function pooled(task: ICoroutineUserTask) {\n  return coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })\n}"
                 },
                 {
                   "type": "paragraph",
@@ -351,7 +351,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Policy precedence is per-call options, transport features, then link-policy plugin. Per-call timeout/retry takes a complete instance or false. The example selects a 500 ms timeout and disables retry for that call. An absent policy adds no implicit timeout or retry loop. supervisor.startupTimeoutMs is the native task startup budget, separate from business timeout."
+                  "text": "Policy precedence is per-call options, transport features, then the default from a host-level flow plugin. Per-call timeout/retry takes policy options or false. The example selects a 500 ms timeout and disables retry for that call. An absent policy adds no implicit timeout or retry loop. supervisor.startupTimeoutMs is the native task startup budget, separate from business timeout."
                 },
                 {
                   "type": "paragraph",
@@ -416,27 +416,27 @@
         {
           "name": "coroutinePlugin",
           "kind": "function",
-          "signature": "export declare function coroutinePlugin<const N extends string = typeof CoroutineText.namespace, E extends object = Record<never, never>, const TFeatures extends readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[] = readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]>(options: ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>): IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "signature": "export declare function coroutinePlugin<const N extends string = typeof CoroutineText.namespace, E extends object = Record<never, never>, const TFeatures extends Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>> = Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>>(options: ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>): IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "declarationLine": 38,
           "source": "packages/rpc-plugin-coroutines/dist/coroutine-plugin.d.ts",
           "purpose": "Run a cooperative task on real MessageChannel; original supervision owns generations, budget, stop and replacement. Same-loop tasks provide no process or Worker isolation and cannot preempt synchronous blocking.",
           "core": "Cold SDK transport definition. Installation publishes host.coroutine calls and actual native extensions; construction alone acquires no resource.\nname: Local native registration name, separate from accepted remote identity.\nOmitted: the native registration default.\nnamespace: Unique Host property exposing this transport calls and extensions.\nOmitted: the factory namespace.\nexpose: Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.\nOmitted: no ordinary Feature output selected.\nreport: Receives native background and cleanup failures; operation rejections retain original causes.\nreport.error: Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.\nNo return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.\nOmitted: configured Host reporter, then effective default.\nSet an application monitoring sink when cooperative task background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.\nfeatures: Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.\nOmitted: no optional policy installed by this field.\nspawn: Actual task function. Returning settles its generation and closes native ports.\nAbsent in child mode.\nconnectToParent: Exact opaque context.connect issued by this task invocation, not copied or reused.\nAbsent in spawn mode.\nsupervisor: Original restart, terminalPolicy, startupTimeoutMs, stop, budget and heartbeat policy.\nOmitted: original supervisor defaults.\nRun a cooperative task on real MessageChannel; original supervision owns generations, budget, stop and replacement. Same-loop tasks provide no process or Worker isolation and cannot preempt synchronous blocking.",
           "advanced": "The task owns its child host; close drains and signals the original supervised task.\nUse cooperative tasks when native isolation is unnecessary.",
           "parameters": [
-            "options: ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>"
+            "options: ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>"
           ],
           "parameterDetails": [
             {
               "name": "options",
-              "type": "ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>",
+              "type": "ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>",
               "optional": false
             }
           ],
-          "returns": "IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>, true>",
+          "returns": "IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>, true>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { echo(value: string): string; values(end: number): AsyncIterable<number> }\n\nfunction taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({\n      spawn: task,\n      features: [timeoutFeature({ ms: 1000 }), retryFeature({ attempts: 2 })],\n      supervisor: { startupTimeoutMs: 1500 }\n    })\n  ] as const\n}\n\ntype ITaskHost = IRpcHost<IWorkerApi, ReturnType<typeof taskPlugins>>\n\nexport function open(task: ICoroutineUserTask) {\n  const plugins = taskPlugins(task)\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport function call(host: ITaskHost, target: string, signal: AbortSignal) {\n  return host.coroutine.send(target, 'echo', 'hello', {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport async function firstValue(host: ITaskHost, target: string) {\n  const stream = host.coroutine.peers[target].values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function replace(host: ITaskHost, target: string, task: ICoroutineUserTask) {\n  return host.coroutine.members.replace(target, { task })\n}\n\nexport function pooled(task: ICoroutineUserTask) {\n  return coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })\n}",
+            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { echo(value: string): string; values(end: number): AsyncIterable<number> }\n\nfunction taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({\n      spawn: task,\n      features: { timeout: timeoutFeature({ ms: 1000 }), retry: retryFeature({ attempts: 2 }) },\n      supervisor: { startupTimeoutMs: 1500 }\n    })\n  ] as const\n}\n\ntype ITaskHost = IRpcHost<IWorkerApi, ReturnType<typeof taskPlugins>>\n\nexport function open(task: ICoroutineUserTask) {\n  const plugins = taskPlugins(task)\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport function call(host: ITaskHost, target: string, signal: AbortSignal) {\n  return host.coroutine.send(target, 'echo', 'hello', {\n    signal,\n    timeout: { ms: 500 },\n    retry: false\n  })\n}\n\nexport async function firstValue(host: ITaskHost, target: string) {\n  const stream = host.coroutine.peers[target].values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function replace(host: ITaskHost, target: string, task: ICoroutineUserTask) {\n  return host.coroutine.members.replace(target, { task })\n}\n\nexport function pooled(task: ICoroutineUserTask) {\n  return coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })\n}",
             "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  heartbeat()\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\ntry {\n  console.log(await parent.coroutine.request('double', 21))\n} finally {\n  await parent.close()\n}"
           ],
           "members": [],
@@ -444,19 +444,19 @@
           "aliasOf": "coroutinePlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function coroutinePlugin<const N extends string = typeof CoroutineText.namespace, E extends object = Record<never, never>, const TFeatures extends readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[] = readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]>(options: ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>): IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>, true>;"
+            "export declare function coroutinePlugin<const N extends string = typeof CoroutineText.namespace, E extends object = Record<never, never>, const TFeatures extends Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>> = Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>>(options: ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>): IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>, true>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
-                "type": "ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>",
+                "type": "ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>",
                 "optional": false
               }
             ]
           ],
           "overloadReturns": [
-            "IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>, true>"
+            "IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>, true>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -501,7 +501,7 @@
             },
             {
               "name": "features",
-              "type": "readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]",
+              "type": "Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>",
               "optional": true,
               "description": ""
             },
@@ -554,7 +554,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-plugin.d.ts:coroutinePlugin:export declare function coroutinePlugin<const N extends string = typeof CoroutineText.namespace, E extends object = Record<never, never>, const TFeatures extends readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[] = readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]>(options: ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]; }>): IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-plugin.d.ts:coroutinePlugin:export declare function coroutinePlugin<const N extends string = typeof CoroutineText.namespace, E extends object = Record<never, never>, const TFeatures extends Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>> = Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>>(options: ICoroutinePluginOptions & Readonly<{ namespace?: N; features?: TFeatures & Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>>>; }>): IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "guidance": [],
           "usageScore": 32,
           "configuration": [
@@ -568,19 +568,19 @@
             },
             {
               "name": "features",
-              "type": "readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]",
+              "type": "Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>",
               "optional": true,
-              "description": "同载体多任务使用 `coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })`，pool 来自独立 rpc-plugin-pool。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 Devtools。",
+              "description": "同载体多任务使用 `coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })`，pool 来自独立 rpc-plugin-pool。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 Devtools。",
               "descriptionEn": "",
-              "descriptionZh": "同载体多任务使用 `coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })`，pool 来自独立 rpc-plugin-pool。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 Devtools。"
+              "descriptionZh": "同载体多任务使用 `coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })`，pool 来自独立 rpc-plugin-pool。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 Devtools。"
             },
             {
               "name": "spawn",
               "type": "ICoroutineUserTask",
               "optional": true,
-              "description": "同载体多任务使用 `coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })`，pool 来自独立 rpc-plugin-pool。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 Devtools。",
+              "description": "同载体多任务使用 `coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })`，pool 来自独立 rpc-plugin-pool。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 Devtools。",
               "descriptionEn": "",
-              "descriptionZh": "同载体多任务使用 `coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })`，pool 来自独立 rpc-plugin-pool。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 Devtools。"
+              "descriptionZh": "同载体多任务使用 `coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })`，pool 来自独立 rpc-plugin-pool。flow plugin 放在 Host 的 `plugins` 中；Devtools 借统一 probe 观察消息，见 Devtools。"
             },
             {
               "name": "supervisor",
@@ -644,7 +644,7 @@
         {
           "name": "ICoroutineCommonOptions",
           "kind": "type",
-          "signature": "export type ICoroutineCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]; /** The native task or parent token borrows this exact connection's auth retention policy. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;",
+          "signature": "export type ICoroutineCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>; /** The native task or parent token borrows this exact connection's auth retention policy. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;",
           "declarationLine": 12,
           "source": "packages/rpc-plugin-coroutines/dist/coroutine-plugin.d.ts",
           "purpose": "Cold native registration and scope; Host owns identity, providers and protocol execution.",
@@ -688,10 +688,10 @@
               "name": "features",
               "kind": "property",
               "optional": true,
-              "signature": "features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[];",
+              "signature": "features?: Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>;",
               "description": null,
               "parameterDetails": [],
-              "returns": "readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]"
+              "returns": "Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>"
             },
             {
               "name": "connect",
@@ -722,7 +722,7 @@
           "aliasOf": "ICoroutineCommonOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ICoroutineCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]; /** The native task or parent token borrows this exact connection's auth retention policy. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;"
+            "export type ICoroutineCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>; /** The native task or parent token borrows this exact connection's auth retention policy. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -761,7 +761,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-plugin.d.ts:ICoroutineCommonOptions:export type ICoroutineCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]; /** The native task or parent token borrows this exact connection's auth retention policy. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;",
+          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-plugin.d.ts:ICoroutineCommonOptions:export type ICoroutineCommonOptions = Readonly<{ name?: string; namespace?: string; expose?: readonly string[]; features?: Readonly<Record<string, IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>>>; /** The native task or parent token borrows this exact connection's auth retention policy. */ connect?: Readonly<{ retain?: IRpcAuthenticationRetain; }>; report?(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1330,7 +1330,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { echo(value: string): string; values(end: number): AsyncIterable<number> }\n\nfunction taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({\n      spawn: task,\n      features: [timeoutFeature({ ms: 1000 }), retryFeature({ attempts: 2 })],\n      supervisor: { startupTimeoutMs: 1500 }\n    })\n  ] as const\n}\n\ntype ITaskHost = IRpcHost<IWorkerApi, ReturnType<typeof taskPlugins>>\n\nexport function open(task: ICoroutineUserTask) {\n  const plugins = taskPlugins(task)\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport function call(host: ITaskHost, target: string, signal: AbortSignal) {\n  return host.coroutine.send(target, 'echo', 'hello', {\n    signal,\n    timeout: timeoutFeature({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport async function firstValue(host: ITaskHost, target: string) {\n  const stream = host.coroutine.peers[target].values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function replace(host: ITaskHost, target: string, task: ICoroutineUserTask) {\n  return host.coroutine.members.replace(target, { task })\n}\n\nexport function pooled(task: ICoroutineUserTask) {\n  return coroutinePlugin({ spawn: task, features: [pool({ size: 3 })] })\n}",
+            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { echo(value: string): string; values(end: number): AsyncIterable<number> }\n\nfunction taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({\n      spawn: task,\n      features: { timeout: timeoutFeature({ ms: 1000 }), retry: retryFeature({ attempts: 2 }) },\n      supervisor: { startupTimeoutMs: 1500 }\n    })\n  ] as const\n}\n\ntype ITaskHost = IRpcHost<IWorkerApi, ReturnType<typeof taskPlugins>>\n\nexport function open(task: ICoroutineUserTask) {\n  const plugins = taskPlugins(task)\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport function call(host: ITaskHost, target: string, signal: AbortSignal) {\n  return host.coroutine.send(target, 'echo', 'hello', {\n    signal,\n    timeout: { ms: 500 },\n    retry: false\n  })\n}\n\nexport async function firstValue(host: ITaskHost, target: string) {\n  const stream = host.coroutine.peers[target].values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function replace(host: ITaskHost, target: string, task: ICoroutineUserTask) {\n  return host.coroutine.members.replace(target, { task })\n}\n\nexport function pooled(task: ICoroutineUserTask) {\n  return coroutinePlugin({ spawn: task, features: { workers: pool({ size: 3 }) } })\n}",
             "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  heartbeat()\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\ntry {\n  console.log(await parent.coroutine.request('double', 21))\n} finally {\n  await parent.close()\n}"
           ],
           "members": [],

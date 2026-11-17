@@ -300,7 +300,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
               },
               {
                 "type": "paragraph",
@@ -568,7 +568,11 @@
                     "INVALID_CONFIG",
                     "token/Provider/owned/ready/feature 配置无效"
                   ],
-                  ["readyRejected", "READY_REJECTED", "非 Error ready 拒绝原因的包装"]
+                  [
+                    "readyRejected",
+                    "READY_REJECTED",
+                    "ready 拒绝：附加到未带码的 Error 上，非 Error 原因则包装"
+                  ]
                 ]
               },
               {
@@ -1068,7 +1072,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
               },
               {
                 "type": "paragraph",
@@ -1336,7 +1340,11 @@
                     "INVALID_CONFIG",
                     "token/Provider/owned/ready/feature 配置无效"
                   ],
-                  ["readyRejected", "READY_REJECTED", "非 Error ready 拒绝原因的包装"]
+                  [
+                    "readyRejected",
+                    "READY_REJECTED",
+                    "ready 拒绝：附加到未带码的 Error 上，非 Error 原因则包装"
+                  ]
                 ]
               },
               {
@@ -1719,7 +1727,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "An IStoreReadyBarrier factory is `()=>Promise<unknown> or unknown`. Normalization invokes it synchronously and admits its result with Promise.resolve. All barriers must fulfill before children render. Rejection is thrown during render for an outer Error Boundary; the Provider supplies no error UI. An Error reason retains its identity, including frozen Errors. A non-Error reason becomes READY_REJECTED with the original cause, without string coercion. Any equivalent initialization barrier can satisfy features.wasm; store-wasm's ensureWasm is an optional composition."
+                  "text": "An IStoreReadyBarrier factory is `()=>Promise<unknown> or unknown`. Normalization invokes it synchronously and admits its result with Promise.resolve. All barriers must fulfill before children render. Rejection is thrown during render for an outer Error Boundary; the Provider supplies no error UI. An uncoded Error reason keeps its identity and gets READY_REJECTED attached; an Error that already has a source and code is unchanged. A non-Error reason, or a frozen Error that cannot be tagged, becomes READY_REJECTED with the original on cause, without string coercion. Any equivalent initialization barrier can satisfy features.wasm; store-wasm's ensureWasm is an optional composition."
                 },
                 {
                   "type": "paragraph",
@@ -1999,7 +2007,7 @@
                     [
                       "readyRejected",
                       "READY_REJECTED",
-                      "Wrapper for a non-Error readiness rejection reason"
+                      "Readiness rejection: attached to an uncoded Error, or wraps a non-Error reason"
                     ]
                   ]
                 },
@@ -2539,7 +2547,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "An IStoreReadyBarrier factory is `()=>Promise<unknown> or unknown`. Normalization invokes it synchronously and admits its result with Promise.resolve. All barriers must fulfill before children render. Rejection is thrown during render for an outer Error Boundary; the Provider supplies no error UI. An Error reason retains its identity, including frozen Errors. A non-Error reason becomes READY_REJECTED with the original cause, without string coercion. Any equivalent initialization barrier can satisfy features.wasm; store-wasm's ensureWasm is an optional composition."
+                  "text": "An IStoreReadyBarrier factory is `()=>Promise<unknown> or unknown`. Normalization invokes it synchronously and admits its result with Promise.resolve. All barriers must fulfill before children render. Rejection is thrown during render for an outer Error Boundary; the Provider supplies no error UI. An uncoded Error reason keeps its identity and gets READY_REJECTED attached; an Error that already has a source and code is unchanged. A non-Error reason, or a frozen Error that cannot be tagged, becomes READY_REJECTED with the original on cause, without string coercion. Any equivalent initialization barrier can satisfy features.wasm; store-wasm's ensureWasm is an optional composition."
                 },
                 {
                   "type": "paragraph",
@@ -2819,7 +2827,7 @@
                     [
                       "readyRejected",
                       "READY_REJECTED",
-                      "Wrapper for a non-Error readiness rejection reason"
+                      "Readiness rejection: attached to an uncoded Error, or wraps a non-Error reason"
                     ]
                   ]
                 },
@@ -2910,7 +2918,7 @@
           "name": "assertStoreFeature",
           "kind": "function",
           "signature": "export declare function assertStoreFeature(config: IStoreConfigValue | null, path: IStoreFeaturePath, apiName?: string): void;",
-          "declarationLine": 113,
+          "declarationLine": 119,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Throws PROVIDER_REQUIRED for absent config and FEATURE_DISABLED for a disabled path; it does not initialize the requested feature.",
           "core": "config: Normalized config from normalizeStoreConfig or useStoreConfig, possibly null.\npath: wasm or experimental.<name>; select a flag explicitly declared by the application Provider configuration.\napiName: Optional application API label used in diagnostics; defaults to this API.\nNothing when enabled; otherwise throws a stable package error.\nfeatures: Normalized explicit WASM boolean and frozen experimental dictionary; only exact true is enabled.\ndefaults: Application defaults with explicit warnAsyncActions boolean; consumers decide whether to apply it to their Stores.\nready: Null when no barrier exists; otherwise {promise, status(), error()}. Status is pending/ready/error, updated in a microtask; error() preserves rejection identity.\nfeatures.wasm: Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.\n`false`: no WASM readiness requirement.\nRequire caller-supplied initialization readiness before rendering the subtree.\nDo not require a WASM initialization barrier.\nSet true when the subtree uses WASM fields, and supply its initialization barriers in `ready`. This declaration does not initialize WASM. False, including omission, disables the declaration and requires no WASM barrier; true without a barrier creates rejected readiness.\nfeatures.experimental: Application feature dictionary; only exact true enables an enumerable data-property entry. A sorted frozen null-prototype snapshot excludes accessors.\nEmpty frozen dictionary; every experimental path is disabled.",
@@ -3065,7 +3073,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -3285,7 +3293,11 @@
                       "INVALID_CONFIG",
                       "token/Provider/owned/ready/feature 配置无效"
                     ],
-                    ["readyRejected", "READY_REJECTED", "非 Error ready 拒绝原因的包装"]
+                    [
+                      "readyRejected",
+                      "READY_REJECTED",
+                      "ready 拒绝：附加到未带码的 Error 上，非 Error 原因则包装"
+                    ]
                   ]
                 },
                 {
@@ -3466,7 +3478,11 @@
                       "INVALID_CONFIG",
                       "token/Provider/owned/ready/feature 配置无效"
                     ],
-                    ["readyRejected", "READY_REJECTED", "非 Error ready 拒绝原因的包装"]
+                    [
+                      "readyRejected",
+                      "READY_REJECTED",
+                      "ready 拒绝：附加到未带码的 Error 上，非 Error 原因则包装"
+                    ]
                   ]
                 },
                 {
@@ -3887,7 +3903,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -4008,7 +4024,7 @@
           "name": "IStoreFeaturePath",
           "kind": "type",
           "signature": "export type IStoreFeaturePath = 'wasm' | `experimental.${string}`;",
-          "declarationLine": 102,
+          "declarationLine": 108,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Feature lookup path: wasm or experimental.<name>; an empty experimental suffix is disabled.",
           "core": "Feature lookup path: wasm or experimental.<name>; an empty experimental suffix is disabled.",
@@ -4334,7 +4350,7 @@
           "name": "IStoreProviderProps",
           "kind": "type",
           "signature": "export type IStoreProviderProps = { /** Required subtree shown after readiness, if any, permits rendering. */ readonly children: ReactNode; /** Existing registry to borrow; omission creates a Provider-local registry and atom store. */ readonly registry?: StoreRegistry; /** Runtime for an internal registry; when registry is supplied, this must be its exact Runtime. */ readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** * Configures application features and readiness barriers. Omission keeps all features disabled * and uses no barrier. */ readonly config?: IStoreProviderConfig; };",
-          "declarationLine": 8,
+          "declarationLine": 11,
           "source": "packages/store-react/dist/StoreProvider.d.ts",
           "purpose": "React Provider ownership and configuration props; external Registry and Runtime identities must agree.",
           "core": "children: React subtree receiving configuration and Registry contexts after readiness succeeds.\nregistry: Caller-owned StoreRegistry returned by createStoreRegistry or new StoreRegistry; when runtime is also supplied it must be the same object as registry.runtime.\nCreate an internal registry for this Provider scope.\nruntime: IRuntime used for an internally created Registry; when an external registry is supplied it may only confirm the same runtime identity.\nExternal registry.runtime, or a new createRuntime for an internal registry.\ndisposeOnUnmount: Whether final Provider release disposes the registry, its atomStore and owned registrations after a task delay; Runtime remains outside this ownership.\n`true` for internal registries, `false` for injected external registries; SSR runs no unmount effects.\nDispose the registry once no retained Provider owner remains.\nLeave registry disposal to the external application owner.\nUse true for a registry whose lifetime belongs to this mounted widget: its owned registrations are released after the final unmount. Use false when an application shell keeps the registry across remounts and will dispose it itself. Omission chooses true for internal registries and false for supplied registries.\nconfig: Optional IStoreProviderConfig for feature declarations, readiness, pending fallback and readable defaults.\nAll features disabled with no readiness barrier.",
@@ -4531,7 +4547,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -4672,7 +4688,11 @@
                       "INVALID_CONFIG",
                       "token/Provider/owned/ready/feature 配置无效"
                     ],
-                    ["readyRejected", "READY_REJECTED", "非 Error ready 拒绝原因的包装"]
+                    [
+                      "readyRejected",
+                      "READY_REJECTED",
+                      "ready 拒绝：附加到未带码的 Error 上，非 Error 原因则包装"
+                    ]
                   ]
                 },
                 {
@@ -4809,7 +4829,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -5044,7 +5064,11 @@
                       "INVALID_CONFIG",
                       "token/Provider/owned/ready/feature 配置无效"
                     ],
-                    ["readyRejected", "READY_REJECTED", "非 Error ready 拒绝原因的包装"]
+                    [
+                      "readyRejected",
+                      "READY_REJECTED",
+                      "ready 拒绝：附加到未带码的 Error 上，非 Error 原因则包装"
+                    ]
                   ]
                 },
                 {
@@ -5233,7 +5257,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -5322,7 +5346,7 @@
           "name": "readStoreFeature",
           "kind": "function",
           "signature": "export declare function readStoreFeature(config: IStoreConfigValue, path: IStoreFeaturePath): boolean;",
-          "declarationLine": 107,
+          "declarationLine": 113,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Reads a normalized wasm or experimental feature flag synchronously, treating disabled, unknown and empty experimental paths as false.",
           "core": "config: IStoreConfigValue returned by normalizeStoreConfig or useStoreConfig after checking for null.\npath: wasm or experimental.<name>; select a flag explicitly declared by the application Provider configuration.\nBoolean enabled value; unknown or empty experimental names return false.\nfeatures: Normalized explicit WASM boolean and frozen experimental dictionary; only exact true is enabled.\ndefaults: Application defaults with explicit warnAsyncActions boolean; consumers decide whether to apply it to their Stores.\nready: Null when no barrier exists; otherwise {promise, status(), error()}. Status is pending/ready/error, updated in a microtask; error() preserves rejection identity.\nfeatures.wasm: Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.\n`false`: no WASM readiness requirement.\nRequire caller-supplied initialization readiness before rendering the subtree.\nDo not require a WASM initialization barrier.\nSet true when the subtree uses WASM fields, and supply its initialization barriers in `ready`. This declaration does not initialize WASM. False, including omission, disables the declaration and requires no WASM barrier; true without a barrier creates rejected readiness.\nfeatures.experimental: Application feature dictionary; only exact true enables an enumerable data-property entry. A sorted frozen null-prototype snapshot excludes accessors.\nEmpty frozen dictionary; every experimental path is disabled.",
@@ -5463,7 +5487,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -5643,7 +5667,11 @@
                       "INVALID_CONFIG",
                       "token/Provider/owned/ready/feature 配置无效"
                     ],
-                    ["readyRejected", "READY_REJECTED", "非 Error ready 拒绝原因的包装"]
+                    [
+                      "readyRejected",
+                      "READY_REJECTED",
+                      "ready 拒绝：附加到未带码的 Error 上，非 Error 原因则包装"
+                    ]
                   ]
                 },
                 {
@@ -5694,7 +5722,7 @@
           "name": "StoreProvider",
           "kind": "function",
           "signature": "export declare function StoreProvider({ children, registry, runtime, disposeOnUnmount, config }: IStoreProviderProps): import(\"react\").JSX.Element;",
-          "declarationLine": 35,
+          "declarationLine": 38,
           "source": "packages/store-react/dist/StoreProvider.d.ts",
           "purpose": "Provides Registry and feature/readiness contexts to a React subtree. Pending barriers render fallback; rejection reaches an outer Error Boundary and new barrier-list identity creates a new readiness generation.",
           "core": "props: JSX props object destructured by the component: children, optional registry/runtime ownership, disposal policy and feature/readiness config.\nReact element tree; internal registries default to disposal on final unmount and external registries remain borrowed by default.\nchildren: React subtree receiving configuration and Registry contexts after readiness succeeds.\nregistry: Caller-owned StoreRegistry returned by createStoreRegistry or new StoreRegistry; when runtime is also supplied it must be the same object as registry.runtime.\nCreate an internal registry for this Provider scope.\nruntime: IRuntime used for an internally created Registry; when an external registry is supplied it may only confirm the same runtime identity.\nExternal registry.runtime, or a new createRuntime for an internal registry.\ndisposeOnUnmount: Whether final Provider release disposes the registry, its atomStore and owned registrations after a task delay; Runtime remains outside this ownership.\n`true` for internal registries, `false` for injected external registries; SSR runs no unmount effects.\nDispose the registry once no retained Provider owner remains.\nLeave registry disposal to the external application owner.\nUse true for a registry whose lifetime belongs to this mounted widget: its owned registrations are released after the final unmount. Use false when an application shell keeps the registry across remounts and will dispose it itself. Omission chooses true for internal registries and false for supplied registries.\nconfig: Optional IStoreProviderConfig for feature declarations, readiness, pending fallback and readable defaults.\nAll features disabled with no readiness barrier.\nconfig.features: Application feature declarations normalized to explicit WASM and experimental booleans.\nOmitted: all features are disabled.\nconfig.ready: Promises or zero-argument synchronous/async factories. Normalization eagerly invokes uncached factories before returning, caches factory results by scope plus factory identity, and separately caches each list Promise by scope plus array identity. Rejected factory results leave the factory cache; scopes are isolated. A changed array identity selects a new Provider generation and ReadyBoundary, so an old generation cannot release the new one; changing only the array does not rerun a successful cached factory.\nFactory result is awaited and discarded; rejection blocks the subtree and reaches its outer Error Boundary.\nNo barrier, unless WASM is enabled without one, which creates a rejected barrier.\nconfig.fallback: ReactNode rendered while readiness remains pending; rejected barriers throw instead of rendering this fallback.\n`null`: render no subtree while pending.\nconfig.defaults: Application-readable defaults snapshot; it does not change existing or future Store construction options.\n`warnAsyncActions` is `false`.\nconfig.features.wasm: Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.\n`false`: no WASM readiness requirement.\nRequire caller-supplied initialization readiness before rendering the subtree.\nDo not require a WASM initialization barrier.\nSet true when the subtree uses WASM fields, and supply its initialization barriers in `ready`. This declaration does not initialize WASM. False, including omission, disables the declaration and requires no WASM barrier; true without a barrier creates rejected readiness.\nconfig.features.experimental: Application feature dictionary; only exact true enables an enumerable data-property entry. A sorted frozen null-prototype snapshot excludes accessors.\nEmpty frozen dictionary; every experimental path is disabled.\nconfig.defaults.warnAsyncActions: Application-readable default in useStoreConfig; the Provider does not pass it into createStore, so each Store must explicitly apply its own option.\n`false` in the normalized configuration.\nExpose an enabled application preference without changing any Store automatically.\nExpose a disabled application preference.\nInstalls scoped Registry and configuration contexts; definition hooks gain one local AtomStore and token hooks resolve registered values.",
@@ -5849,7 +5877,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -5924,7 +5952,11 @@
                       "INVALID_CONFIG",
                       "token/Provider/owned/ready/feature 配置无效"
                     ],
-                    ["readyRejected", "READY_REJECTED", "非 Error ready 拒绝原因的包装"]
+                    [
+                      "readyRejected",
+                      "READY_REJECTED",
+                      "ready 拒绝：附加到未带码的 Error 上，非 Error 原因则包装"
+                    ]
                   ]
                 },
                 {
@@ -6162,7 +6194,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -6385,7 +6417,11 @@
                       "INVALID_CONFIG",
                       "token/Provider/owned/ready/feature 配置无效"
                     ],
-                    ["readyRejected", "READY_REJECTED", "非 Error ready 拒绝原因的包装"]
+                    [
+                      "readyRejected",
+                      "READY_REJECTED",
+                      "ready 拒绝：附加到未带码的 Error 上，非 Error 原因则包装"
+                    ]
                   ]
                 },
                 {
@@ -6709,7 +6745,7 @@
           "name": "useAssertStoreFeature",
           "kind": "function",
           "signature": "export declare function useAssertStoreFeature(path: IStoreFeaturePath, apiName?: string): void;",
-          "declarationLine": 128,
+          "declarationLine": 134,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Guards a component API against missing configuration or disabled features during rendering.",
           "core": "path: wasm or experimental.<name>; select a flag explicitly declared by the application Provider configuration.\napiName: Optional application API name for diagnostic text; defaults to this API.\nNothing when enabled; otherwise throws PROVIDER_REQUIRED or FEATURE_DISABLED.",
@@ -6819,7 +6855,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -7916,7 +7952,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -7972,7 +8008,7 @@
           "name": "useStoreConfig",
           "kind": "function",
           "signature": "export declare function useStoreConfig(): IStoreConfigValue | null;",
-          "declarationLine": 118,
+          "declarationLine": 124,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Reads configuration context independently of Registry lookup; missing Provider returns null without throwing.",
           "core": "Current IStoreConfigValue or null; defaults remain application-readable data.",
@@ -8058,7 +8094,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",
@@ -8114,7 +8150,7 @@
           "name": "useStoreFeature",
           "kind": "function",
           "signature": "export declare function useStoreFeature(path: IStoreFeaturePath): boolean;",
-          "declarationLine": 123,
+          "declarationLine": 129,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "Reads a feature flag from the current StoreProvider configuration for optional UI behavior, returning false when no Provider supplies configuration.",
           "core": "path: wasm or experimental.<name>; select a flag explicitly declared by the application Provider configuration.\nTrue only for an explicitly enabled feature.",
@@ -8214,7 +8250,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。Error 原因保持原实例（包括冻结 Error），非 Error 原因以 READY_REJECTED 包装并在 cause 保留，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
+                  "text": "IStoreReadyBarrier 工厂为 `()=>Promise<unknown> 或 unknown`，归一化会同步调用它，结果用 Promise.resolve 接纳。所有屏障成功后渲染子树，任一失败在 render 抛给外层 Error Boundary；Provider 自己不提供错误 UI。未带码的 Error 原因保持原实例并附加 READY_REJECTED；已带 source 与 code 的 Error 原样保留。非 Error 原因、或无法附加的冻结 Error，以 READY_REJECTED 包装并在 cause 保留原值，不进行字符串强制转换。features.wasm 的屏障可为任何等价初始化，不强制使用 store-wasm；ensureWasm 是可选组合。"
                 },
                 {
                   "type": "paragraph",

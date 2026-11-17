@@ -3,7 +3,7 @@
   "library": {
     "slug": "lifecycle",
     "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "exports": [
       ".",
       "./abort",
@@ -1723,7 +1723,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`createLifecycleUnit` 及其 option/result types 不再从 module 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay`、`tagLifecycleError`、`createLifecycleRangeError` 只供包内部使用，root 与 leaf 均不再暴露。`/scheduler` 公开 snapshot/resolve 准入工具。错误构造器与 scheduler 算术 helper 均已收回内部，不提供兼容 alias；业务错误使用所属包的身份。"
+                "text": "`createLifecycleUnit` 及其 option/result types 不再从 module 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay` 只供包内部使用，root 与 leaf 均不再暴露；`tagLifecycleError`、`createLifecycleRangeError` 等错误工厂已删除，包内统一用原生错误加 `@migaia/utils/error` 的 `attachErrorIdentity`。`/scheduler` 公开 snapshot/resolve 准入工具。错误构造器与 scheduler 算术 helper 均已收回内部，不提供兼容 alias；业务错误使用所属包的身份。"
               },
               {
                 "type": "paragraph",
@@ -3498,7 +3498,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleUnit` and its option/result types are no longer exported; applications use `createGenerationController` for stale work and keep loading state in their own code. `createStringQuiescenceTracker` was replaced by `createStringLeaseRegistry`, which has real consumers. `validateSchedulerTime`, `validateSchedulerDelay`, `tagLifecycleError` and `createLifecycleRangeError` are internal and exposed neither at the root nor from a leaf. `/scheduler` exposes the snapshot/resolve admission helpers. Error constructors and scheduler arithmetic helpers are internal with no compatibility aliases; application errors use their own module's identity."
+                  "text": "`createLifecycleUnit` and its option/result types are no longer exported; applications use `createGenerationController` for stale work and keep loading state in their own code. `createStringQuiescenceTracker` was replaced by `createStringLeaseRegistry`, which has real consumers. `validateSchedulerTime` and `validateSchedulerDelay` are internal and exposed neither at the root nor from a leaf; the error factories such as `tagLifecycleError` and `createLifecycleRangeError` were removed, and the module now builds native errors and attaches identity with `attachErrorIdentity` from `@migaia/utils/error`. `/scheduler` exposes the snapshot/resolve admission helpers. Error constructors and scheduler arithmetic helpers are internal with no compatibility aliases; application errors use their own module's identity."
                 },
                 {
                   "type": "paragraph",
@@ -3784,7 +3784,7 @@
           "name": "createMutationQueue",
           "kind": "function",
           "signature": "export declare function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue;",
-          "declarationLine": 42,
+          "declarationLine": 47,
           "source": "packages/lifecycle/dist/mutation-queue.d.ts",
           "purpose": "Serializes caller-authored mutations in submission order. Only waiting tasks receive an admission timer; the current task is never interrupted, and a labeled same-owner submission is rejected to avoid a self-dependent successor.",
           "core": "An `IMutationQueue`; tasks settle independently and a failed task does not stop later submissions.\nqueueAdmissionTimeoutMs: Per-waiting-task admission budget: a number rejects and removes an overdue task, false disables timers, and undefined permits diagnostics without rejection.\n`undefined`: diagnose only and never reject for admission delay.\nDisable rejection and diagnostic timers for queued admission.\nUse milliseconds to reject an overdue waiting task. false disables rejection and diagnostic timers; undefined, the default, allows diagnostics without rejecting. Running tasks are never interrupted.\nadmissionDiagnosticMs: Diagnostic delay used only when admission timeout is undefined and a diagnostic callback exists; false disables the diagnostic timer.\n`1000` milliseconds: emit one diagnostic while a task remains queued.\nDisable diagnostic scheduling while retaining unlimited admission waiting.\nSet milliseconds to change the default 1000 ms queue warning threshold, or false to disable it. It applies only with undefined admission timeout and an onAdmissionDiagnostic callback; it never rejects work.\nonAdmissionDiagnostic: Synchronous `(info) => void` notification with caller-issued `info.owner` and elapsed `info.waitedMs` from the scheduler clock. The return is ignored; synchronous throws and accidental async rejections are contained.\nonAdmissionDiagnostic.info: Queue-issued record containing the submitted owner label and observed wait duration in milliseconds.\nNo value is consumed and callback failure does not change queue results.\nOmitted: no diagnostic callback or diagnostic-only timer is installed.\nSet it to observe the owner and elapsed wait without rejecting the queued task. Without it no diagnostic-only timer is installed. Callback failures are contained.\nscheduler: Clock and timer implementation from `@migaia/utils/scheduler`. Supply the same scheduler that produced every absolute deadline; lifecycle snapshots methods with their original receiver and rejects invalid shapes with `INVALID_OPTION`.\nOmitted: use the admitted `systemScheduler` when a timed phase first needs it.",
@@ -3871,7 +3871,7 @@
             },
             {
               "name": "onAdmissionDiagnostic",
-              "type": "(info: { readonly owner: string | undefined; readonly waitedMs: number; }) => void",
+              "type": "(info: { readonly owner: string | undefined; readonly waitedMs: number; /** * Present only when disarming the admission watchdog failed: a `QUEUE_ADMISSION_TIMEOUT` error * whose `cause` is the cancellation failure. Absent on the plain wait diagnostic. */ readonly error?: unknown; }) => void",
               "optional": true,
               "description": ""
             },
@@ -3960,7 +3960,7 @@
             },
             {
               "name": "onAdmissionDiagnostic",
-              "type": "(info: { readonly owner: string | undefined; readonly waitedMs: number; }) => void",
+              "type": "(info: { readonly owner: string | undefined; readonly waitedMs: number; /** * Present only when disarming the admission watchdog failed: a `QUEUE_ADMISSION_TIMEOUT` error * whose `cause` is the cancellation failure. Absent on the plain wait diagnostic. */ readonly error?: unknown; }) => void",
               "optional": true,
               "description": "`admissionDiagnosticMs`：仅在 `queueAdmissionTimeoutMs` 为 `undefined` 且提供了 `onAdmissionDiagnostic` 时生效的诊断阈值；`false` 关闭诊断计时器。",
               "descriptionEn": "",
@@ -4906,7 +4906,7 @@
           "name": "IEnqueueOptions",
           "kind": "type",
           "signature": "export type IEnqueueOptions = { readonly owner?: string; /** Overrides the queue's default for this one task. */ readonly queueAdmissionTimeoutMs?: number | false; };",
-          "declarationLine": 24,
+          "declarationLine": 29,
           "source": "packages/lifecycle/dist/mutation-queue.d.ts",
           "purpose": "Per-submission owner identity and optional override of the queue’s admission timeout policy.",
           "core": "owner: Caller-issued stable label for one mutation owner; matching the currently running label rejects the successor with `QUEUE_SELF_DEPENDENCY`.\nOmitted: no owner-based self-dependency detection is possible.\nqueueAdmissionTimeoutMs: Overrides admission waiting for this task with a millisecond budget or false; the override never interrupts a running task.\nOmitted: inherit the queue’s admission policy.\nDisable both admission timeout and diagnostics for this task.",
@@ -5550,7 +5550,7 @@
           "name": "IMutationQueue",
           "kind": "type",
           "signature": "export type IMutationQueue = { enqueue<T>(task: () => T | PromiseLike<T>, options?: IEnqueueOptions): Promise<T>; readonly size: number; };",
-          "declarationLine": 29,
+          "declarationLine": 34,
           "source": "packages/lifecycle/dist/mutation-queue.d.ts",
           "purpose": "Single-flight FIFO executor returned by `createMutationQueue()`; callers retain responsibility for external cancellation and queue lifetime.",
           "core": "enqueue: Submits one task to run after all earlier admitted tasks settle. Never await a queued successor from inside the running task: different or absent owner labels cannot detect that deadlock.\nenqueue.task: Caller-authored no-argument callback returning a value or thenable. Synchronous throws and rejections reject only this submission; the next task still runs.\nenqueue.options: Optional `IEnqueueOptions` chosen by the caller; owner defaults to absent and admission policy inherits the queue.\nA fresh `Promise<T>` for this task. Admission timeout rejects with `QUEUE_ADMISSION_TIMEOUT`; matching running-owner submission rejects with `QUEUE_SELF_DEPENDENCY`.\nsize: Number of queued tasks plus the currently running task; removed timed-out tasks no longer contribute.",
@@ -5647,7 +5647,7 @@
         {
           "name": "IMutationQueueOptions",
           "kind": "type",
-          "signature": "export type IMutationQueueOptions = { /** * Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — * the core never invents a domain timeout. `false` disables even diagnostics. A number is the * `plugin-host`-equivalent behavior: reject once a queued task has waited this long. */ readonly queueAdmissionTimeoutMs?: number | false; /** * Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables * the diagnostic timer. */ readonly admissionDiagnosticMs?: number | false; readonly onAdmissionDiagnostic?: (info: { readonly owner: string | undefined; readonly waitedMs: number; }) => void; /** * Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. * Defaults to `systemScheduler`. */ readonly scheduler?: IScheduler; };",
+          "signature": "export type IMutationQueueOptions = { /** * Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — * the core never invents a domain timeout. `false` disables even diagnostics. A number is the * `plugin-host`-equivalent behavior: reject once a queued task has waited this long. */ readonly queueAdmissionTimeoutMs?: number | false; /** * Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables * the diagnostic timer. */ readonly admissionDiagnosticMs?: number | false; readonly onAdmissionDiagnostic?: (info: { readonly owner: string | undefined; readonly waitedMs: number; /** * Present only when disarming the admission watchdog failed: a `QUEUE_ADMISSION_TIMEOUT` error * whose `cause` is the cancellation failure. Absent on the plain wait diagnostic. */ readonly error?: unknown; }) => void; /** * Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. * Defaults to `systemScheduler`. */ readonly scheduler?: IScheduler; };",
           "declarationLine": 2,
           "source": "packages/lifecycle/dist/mutation-queue.d.ts",
           "purpose": "Admission and diagnostics configuration for serial mutations; no option imposes a running-task timeout.",
@@ -5685,10 +5685,10 @@
               "name": "onAdmissionDiagnostic",
               "kind": "property",
               "optional": true,
-              "signature": "readonly onAdmissionDiagnostic?: (info: { readonly owner: string | undefined; readonly waitedMs: number; }) => void;",
+              "signature": "readonly onAdmissionDiagnostic?: (info: { readonly owner: string | undefined; readonly waitedMs: number; /** * Present only when disarming the admission watchdog failed: a `QUEUE_ADMISSION_TIMEOUT` error * whose `cause` is the cancellation failure. Absent on the plain wait diagnostic. */ readonly error?: unknown; }) => void;",
               "description": null,
               "parameterDetails": [],
-              "returns": "(info: { readonly owner: string | undefined; readonly waitedMs: number; }) => void"
+              "returns": "(info: { readonly owner: string | undefined; readonly waitedMs: number; /** * Present only when disarming the admission watchdog failed: a `QUEUE_ADMISSION_TIMEOUT` error * whose `cause` is the cancellation failure. Absent on the plain wait diagnostic. */ readonly error?: unknown; }) => void"
             },
             {
               "name": "scheduler",
@@ -5704,7 +5704,7 @@
           "aliasOf": "IMutationQueueOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IMutationQueueOptions = { /** * Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — * the core never invents a domain timeout. `false` disables even diagnostics. A number is the * `plugin-host`-equivalent behavior: reject once a queued task has waited this long. */ readonly queueAdmissionTimeoutMs?: number | false; /** * Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables * the diagnostic timer. */ readonly admissionDiagnosticMs?: number | false; readonly onAdmissionDiagnostic?: (info: { readonly owner: string | undefined; readonly waitedMs: number; }) => void; /** * Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. * Defaults to `systemScheduler`. */ readonly scheduler?: IScheduler; };"
+            "export type IMutationQueueOptions = { /** * Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — * the core never invents a domain timeout. `false` disables even diagnostics. A number is the * `plugin-host`-equivalent behavior: reject once a queued task has waited this long. */ readonly queueAdmissionTimeoutMs?: number | false; /** * Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables * the diagnostic timer. */ readonly admissionDiagnosticMs?: number | false; readonly onAdmissionDiagnostic?: (info: { readonly owner: string | undefined; readonly waitedMs: number; /** * Present only when disarming the admission watchdog failed: a `QUEUE_ADMISSION_TIMEOUT` error * whose `cause` is the cancellation failure. Absent on the plain wait diagnostic. */ readonly error?: unknown; }) => void; /** * Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. * Defaults to `systemScheduler`. */ readonly scheduler?: IScheduler; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5743,7 +5743,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/mutation-queue.d.ts:IMutationQueueOptions:export type IMutationQueueOptions = { /** * Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — * the core never invents a domain timeout. `false` disables even diagnostics. A number is the * `plugin-host`-equivalent behavior: reject once a queued task has waited this long. */ readonly queueAdmissionTimeoutMs?: number | false; /** * Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables * the diagnostic timer. */ readonly admissionDiagnosticMs?: number | false; readonly onAdmissionDiagnostic?: (info: { readonly owner: string | undefined; readonly waitedMs: number; }) => void; /** * Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. * Defaults to `systemScheduler`. */ readonly scheduler?: IScheduler; };",
+          "identity": "packages/lifecycle/dist/mutation-queue.d.ts:IMutationQueueOptions:export type IMutationQueueOptions = { /** * Default per-task admission budget. `undefined` (default) means \"diagnose only, never reject\" — * the core never invents a domain timeout. `false` disables even diagnostics. A number is the * `plugin-host`-equivalent behavior: reject once a queued task has waited this long. */ readonly queueAdmissionTimeoutMs?: number | false; /** * Diagnostic-only threshold used while `queueAdmissionTimeoutMs` is `undefined`. `false` disables * the diagnostic timer. */ readonly admissionDiagnosticMs?: number | false; readonly onAdmissionDiagnostic?: (info: { readonly owner: string | undefined; readonly waitedMs: number; /** * Present only when disarming the admission watchdog failed: a `QUEUE_ADMISSION_TIMEOUT` error * whose `cause` is the cancellation failure. Absent on the plain wait diagnostic. */ readonly error?: unknown; }) => void; /** * Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. * Defaults to `systemScheduler`. */ readonly scheduler?: IScheduler; };",
           "guidance": [],
           "usageScore": 28,
           "configuration": [],
@@ -7930,9 +7930,9 @@
           "ownerFragment": "lifecycle-abort--createAbortController"
         },
         {
-          "identity": "packages/lifecycle/dist/dispose-transaction.d.ts:createDisposeTransaction:export declare function createDisposeTransaction(mode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;",
+          "identity": "packages/lifecycle/dist/dispose-transaction.d.ts:createDisposeTransaction:export declare function createDisposeTransaction(requestedMode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;",
           "name": "createDisposeTransaction",
-          "signature": "export declare function createDisposeTransaction(mode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;",
+          "signature": "export declare function createDisposeTransaction(requestedMode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;",
           "source": "packages/lifecycle/dist/dispose-transaction.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./disposal",
@@ -8752,19 +8752,19 @@
         {
           "name": "createDisposeTransaction",
           "kind": "function",
-          "signature": "export declare function createDisposeTransaction(mode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;",
+          "signature": "export declare function createDisposeTransaction(requestedMode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;",
           "declarationLine": 106,
           "source": "packages/lifecycle/dist/dispose-transaction.d.ts",
           "purpose": "Builds a reusable sequential release executor with one fixed ordering mode and error policy. Every run admits all descriptors before invoking callbacks, releases valid items despite other failures, then drains optional pending work.",
           "core": "mode: Caller-authored `IDisposeTransactionMode`: `order` stably sorts descending priorities; `plan` preserves the supplied sequence and never reads priorities.\nAn `IDisposeTransaction`; missing required reporters and invalid schedulers fail construction with `INVALID_OPTION`.\nerrorPolicy: Selects the release error outcome from `LifecycleErrorPolicy`. Every admitted item still receives its release attempt; `report` and `firstError` require a reporter when creating a scope or transaction.\n`throw`: rethrow one original failure or aggregate several after release.\nKeep default throw to propagate release failures. Choose collect to inspect a returned list, report to deliver every failure to a required reporter, or firstError to throw the first and report later ones. Every item still receives its release attempt.\nreport: Receives each diagnostic or policy-routed `error` from lifecycle. Return nothing synchronously; accidental thenable rejections and synchronous throws are contained. A scope or transaction requires this callback for `report` and `firstError` policies.\nreport.error: Original failure or coded diagnostic supplied by the current lifecycle operation.\nNo value is consumed; callback failures do not replace the operation result.\nOmitted: diagnostics have no sink; factories reject this omission for `report` and `firstError`.\nSupply a synchronous receiver when cleanup failures must reach monitoring. It is required with report or firstError policies; omission otherwise provides no diagnostic sink. Return no value; reporter failures are contained.\ndeadlineAt: Absolute finite time in the selected scheduler clock. Every item sees the same `deadlineAt`; it caps graceful waiting only, so forced release can continue beyond it.\nOmitted: no shared deadline; an individual descriptor may still set its own graceful budget.\nscheduler: Clock and timer implementation from `@migaia/utils/scheduler`. Supply the same scheduler that produced every absolute deadline; lifecycle snapshots methods with their original receiver and rejects invalid shapes with `INVALID_OPTION`.\nOmitted: use the admitted `systemScheduler` when a timed phase first needs it.\nsignal: Caller-owned `IAbortSignal` mirrored into a private per-run native signal; running the transaction never aborts the input controller.\nOmitted: every item receives an inert non-aborting signal.\ndisposer: Owner-bound `IDisposerContext` supplied by an owning scope; generic callers normally omit this capability.\nOmitted: no scope self-join capability is placed in the context.\npending: Caller-owned object with async no-argument `drain()` invoked after all release items; fulfillment means pending work drained, and rejection becomes a transaction-pending failure.\nOmitted: no final pending-work drain is run.\npending.drain: Caller-provided no-argument callback invoked after all release items; return a Promise<void> that settles when pending work drains. Synchronous throws or rejection become transaction-pending failures.\nSupply it when releases start work that must settle after all items. Return Promise<void>; rejection becomes a transaction-pending failure. Omitting pending skips this final drain.",
           "advanced": "",
           "parameters": [
-            "mode: IDisposeTransactionMode",
+            "requestedMode: IDisposeTransactionMode",
             "options: IDisposeTransactionOptions (optional)"
           ],
           "parameterDetails": [
             {
-              "name": "mode",
+              "name": "requestedMode",
               "type": "IDisposeTransactionMode",
               "optional": false
             },
@@ -8786,12 +8786,12 @@
           "aliasOf": "createDisposeTransaction",
           "exportPath": "./disposal",
           "overloadSignatures": [
-            "export declare function createDisposeTransaction(mode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;"
+            "export declare function createDisposeTransaction(requestedMode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "mode",
+                "name": "requestedMode",
                 "type": "IDisposeTransactionMode",
                 "optional": false
               },
@@ -8887,7 +8887,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/lifecycle/dist/dispose-transaction.d.ts:createDisposeTransaction:export declare function createDisposeTransaction(mode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;",
+          "identity": "packages/lifecycle/dist/dispose-transaction.d.ts:createDisposeTransaction:export declare function createDisposeTransaction(requestedMode: IDisposeTransactionMode, options?: IDisposeTransactionOptions): IDisposeTransaction;",
           "guidance": [
             {
               "id": "createdisposetransaction",
@@ -10084,7 +10084,7 @@
           "name": "containAsyncRejection",
           "kind": "function",
           "signature": "export declare function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void;",
-          "declarationLine": 76,
+          "declarationLine": 53,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Inspects a callback return through the canonical thenable boundary and observes rejection without awaiting completion. Use for values returned by nominally synchronous hooks that may accidentally be asynchronous.",
           "core": "value: The exact return value of a callback, supplied by its caller; ordinary non-thenable values require no observation.\nonRejected: Synchronous `(error) => void` sink receiving a getter, invocation or rejection failure from the inspected value. Return nothing; the thenable observer contains sink throws.\nReturns immediately after attaching rejection observation; it does not expose a completion promise.",
@@ -10209,7 +10209,7 @@
           "name": "createErrorCollector",
           "kind": "function",
           "signature": "export declare function createErrorCollector(policy: IErrorPolicy, report: ((error: unknown) => void) | undefined): IErrorCollector;",
-          "declarationLine": 68,
+          "declarationLine": 45,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Collects release failures by policy. All four policies annotate unclassified native errors with `SCOPE_DISPOSAL_FAILED`, wrap primitives through `cause`, and preserve valid external identity. Multiple throw-policy failures aggregate; reporters cannot replace release results.",
           "core": "policy: Value from `LifecycleErrorPolicy`; `report` and `firstError` require a reporter at construction; missing reporters throw `INVALID_OPTION`.\nreport: Synchronous `(error) => void` callback or `undefined`; receives report-policy errors and later first-error failures, ignores its return and contains throws/rejections.\nAn `IErrorCollector` retaining failures until finalization; it does not release resources or clear entries on finalize.",
@@ -10336,7 +10336,7 @@
           "name": "IErrorCollector",
           "kind": "type",
           "signature": "export type IErrorCollector = { readonly policy: IErrorPolicy; /** Records one item's failure. For `report`, this is also where the reporter is invoked. */ add(source: string, error: unknown): void; /** * Finalizes collection. `collect`/`report`/`firstError`-with-no-error return the collected list * (empty for `report`, since those were already handed to the reporter per `add`); `throw` and * `firstError`-with-an-error throw instead of returning. */ finalize(message: string): readonly ICollectedError[]; };",
-          "declarationLine": 57,
+          "declarationLine": 34,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Policy-bound failure recorder returned by `createErrorCollector()`; the owner must call finalize after completing release attempts.",
           "core": "policy: Failure-delivery policy selected by the caller when constructing this collector.\nadd: Records a labeled failure, or immediately reports it for report policy. First-error policy retains the first and reports later failures.\nadd.source: Caller-issued item identity retained on collect-policy entries.\nadd.error: Original thrown or rejected value captured by the release owner.\nThe failure is recorded or reported; reporter throws and rejections are contained.\nfinalize: Applies the chosen failure-delivery outcome without clearing entries. A single failure keeps its normalized identity; unclassified native errors receive `SCOPE_DISPOSAL_FAILED` and primitive failures remain on cause. Several throw-policy failures aggregate.\nfinalize.message: Caller-selected stable aggregate message used only when several failures are thrown together.\nCollected entries for collect, otherwise an empty list or policy-selected throw. First-error policy throws the exact first error.",
@@ -10485,7 +10485,7 @@
           "name": "ILifecycleError",
           "kind": "type",
           "signature": "export type ILifecycleError = Error & { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; readonly cause?: unknown; /** * Stores a frozen, non-enumerable list of secondary failures such as cleanup errors, appended in * occurrence order. Keeps them separate from `cause` so the primary error retains its identity. */ readonly errors?: readonly unknown[]; };",
-          "declarationLine": 9,
+          "declarationLine": 10,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Native `Error` carrying lifecycle identity and traceable metadata. If diagnostic message/stack getters fail during normalization, the original thrown value remains cause and getter failures remain secondary errors; they never replace the primary.",
           "core": "source: Package identity assigned by lifecycle error construction; equals `LIFECYCLE_SOURCE`.\ncode: Semantic boundary code chosen by the owner, normally from `LifecycleErrorCode`; interpret together with source.\nphase: Optional caller-selected operation phase explaining where the failure crossed a boundary.\ndetail: Optional readonly context record supplied by the owner, such as a field label or timing attribution.\ncause: Optional original primary thrown value retained for identity-based inspection and causal tracing.\nerrors: Frozen non-enumerable secondary failure list retained in occurrence order without replacing the primary cause.",
@@ -10756,7 +10756,7 @@
           "name": "LIFECYCLE_SOURCE",
           "kind": "const",
           "signature": "export declare const LIFECYCLE_SOURCE = \"lifecycle\";",
-          "declarationLine": 3,
+          "declarationLine": 4,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Stable source marker stamped onto errors constructed by lifecycle. Check it before interpreting a code because another package can use the same code string for different semantics.",
           "core": "Stable source marker stamped onto errors constructed by lifecycle. Check it before interpreting a code because another package can use the same code string for different semantics.",

@@ -20,7 +20,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    httpPlugin({\n      url: 'https://example.test/logs',\n      features: [\n        batchFeature({ maxSize: 20 }),\n        retryFeature({ attempts: 3, backoff: 200 }),\n        timeoutFeature({ ms: 10000 })\n      ]\n    })\n  ]\n})\nlog.info('request completed', { requestId: 'one' })\nawait log.flush()\nawait log.shutdown('manual')"
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    httpPlugin({\n      url: 'https://example.test/logs',\n      features: {\n        batch: batchFeature({ maxSize: 20 }),\n        retry: retryFeature({ attempts: 3, backoff: 200 }),\n        timeout: timeoutFeature({ ms: 10000 })\n      }\n    })\n  ]\n})\nlog.info('request completed', { requestId: 'one' })\nawait log.flush()\nawait log.shutdown('manual')"
               },
               {
                 "type": "paragraph",
@@ -33,6 +33,10 @@
               {
                 "type": "paragraph",
                 "text": "运行期交付错误进入 host 失败通道；不会让日志方法抛错或让 `flush` 拒绝。完整配置与错误边界见 使用指南。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `http_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `http_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。"
               }
             ]
           }
@@ -51,7 +55,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    httpPlugin({\n      url: 'https://example.test/logs',\n      fetcher: globalThis.fetch,\n      headers: { 'X-Application': 'example' },\n      authToken: 'example-token',\n      maxRetryAfterMs: 30000,\n      features: [\n        batchFeature({ maxSize: 20 }),\n        retryFeature({ attempts: 3, backoff: 200 }),\n        timeoutFeature({ ms: 10000 })\n      ]\n    })\n  ]\n})\nlog.onFailure(({ error }) => {\n  globalThis.console.error(error)\n})\nlog.log('info', 'request complete')\nawait log.flush()\nawait log.shutdown('manual')"
+                "code": "import { createLogHost } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    httpPlugin({\n      url: 'https://example.test/logs',\n      fetcher: globalThis.fetch,\n      headers: { 'X-Application': 'example' },\n      authToken: 'example-token',\n      maxRetryAfterMs: 30000,\n      features: {\n        batch: batchFeature({ maxSize: 20 }),\n        retry: retryFeature({ attempts: 3, backoff: 200 }),\n        timeout: timeoutFeature({ ms: 10000 })\n      }\n    })\n  ]\n})\nlog.onFailure(({ error }) => {\n  globalThis.console.error(error)\n})\nlog.log('info', 'request complete')\nawait log.flush()\nawait log.shutdown('manual')"
               },
               {
                 "type": "paragraph",
@@ -63,7 +67,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "请求体始终为 `{ \"entries\": [...] }`。HTTP 调用 host 的共享 entry 投影；error 使用完整序列化错误链，保留 source/code/name/message/stack/cause/errors，排除 raw 和额外私有 Error 字段。普通业务字段保持原结构。HTTP 不消费格式化文本，跳过整个 host format 阶段；host 级 plain/pretty/JSON 格式不改变 wire。HTTP 的 output features 不能包含任何 format descriptor，否则创建时由 host 以 logging/INVALID_OPTION 拒绝。gate 与 entry 阶段照常执行。"
+                "text": "请求体始终为 `{ \"entries\": [...] }`。HTTP 调用 host 的共享 entry 投影；error 使用完整序列化错误链，保留 source/code/name/message/stack/cause/errors，排除 raw 和额外私有 Error 字段。普通业务字段保持原结构。HTTP 不消费格式化文本，跳过整个 host format 阶段；host 级 plain/pretty/JSON 格式不改变 wire。HTTP 的 output features 不能包含任何 format feature，否则创建时由 host 以 logging/INVALID_OPTION 拒绝。gate 与 entry 阶段照常执行。"
               },
               {
                 "type": "paragraph",
@@ -72,6 +76,10 @@
               {
                 "type": "paragraph",
                 "text": "`LOG_HTTP_ERROR_SOURCE` 为 logging.http；`LogHttpErrorCode` 包含 TRANSPORT_UNAVAILABLE、SERIALIZE_FAILED、DELIVERY_FAILED、INVALID_OPTION。缺少所有 fetcher、非法 maxRetryAfterMs 在创建时同步失败。运行期发送/序列化错误交给 host 失败通道，原生错误类型与 cause 保持可追溯；业务日志调用和 flush 不把交付失败重新抛出。交付失败与清理失败同时出现时，原交付错误排在错误链首位并用于重试分类；503 附带清理失败仍按配置重试。200 已成功而清理失败只报告一次 host 的 logging/DELIVERY_FAILED，不重发请求；timeout 自身错误也由 host logging 域负责。scheduler 必须在返回 receipt 之后才调用 callback。部署前应为 onFailure 提供业务需要的报告处理。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `http_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `http_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。"
               }
             ]
           }
@@ -91,7 +99,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    httpPlugin({\n      url: 'https://example.test/logs',\n      features: [\n        batchFeature({ maxSize: 20 }),\n        retryFeature({ attempts: 3, backoff: 200 }),\n        timeoutFeature({ ms: 10000 })\n      ]\n    })\n  ]\n})\nlog.info('request completed', { requestId: 'one' })\nawait log.flush()\nawait log.shutdown('manual')"
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    httpPlugin({\n      url: 'https://example.test/logs',\n      features: {\n        batch: batchFeature({ maxSize: 20 }),\n        retry: retryFeature({ attempts: 3, backoff: 200 }),\n        timeout: timeoutFeature({ ms: 10000 })\n      }\n    })\n  ]\n})\nlog.info('request completed', { requestId: 'one' })\nawait log.flush()\nawait log.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
@@ -104,6 +112,10 @@
                 {
                   "type": "paragraph",
                   "text": "Runtime delivery failures enter the host failure channel. Logging methods do not throw and `flush` does not reject. See the usage guide for configuration and error boundaries."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `http_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `http_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/sdk`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported."
                 }
               ]
             }
@@ -122,7 +134,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    httpPlugin({\n      url: 'https://example.test/logs',\n      fetcher: globalThis.fetch,\n      headers: { 'X-Application': 'example' },\n      authToken: 'example-token',\n      maxRetryAfterMs: 30000,\n      features: [\n        batchFeature({ maxSize: 20 }),\n        retryFeature({ attempts: 3, backoff: 200 }),\n        timeoutFeature({ ms: 10000 })\n      ]\n    })\n  ]\n})\nlog.onFailure(({ error }) => {\n  globalThis.console.error(error)\n})\nlog.log('info', 'request complete')\nawait log.flush()\nawait log.shutdown('manual')"
+                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    httpPlugin({\n      url: 'https://example.test/logs',\n      fetcher: globalThis.fetch,\n      headers: { 'X-Application': 'example' },\n      authToken: 'example-token',\n      maxRetryAfterMs: 30000,\n      features: {\n        batch: batchFeature({ maxSize: 20 }),\n        retry: retryFeature({ attempts: 3, backoff: 200 }),\n        timeout: timeoutFeature({ ms: 10000 })\n      }\n    })\n  ]\n})\nlog.onFailure(({ error }) => {\n  globalThis.console.error(error)\n})\nlog.log('info', 'request complete')\nawait log.flush()\nawait log.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
@@ -134,7 +146,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The body is always `{ \"entries\": [...] }`. HTTP uses the host's shared entry projection: errors retain source/code/name/message/stack/cause/errors while raw and private Error fields stay off the wire. Ordinary business fields retain their structure. HTTP does not consume formatted text and skips the entire host format phase. Host plain/pretty/JSON formats do not change the wire. HTTP output features cannot include any format descriptor: the host rejects it at creation with logging/INVALID_OPTION. Gate and entry stages still execute."
+                  "text": "The body is always `{ \"entries\": [...] }`. HTTP uses the host's shared entry projection: errors retain source/code/name/message/stack/cause/errors while raw and private Error fields stay off the wire. Ordinary business fields retain their structure. HTTP does not consume formatted text and skips the entire host format phase. Host plain/pretty/JSON formats do not change the wire. HTTP output features cannot include any format feature: the host rejects it at creation with logging/INVALID_OPTION. Gate and entry stages still execute."
                 },
                 {
                   "type": "paragraph",
@@ -143,6 +155,10 @@
                 {
                   "type": "paragraph",
                   "text": "`LOG_HTTP_ERROR_SOURCE` is logging.http. `LogHttpErrorCode` contains TRANSPORT_UNAVAILABLE, SERIALIZE_FAILED, DELIVERY_FAILED, and INVALID_OPTION. Missing fetch capabilities and invalid maxRetryAfterMs fail synchronously at creation. Runtime delivery/serialization failures reach the host failure channel with native error types and reachable causes. Business log calls and flush do not rethrow delivery failures. When delivery and cleanup both fail, the original delivery error comes first in the error chain and drives retry classification. A 503 with cleanup failures still follows the configured retry policy. Cleanup after a successful 200 is reported once as host logging/DELIVERY_FAILED and never replays the request; timeout errors also belong to host logging. A scheduler must return its receipt before invoking the callback. Install the onFailure reporting behavior required by your application."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `http_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `http_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/sdk`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported."
                 }
               ]
             }
@@ -171,44 +187,44 @@
         {
           "name": "httpPlugin",
           "kind": "function",
-          "signature": "export declare function httpPlugin(options: IHttpPluginConfig): ILogPlugin;",
-          "declarationLine": 4,
+          "signature": "export declare function httpPlugin<const F extends ILogFeatureRecord = Record<never, never>>(requested: IHttpPluginConfig<F>): ReturnType<typeof defineOutputPlugin<typeof HTTP_PLUGIN_NAME, F>>;",
+          "declarationLine": 5,
           "source": "packages/log-plugin-http/dist/http.d.ts",
           "purpose": "Serialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts.",
           "core": "options: Required URL with optional headers, authToken, fetcher, Retry-After bound and delivery features; the wire method is fixed to POST.\nAn entry-only output plugin; install it in createLogHost.plugins and configure delivery policies through features.\nurl: Destination passed unchanged to the injected fetcher.\nfetcher: Return a response with ok/status/headers.get; cooperate with the supplied AbortSignal.\nglobalThis.fetch; creation fails when absent.\nheaders: Copied request headers; caller values override JSON content type.\nContent-Type application/json.\nauthToken: A nonempty value overrides Authorization using the bearer convention.\nNo bearer override.\nmaxRetryAfterMs: Finite nonnegative limit for strictly parsed server Retry-After advice.\n30000 milliseconds.\nfeatures: Use batchFeature, retryFeature and timeoutFeature; format descriptors are rejected.\nNo implicit transport policy.\nSerialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts.",
           "advanced": "Serialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts.",
-          "parameters": ["options: IHttpPluginConfig"],
+          "parameters": ["requested: IHttpPluginConfig<F>"],
           "parameterDetails": [
             {
-              "name": "options",
-              "type": "IHttpPluginConfig",
+              "name": "requested",
+              "type": "IHttpPluginConfig<F>",
               "optional": false
             }
           ],
-          "returns": "ILogPlugin",
+          "returns": "ReturnType<typeof defineOutputPlugin<typeof HTTP_PLUGIN_NAME, F>>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    httpPlugin({\n      url: 'https://example.test/logs',\n      fetcher: globalThis.fetch,\n      headers: { 'X-Application': 'example' },\n      authToken: 'example-token',\n      maxRetryAfterMs: 30000,\n      features: [\n        batchFeature({ maxSize: 20 }),\n        retryFeature({ attempts: 3, backoff: 200 }),\n        timeoutFeature({ ms: 10000 })\n      ]\n    })\n  ]\n})\nlog.onFailure(({ error }) => {\n  globalThis.console.error(error)\n})\nlog.log('info', 'request complete')\nawait log.flush()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    httpPlugin({\n      url: 'https://example.test/logs',\n      features: [\n        batchFeature({ maxSize: 20 }),\n        retryFeature({ attempts: 3, backoff: 200 }),\n        timeoutFeature({ ms: 10000 })\n      ]\n    })\n  ]\n})\nlog.info('request completed', { requestId: 'one' })\nawait log.flush()\nawait log.shutdown('manual')"
+            "import { createLogHost } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    httpPlugin({\n      url: 'https://example.test/logs',\n      fetcher: globalThis.fetch,\n      headers: { 'X-Application': 'example' },\n      authToken: 'example-token',\n      maxRetryAfterMs: 30000,\n      features: {\n        batch: batchFeature({ maxSize: 20 }),\n        retry: retryFeature({ attempts: 3, backoff: 200 }),\n        timeout: timeoutFeature({ ms: 10000 })\n      }\n    })\n  ]\n})\nlog.onFailure(({ error }) => {\n  globalThis.console.error(error)\n})\nlog.log('info', 'request complete')\nawait log.flush()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    httpPlugin({\n      url: 'https://example.test/logs',\n      features: {\n        batch: batchFeature({ maxSize: 20 }),\n        retry: retryFeature({ attempts: 3, backoff: 200 }),\n        timeout: timeoutFeature({ ms: 10000 })\n      }\n    })\n  ]\n})\nlog.info('request completed', { requestId: 'one' })\nawait log.flush()\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
           "aliasOf": "httpPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function httpPlugin(options: IHttpPluginConfig): ILogPlugin;"
+            "export declare function httpPlugin<const F extends ILogFeatureRecord = Record<never, never>>(requested: IHttpPluginConfig<F>): ReturnType<typeof defineOutputPlugin<typeof HTTP_PLUGIN_NAME, F>>;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "options",
-                "type": "IHttpPluginConfig",
+                "name": "requested",
+                "type": "IHttpPluginConfig<F>",
                 "optional": false
               }
             ]
           ],
-          "overloadReturns": ["ILogPlugin"],
+          "overloadReturns": ["ReturnType<typeof defineOutputPlugin<typeof HTTP_PLUGIN_NAME, F>>"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -276,12 +292,12 @@
             },
             {
               "name": "features",
-              "type": "readonly ILogFeature[]",
+              "type": "F",
               "optional": true,
               "description": "Output-scoped host features override defaults without adding a second transport policy."
             }
           ],
-          "identity": "packages/log-plugin-http/dist/http.d.ts:httpPlugin:export declare function httpPlugin(options: IHttpPluginConfig): ILogPlugin;",
+          "identity": "packages/log-plugin-http/dist/http.d.ts:httpPlugin:export declare function httpPlugin<const F extends ILogFeatureRecord = Record<never, never>>(requested: IHttpPluginConfig<F>): ReturnType<typeof defineOutputPlugin<typeof HTTP_PLUGIN_NAME, F>>;",
           "guidance": [],
           "usageScore": 24,
           "configuration": [
@@ -327,11 +343,11 @@
             },
             {
               "name": "features",
-              "type": "readonly ILogFeature[]",
+              "type": "F",
               "optional": true,
-              "description": "请求体始终是 `{ \"entries\": [...] }`，每条 entry 的 error 字段由 host 的共享错误链投影处理。HTTP 不消费格式化文本，host 级格式对它跳过；请勿在 HTTP 的 features 中添加 format，创建时会以 host 的 INVALID_OPTION 拒绝。默认 fetcher 是 `globalThis.fetch`；没有任何 fetcher 时工厂同步拒绝创建。",
+              "description": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `http_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `http_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。",
               "descriptionEn": "Output-scoped host features override defaults without adding a second transport policy.",
-              "descriptionZh": "请求体始终是 `{ \"entries\": [...] }`，每条 entry 的 error 字段由 host 的共享错误链投影处理。HTTP 不消费格式化文本，host 级格式对它跳过；请勿在 HTTP 的 features 中添加 format，创建时会以 host 的 INVALID_OPTION 拒绝。默认 fetcher 是 `globalThis.fetch`；没有任何 fetcher 时工厂同步拒绝创建。"
+              "descriptionZh": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `http_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `http_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。"
             }
           ],
           "fragment": "log-plugin-http-index--httpPlugin"
@@ -339,7 +355,7 @@
         {
           "name": "IHttpPluginConfig",
           "kind": "type",
-          "signature": "export type IHttpPluginConfig = { /** Destination passed unchanged to the borrowed fetcher. */ url: string; /** Defaults to the current host fetch function when present. */ fetcher?: IHttpFetcher; /** Caller headers override the default JSON content type. */ headers?: Record<string, string>; /** A truthy token overrides Authorization with the existing bearer convention. */ authToken?: string; /** Valid server delays are clamped to this finite nonnegative bound, default 30000ms. */ maxRetryAfterMs?: number; /** Output-scoped host features override defaults without adding a second transport policy. */ features?: readonly ILogFeature[]; };",
+          "signature": "export type IHttpPluginConfig<F extends ILogFeatureRecord = ILogFeatureRecord> = { /** Destination passed unchanged to the borrowed fetcher. */ url: string; /** Defaults to the current host fetch function when present. */ fetcher?: IHttpFetcher; /** Caller headers override the default JSON content type. */ headers?: Record<string, string>; /** A truthy token overrides Authorization with the existing bearer convention. */ authToken?: string; /** Valid server delays are clamped to this finite nonnegative bound, default 30000ms. */ maxRetryAfterMs?: number; /** Output-scoped host features override defaults without adding a second transport policy. */ features?: F; };",
           "declarationLine": 18,
           "source": "packages/log-plugin-http/dist/typing.d.ts",
           "purpose": "Serialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts.",
@@ -401,17 +417,17 @@
               "name": "features",
               "kind": "property",
               "optional": true,
-              "signature": "features?: readonly ILogFeature[];",
+              "signature": "features?: F;",
               "description": "Output-scoped host features override defaults without adding a second transport policy.",
               "parameterDetails": [],
-              "returns": "readonly ILogFeature[]"
+              "returns": "F"
             }
           ],
           "composes": [],
           "aliasOf": "IHttpPluginConfig",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IHttpPluginConfig = { /** Destination passed unchanged to the borrowed fetcher. */ url: string; /** Defaults to the current host fetch function when present. */ fetcher?: IHttpFetcher; /** Caller headers override the default JSON content type. */ headers?: Record<string, string>; /** A truthy token overrides Authorization with the existing bearer convention. */ authToken?: string; /** Valid server delays are clamped to this finite nonnegative bound, default 30000ms. */ maxRetryAfterMs?: number; /** Output-scoped host features override defaults without adding a second transport policy. */ features?: readonly ILogFeature[]; };"
+            "export type IHttpPluginConfig<F extends ILogFeatureRecord = ILogFeatureRecord> = { /** Destination passed unchanged to the borrowed fetcher. */ url: string; /** Defaults to the current host fetch function when present. */ fetcher?: IHttpFetcher; /** Caller headers override the default JSON content type. */ headers?: Record<string, string>; /** A truthy token overrides Authorization with the existing bearer convention. */ authToken?: string; /** Valid server delays are clamped to this finite nonnegative bound, default 30000ms. */ maxRetryAfterMs?: number; /** Output-scoped host features override defaults without adding a second transport policy. */ features?: F; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -450,7 +466,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/log-plugin-http/dist/typing.d.ts:IHttpPluginConfig:export type IHttpPluginConfig = { /** Destination passed unchanged to the borrowed fetcher. */ url: string; /** Defaults to the current host fetch function when present. */ fetcher?: IHttpFetcher; /** Caller headers override the default JSON content type. */ headers?: Record<string, string>; /** A truthy token overrides Authorization with the existing bearer convention. */ authToken?: string; /** Valid server delays are clamped to this finite nonnegative bound, default 30000ms. */ maxRetryAfterMs?: number; /** Output-scoped host features override defaults without adding a second transport policy. */ features?: readonly ILogFeature[]; };",
+          "identity": "packages/log-plugin-http/dist/typing.d.ts:IHttpPluginConfig:export type IHttpPluginConfig<F extends ILogFeatureRecord = ILogFeatureRecord> = { /** Destination passed unchanged to the borrowed fetcher. */ url: string; /** Defaults to the current host fetch function when present. */ fetcher?: IHttpFetcher; /** Caller headers override the default JSON content type. */ headers?: Record<string, string>; /** A truthy token overrides Authorization with the existing bearer convention. */ authToken?: string; /** Valid server delays are clamped to this finite nonnegative bound, default 30000ms. */ maxRetryAfterMs?: number; /** Output-scoped host features override defaults without adding a second transport policy. */ features?: F; };",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],

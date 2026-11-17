@@ -163,7 +163,7 @@
                 "type": "table",
                 "headers": ["API", "用途"],
                 "rows": [
-                  ["`sqliteBackendPlugin({ driver, table?, wal? })`", "安装 SQLite 存储"],
+                  ["`sqliteBackendPlugin({ driver, table?, wal?  })`", "安装 SQLite 存储"],
                   ["`store.use(kv / records / sql / ttl / counter)`", "标准数据、查询、期限与计数"],
                   ["`store.transaction` / `store.tx()`", "同一连接中的原生事务"],
                   ["`store.sql` / `tx.sql`", "绑定参数 SQL"],
@@ -286,7 +286,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))"
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({\n      driver: connection,\n      features: { maintenance: sqliteMaintenanceFeature() }\n    })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))"
               },
               {
                 "type": "paragraph",
@@ -322,7 +322,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "本包错误 source 为 @migaia/storage-plugin-sqlite，码为 SQLITE_FAILED、TRANSACTION_FAILED、DUPLICATE_KEY、DECODE_FAILED。校验、取消、超时和并发使用共享错误码。原生或编码错误保留在 cause；回滚也失败时，aggregate errors 首项保留主错误。解码失败不自动修补数据。向量和 RDF 不支持，对应锁在原生调用前报 UNSUPPORTED_CAPABILITY；不提供变更流或服务端记录字段索引。"
+                "text": "本包错误 source 为 storage.backend.sqlite，码为 SQLITE_FAILED、TRANSACTION_FAILED、DUPLICATE_KEY、DECODE_FAILED。校验、取消、超时和并发使用共享错误码。原生或编码错误保留在 cause；回滚也失败时，aggregate errors 首项保留主错误。解码失败不自动修补数据。向量和 RDF 不支持，对应锁在原生调用前报 UNSUPPORTED_CAPABILITY；不提供变更流或服务端记录字段索引。"
               }
             ]
           },
@@ -513,7 +513,7 @@
                   "type": "table",
                   "headers": ["API", "Purpose"],
                   "rows": [
-                    ["`sqliteBackendPlugin({ driver, table?, wal? })`", "Install SQLite storage"],
+                    ["`sqliteBackendPlugin({ driver, table?, wal?  })`", "Install SQLite storage"],
                     [
                       "`store.use(kv / records / sql / ttl / counter)`",
                       "Standard values, queries, expiry and counters"
@@ -645,7 +645,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))"
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({\n      driver: connection,\n      features: { maintenance: sqliteMaintenanceFeature() }\n    })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))"
                 },
                 {
                   "type": "paragraph",
@@ -681,7 +681,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "module failures use source @migaia/storage-plugin-sqlite and SQLITE_FAILED, TRANSACTION_FAILED, DUPLICATE_KEY or DECODE_FAILED. Shared validation, cancellation, timeout and conflict codes retain their source. Original failures remain on cause; aggregate errors keep the primary failure first if rollback also fails. Decode errors never repair data automatically. Vectors and RDF are unsupported, including their lock targets before native I/O. No live change feed or server-side record-field index is provided."
+                  "text": "module failures use source storage.backend.sqlite and SQLITE_FAILED, TRANSACTION_FAILED, DUPLICATE_KEY or DECODE_FAILED. Shared validation, cancellation, timeout and conflict codes retain their source. Original failures remain on cause; aggregate errors keep the primary failure first if rollback also fails. Decode errors never repair data automatically. Vectors and RDF are unsupported, including their lock targets before native I/O. No live change feed or server-side record-field index is provided."
                 }
               ]
             },
@@ -725,6 +725,71 @@
       "guidePath": "/en/docs/storage-plugin-sqlite/getting-started",
       "architecturePath": "/en/docs/storage-plugin-sqlite",
       "symbols": [
+        {
+          "name": "ISqliteBackend",
+          "kind": "type",
+          "signature": "export type ISqliteBackend = IStorageBackendType<ISqliteStore, ISqliteDriver, { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver; }>;",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-sqlite/dist/plugin.d.ts",
+          "purpose": "The SQLite engine as a type: its Store, native driver and transaction client getter.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISqliteBackend.",
+          "advanced": "No additional advanced behavior is declared for ISqliteBackend.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ISqliteBackend."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISqliteBackend.",
+          "examples": [],
+          "members": [],
+          "composes": ["IStorageBackendType"],
+          "aliasOf": "ISqliteBackend",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteBackend = IStorageBackendType<ISqliteStore, ISqliteDriver, { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ISqliteBackend when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ISqliteBackend does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The SQLite engine as a type: its Store, native driver and transaction client getter."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteBackend from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteBackend when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteBackend does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISqliteBackend."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ISqliteBackend."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/plugin.d.ts:ISqliteBackend:export type ISqliteBackend = IStorageBackendType<ISqliteStore, ISqliteDriver, { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteBackend"
+        },
         {
           "name": "ISqliteCapabilities",
           "kind": "type",
@@ -1682,102 +1747,31 @@
           "fragment": "storage-plugin-sqlite-index--ISqliteValue"
         },
         {
-          "name": "sqliteBackendKind",
-          "kind": "const",
-          "signature": "export declare const sqliteBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", ISqliteStore, ISqliteDriver, { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver; }>;",
-          "declarationLine": 4,
-          "source": "packages/storage-plugin-sqlite/dist/plugin.d.ts",
-          "purpose": "Authenticate SQLite Feature targets by exact kind identity.",
-          "core": "A neutral kind token; it owns no connection and grants no close authority.",
-          "advanced": "",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "aliasOf": "sqliteBackendKind",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const sqliteBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", ISqliteStore, ISqliteDriver, { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Authenticate SQLite Feature targets by exact kind identity."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import sqliteBackendKind from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use sqliteBackendKind when its const contract and declared inputs match the result you need. Choose a different public symbol when sqliteBackendKind does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "A neutral kind token; it owns no connection and grants no close authority."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-sqlite/dist/plugin.d.ts:sqliteBackendKind:export declare const sqliteBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", ISqliteStore, ISqliteDriver, { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-sqlite-index--sqliteBackendKind"
-        },
-        {
           "name": "sqliteBackendPlugin",
           "kind": "function",
-          "signature": "export declare function sqliteBackendPlugin<TValue = unknown, const TId extends string = 'sqlite', const F extends IStorageFeatureRecord = {}>(options: ISqliteOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>): IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>>;",
-          "declarationLine": 8,
+          "signature": "export declare function sqliteBackendPlugin<TValue = unknown, const TId extends string = 'sqlite', const F extends IStorageFeatureRecord = {}>(options: ISqliteOptions & { /** Plugin name and backend lookup key; `'sqlite'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISqliteBackend, NoInfer<F>, ISqliteStore<TValue>>; }): IStorageBackendPlugin<ISqliteBackend, NoInfer<TId>, F, ISqliteStore<TValue>>;",
+          "declarationLine": 10,
           "source": "packages/storage-plugin-sqlite/dist/plugin.d.ts",
           "purpose": "Define one caller-owned driver backend for the storage host.",
           "core": "options: Captured driver and backend configuration.\nfeatures: Optional exact-kind Feature definitions keyed by installed API name.\nAn exact-id backend plugin. File databases verify WAL by default; memory defaults to wal:false and can reserve private native log namespaces.\ndriver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nChoose a logical acquisition budget instead of changing native SQLite timeouts.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite.\nid: Literal backend id selected by host.backend.\nsqlite.\nowner.label: Diagnostic text for the existing concurrency owner.\nNo custom label.",
           "advanced": "",
           "parameters": [
-            "options: ISqliteOptions & { readonly id?: TId; }",
-            "features: F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>> (optional)"
+            "options: ISqliteOptions & { /** Plugin name and backend lookup key; `'sqlite'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISqliteBackend, NoInfer<F>, ISqliteStore<TValue>>; }"
           ],
           "parameterDetails": [
             {
               "name": "options",
-              "type": "ISqliteOptions & { readonly id?: TId; }",
+              "type": "ISqliteOptions & { /** Plugin name and backend lookup key; `'sqlite'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISqliteBackend, NoInfer<F>, ISqliteStore<TValue>>; }",
               "optional": false
-            },
-            {
-              "name": "features",
-              "type": "F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>",
-              "optional": true
             }
           ],
-          "returns": "IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>>",
+          "returns": "IStorageBackendPlugin<ISqliteBackend, NoInfer<TId>, F, ISqliteStore<TValue>>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
             "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/sdk'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.org('10000000-0000-4000-8000-000000000001').backend('sqlite')\nawait store\n  .tx()\n  .lock(lockKey.text('example:status'))\n  .run(async (tx) => {\n    await tx.use(kv).setMany([\n      { key: 'example:status', value: 'ready' },\n      { key: ['example', 1], value: 'first', ttlMs: 60000 }\n    ])\n    await tx.putRecord({ name: 'Ada' }, 'example:user')\n    await tx.use(ttl).expire(lockKey.text('example:status'), 60000)\n    await tx.set('example:count', '0')\n    await tx.use(counter).increment('example:count')\n  })\nconsole.log(await store.get('example:status'))\nconsole.log(await store.get('example:count'))\nconsole.log((await store.use(records).query().all()).length >= 1)",
             "import { createStorageHost } from '@migaia/storage-host'\nimport { sqlFragment } from '@migaia/storage-host/sdk'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.sql`CREATE TABLE app_users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait store.transaction(async (tx) => {\n  await tx.sql`INSERT INTO app_users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst row = await store.sql<{ name: string }>`\n  SELECT name FROM ${sqlFragment.id('app_users')} WHERE id=${1}\n`.get()\nconsole.log(row?.name)\nconsole.log(store.sync!.get('user-count'))",
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({\n      driver: connection,\n      features: { maintenance: sqliteMaintenanceFeature() }\n    })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))",
             "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('theme', 'dark')\nconsole.log(await store.get('theme'))"
           ],
           "members": [],
@@ -1785,24 +1779,19 @@
           "aliasOf": "sqliteBackendPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function sqliteBackendPlugin<TValue = unknown, const TId extends string = 'sqlite', const F extends IStorageFeatureRecord = {}>(options: ISqliteOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>): IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>>;"
+            "export declare function sqliteBackendPlugin<TValue = unknown, const TId extends string = 'sqlite', const F extends IStorageFeatureRecord = {}>(options: ISqliteOptions & { /** Plugin name and backend lookup key; `'sqlite'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISqliteBackend, NoInfer<F>, ISqliteStore<TValue>>; }): IStorageBackendPlugin<ISqliteBackend, NoInfer<TId>, F, ISqliteStore<TValue>>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
-                "type": "ISqliteOptions & { readonly id?: TId; }",
+                "type": "ISqliteOptions & { /** Plugin name and backend lookup key; `'sqlite'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISqliteBackend, NoInfer<F>, ISqliteStore<TValue>>; }",
                 "optional": false
-              },
-              {
-                "name": "features",
-                "type": "F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>",
-                "optional": true
               }
             ]
           ],
           "overloadReturns": [
-            "IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>>"
+            "IStorageBackendPlugin<ISqliteBackend, NoInfer<TId>, F, ISqliteStore<TValue>>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -1840,10 +1829,16 @@
           ],
           "declaredConfiguration": [
             {
-              "name": "id",
+              "name": "name",
               "type": "TId",
               "optional": true,
-              "description": ""
+              "description": "Plugin name and backend lookup key; `'sqlite'` when omitted."
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<ISqliteBackend, NoInfer<F>, ISqliteStore<TValue>>",
+              "optional": true,
+              "description": "Features installed on this backend."
             },
             {
               "name": "driver",
@@ -1888,33 +1883,41 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-plugin-sqlite/dist/plugin.d.ts:sqliteBackendPlugin:export declare function sqliteBackendPlugin<TValue = unknown, const TId extends string = 'sqlite', const F extends IStorageFeatureRecord = {}>(options: ISqliteOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>): IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>>;",
+          "identity": "packages/storage-plugin-sqlite/dist/plugin.d.ts:sqliteBackendPlugin:export declare function sqliteBackendPlugin<TValue = unknown, const TId extends string = 'sqlite', const F extends IStorageFeatureRecord = {}>(options: ISqliteOptions & { /** Plugin name and backend lookup key; `'sqlite'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<ISqliteBackend, NoInfer<F>, ISqliteStore<TValue>>; }): IStorageBackendPlugin<ISqliteBackend, NoInfer<TId>, F, ISqliteStore<TValue>>;",
           "guidance": [],
           "usageScore": 54,
           "configuration": [
             {
-              "name": "id",
+              "name": "name",
               "type": "TId",
               "optional": true,
-              "description": "组织 ID 是 UUID。所有组织共用连接和物理表；逻辑键、期限、修订与锁按组织隔离。访问组织不会开新连接或创建新表。`host.dropOrg(id)` 只删除相应组织的托管数据，不删除应用表。显式组织视图不提供任意 SQL 或数据库维护。",
-              "descriptionEn": "",
-              "descriptionZh": "组织 ID 是 UUID。所有组织共用连接和物理表；逻辑键、期限、修订与锁按组织隔离。访问组织不会开新连接或创建新表。`host.dropOrg(id)` 只删除相应组织的托管数据，不删除应用表。显式组织视图不提供任意 SQL 或数据库维护。"
+              "description": "Plugin name and backend lookup key; `'sqlite'` when omitted.",
+              "descriptionEn": "Plugin name and backend lookup key; `'sqlite'` when omitted.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<ISqliteBackend, NoInfer<F>, ISqliteStore<TValue>>",
+              "optional": true,
+              "description": "Features installed on this backend.",
+              "descriptionEn": "Features installed on this backend.",
+              "descriptionZh": ""
             },
             {
               "name": "driver",
               "type": "ISqliteDriver",
               "optional": false,
-              "description": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储",
+              "description": "`sqliteBackendPlugin({ driver, table?, wal?  })` — 安装 SQLite 存储",
               "descriptionEn": "",
-              "descriptionZh": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储"
+              "descriptionZh": "`sqliteBackendPlugin({ driver, table?, wal?  })` — 安装 SQLite 存储"
             },
             {
               "name": "table",
               "type": "string",
               "optional": true,
-              "description": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储",
+              "description": "`sqliteBackendPlugin({ driver, table?, wal?  })` — 安装 SQLite 存储",
               "descriptionEn": "",
-              "descriptionZh": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储"
+              "descriptionZh": "`sqliteBackendPlugin({ driver, table?, wal?  })` — 安装 SQLite 存储"
             },
             {
               "name": "concurrency",
@@ -1952,9 +1955,9 @@
               "name": "wal",
               "type": "boolean",
               "optional": true,
-              "description": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储",
+              "description": "`sqliteBackendPlugin({ driver, table?, wal?  })` — 安装 SQLite 存储",
               "descriptionEn": "",
-              "descriptionZh": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储"
+              "descriptionZh": "`sqliteBackendPlugin({ driver, table?, wal?  })` — 安装 SQLite 存储"
             }
           ],
           "fragment": "storage-plugin-sqlite-index--sqliteBackendPlugin"
@@ -2078,7 +2081,7 @@
         {
           "name": "sqliteMaintenanceFeature",
           "kind": "function",
-          "signature": "export declare function sqliteMaintenanceFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", import(\"../types.ts\").ISqliteStore, import(\"../types.ts\").ISqliteDriver, { getTransactionClient(scope: import(\"../types.ts\").ISqliteTransactionScope): import(\"../types.ts\").ISqliteDriver; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>;",
+          "signature": "export declare function sqliteMaintenanceFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISqliteBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-sqlite/dist/features/maintenance.d.ts",
           "purpose": "Add backup and vacuum only to the installed store API.",
@@ -2086,21 +2089,21 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", import(\"../types.ts\").ISqliteStore, import(\"../types.ts\").ISqliteDriver, { getTransactionClient(scope: import(\"../types.ts\").ISqliteTransactionScope): import(\"../types.ts\").ISqliteDriver; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISqliteBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))"
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({\n      driver: connection,\n      features: { maintenance: sqliteMaintenanceFeature() }\n    })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/maintenance",
           "overloadSignatures": [
-            "export declare function sqliteMaintenanceFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", import(\"../types.ts\").ISqliteStore, import(\"../types.ts\").ISqliteDriver, { getTransactionClient(scope: import(\"../types.ts\").ISqliteTransactionScope): import(\"../types.ts\").ISqliteDriver; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>;"
+            "export declare function sqliteMaintenanceFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISqliteBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", import(\"../types.ts\").ISqliteStore, import(\"../types.ts\").ISqliteDriver, { getTransactionClient(scope: import(\"../types.ts\").ISqliteTransactionScope): import(\"../types.ts\").ISqliteDriver; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISqliteBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2137,7 +2140,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-sqlite/dist/features/maintenance.d.ts:sqliteMaintenanceFeature:export declare function sqliteMaintenanceFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", import(\"../types.ts\").ISqliteStore, import(\"../types.ts\").ISqliteDriver, { getTransactionClient(scope: import(\"../types.ts\").ISqliteTransactionScope): import(\"../types.ts\").ISqliteDriver; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>;",
+          "identity": "packages/storage-plugin-sqlite/dist/features/maintenance.d.ts:sqliteMaintenanceFeature:export declare function sqliteMaintenanceFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").ISqliteBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>;",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -2185,7 +2188,7 @@
           "examples": [
             "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/sdk'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.org('10000000-0000-4000-8000-000000000001').backend('sqlite')\nawait store\n  .tx()\n  .lock(lockKey.text('example:status'))\n  .run(async (tx) => {\n    await tx.use(kv).setMany([\n      { key: 'example:status', value: 'ready' },\n      { key: ['example', 1], value: 'first', ttlMs: 60000 }\n    ])\n    await tx.putRecord({ name: 'Ada' }, 'example:user')\n    await tx.use(ttl).expire(lockKey.text('example:status'), 60000)\n    await tx.set('example:count', '0')\n    await tx.use(counter).increment('example:count')\n  })\nconsole.log(await store.get('example:status'))\nconsole.log(await store.get('example:count'))\nconsole.log((await store.use(records).query().all()).length >= 1)",
             "import { createStorageHost } from '@migaia/storage-host'\nimport { sqlFragment } from '@migaia/storage-host/sdk'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.sql`CREATE TABLE app_users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait store.transaction(async (tx) => {\n  await tx.sql`INSERT INTO app_users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst row = await store.sql<{ name: string }>`\n  SELECT name FROM ${sqlFragment.id('app_users')} WHERE id=${1}\n`.get()\nconsole.log(row?.name)\nconsole.log(store.sync!.get('user-count'))",
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({\n      driver: connection,\n      features: { maintenance: sqliteMaintenanceFeature() }\n    })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))",
             "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('theme', 'dark')\nconsole.log(await store.get('theme'))"
           ],
           "members": [],

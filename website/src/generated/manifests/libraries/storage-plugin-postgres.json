@@ -125,7 +125,7 @@
                     "`host.backend('postgres')`，或 `store.use(token)`"
                   ],
                   ["只访问一个组织的数据", "`host.org(orgId).backend('postgres')`"],
-                  ["增加向量、COPY、通知或复制", "插件第二参数中的 Feature"]
+                  ["增加向量、COPY、通知或复制", "插件选项 `features` 中的 Feature"]
                 ]
               },
               {
@@ -198,7 +198,10 @@
                 "type": "table",
                 "headers": ["API", "用途"],
                 "rows": [
-                  ["`postgresBackendPlugin(options, features?)`", "安装一个 PostgreSQL 后端"],
+                  [
+                    "`postgresBackendPlugin({ ...options, features? })`",
+                    "安装一个 PostgreSQL 后端"
+                  ],
                   ["`store.use(kv / records / ttl / counter / sql)`", "使用对应标准功能"],
                   [
                     "`store.transaction` / `store.tx().lock(...).run(...)`",
@@ -312,7 +315,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      )\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}"
+                "code": "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      })\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}"
               },
               {
                 "type": "paragraph",
@@ -343,7 +346,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { copy: pgCopyFeature(), listen: pgListenFeature() }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}"
+                "code": "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { copy: pgCopyFeature(), listen: pgListenFeature() }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}"
               },
               {
                 "type": "paragraph",
@@ -395,7 +398,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}"
+                "code": "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}"
               },
               {
                 "type": "paragraph",
@@ -554,7 +557,7 @@
                     ["Access one organization's data", "`host.org(orgId).backend('postgres')`"],
                     [
                       "Add vectors, COPY, notifications or replication",
-                      "Features in the plugin's second argument"
+                      "Features in the plugin's `features` option"
                     ]
                   ]
                 },
@@ -640,7 +643,10 @@
                   "type": "table",
                   "headers": ["API", "Purpose"],
                   "rows": [
-                    ["`postgresBackendPlugin(options, features?)`", "Install a PostgreSQL backend"],
+                    [
+                      "`postgresBackendPlugin({ ...options, features? })`",
+                      "Install a PostgreSQL backend"
+                    ],
                     [
                       "`store.use(kv / records / ttl / counter / sql)`",
                       "Select standard functionality"
@@ -760,7 +766,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      )\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}"
+                  "code": "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      })\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -791,7 +797,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { copy: pgCopyFeature(), listen: pgListenFeature() }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}"
+                  "code": "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { copy: pgCopyFeature(), listen: pgListenFeature() }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -843,7 +849,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}"
+                  "code": "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -3104,6 +3110,136 @@
           "fragment": "storage-plugin-postgres-index--IPgTransactionNotifyApi"
         },
         {
+          "name": "IPostgresBackend",
+          "kind": "type",
+          "signature": "export type IPostgresBackend = IStorageBackendType<IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.ts').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import('./types.ts').IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
+          "declarationLine": 6,
+          "source": "packages/storage-plugin-postgres/dist/plugin.d.ts",
+          "purpose": "The PostgreSQL engine as a type: its Store, native driver and the ports Features borrow.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPostgresBackend.",
+          "advanced": "No additional advanced behavior is declared for IPostgresBackend.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IPostgresBackend."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPostgresBackend.",
+          "examples": [],
+          "members": [],
+          "composes": ["IStorageBackendType"],
+          "aliasOf": "IPostgresBackend",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPostgresBackend = IStorageBackendType<IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.ts').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import('./types.ts').IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IPostgresBackend when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IPostgresBackend does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The PostgreSQL engine as a type: its Store, native driver and the ports Features borrow."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPostgresBackend from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPostgresBackend when its type contract and declared inputs match the result you need. Choose a different public symbol when IPostgresBackend does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPostgresBackend."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IPostgresBackend."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/plugin.d.ts:IPostgresBackend:export type IPostgresBackend = IStorageBackendType<IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.ts').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import('./types.ts').IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPostgresBackend"
+        },
+        {
+          "name": "IPostgresErrorCode",
+          "kind": "type",
+          "signature": "export type IPostgresErrorCode = (typeof PostgresErrorCode)[keyof typeof PostgresErrorCode];",
+          "declarationLine": 19,
+          "source": "packages/storage-plugin-postgres/dist/error-code.d.ts",
+          "purpose": "Value union from the single package-owned PostgreSQL semantic error table.",
+          "core": "Value union from the single package-owned PostgreSQL semantic error table.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IPostgresErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPostgresErrorCode = (typeof PostgresErrorCode)[keyof typeof PostgresErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Value union from the single package-owned PostgreSQL semantic error table."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPostgresErrorCode from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPostgresErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IPostgresErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Value union from the single package-owned PostgreSQL semantic error table."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/error-code.d.ts:IPostgresErrorCode:export type IPostgresErrorCode = (typeof PostgresErrorCode)[keyof typeof PostgresErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPostgresErrorCode"
+        },
+        {
           "name": "IPostgresOptions",
           "kind": "type",
           "signature": "export type IPostgresOptions<TServer extends IPgServer = 'postgres'> = { readonly driver: IPgDriver; readonly server?: TServer; readonly schema?: string; readonly prefix?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; };",
@@ -3363,103 +3499,32 @@
           "fragment": "storage-plugin-postgres-index--IPostgresTransactionScope"
         },
         {
-          "name": "postgresBackendKind",
-          "kind": "const",
-          "signature": "export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.ts').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import('./types.ts').IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
-          "declarationLine": 6,
-          "source": "packages/storage-plugin-postgres/dist/plugin.d.ts",
-          "purpose": "Authenticate selected native Features against the exact PostgreSQL backend kind.",
-          "core": "Authenticate selected native Features against the exact PostgreSQL backend kind.",
-          "advanced": "",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "aliasOf": "postgresBackendKind",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.ts').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import('./types.ts').IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Authenticate selected native Features against the exact PostgreSQL backend kind."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import postgresBackendKind from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use postgresBackendKind when its const contract and declared inputs match the result you need. Choose a different public symbol when postgresBackendKind does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Authenticate selected native Features against the exact PostgreSQL backend kind."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-postgres/dist/plugin.d.ts:postgresBackendKind:export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.ts').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import('./types.ts').IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-postgres-index--postgresBackendKind"
-        },
-        {
           "name": "postgresBackendPlugin",
           "kind": "function",
-          "signature": "export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>): IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;",
-          "declarationLine": 20,
+          "signature": "export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { /** Plugin name and backend lookup key; `'postgres'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IPostgresBackend, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>; }): IStorageBackendPlugin<IPostgresBackend, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;",
+          "declarationLine": 22,
           "source": "packages/storage-plugin-postgres/dist/plugin.d.ts",
           "purpose": "Install an injected native driver with standard transactions, SQL and independently selected native Features.",
           "core": "options: Caller-supplied native driver, physical layout and original concurrency policy.\nfeatures: Exact-kind native Feature selections attached during installation.\nAn exact-id plugin; defaults public/migaia/postgres.\nid: Application-assigned backend identifier selected by host.backend.\npostgres, the default backend identifier.\ndriver: Borrowed native driver from pgDriver, postgresJsDriver or bunSqlDriver.\nserver: Actual deployed server preset used for native capability admission.\npostgres enables PostgreSQL semantics.\nPostgreSQL with native change notifications.\nCockroachDB without PostgreSQL changeFeed promises.\nYugabyteDB without PostgreSQL changeFeed promises.\nChoose the actual deployed server, since capability admission depends on its native guarantees.\nschema: Existing SQL schema containing managed tables.\npublic schema.\nprefix: Prefix for fixed managed tables, shared by every organization.\nmigaia table prefix.\nconcurrency: Authentic shared policy governing the original native operation.\nOriginal shared owner default policy.\nowner: Optional application diagnostic identity without value payloads.\nNo application owner label.\nowner.label: Application-assigned label for native lock diagnostics.\nNo diagnostic application label.\nmaxLockMs: Positive native logical-key lock lease bound measured against database time.\n60000 milliseconds.",
           "advanced": "",
           "parameters": [
-            "options: IPostgresOptions<TServer> & { readonly id?: TId; }",
-            "features: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>> (optional)"
+            "options: IPostgresOptions<TServer> & { /** Plugin name and backend lookup key; `'postgres'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IPostgresBackend, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>; }"
           ],
           "parameterDetails": [
             {
               "name": "options",
-              "type": "IPostgresOptions<TServer> & { readonly id?: TId; }",
+              "type": "IPostgresOptions<TServer> & { /** Plugin name and backend lookup key; `'postgres'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IPostgresBackend, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>; }",
               "optional": false
-            },
-            {
-              "name": "features",
-              "type": "F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>",
-              "optional": true
             }
           ],
-          "returns": "IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>",
+          "returns": "IStorageBackendPlugin<IPostgresBackend, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
             "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, records, ttl } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/sdk'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [postgresBackendPlugin({ driver: pgDriver(pool) })] as const\n  })\n  const store = host.org('10000000-0000-4000-8000-000000000001').backend('postgres')\n  await store\n    .tx()\n    .lock(lockKey.text('example:status'))\n    .run(async (tx) => {\n      await tx.use(kv).setMany([\n        { key: 'example:status', value: 'ready' },\n        { key: ['example', 1], value: 'first', ttlMs: 60000 }\n      ])\n      await tx.putRecord({ name: 'Ada' }, 'example:user')\n      await tx.use(ttl).expire(lockKey.text('example:status'), 60000)\n    })\n  console.log(await store.get('example:status'))\n  console.log((await store.use(records).query().all()).length >= 1)\n} finally {\n  await pool.end()\n}",
-            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      )\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}",
-            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { copy: pgCopyFeature(), listen: pgListenFeature() }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}",
-            "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}",
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      })\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}",
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { copy: pgCopyFeature(), listen: pgListenFeature() }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}",
+            "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}",
             "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [postgresBackendPlugin({ driver: pgDriver(pool) })] as const\n  })\n  const store = host.backend('postgres')\n  await store.set('example:status', 'ready')\n  console.log(await store.get('example:status'))\n} finally {\n  await pool.end()\n}"
           ],
           "members": [],
@@ -3467,24 +3532,19 @@
           "aliasOf": "postgresBackendPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>): IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;"
+            "export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { /** Plugin name and backend lookup key; `'postgres'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IPostgresBackend, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>; }): IStorageBackendPlugin<IPostgresBackend, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
-                "type": "IPostgresOptions<TServer> & { readonly id?: TId; }",
+                "type": "IPostgresOptions<TServer> & { /** Plugin name and backend lookup key; `'postgres'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IPostgresBackend, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>; }",
                 "optional": false
-              },
-              {
-                "name": "features",
-                "type": "F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>",
-                "optional": true
               }
             ]
           ],
           "overloadReturns": [
-            "IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>"
+            "IStorageBackendPlugin<IPostgresBackend, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3522,10 +3582,16 @@
           ],
           "declaredConfiguration": [
             {
-              "name": "id",
+              "name": "name",
               "type": "TId",
               "optional": true,
-              "description": ""
+              "description": "Plugin name and backend lookup key; `'postgres'` when omitted."
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<IPostgresBackend, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>",
+              "optional": true,
+              "description": "Features installed on this backend."
             },
             {
               "name": "driver",
@@ -3576,17 +3642,25 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-plugin-postgres/dist/plugin.d.ts:postgresBackendPlugin:export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>): IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;",
+          "identity": "packages/storage-plugin-postgres/dist/plugin.d.ts:postgresBackendPlugin:export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { /** Plugin name and backend lookup key; `'postgres'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IPostgresBackend, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>; }): IStorageBackendPlugin<IPostgresBackend, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;",
           "guidance": [],
           "usageScore": 68,
           "configuration": [
             {
-              "name": "id",
+              "name": "name",
               "type": "TId",
               "optional": true,
-              "description": "组织 ID 是 UUID 字符串。同名逻辑键、期限、锁和修订分别隔离；默认组织与其它组织共用物理表。`host.dropOrg(id)` 删除该组织的托管行，不删除其它组织或应用表。显式组织视图不允许任意 SQL、COPY 或自有向量表检索。",
-              "descriptionEn": "",
-              "descriptionZh": "组织 ID 是 UUID 字符串。同名逻辑键、期限、锁和修订分别隔离；默认组织与其它组织共用物理表。`host.dropOrg(id)` 删除该组织的托管行，不删除其它组织或应用表。显式组织视图不允许任意 SQL、COPY 或自有向量表检索。"
+              "description": "Plugin name and backend lookup key; `'postgres'` when omitted.",
+              "descriptionEn": "Plugin name and backend lookup key; `'postgres'` when omitted.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<IPostgresBackend, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>",
+              "optional": true,
+              "description": "`postgresBackendPlugin({ ...options, features? })` — 安装一个 PostgreSQL 后端",
+              "descriptionEn": "Features installed on this backend.",
+              "descriptionZh": "`postgresBackendPlugin({ ...options, features? })` — 安装一个 PostgreSQL 后端"
             },
             {
               "name": "driver",
@@ -3654,6 +3728,173 @@
             }
           ],
           "fragment": "storage-plugin-postgres-index--postgresBackendPlugin"
+        },
+        {
+          "name": "PostgresErrorCode",
+          "kind": "const",
+          "signature": "export declare const PostgresErrorCode: { /** An uncategorized native query or connection failed; inspect its original cause. */ readonly sqlFailed: 'SQL_FAILED'; /** A persisted canonical key, value or metadata row could not be decoded. */ readonly decodeFailed: 'DECODE_FAILED'; /** A callback, accepted operation or transaction lifecycle failed and rolled back. */ readonly transactionFailed: 'TRANSACTION_FAILED'; /** A known standard-channel write found the same key in an incompatible channel. */ readonly duplicateKey: 'DUPLICATE_KEY'; };",
+          "declarationLine": 8,
+          "source": "packages/storage-plugin-postgres/dist/error-code.d.ts",
+          "purpose": "Classify native SQL, persisted-data decoding and original transaction failures under the PostgreSQL error domain.",
+          "core": "sqlFailed: Native query, stream or connection failure; inspect cause.\ndecodeFailed: Persisted key/value/native metadata decoding failed.\ntransactionFailed: Original transaction failed, preserving the primary and cleanup causes.\nduplicateKey: A rejected write collides with another public channel.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "sqlFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sqlFailed: 'SQL_FAILED';",
+              "description": "An uncategorized native query or connection failed; inspect its original cause.",
+              "parameterDetails": [],
+              "returns": "'SQL_FAILED'"
+            },
+            {
+              "name": "decodeFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly decodeFailed: 'DECODE_FAILED';",
+              "description": "A persisted canonical key, value or metadata row could not be decoded.",
+              "parameterDetails": [],
+              "returns": "'DECODE_FAILED'"
+            },
+            {
+              "name": "transactionFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly transactionFailed: 'TRANSACTION_FAILED';",
+              "description": "A callback, accepted operation or transaction lifecycle failed and rolled back.",
+              "parameterDetails": [],
+              "returns": "'TRANSACTION_FAILED'"
+            },
+            {
+              "name": "duplicateKey",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly duplicateKey: 'DUPLICATE_KEY';",
+              "description": "A known standard-channel write found the same key in an incompatible channel.",
+              "parameterDetails": [],
+              "returns": "'DUPLICATE_KEY'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "PostgresErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const PostgresErrorCode: { /** An uncategorized native query or connection failed; inspect its original cause. */ readonly sqlFailed: 'SQL_FAILED'; /** A persisted canonical key, value or metadata row could not be decoded. */ readonly decodeFailed: 'DECODE_FAILED'; /** A callback, accepted operation or transaction lifecycle failed and rolled back. */ readonly transactionFailed: 'TRANSACTION_FAILED'; /** A known standard-channel write found the same key in an incompatible channel. */ readonly duplicateKey: 'DUPLICATE_KEY'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Classify native SQL, persisted-data decoding and original transaction failures under the PostgreSQL error domain."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import PostgresErrorCode from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use PostgresErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when PostgresErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "sqlFailed: Native query, stream or connection failure; inspect cause.\ndecodeFailed: Persisted key/value/native metadata decoding failed.\ntransactionFailed: Original transaction failed, preserving the primary and cleanup causes.\nduplicateKey: A rejected write collides with another public channel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/error-code.d.ts:PostgresErrorCode:export declare const PostgresErrorCode: { /** An uncategorized native query or connection failed; inspect its original cause. */ readonly sqlFailed: 'SQL_FAILED'; /** A persisted canonical key, value or metadata row could not be decoded. */ readonly decodeFailed: 'DECODE_FAILED'; /** A callback, accepted operation or transaction lifecycle failed and rolled back. */ readonly transactionFailed: 'TRANSACTION_FAILED'; /** A known standard-channel write found the same key in an incompatible channel. */ readonly duplicateKey: 'DUPLICATE_KEY'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--PostgresErrorCode"
+        },
+        {
+          "name": "STORAGE_POSTGRES_ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const STORAGE_POSTGRES_ERROR_SOURCE = \"storage.backend.postgres\";",
+          "declarationLine": 2,
+          "source": "packages/storage-plugin-postgres/dist/error-code.d.ts",
+          "purpose": "Registered error domain of storage-plugin-postgres; never names the module or a path.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for STORAGE_POSTGRES_ERROR_SOURCE.",
+          "advanced": "No additional advanced behavior is declared for STORAGE_POSTGRES_ERROR_SOURCE.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for STORAGE_POSTGRES_ERROR_SOURCE."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORAGE_POSTGRES_ERROR_SOURCE.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const STORAGE_POSTGRES_ERROR_SOURCE = \"storage.backend.postgres\";"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use STORAGE_POSTGRES_ERROR_SOURCE when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when STORAGE_POSTGRES_ERROR_SOURCE does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registered error domain of storage-plugin-postgres; never names the module or a path."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import STORAGE_POSTGRES_ERROR_SOURCE from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use STORAGE_POSTGRES_ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when STORAGE_POSTGRES_ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for STORAGE_POSTGRES_ERROR_SOURCE."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for STORAGE_POSTGRES_ERROR_SOURCE."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/error-code.d.ts:STORAGE_POSTGRES_ERROR_SOURCE:export declare const STORAGE_POSTGRES_ERROR_SOURCE = \"storage.backend.postgres\";",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--STORAGE_POSTGRES_ERROR_SOURCE"
         }
       ],
       "aliases": []
@@ -3772,7 +4013,7 @@
         {
           "name": "pgCopyFeature",
           "kind": "function",
-          "signature": "export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;",
+          "signature": "export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/features/copy.d.ts",
           "purpose": "Add streaming client STDIN COPY with a fresh iterable for every actual native transaction attempt.",
@@ -3780,21 +4021,21 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { copy: pgCopyFeature(), listen: pgListenFeature() }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}"
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { copy: pgCopyFeature(), listen: pgListenFeature() }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/copy",
           "overloadSignatures": [
-            "export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;"
+            "export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3831,7 +4072,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-postgres/dist/features/copy.d.ts:pgCopyFeature:export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;",
+          "identity": "packages/storage-plugin-postgres/dist/features/copy.d.ts:pgCopyFeature:export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -3859,7 +4100,7 @@
         {
           "name": "pgListenFeature",
           "kind": "function",
-          "signature": "export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;",
+          "signature": "export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/features/listen.d.ts",
           "purpose": "Add dedicated root LISTEN resources and transaction-bound native NOTIFY calls without polling.",
@@ -3867,21 +4108,21 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { copy: pgCopyFeature(), listen: pgListenFeature() }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}"
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { copy: pgCopyFeature(), listen: pgListenFeature() }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/listen",
           "overloadSignatures": [
-            "export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;"
+            "export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3918,7 +4159,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-postgres/dist/features/listen.d.ts:pgListenFeature:export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;",
+          "identity": "packages/storage-plugin-postgres/dist/features/listen.d.ts:pgListenFeature:export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -3946,7 +4187,7 @@
         {
           "name": "pgLogicalReplicationFeature",
           "kind": "function",
-          "signature": "export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;",
+          "signature": "export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;",
           "declarationLine": 8,
           "source": "packages/storage-plugin-postgres/dist/features/logical-replication.d.ts",
           "purpose": "Publish a durable feed backed by deployment-owned slots and publications without creating them implicitly.",
@@ -3960,17 +4201,17 @@
               "optional": false
             }
           ],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}"
+            "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/logical-replication",
           "overloadSignatures": [
-            "export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;"
+            "export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;"
           ],
           "overloadParameterDetails": [
             [
@@ -3982,7 +4223,7 @@
             ]
           ],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -4038,7 +4279,7 @@
               "description": "Reset invalidates the complete route; block leaves a TRUNCATE commit unacknowledged."
             }
           ],
-          "identity": "packages/storage-plugin-postgres/dist/features/logical-replication.d.ts:pgLogicalReplicationFeature:export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;",
+          "identity": "packages/storage-plugin-postgres/dist/features/logical-replication.d.ts:pgLogicalReplicationFeature:export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;",
           "guidance": [],
           "usageScore": 18,
           "configuration": [
@@ -4091,7 +4332,7 @@
         {
           "name": "pgvectorFeature",
           "kind": "function",
-          "signature": "export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;",
+          "signature": "export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;",
           "declarationLine": 8,
           "source": "packages/storage-plugin-postgres/dist/features/pgvector.d.ts",
           "purpose": "Publish native standard vector ranking and a separate search API for caller-owned SQL vector tables.",
@@ -4099,21 +4340,21 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      )\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}"
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      })\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/pgvector",
           "overloadSignatures": [
-            "export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;"
+            "export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -4150,7 +4391,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-postgres/dist/features/pgvector.d.ts:pgvectorFeature:export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.ts\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;",
+          "identity": "packages/storage-plugin-postgres/dist/features/pgvector.d.ts:pgvectorFeature:export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -4411,7 +4652,7 @@
         {
           "name": "pgQuantizedFeature",
           "kind": "function",
-          "signature": "export declare function pgQuantizedFeature(options: IPgQuantizedOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>;",
+          "signature": "export declare function pgQuantizedFeature(options: IPgQuantizedOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>;",
           "declarationLine": 17,
           "source": "packages/storage-plugin-postgres/dist/features/quantized.d.ts",
           "purpose": "Select a native quantized expression HNSW layout and add bounded rescore to the existing pgvector chain. Install with pgvectorFeature in the same backend Feature batch; organization, expiry and faithful payload predicates stay in the native recall.",
@@ -4425,17 +4666,17 @@
               "optional": false
             }
           ],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      )\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}"
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      })\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/quantized",
           "overloadSignatures": [
-            "export declare function pgQuantizedFeature(options: IPgQuantizedOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>;"
+            "export declare function pgQuantizedFeature(options: IPgQuantizedOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>;"
           ],
           "overloadParameterDetails": [
             [
@@ -4447,7 +4688,7 @@
             ]
           ],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -4491,7 +4732,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-plugin-postgres/dist/features/quantized.d.ts:pgQuantizedFeature:export declare function pgQuantizedFeature(options: IPgQuantizedOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.ts\").IPostgresStore<import(\"../types.ts\").IPgServer>, import(\"../types.ts\").IPgDriver, { getTransactionClient(scope: import(\"../types.ts\").IPostgresTransactionScope): import(\"../types.ts\").IPgConnection; readonly runNative: import(\"../types.ts\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.ts\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.ts\").IPgLogicalReplicationRoute; getServer(): import(\"../types.ts\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import(\"../types.ts\").IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>;",
+          "identity": "packages/storage-plugin-postgres/dist/features/quantized.d.ts:pgQuantizedFeature:export declare function pgQuantizedFeature(options: IPgQuantizedOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IPostgresBackend, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [
@@ -4547,9 +4788,9 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, records, ttl } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/sdk'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [postgresBackendPlugin({ driver: pgDriver(pool) })] as const\n  })\n  const store = host.org('10000000-0000-4000-8000-000000000001').backend('postgres')\n  await store\n    .tx()\n    .lock(lockKey.text('example:status'))\n    .run(async (tx) => {\n      await tx.use(kv).setMany([\n        { key: 'example:status', value: 'ready' },\n        { key: ['example', 1], value: 'first', ttlMs: 60000 }\n      ])\n      await tx.putRecord({ name: 'Ada' }, 'example:user')\n      await tx.use(ttl).expire(lockKey.text('example:status'), 60000)\n    })\n  console.log(await store.get('example:status'))\n  console.log((await store.use(records).query().all()).length >= 1)\n} finally {\n  await pool.end()\n}",
-            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      )\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}",
-            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { copy: pgCopyFeature(), listen: pgListenFeature() }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}",
-            "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}",
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      })\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}",
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: { copy: pgCopyFeature(), listen: pgListenFeature() }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}",
+            "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin({\n        driver: pgDriver(pool),\n        features: {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      })\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}",
             "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [postgresBackendPlugin({ driver: pgDriver(pool) })] as const\n  })\n  const store = host.backend('postgres')\n  await store.set('example:status', 'ready')\n  console.log(await store.get('example:status'))\n} finally {\n  await pool.end()\n}"
           ],
           "members": [],

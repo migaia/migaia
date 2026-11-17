@@ -1689,109 +1689,163 @@
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin",
+      "path": "/en/docs/log-host/api/sdk",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/IErrorInfo",
+      "path": "/en/docs/log-host/api/sdk/IDefinedLogPlugin",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/ILogContext",
+      "path": "/en/docs/log-host/api/sdk/IEnabledLogFeatures",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/ILogEntry",
+      "path": "/en/docs/log-host/api/sdk/IErrorInfo",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/ILogFailure",
+      "path": "/en/docs/log-host/api/sdk/ILogContext",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/ILogFeature",
+      "path": "/en/docs/log-host/api/sdk/ILogControlExtensions",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/ILogFeatureDefinition",
+      "path": "/en/docs/log-host/api/sdk/ILogEntry",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/ILogOutputRecord",
+      "path": "/en/docs/log-host/api/sdk/ILogFailure",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/ILogPlugin",
+      "path": "/en/docs/log-host/api/sdk/ILogFeature",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/ILogPluginConstraint",
+      "path": "/en/docs/log-host/api/sdk/ILogFeatureDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/ILogPluginCore",
+      "path": "/en/docs/log-host/api/sdk/ILogFeatureRecord",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/ILogProjectedEntry",
+      "path": "/en/docs/log-host/api/sdk/ILogFormat",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/IPluginExtensions",
+      "path": "/en/docs/log-host/api/sdk/ILogOutputFeatureRecord",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/IRawEntryInput",
+      "path": "/en/docs/log-host/api/sdk/ILogOutputRecord",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/IShutdownReason",
+      "path": "/en/docs/log-host/api/sdk/ILogPlugin",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/defineLogFeature",
+      "path": "/en/docs/log-host/api/sdk/ILogPluginConstraint",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/defineOutputPlugin",
+      "path": "/en/docs/log-host/api/sdk/ILogPluginCore",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/en/docs/log-host/api/plugin/projectLogEntry",
+      "path": "/en/docs/log-host/api/sdk/ILogProjectedEntry",
+      "locale": "en",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/en/docs/log-host/api/sdk/IPluginExtensions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/en/docs/log-host/api/sdk/IRawEntryInput",
+      "locale": "en",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/en/docs/log-host/api/sdk/IShutdownReason",
+      "locale": "en",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/en/docs/log-host/api/sdk/LogEntryDataKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/en/docs/log-host/api/sdk/LogFailureSource",
+      "locale": "en",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/en/docs/log-host/api/sdk/defineLogFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/en/docs/log-host/api/sdk/defineLogPlugin",
+      "locale": "en",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/en/docs/log-host/api/sdk/defineOutputPlugin",
+      "locale": "en",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/en/docs/log-host/api/sdk/projectLogEntry",
       "locale": "en",
       "domain": "docs",
       "library": "log-host"
@@ -2943,6 +2997,12 @@
       "library": "middleware-pipeline"
     },
     {
+      "path": "/en/docs/middleware-pipeline/api/IPipelineModeObject",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
       "path": "/en/docs/middleware-pipeline/api/ISyncMiddlewareStage",
       "locale": "en",
       "domain": "docs",
@@ -2985,7 +3045,67 @@
       "library": "middleware-pipeline"
     },
     {
+      "path": "/en/docs/middleware-pipeline/api/admission",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/api/admission/admitPipelineNext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/api/async",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/api/async-generator",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/api/async-generator/asyncGeneratorMode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/api/async/asyncMode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
       "path": "/en/docs/middleware-pipeline/api/createPipeline",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/api/generator",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/api/generator/generatorMode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/api/sync",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/api/sync/syncMode",
       "locale": "en",
       "domain": "docs",
       "library": "middleware-pipeline"
@@ -3154,6 +3274,12 @@
     },
     {
       "path": "/en/docs/plugin-host/api/IHostHandle",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/IHostModule",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -3633,6 +3759,18 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/api/activation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/activation/activationModule",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/plugin-host/api/asyncDisposeKey",
       "locale": "en",
       "domain": "docs",
@@ -3693,12 +3831,6 @@
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/api/defineFeature",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
       "path": "/en/docs/plugin-host/api/defineHost",
       "locale": "en",
       "domain": "docs",
@@ -3706,6 +3838,96 @@
     },
     {
       "path": "/en/docs/plugin-host/api/definePlugin",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/enablement",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/enablement/enablementModule",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/feature-dependencies",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/feature-dependencies/featureDependenciesModule",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/feature-overlay",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/feature-overlay/FeatureOverlay",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/feature-overlay/IFeatureOverlayEntry",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/feature-overlay/IFeatureOverlayRole",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/feature-overlay/IFeatureOverlaySelection",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/feature-overlay/notifications",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/feature-overlay/notifications/FeatureOverlay",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/feature-overlay/notifications/IFeatureOverlayOwner",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/features",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/features/defineFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/features/featuresModule",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -3724,6 +3946,66 @@
     },
     {
       "path": "/en/docs/plugin-host/api/isPluginHandleCurrent",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/named-pipelines",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/named-pipelines/namedPipelinesModule",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/pipeline-modes/async",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/pipeline-modes/async-generator",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/pipeline-modes/async-generator/asyncGeneratorPipelineModule",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/pipeline-modes/async/asyncPipelineModule",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/pipeline-modes/generator",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/pipeline-modes/generator/generatorPipelineModule",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/pipeline-modes/sync",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/pipeline-modes/sync/syncPipelineModule",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -4833,6 +5115,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/en/docs/rpc-contract/api/interfaces/IRetryFeatureOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/docs/rpc-contract/api/interfaces/IRpcAttachedSession",
       "locale": "en",
       "domain": "docs",
@@ -5097,6 +5385,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/en/docs/rpc-contract/api/interfaces/IRpcRetryExecution",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/docs/rpc-contract/api/interfaces/IRpcRetryFeature",
       "locale": "en",
       "domain": "docs",
@@ -5122,6 +5416,12 @@
     },
     {
       "path": "/en/docs/rpc-contract/api/interfaces/IRpcTargetSource",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/api/interfaces/IRpcTimeoutExecution",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -5163,13 +5463,13 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/en/docs/rpc-contract/api/interfaces/IpcSendClass",
+      "path": "/en/docs/rpc-contract/api/interfaces/ITimeoutFeatureOptions",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
     },
     {
-      "path": "/en/docs/rpc-contract/api/interfaces/RpcCallFeatureKind",
+      "path": "/en/docs/rpc-contract/api/interfaces/IpcSendClass",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -6435,13 +6735,223 @@
       "library": "rpc-host"
     },
     {
+      "path": "/en/docs/rpc-host/api/features/IRetryFeatureOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcAuthenticationCredentials",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcAuthenticationOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcAuthenticationTransform",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcBatchOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcErrorMap",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcIdempotencyClaim",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcIdempotencyLookup",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcIdempotencyOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcIdempotencyOutcome",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcIdempotencyStore",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcIdempotencyStoreOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcLimitsOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcLimitsOverflow",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcMethodValidators",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcOutcomeLookup",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcProviderRejection",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcSchemaOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/IRpcSchemaParser",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/ITimeoutFeatureOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/auth",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/auth/IRpcAuthenticationCredentialsContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/auth/authFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/batch",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/batch/batchFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/chunk",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/chunk/IRpcChunkFeatureOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/chunk/chunkFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/createRpcIdempotencyStore",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/error-map",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/error-map/errorMapFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/idempotency",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/idempotency/idempotencyFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/limits",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/limits/limitsFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
       "path": "/en/docs/rpc-host/api/features/retry",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
     },
     {
-      "path": "/en/docs/rpc-host/api/features/retry/IRetryFeatureOptions",
+      "path": "/en/docs/rpc-host/api/features/retry/createRpcRetryExecution",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -6453,13 +6963,25 @@
       "library": "rpc-host"
     },
     {
+      "path": "/en/docs/rpc-host/api/features/schema",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/features/schema/schemaFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
       "path": "/en/docs/rpc-host/api/features/timeout",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
     },
     {
-      "path": "/en/docs/rpc-host/api/features/timeout/ITimeoutFeatureOptions",
+      "path": "/en/docs/rpc-host/api/features/timeout/createRpcTimeoutExecution",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -6472,96 +6994,6 @@
     },
     {
       "path": "/en/docs/rpc-host/api/plugins",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcAuthenticationCredentials",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcAuthenticationOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcAuthenticationTransform",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcBatchOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcErrorMap",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcIdempotencyClaim",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcIdempotencyLookup",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcIdempotencyOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcIdempotencyOutcome",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcIdempotencyStore",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcIdempotencyStoreOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcLimitsOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcLimitsOverflow",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcMethodValidators",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcOutcomeLookup",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -6591,139 +7023,7 @@
       "library": "rpc-host"
     },
     {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcProviderRejection",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcSchemaOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/IRpcSchemaParser",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/auth",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/auth/IRpcAuthenticationCredentialsContext",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/auth/authFeature",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/batch",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/batch/batchFeature",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/chunk",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/chunk/IRpcChunkFeatureOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/chunk/chunkFeature",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/createRpcIdempotencyStore",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
       "path": "/en/docs/rpc-host/api/plugins/defineProbe",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/error-map",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/error-map/errorMapFeature",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/idempotency",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/idempotency/idempotencyFeature",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/limits",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/limits/limitsFeature",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/link-policy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/link-policy/IRpcLinkPolicyOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/link-policy/RpcLinkPolicyName",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/link-policy/linkPolicy",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -6766,18 +7066,6 @@
     },
     {
       "path": "/en/docs/rpc-host/api/plugins/probe/subscribeProbeStages",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/schema",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/plugins/schema/schemaFeature",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -7065,6 +7353,12 @@
       "library": "rpc-host"
     },
     {
+      "path": "/en/docs/rpc-host/api/sdk/IRpcFeatureMetadata",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
       "path": "/en/docs/rpc-host/api/sdk/IRpcFlowContext",
       "locale": "en",
       "domain": "docs",
@@ -7090,6 +7384,12 @@
     },
     {
       "path": "/en/docs/rpc-host/api/sdk/IRpcFlowPlugin",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/sdk/IRpcFlowPluginDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -7144,12 +7444,6 @@
     },
     {
       "path": "/en/docs/rpc-host/api/sdk/IRpcLaunchFacts",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/sdk/IRpcLinkPolicyDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -7449,6 +7743,12 @@
       "library": "rpc-host"
     },
     {
+      "path": "/en/docs/rpc-host/api/sdk/IRpcRetryExecution",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
       "path": "/en/docs/rpc-host/api/sdk/IRpcRetryFeature",
       "locale": "en",
       "domain": "docs",
@@ -7486,6 +7786,12 @@
     },
     {
       "path": "/en/docs/rpc-host/api/sdk/IRpcTargetSource",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/sdk/IRpcTimeoutExecution",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -7588,12 +7894,6 @@
     },
     {
       "path": "/en/docs/rpc-host/api/sdk/RpcBytePump",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/sdk/RpcCallFeatureKind",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -7905,12 +8205,6 @@
       "library": "rpc-host"
     },
     {
-      "path": "/en/docs/rpc-host/api/sdk/defineLinkPolicy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
       "path": "/en/docs/rpc-host/api/sdk/defineRpcSourcePlugin",
       "locale": "en",
       "domain": "docs",
@@ -7930,6 +8224,12 @@
     },
     {
       "path": "/en/docs/rpc-host/api/sdk/encodeRpcStreamTextFrame",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/sdk/findRpcNativeFeatureOutput",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -7971,7 +8271,19 @@
       "library": "rpc-host"
     },
     {
+      "path": "/en/docs/rpc-host/api/sdk/readRpcFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
       "path": "/en/docs/rpc-host/api/sdk/readRpcLaunchFacts",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/en/docs/rpc-host/api/sdk/registerRpcNativeFeature",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -8002,12 +8314,6 @@
     },
     {
       "path": "/en/docs/rpc-host/api/sdk/rpcCarrierWriteFacts",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/en/docs/rpc-host/api/sdk/rpcFlowPlugin",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-host"
@@ -8355,7 +8661,7 @@
       "library": "rpc-plugin-devtools"
     },
     {
-      "path": "/en/docs/rpc-plugin-devtools/api/IDevtoolsPlugin",
+      "path": "/en/docs/rpc-plugin-devtools/api/IDevtoolsBundle",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-plugin-devtools"
@@ -8661,6 +8967,12 @@
       "library": "rpc-plugin-process"
     },
     {
+      "path": "/en/docs/rpc-plugin-process/api/features/flow-control/IIpcFlowControlExecution",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-plugin-process"
+    },
+    {
       "path": "/en/docs/rpc-plugin-process/api/features/flow-control/IIpcFlowControlOptions",
       "locale": "en",
       "domain": "docs",
@@ -8715,6 +9027,12 @@
       "library": "rpc-plugin-process"
     },
     {
+      "path": "/en/docs/rpc-plugin-process/api/features/log/IIpcLogExecution",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-plugin-process"
+    },
+    {
       "path": "/en/docs/rpc-plugin-process/api/features/log/IIpcLogOptions",
       "locale": "en",
       "domain": "docs",
@@ -8728,6 +9046,12 @@
     },
     {
       "path": "/en/docs/rpc-plugin-process/api/features/send-queue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-plugin-process"
+    },
+    {
+      "path": "/en/docs/rpc-plugin-process/api/features/send-queue/IIpcSendQueueExecution",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-plugin-process"
@@ -9525,7 +9849,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/BACKEND_KIND_PATTERN",
+      "path": "/en/docs/storage-contract/api/BACKEND_NAME_PATTERN",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -9556,12 +9880,6 @@
     },
     {
       "path": "/en/docs/storage-contract/api/IAnyStorageCapability",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IBackendKind",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -11175,19 +11493,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/error-code/CacheErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/error-code/IArchiveErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/error-code/ICacheErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -11199,19 +11505,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/error-code/IPostgresErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/error-code/IQdrantErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/error-code/IRedisErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -11253,19 +11547,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/error-code/PostgresErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/error-code/QdrantErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/error-code/RedisErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -11283,12 +11565,6 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/error-code/STORAGE_CACHE_ERROR_SOURCE",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/error-code/STORAGE_HOST_ERROR_SOURCE",
       "locale": "en",
       "domain": "docs",
@@ -11301,19 +11577,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/error-code/STORAGE_POSTGRES_ERROR_SOURCE",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/error-code/STORAGE_QDRANT_ERROR_SOURCE",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/error-code/STORAGE_REDIS_ERROR_SOURCE",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -11409,7 +11673,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/isBackendKind",
+      "path": "/en/docs/storage-contract/api/isBackendName",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -11589,18 +11853,6 @@
       "library": "storage-host"
     },
     {
-      "path": "/en/docs/storage-host/api/IRejectInstalledOrDuplicateIds",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/IStorageBackendKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
       "path": "/en/docs/storage-host/api/IStorageBackendOrgContext",
       "locale": "en",
       "domain": "docs",
@@ -11613,7 +11865,49 @@
       "library": "storage-host"
     },
     {
+      "path": "/en/docs/storage-host/api/IStorageBackendPluginDefiner",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
       "path": "/en/docs/storage-host/api/IStorageBackendPluginHandle",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/IStorageBackendTransactionClient",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/IStorageBackendTransactionScope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/IStorageBackendType",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/IStorageBackendTypeClient",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/IStorageBackendTypeExpose",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/IStorageBackendTypeStore",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -11632,12 +11926,6 @@
     },
     {
       "path": "/en/docs/storage-host/api/IStorageCodecHookPayload",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/IStorageDefineFeature",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -11716,6 +12004,12 @@
     },
     {
       "path": "/en/docs/storage-host/api/IStorageFeatureClientResolver",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/IStorageFeatureDefiner",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -11913,36 +12207,6 @@
       "library": "storage-host"
     },
     {
-      "path": "/en/docs/storage-host/api/IStorageKindClient",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/IStorageKindExpose",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/IStorageKindStore",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/IStorageKindTransactionClient",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/IStorageKindTransactionScope",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
       "path": "/en/docs/storage-host/api/IStorageLockAttemptHookPayload",
       "locale": "en",
       "domain": "docs",
@@ -12021,13 +12285,31 @@
       "library": "storage-host"
     },
     {
-      "path": "/en/docs/storage-host/api/IStoragePluginId",
+      "path": "/en/docs/storage-host/api/IStoragePluginName",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
     },
     {
       "path": "/en/docs/storage-host/api/IStorageQueryHookPayload",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/IStorageReactiveProfile",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/IStorageReactiveProfileExpose",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/IStorageReactiveVisibility",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -12063,12 +12345,6 @@
       "library": "storage-host"
     },
     {
-      "path": "/en/docs/storage-host/api/assertStorageBackendId",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
       "path": "/en/docs/storage-host/api/createOrgId",
       "locale": "en",
       "domain": "docs",
@@ -12076,24 +12352,6 @@
     },
     {
       "path": "/en/docs/storage-host/api/createStorageHost",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/defineFeature",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/definePlugin",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/defineStorageBackendKind",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -12129,18 +12387,6 @@
       "library": "storage-host"
     },
     {
-      "path": "/en/docs/storage-host/api/entity/IEntityDefinition",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/entity/IEntityFeature",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
       "path": "/en/docs/storage-host/api/entity/IEntityIndex",
       "locale": "en",
       "domain": "docs",
@@ -12165,7 +12411,13 @@
       "library": "storage-host"
     },
     {
-      "path": "/en/docs/storage-host/api/entity/IEntityOptions",
+      "path": "/en/docs/storage-host/api/entity/IEntityPlugin",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/entity/IEntityPluginOptions",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -12226,6 +12478,12 @@
     },
     {
       "path": "/en/docs/storage-host/api/entity/IEntityQueryOrderedCore",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/entity/IEntityRepositoryAccess",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -12387,7 +12645,7 @@
       "library": "storage-host"
     },
     {
-      "path": "/en/docs/storage-host/api/entity/defineEntity",
+      "path": "/en/docs/storage-host/api/entity/defineEntityPlugin",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -12555,6 +12813,12 @@
       "library": "storage-host"
     },
     {
+      "path": "/en/docs/storage-host/api/plugins/memory/IMemoryBackend",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
       "path": "/en/docs/storage-host/api/plugins/memory/IMemoryBackendStore",
       "locale": "en",
       "domain": "docs",
@@ -12562,12 +12826,6 @@
     },
     {
       "path": "/en/docs/storage-host/api/plugins/memory/IMemoryOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/en/docs/storage-host/api/plugins/memory/memoryBackendKind",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -12831,6 +13089,12 @@
       "library": "storage-host"
     },
     {
+      "path": "/en/docs/storage-host/api/sdk/StorageReactiveVisibility",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
       "path": "/en/docs/storage-host/api/sdk/assertKeyRange",
       "locale": "en",
       "domain": "docs",
@@ -13030,6 +13294,24 @@
     },
     {
       "path": "/en/docs/storage-host/api/sdk/decodeStorageOrgKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/sdk/defineBackendPlugin",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/sdk/definePlugin",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/sdk/defineStorageFeature",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -13749,6 +14031,12 @@
       "library": "storage-plugin-browser"
     },
     {
+      "path": "/en/docs/storage-plugin-browser/api/cookies/ICookieBackend",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-browser"
+    },
+    {
       "path": "/en/docs/storage-plugin-browser/api/cookies/ICookieBackendStore",
       "locale": "en",
       "domain": "docs",
@@ -13780,12 +14068,6 @@
     },
     {
       "path": "/en/docs/storage-plugin-browser/api/cookies/ISyncCookieStore",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-plugin-browser"
-    },
-    {
-      "path": "/en/docs/storage-plugin-browser/api/cookies/cookieBackendKind",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-browser"
@@ -13953,6 +14235,12 @@
       "library": "storage-plugin-browser"
     },
     {
+      "path": "/en/docs/storage-plugin-browser/api/indexed-db/IIndexedDbBackend",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-browser"
+    },
+    {
       "path": "/en/docs/storage-plugin-browser/api/indexed-db/IIndexedDbBackendStore",
       "locale": "en",
       "domain": "docs",
@@ -13966,12 +14254,6 @@
     },
     {
       "path": "/en/docs/storage-plugin-browser/api/indexed-db/IIndexedDbOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-plugin-browser"
-    },
-    {
-      "path": "/en/docs/storage-plugin-browser/api/indexed-db/indexedDbBackendKind",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-browser"
@@ -13995,6 +14277,12 @@
       "library": "storage-plugin-browser"
     },
     {
+      "path": "/en/docs/storage-plugin-browser/api/local-storage/ILocalStorageBackend",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-browser"
+    },
+    {
       "path": "/en/docs/storage-plugin-browser/api/local-storage/ILocalStorageBackendStore",
       "locale": "en",
       "domain": "docs",
@@ -14002,12 +14290,6 @@
     },
     {
       "path": "/en/docs/storage-plugin-browser/api/local-storage/ILocalStorageOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-plugin-browser"
-    },
-    {
-      "path": "/en/docs/storage-plugin-browser/api/local-storage/localStorageBackendKind",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-browser"
@@ -14025,6 +14307,12 @@
       "library": "storage-plugin-browser"
     },
     {
+      "path": "/en/docs/storage-plugin-browser/api/session-storage/ISessionStorageBackend",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-browser"
+    },
+    {
       "path": "/en/docs/storage-plugin-browser/api/session-storage/ISessionStorageBackendStore",
       "locale": "en",
       "domain": "docs",
@@ -14032,12 +14320,6 @@
     },
     {
       "path": "/en/docs/storage-plugin-browser/api/session-storage/ISessionStorageOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-plugin-browser"
-    },
-    {
-      "path": "/en/docs/storage-plugin-browser/api/session-storage/sessionStorageBackendKind",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-browser"
@@ -14073,7 +14355,19 @@
       "library": "storage-plugin-cache"
     },
     {
+      "path": "/en/docs/storage-plugin-cache/api/CacheErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-cache"
+    },
+    {
       "path": "/en/docs/storage-plugin-cache/api/CacheWriteMode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-cache"
+    },
+    {
+      "path": "/en/docs/storage-plugin-cache/api/ICacheBackend",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-cache"
@@ -14092,6 +14386,12 @@
     },
     {
       "path": "/en/docs/storage-plugin-cache/api/ICacheEntryInfo",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-cache"
+    },
+    {
+      "path": "/en/docs/storage-plugin-cache/api/ICacheErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-cache"
@@ -14133,7 +14433,7 @@
       "library": "storage-plugin-cache"
     },
     {
-      "path": "/en/docs/storage-plugin-cache/api/cacheBackendKind",
+      "path": "/en/docs/storage-plugin-cache/api/STORAGE_CACHE_ERROR_SOURCE",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-cache"
@@ -14229,6 +14529,12 @@
       "library": "storage-plugin-object"
     },
     {
+      "path": "/en/docs/storage-plugin-object/api/IObjectBackend",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-object"
+    },
+    {
       "path": "/en/docs/storage-plugin-object/api/IObjectDriver",
       "locale": "en",
       "domain": "docs",
@@ -14302,12 +14608,6 @@
     },
     {
       "path": "/en/docs/storage-plugin-object/api/fs/fsObjectDriver",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-plugin-object"
-    },
-    {
-      "path": "/en/docs/storage-plugin-object/api/objectBackendKind",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-object"
@@ -14499,6 +14799,18 @@
       "library": "storage-plugin-postgres"
     },
     {
+      "path": "/en/docs/storage-plugin-postgres/api/IPostgresBackend",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-postgres"
+    },
+    {
+      "path": "/en/docs/storage-plugin-postgres/api/IPostgresErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-postgres"
+    },
+    {
       "path": "/en/docs/storage-plugin-postgres/api/IPostgresOptions",
       "locale": "en",
       "domain": "docs",
@@ -14512,6 +14824,18 @@
     },
     {
       "path": "/en/docs/storage-plugin-postgres/api/IPostgresTransactionScope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-postgres"
+    },
+    {
+      "path": "/en/docs/storage-plugin-postgres/api/PostgresErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-postgres"
+    },
+    {
+      "path": "/en/docs/storage-plugin-postgres/api/STORAGE_POSTGRES_ERROR_SOURCE",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-postgres"
@@ -14631,12 +14955,6 @@
       "library": "storage-plugin-postgres"
     },
     {
-      "path": "/en/docs/storage-plugin-postgres/api/postgresBackendKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-plugin-postgres"
-    },
-    {
       "path": "/en/docs/storage-plugin-postgres/api/postgresBackendPlugin",
       "locale": "en",
       "domain": "docs",
@@ -14662,6 +14980,12 @@
     },
     {
       "path": "/en/docs/storage-plugin-qdrant/api",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-qdrant"
+    },
+    {
+      "path": "/en/docs/storage-plugin-qdrant/api/IQdrantBackend",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-qdrant"
@@ -14943,12 +15267,6 @@
       "library": "storage-plugin-qdrant"
     },
     {
-      "path": "/en/docs/storage-plugin-qdrant/api/qdrantBackendKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-plugin-qdrant"
-    },
-    {
       "path": "/en/docs/storage-plugin-qdrant/api/qdrantBackendPlugin",
       "locale": "en",
       "domain": "docs",
@@ -14979,6 +15297,12 @@
       "library": "storage-plugin-redis"
     },
     {
+      "path": "/en/docs/storage-plugin-redis/api/IRedisBackend",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-redis"
+    },
+    {
       "path": "/en/docs/storage-plugin-redis/api/IRedisBorrowedClient",
       "locale": "en",
       "domain": "docs",
@@ -15004,6 +15328,12 @@
     },
     {
       "path": "/en/docs/storage-plugin-redis/api/IRedisDriver",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-redis"
+    },
+    {
+      "path": "/en/docs/storage-plugin-redis/api/IRedisErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-redis"
@@ -15040,6 +15370,18 @@
     },
     {
       "path": "/en/docs/storage-plugin-redis/api/IRedisWatchConflictHookPayload",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-redis"
+    },
+    {
+      "path": "/en/docs/storage-plugin-redis/api/RedisErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-redis"
+    },
+    {
+      "path": "/en/docs/storage-plugin-redis/api/STORAGE_REDIS_ERROR_SOURCE",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-redis"
@@ -15231,12 +15573,6 @@
       "library": "storage-plugin-redis"
     },
     {
-      "path": "/en/docs/storage-plugin-redis/api/redisBackendKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-plugin-redis"
-    },
-    {
       "path": "/en/docs/storage-plugin-redis/api/redisBackendPlugin",
       "locale": "en",
       "domain": "docs",
@@ -15286,6 +15622,12 @@
     },
     {
       "path": "/en/docs/storage-plugin-sparql/api/ISparqlAbortSignal",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-sparql"
+    },
+    {
+      "path": "/en/docs/storage-plugin-sparql/api/ISparqlBackend",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-sparql"
@@ -15447,12 +15789,6 @@
       "library": "storage-plugin-sparql"
     },
     {
-      "path": "/en/docs/storage-plugin-sparql/api/sparqlBackendKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-plugin-sparql"
-    },
-    {
       "path": "/en/docs/storage-plugin-sparql/api/sparqlBackendPlugin",
       "locale": "en",
       "domain": "docs",
@@ -15478,6 +15814,12 @@
     },
     {
       "path": "/en/docs/storage-plugin-sqlite/api",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-plugin-sqlite"
+    },
+    {
+      "path": "/en/docs/storage-plugin-sqlite/api/ISqliteBackend",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-sqlite"
@@ -15586,12 +15928,6 @@
     },
     {
       "path": "/en/docs/storage-plugin-sqlite/api/node/nodeSqliteDriver",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-plugin-sqlite"
-    },
-    {
-      "path": "/en/docs/storage-plugin-sqlite/api/sqliteBackendKind",
       "locale": "en",
       "domain": "docs",
       "library": "storage-plugin-sqlite"
@@ -20217,6 +20553,18 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/api/error/hasErrorIdentity",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/error/identifyBoundaryFailure",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/api/error/isNativeErrorValue",
       "locale": "en",
       "domain": "docs",
@@ -20248,6 +20596,12 @@
     },
     {
       "path": "/en/docs/utils/api/error/reachErrorChain",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/error/reportUnhandledError",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -20650,6 +21004,12 @@
     },
     {
       "path": "/en/docs/utils/api/object/probeProperty",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/object/snapshotOptionProperties",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -23043,109 +23403,163 @@
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin",
+      "path": "/zh/docs/log-host/api/sdk",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/IErrorInfo",
+      "path": "/zh/docs/log-host/api/sdk/IDefinedLogPlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/ILogContext",
+      "path": "/zh/docs/log-host/api/sdk/IEnabledLogFeatures",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/ILogEntry",
+      "path": "/zh/docs/log-host/api/sdk/IErrorInfo",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/ILogFailure",
+      "path": "/zh/docs/log-host/api/sdk/ILogContext",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/ILogFeature",
+      "path": "/zh/docs/log-host/api/sdk/ILogControlExtensions",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/ILogFeatureDefinition",
+      "path": "/zh/docs/log-host/api/sdk/ILogEntry",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/ILogOutputRecord",
+      "path": "/zh/docs/log-host/api/sdk/ILogFailure",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/ILogPlugin",
+      "path": "/zh/docs/log-host/api/sdk/ILogFeature",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/ILogPluginConstraint",
+      "path": "/zh/docs/log-host/api/sdk/ILogFeatureDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/ILogPluginCore",
+      "path": "/zh/docs/log-host/api/sdk/ILogFeatureRecord",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/ILogProjectedEntry",
+      "path": "/zh/docs/log-host/api/sdk/ILogFormat",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/IPluginExtensions",
+      "path": "/zh/docs/log-host/api/sdk/ILogOutputFeatureRecord",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/IRawEntryInput",
+      "path": "/zh/docs/log-host/api/sdk/ILogOutputRecord",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/IShutdownReason",
+      "path": "/zh/docs/log-host/api/sdk/ILogPlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/defineLogFeature",
+      "path": "/zh/docs/log-host/api/sdk/ILogPluginConstraint",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/defineOutputPlugin",
+      "path": "/zh/docs/log-host/api/sdk/ILogPluginCore",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
     },
     {
-      "path": "/zh/docs/log-host/api/plugin/projectLogEntry",
+      "path": "/zh/docs/log-host/api/sdk/ILogProjectedEntry",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/zh/docs/log-host/api/sdk/IPluginExtensions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/zh/docs/log-host/api/sdk/IRawEntryInput",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/zh/docs/log-host/api/sdk/IShutdownReason",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/zh/docs/log-host/api/sdk/LogEntryDataKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/zh/docs/log-host/api/sdk/LogFailureSource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/zh/docs/log-host/api/sdk/defineLogFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/zh/docs/log-host/api/sdk/defineLogPlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/zh/docs/log-host/api/sdk/defineOutputPlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "log-host"
+    },
+    {
+      "path": "/zh/docs/log-host/api/sdk/projectLogEntry",
       "locale": "zh",
       "domain": "docs",
       "library": "log-host"
@@ -24297,6 +24711,12 @@
       "library": "middleware-pipeline"
     },
     {
+      "path": "/zh/docs/middleware-pipeline/api/IPipelineModeObject",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
       "path": "/zh/docs/middleware-pipeline/api/ISyncMiddlewareStage",
       "locale": "zh",
       "domain": "docs",
@@ -24339,7 +24759,67 @@
       "library": "middleware-pipeline"
     },
     {
+      "path": "/zh/docs/middleware-pipeline/api/admission",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/api/admission/admitPipelineNext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/api/async",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/api/async-generator",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/api/async-generator/asyncGeneratorMode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/api/async/asyncMode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
       "path": "/zh/docs/middleware-pipeline/api/createPipeline",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/api/generator",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/api/generator/generatorMode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/api/sync",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/api/sync/syncMode",
       "locale": "zh",
       "domain": "docs",
       "library": "middleware-pipeline"
@@ -24508,6 +24988,12 @@
     },
     {
       "path": "/zh/docs/plugin-host/api/IHostHandle",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/IHostModule",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -24987,6 +25473,18 @@
       "library": "plugin-host"
     },
     {
+      "path": "/zh/docs/plugin-host/api/activation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/activation/activationModule",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/zh/docs/plugin-host/api/asyncDisposeKey",
       "locale": "zh",
       "domain": "docs",
@@ -25047,12 +25545,6 @@
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/api/defineFeature",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
       "path": "/zh/docs/plugin-host/api/defineHost",
       "locale": "zh",
       "domain": "docs",
@@ -25060,6 +25552,96 @@
     },
     {
       "path": "/zh/docs/plugin-host/api/definePlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/enablement",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/enablement/enablementModule",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/feature-dependencies",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/feature-dependencies/featureDependenciesModule",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/feature-overlay",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/feature-overlay/FeatureOverlay",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/feature-overlay/IFeatureOverlayEntry",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/feature-overlay/IFeatureOverlayRole",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/feature-overlay/IFeatureOverlaySelection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/feature-overlay/notifications",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/feature-overlay/notifications/FeatureOverlay",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/feature-overlay/notifications/IFeatureOverlayOwner",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/features",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/features/defineFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/features/featuresModule",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -25078,6 +25660,66 @@
     },
     {
       "path": "/zh/docs/plugin-host/api/isPluginHandleCurrent",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/named-pipelines",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/named-pipelines/namedPipelinesModule",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/pipeline-modes/async",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/pipeline-modes/async-generator",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/pipeline-modes/async-generator/asyncGeneratorPipelineModule",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/pipeline-modes/async/asyncPipelineModule",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/pipeline-modes/generator",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/pipeline-modes/generator/generatorPipelineModule",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/pipeline-modes/sync",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/pipeline-modes/sync/syncPipelineModule",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -26187,6 +26829,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/zh/docs/rpc-contract/api/interfaces/IRetryFeatureOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/zh/docs/rpc-contract/api/interfaces/IRpcAttachedSession",
       "locale": "zh",
       "domain": "docs",
@@ -26451,6 +27099,12 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/zh/docs/rpc-contract/api/interfaces/IRpcRetryExecution",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/zh/docs/rpc-contract/api/interfaces/IRpcRetryFeature",
       "locale": "zh",
       "domain": "docs",
@@ -26476,6 +27130,12 @@
     },
     {
       "path": "/zh/docs/rpc-contract/api/interfaces/IRpcTargetSource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/api/interfaces/IRpcTimeoutExecution",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -26517,13 +27177,13 @@
       "library": "rpc-contract"
     },
     {
-      "path": "/zh/docs/rpc-contract/api/interfaces/IpcSendClass",
+      "path": "/zh/docs/rpc-contract/api/interfaces/ITimeoutFeatureOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
     },
     {
-      "path": "/zh/docs/rpc-contract/api/interfaces/RpcCallFeatureKind",
+      "path": "/zh/docs/rpc-contract/api/interfaces/IpcSendClass",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -27789,13 +28449,223 @@
       "library": "rpc-host"
     },
     {
+      "path": "/zh/docs/rpc-host/api/features/IRetryFeatureOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcAuthenticationCredentials",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcAuthenticationOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcAuthenticationTransform",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcBatchOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcErrorMap",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcIdempotencyClaim",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcIdempotencyLookup",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcIdempotencyOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcIdempotencyOutcome",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcIdempotencyStore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcIdempotencyStoreOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcLimitsOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcLimitsOverflow",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcMethodValidators",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcOutcomeLookup",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcProviderRejection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcSchemaOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/IRpcSchemaParser",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/ITimeoutFeatureOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/auth",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/auth/IRpcAuthenticationCredentialsContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/auth/authFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/batch",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/batch/batchFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/chunk",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/chunk/IRpcChunkFeatureOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/chunk/chunkFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/createRpcIdempotencyStore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/error-map",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/error-map/errorMapFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/idempotency",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/idempotency/idempotencyFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/limits",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/limits/limitsFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
       "path": "/zh/docs/rpc-host/api/features/retry",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
     },
     {
-      "path": "/zh/docs/rpc-host/api/features/retry/IRetryFeatureOptions",
+      "path": "/zh/docs/rpc-host/api/features/retry/createRpcRetryExecution",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -27807,13 +28677,25 @@
       "library": "rpc-host"
     },
     {
+      "path": "/zh/docs/rpc-host/api/features/schema",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/features/schema/schemaFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
       "path": "/zh/docs/rpc-host/api/features/timeout",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
     },
     {
-      "path": "/zh/docs/rpc-host/api/features/timeout/ITimeoutFeatureOptions",
+      "path": "/zh/docs/rpc-host/api/features/timeout/createRpcTimeoutExecution",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -27826,96 +28708,6 @@
     },
     {
       "path": "/zh/docs/rpc-host/api/plugins",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcAuthenticationCredentials",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcAuthenticationOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcAuthenticationTransform",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcBatchOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcErrorMap",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcIdempotencyClaim",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcIdempotencyLookup",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcIdempotencyOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcIdempotencyOutcome",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcIdempotencyStore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcIdempotencyStoreOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcLimitsOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcLimitsOverflow",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcMethodValidators",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcOutcomeLookup",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -27945,139 +28737,7 @@
       "library": "rpc-host"
     },
     {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcProviderRejection",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcSchemaOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/IRpcSchemaParser",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/auth",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/auth/IRpcAuthenticationCredentialsContext",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/auth/authFeature",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/batch",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/batch/batchFeature",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/chunk",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/chunk/IRpcChunkFeatureOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/chunk/chunkFeature",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/createRpcIdempotencyStore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
       "path": "/zh/docs/rpc-host/api/plugins/defineProbe",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/error-map",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/error-map/errorMapFeature",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/idempotency",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/idempotency/idempotencyFeature",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/limits",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/limits/limitsFeature",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/link-policy",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/link-policy/IRpcLinkPolicyOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/link-policy/RpcLinkPolicyName",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/link-policy/linkPolicy",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -28120,18 +28780,6 @@
     },
     {
       "path": "/zh/docs/rpc-host/api/plugins/probe/subscribeProbeStages",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/schema",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/plugins/schema/schemaFeature",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -28419,6 +29067,12 @@
       "library": "rpc-host"
     },
     {
+      "path": "/zh/docs/rpc-host/api/sdk/IRpcFeatureMetadata",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
       "path": "/zh/docs/rpc-host/api/sdk/IRpcFlowContext",
       "locale": "zh",
       "domain": "docs",
@@ -28444,6 +29098,12 @@
     },
     {
       "path": "/zh/docs/rpc-host/api/sdk/IRpcFlowPlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/sdk/IRpcFlowPluginDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -28498,12 +29158,6 @@
     },
     {
       "path": "/zh/docs/rpc-host/api/sdk/IRpcLaunchFacts",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/sdk/IRpcLinkPolicyDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -28803,6 +29457,12 @@
       "library": "rpc-host"
     },
     {
+      "path": "/zh/docs/rpc-host/api/sdk/IRpcRetryExecution",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
       "path": "/zh/docs/rpc-host/api/sdk/IRpcRetryFeature",
       "locale": "zh",
       "domain": "docs",
@@ -28840,6 +29500,12 @@
     },
     {
       "path": "/zh/docs/rpc-host/api/sdk/IRpcTargetSource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/sdk/IRpcTimeoutExecution",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -28942,12 +29608,6 @@
     },
     {
       "path": "/zh/docs/rpc-host/api/sdk/RpcBytePump",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/sdk/RpcCallFeatureKind",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -29259,12 +29919,6 @@
       "library": "rpc-host"
     },
     {
-      "path": "/zh/docs/rpc-host/api/sdk/defineLinkPolicy",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
       "path": "/zh/docs/rpc-host/api/sdk/defineRpcSourcePlugin",
       "locale": "zh",
       "domain": "docs",
@@ -29284,6 +29938,12 @@
     },
     {
       "path": "/zh/docs/rpc-host/api/sdk/encodeRpcStreamTextFrame",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/sdk/findRpcNativeFeatureOutput",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -29325,7 +29985,19 @@
       "library": "rpc-host"
     },
     {
+      "path": "/zh/docs/rpc-host/api/sdk/readRpcFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
       "path": "/zh/docs/rpc-host/api/sdk/readRpcLaunchFacts",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-host"
+    },
+    {
+      "path": "/zh/docs/rpc-host/api/sdk/registerRpcNativeFeature",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -29356,12 +30028,6 @@
     },
     {
       "path": "/zh/docs/rpc-host/api/sdk/rpcCarrierWriteFacts",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-host"
-    },
-    {
-      "path": "/zh/docs/rpc-host/api/sdk/rpcFlowPlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-host"
@@ -29709,7 +30375,7 @@
       "library": "rpc-plugin-devtools"
     },
     {
-      "path": "/zh/docs/rpc-plugin-devtools/api/IDevtoolsPlugin",
+      "path": "/zh/docs/rpc-plugin-devtools/api/IDevtoolsBundle",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-plugin-devtools"
@@ -30015,6 +30681,12 @@
       "library": "rpc-plugin-process"
     },
     {
+      "path": "/zh/docs/rpc-plugin-process/api/features/flow-control/IIpcFlowControlExecution",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-plugin-process"
+    },
+    {
       "path": "/zh/docs/rpc-plugin-process/api/features/flow-control/IIpcFlowControlOptions",
       "locale": "zh",
       "domain": "docs",
@@ -30069,6 +30741,12 @@
       "library": "rpc-plugin-process"
     },
     {
+      "path": "/zh/docs/rpc-plugin-process/api/features/log/IIpcLogExecution",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-plugin-process"
+    },
+    {
       "path": "/zh/docs/rpc-plugin-process/api/features/log/IIpcLogOptions",
       "locale": "zh",
       "domain": "docs",
@@ -30082,6 +30760,12 @@
     },
     {
       "path": "/zh/docs/rpc-plugin-process/api/features/send-queue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-plugin-process"
+    },
+    {
+      "path": "/zh/docs/rpc-plugin-process/api/features/send-queue/IIpcSendQueueExecution",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-plugin-process"
@@ -30879,7 +31563,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/BACKEND_KIND_PATTERN",
+      "path": "/zh/docs/storage-contract/api/BACKEND_NAME_PATTERN",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -30910,12 +31594,6 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/IAnyStorageCapability",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/IBackendKind",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -32529,19 +33207,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/error-code/CacheErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/error-code/IArchiveErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/error-code/ICacheErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -32553,19 +33219,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/error-code/IPostgresErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/error-code/IQdrantErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/error-code/IRedisErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -32607,19 +33261,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/error-code/PostgresErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/error-code/QdrantErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/error-code/RedisErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -32637,12 +33279,6 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/error-code/STORAGE_CACHE_ERROR_SOURCE",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/error-code/STORAGE_HOST_ERROR_SOURCE",
       "locale": "zh",
       "domain": "docs",
@@ -32655,19 +33291,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/error-code/STORAGE_POSTGRES_ERROR_SOURCE",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/error-code/STORAGE_QDRANT_ERROR_SOURCE",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/error-code/STORAGE_REDIS_ERROR_SOURCE",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -32763,7 +33387,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/isBackendKind",
+      "path": "/zh/docs/storage-contract/api/isBackendName",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -32943,18 +33567,6 @@
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/IRejectInstalledOrDuplicateIds",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStorageBackendKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
       "path": "/zh/docs/storage-host/api/IStorageBackendOrgContext",
       "locale": "zh",
       "domain": "docs",
@@ -32967,7 +33579,49 @@
       "library": "storage-host"
     },
     {
+      "path": "/zh/docs/storage-host/api/IStorageBackendPluginDefiner",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
       "path": "/zh/docs/storage-host/api/IStorageBackendPluginHandle",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/IStorageBackendTransactionClient",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/IStorageBackendTransactionScope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/IStorageBackendType",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/IStorageBackendTypeClient",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/IStorageBackendTypeExpose",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/IStorageBackendTypeStore",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -32986,12 +33640,6 @@
     },
     {
       "path": "/zh/docs/storage-host/api/IStorageCodecHookPayload",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStorageDefineFeature",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -33070,6 +33718,12 @@
     },
     {
       "path": "/zh/docs/storage-host/api/IStorageFeatureClientResolver",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/IStorageFeatureDefiner",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -33267,36 +33921,6 @@
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/IStorageKindClient",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStorageKindExpose",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStorageKindStore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStorageKindTransactionClient",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStorageKindTransactionScope",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
       "path": "/zh/docs/storage-host/api/IStorageLockAttemptHookPayload",
       "locale": "zh",
       "domain": "docs",
@@ -33375,13 +33999,31 @@
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/IStoragePluginId",
+      "path": "/zh/docs/storage-host/api/IStoragePluginName",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
       "path": "/zh/docs/storage-host/api/IStorageQueryHookPayload",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/IStorageReactiveProfile",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/IStorageReactiveProfileExpose",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/IStorageReactiveVisibility",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -33417,12 +34059,6 @@
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/assertStorageBackendId",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
       "path": "/zh/docs/storage-host/api/createOrgId",
       "locale": "zh",
       "domain": "docs",
@@ -33430,24 +34066,6 @@
     },
     {
       "path": "/zh/docs/storage-host/api/createStorageHost",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/defineFeature",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/definePlugin",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/defineStorageBackendKind",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -33483,18 +34101,6 @@
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/IEntityDefinition",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityFeature",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
       "path": "/zh/docs/storage-host/api/entity/IEntityIndex",
       "locale": "zh",
       "domain": "docs",
@@ -33519,7 +34125,13 @@
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/IEntityOptions",
+      "path": "/zh/docs/storage-host/api/entity/IEntityPlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityPluginOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -33580,6 +34192,12 @@
     },
     {
       "path": "/zh/docs/storage-host/api/entity/IEntityQueryOrderedCore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityRepositoryAccess",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -33741,7 +34359,7 @@
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/defineEntity",
+      "path": "/zh/docs/storage-host/api/entity/defineEntityPlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -33909,6 +34527,12 @@
       "library": "storage-host"
     },
     {
+      "path": "/zh/docs/storage-host/api/plugins/memory/IMemoryBackend",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
       "path": "/zh/docs/storage-host/api/plugins/memory/IMemoryBackendStore",
       "locale": "zh",
       "domain": "docs",
@@ -33916,12 +34540,6 @@
     },
     {
       "path": "/zh/docs/storage-host/api/plugins/memory/IMemoryOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/plugins/memory/memoryBackendKind",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -34185,6 +34803,12 @@
       "library": "storage-host"
     },
     {
+      "path": "/zh/docs/storage-host/api/sdk/StorageReactiveVisibility",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
       "path": "/zh/docs/storage-host/api/sdk/assertKeyRange",
       "locale": "zh",
       "domain": "docs",
@@ -34384,6 +35008,24 @@
     },
     {
       "path": "/zh/docs/storage-host/api/sdk/decodeStorageOrgKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/sdk/defineBackendPlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/sdk/definePlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/sdk/defineStorageFeature",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -35103,6 +35745,12 @@
       "library": "storage-plugin-browser"
     },
     {
+      "path": "/zh/docs/storage-plugin-browser/api/cookies/ICookieBackend",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-browser"
+    },
+    {
       "path": "/zh/docs/storage-plugin-browser/api/cookies/ICookieBackendStore",
       "locale": "zh",
       "domain": "docs",
@@ -35134,12 +35782,6 @@
     },
     {
       "path": "/zh/docs/storage-plugin-browser/api/cookies/ISyncCookieStore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-plugin-browser"
-    },
-    {
-      "path": "/zh/docs/storage-plugin-browser/api/cookies/cookieBackendKind",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-browser"
@@ -35307,6 +35949,12 @@
       "library": "storage-plugin-browser"
     },
     {
+      "path": "/zh/docs/storage-plugin-browser/api/indexed-db/IIndexedDbBackend",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-browser"
+    },
+    {
       "path": "/zh/docs/storage-plugin-browser/api/indexed-db/IIndexedDbBackendStore",
       "locale": "zh",
       "domain": "docs",
@@ -35320,12 +35968,6 @@
     },
     {
       "path": "/zh/docs/storage-plugin-browser/api/indexed-db/IIndexedDbOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-plugin-browser"
-    },
-    {
-      "path": "/zh/docs/storage-plugin-browser/api/indexed-db/indexedDbBackendKind",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-browser"
@@ -35349,6 +35991,12 @@
       "library": "storage-plugin-browser"
     },
     {
+      "path": "/zh/docs/storage-plugin-browser/api/local-storage/ILocalStorageBackend",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-browser"
+    },
+    {
       "path": "/zh/docs/storage-plugin-browser/api/local-storage/ILocalStorageBackendStore",
       "locale": "zh",
       "domain": "docs",
@@ -35356,12 +36004,6 @@
     },
     {
       "path": "/zh/docs/storage-plugin-browser/api/local-storage/ILocalStorageOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-plugin-browser"
-    },
-    {
-      "path": "/zh/docs/storage-plugin-browser/api/local-storage/localStorageBackendKind",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-browser"
@@ -35379,6 +36021,12 @@
       "library": "storage-plugin-browser"
     },
     {
+      "path": "/zh/docs/storage-plugin-browser/api/session-storage/ISessionStorageBackend",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-browser"
+    },
+    {
       "path": "/zh/docs/storage-plugin-browser/api/session-storage/ISessionStorageBackendStore",
       "locale": "zh",
       "domain": "docs",
@@ -35386,12 +36034,6 @@
     },
     {
       "path": "/zh/docs/storage-plugin-browser/api/session-storage/ISessionStorageOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-plugin-browser"
-    },
-    {
-      "path": "/zh/docs/storage-plugin-browser/api/session-storage/sessionStorageBackendKind",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-browser"
@@ -35427,7 +36069,19 @@
       "library": "storage-plugin-cache"
     },
     {
+      "path": "/zh/docs/storage-plugin-cache/api/CacheErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-cache"
+    },
+    {
       "path": "/zh/docs/storage-plugin-cache/api/CacheWriteMode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-cache"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-cache/api/ICacheBackend",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-cache"
@@ -35446,6 +36100,12 @@
     },
     {
       "path": "/zh/docs/storage-plugin-cache/api/ICacheEntryInfo",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-cache"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-cache/api/ICacheErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-cache"
@@ -35487,7 +36147,7 @@
       "library": "storage-plugin-cache"
     },
     {
-      "path": "/zh/docs/storage-plugin-cache/api/cacheBackendKind",
+      "path": "/zh/docs/storage-plugin-cache/api/STORAGE_CACHE_ERROR_SOURCE",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-cache"
@@ -35583,6 +36243,12 @@
       "library": "storage-plugin-object"
     },
     {
+      "path": "/zh/docs/storage-plugin-object/api/IObjectBackend",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-object"
+    },
+    {
       "path": "/zh/docs/storage-plugin-object/api/IObjectDriver",
       "locale": "zh",
       "domain": "docs",
@@ -35656,12 +36322,6 @@
     },
     {
       "path": "/zh/docs/storage-plugin-object/api/fs/fsObjectDriver",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-plugin-object"
-    },
-    {
-      "path": "/zh/docs/storage-plugin-object/api/objectBackendKind",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-object"
@@ -35853,6 +36513,18 @@
       "library": "storage-plugin-postgres"
     },
     {
+      "path": "/zh/docs/storage-plugin-postgres/api/IPostgresBackend",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-postgres"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-postgres/api/IPostgresErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-postgres"
+    },
+    {
       "path": "/zh/docs/storage-plugin-postgres/api/IPostgresOptions",
       "locale": "zh",
       "domain": "docs",
@@ -35866,6 +36538,18 @@
     },
     {
       "path": "/zh/docs/storage-plugin-postgres/api/IPostgresTransactionScope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-postgres"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-postgres/api/PostgresErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-postgres"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-postgres/api/STORAGE_POSTGRES_ERROR_SOURCE",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-postgres"
@@ -35985,12 +36669,6 @@
       "library": "storage-plugin-postgres"
     },
     {
-      "path": "/zh/docs/storage-plugin-postgres/api/postgresBackendKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-plugin-postgres"
-    },
-    {
       "path": "/zh/docs/storage-plugin-postgres/api/postgresBackendPlugin",
       "locale": "zh",
       "domain": "docs",
@@ -36016,6 +36694,12 @@
     },
     {
       "path": "/zh/docs/storage-plugin-qdrant/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-qdrant"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-qdrant/api/IQdrantBackend",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-qdrant"
@@ -36297,12 +36981,6 @@
       "library": "storage-plugin-qdrant"
     },
     {
-      "path": "/zh/docs/storage-plugin-qdrant/api/qdrantBackendKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-plugin-qdrant"
-    },
-    {
       "path": "/zh/docs/storage-plugin-qdrant/api/qdrantBackendPlugin",
       "locale": "zh",
       "domain": "docs",
@@ -36333,6 +37011,12 @@
       "library": "storage-plugin-redis"
     },
     {
+      "path": "/zh/docs/storage-plugin-redis/api/IRedisBackend",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-redis"
+    },
+    {
       "path": "/zh/docs/storage-plugin-redis/api/IRedisBorrowedClient",
       "locale": "zh",
       "domain": "docs",
@@ -36358,6 +37042,12 @@
     },
     {
       "path": "/zh/docs/storage-plugin-redis/api/IRedisDriver",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-redis"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-redis/api/IRedisErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-redis"
@@ -36394,6 +37084,18 @@
     },
     {
       "path": "/zh/docs/storage-plugin-redis/api/IRedisWatchConflictHookPayload",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-redis"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-redis/api/RedisErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-redis"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-redis/api/STORAGE_REDIS_ERROR_SOURCE",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-redis"
@@ -36585,12 +37287,6 @@
       "library": "storage-plugin-redis"
     },
     {
-      "path": "/zh/docs/storage-plugin-redis/api/redisBackendKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-plugin-redis"
-    },
-    {
       "path": "/zh/docs/storage-plugin-redis/api/redisBackendPlugin",
       "locale": "zh",
       "domain": "docs",
@@ -36640,6 +37336,12 @@
     },
     {
       "path": "/zh/docs/storage-plugin-sparql/api/ISparqlAbortSignal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-sparql"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-sparql/api/ISparqlBackend",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-sparql"
@@ -36801,12 +37503,6 @@
       "library": "storage-plugin-sparql"
     },
     {
-      "path": "/zh/docs/storage-plugin-sparql/api/sparqlBackendKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-plugin-sparql"
-    },
-    {
       "path": "/zh/docs/storage-plugin-sparql/api/sparqlBackendPlugin",
       "locale": "zh",
       "domain": "docs",
@@ -36832,6 +37528,12 @@
     },
     {
       "path": "/zh/docs/storage-plugin-sqlite/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-plugin-sqlite"
+    },
+    {
+      "path": "/zh/docs/storage-plugin-sqlite/api/ISqliteBackend",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-sqlite"
@@ -36940,12 +37642,6 @@
     },
     {
       "path": "/zh/docs/storage-plugin-sqlite/api/node/nodeSqliteDriver",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-plugin-sqlite"
-    },
-    {
-      "path": "/zh/docs/storage-plugin-sqlite/api/sqliteBackendKind",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-sqlite"
@@ -41571,6 +42267,18 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/api/error/hasErrorIdentity",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api/error/identifyBoundaryFailure",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/api/error/isNativeErrorValue",
       "locale": "zh",
       "domain": "docs",
@@ -41602,6 +42310,12 @@
     },
     {
       "path": "/zh/docs/utils/api/error/reachErrorChain",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api/error/reportUnhandledError",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -42004,6 +42718,12 @@
     },
     {
       "path": "/zh/docs/utils/api/object/probeProperty",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api/object/snapshotOptionProperties",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"

@@ -20,7 +20,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin()],\n  features: [prettyFeature({ color: 'auto' })]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })\n  ]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
               },
               {
                 "type": "paragraph",
@@ -45,6 +45,10 @@
               {
                 "type": "paragraph",
                 "text": "meta 保留 host 入口的浅复制语义；同一对象同时作为 args 与 meta 传入时，原 args 对象与额外 meta 副本都会交给控制台。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `console_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `console_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。"
               }
             ]
           }
@@ -63,7 +67,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin({ console: globalThis.console })],\n  features: [prettyFeature({ color: 'never', timestamp: false })]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: [formatFeature({ format: 'json' })] })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')"
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({\n      console: globalThis.console,\n      features: { pretty: prettyFeature({ color: 'never', timestamp: false }) }\n    })\n  ]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: { format: formatFeature({ format: 'json' }) } })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')"
               },
               {
                 "type": "paragraph",
@@ -71,7 +75,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "格式优先级为输出端显式 format、host 显式 format、输出端默认值。同一作用域最多一个 format feature。默认值先读取 `LOG_FORMAT=json|pretty`，再按 CI、TTY 选择 pretty，否则为 JSON。plain 需要显式 `formatFeature({ format: 'plain' })`。"
+                "text": "输出端的 format 只替换 host-wide record 中同 key 的 feature；不同 key 的两个有效 format 在实际安装时以 `INVALID_OPTION` 拒绝。没有有效显式 format 时使用输出默认值。默认值先读取 `LOG_FORMAT=json|pretty`，再按 CI、TTY 选择 pretty，否则为 JSON。plain 需要显式 `formatFeature({ format: 'plain' })`。"
               },
               {
                 "type": "paragraph",
@@ -88,6 +92,10 @@
               {
                 "type": "paragraph",
                 "text": "meta 保留 host 入口的浅复制语义；同一对象同时作为 args 与 meta 传入时，原 args 对象与额外 meta 副本都会交给控制台。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `console_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `console_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。"
               }
             ]
           }
@@ -107,7 +115,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin()],\n  features: [prettyFeature({ color: 'auto' })]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })\n  ]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
@@ -132,6 +140,10 @@
                 {
                   "type": "paragraph",
                   "text": "Meta retains the host entry’s shallow-copy boundary. Passing the same object in args and as meta delivers both the original argument and an additional meta copy to the console."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `console_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `console_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/sdk`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported."
                 }
               ]
             }
@@ -150,7 +162,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin({ console: globalThis.console })],\n  features: [prettyFeature({ color: 'never', timestamp: false })]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: [formatFeature({ format: 'json' })] })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')"
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({\n      console: globalThis.console,\n      features: { pretty: prettyFeature({ color: 'never', timestamp: false }) }\n    })\n  ]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: { format: formatFeature({ format: 'json' }) } })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
@@ -158,7 +170,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "An explicit output format takes precedence over a host format, then the output default. Each scope accepts one format feature. The default reads LOG_FORMAT=json|pretty, then selects pretty for CI or TTY, otherwise JSON. Select plain explicitly with `formatFeature({ format: 'plain' })`."
+                  "text": "An output format replaces only the same host-wide record key. Two effective formats under different keys reject at actual installation with `INVALID_OPTION`. The output default applies when no explicit format survives. The default reads LOG_FORMAT=json|pretty, then selects pretty for CI or TTY, otherwise JSON. Select plain explicitly with `formatFeature({ format: 'plain' })`."
                 },
                 {
                   "type": "paragraph",
@@ -175,6 +187,10 @@
                 {
                   "type": "paragraph",
                   "text": "Meta retains the host entry’s shallow-copy boundary. Passing the same object in args and as meta delivers both the original argument and an additional meta copy to the console."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `console_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `console_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/sdk`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported."
                 }
               ]
             }
@@ -297,44 +313,46 @@
         {
           "name": "consolePlugin",
           "kind": "function",
-          "signature": "export declare function consolePlugin(options?: IConsoleOptions): ILogPlugin<IConsoleExtension>;",
-          "declarationLine": 4,
+          "signature": "export declare function consolePlugin<const F extends ILogOutputFeatureRecord = Record<never, never>>(requested?: IConsoleOptions<F>): ReturnType<typeof defineOutputPlugin<typeof CONSOLE_PLUGIN_NAME, F, IConsoleExtension>>;",
+          "declarationLine": 5,
           "source": "packages/log-plugin-console/dist/console.d.ts",
           "purpose": "Route asynchronous entries by tag, skip silent entries, and add synchronous raw output without owning borrowed capabilities.",
           "core": "options: Optional borrowed console/stdout capabilities and output-scoped features.\nAn installable console output plugin granting synchronous raw(text).\nconsole: Borrow log/warn/error methods and preserve their receiver.\nglobalThis.console.\nstdout: Borrow write(text) and optional isTTY; removing the plugin never closes it.\nRecognized process.stdout, or console.log fallback.\nfeatures: Output-scoped host policies override host defaults of the same kind.\nNo output overrides.\nRoute asynchronous entries by tag, skip silent entries, and add synchronous raw output without owning borrowed capabilities.",
           "advanced": "Route asynchronous entries by tag, skip silent entries, and add synchronous raw output without owning borrowed capabilities.",
-          "parameters": ["options: IConsoleOptions (optional)"],
+          "parameters": ["requested: IConsoleOptions<F> (optional)"],
           "parameterDetails": [
             {
-              "name": "options",
-              "type": "IConsoleOptions",
+              "name": "requested",
+              "type": "IConsoleOptions<F>",
               "optional": true
             }
           ],
-          "returns": "ILogPlugin<IConsoleExtension>",
+          "returns": "ReturnType<typeof defineOutputPlugin<typeof CONSOLE_PLUGIN_NAME, F, IConsoleExtension>>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin({ console: globalThis.console })],\n  features: [prettyFeature({ color: 'never', timestamp: false })]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: [formatFeature({ format: 'json' })] })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin()],\n  features: [prettyFeature({ color: 'auto' })]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({\n      console: globalThis.console,\n      features: { pretty: prettyFeature({ color: 'never', timestamp: false }) }\n    })\n  ]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: { format: formatFeature({ format: 'json' }) } })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })\n  ]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
           "aliasOf": "consolePlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function consolePlugin(options?: IConsoleOptions): ILogPlugin<IConsoleExtension>;"
+            "export declare function consolePlugin<const F extends ILogOutputFeatureRecord = Record<never, never>>(requested?: IConsoleOptions<F>): ReturnType<typeof defineOutputPlugin<typeof CONSOLE_PLUGIN_NAME, F, IConsoleExtension>>;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "options",
-                "type": "IConsoleOptions",
+                "name": "requested",
+                "type": "IConsoleOptions<F>",
                 "optional": true
               }
             ]
           ],
-          "overloadReturns": ["ILogPlugin<IConsoleExtension>"],
+          "overloadReturns": [
+            "ReturnType<typeof defineOutputPlugin<typeof CONSOLE_PLUGIN_NAME, F, IConsoleExtension>>"
+          ],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -384,12 +402,12 @@
             },
             {
               "name": "features",
-              "type": "readonly ILogFeature[]",
+              "type": "F",
               "optional": true,
               "description": ""
             }
           ],
-          "identity": "packages/log-plugin-console/dist/console.d.ts:consolePlugin:export declare function consolePlugin(options?: IConsoleOptions): ILogPlugin<IConsoleExtension>;",
+          "identity": "packages/log-plugin-console/dist/console.d.ts:consolePlugin:export declare function consolePlugin<const F extends ILogOutputFeatureRecord = Record<never, never>>(requested?: IConsoleOptions<F>): ReturnType<typeof defineOutputPlugin<typeof CONSOLE_PLUGIN_NAME, F, IConsoleExtension>>;",
           "guidance": [],
           "usageScore": 34,
           "configuration": [
@@ -411,7 +429,7 @@
             },
             {
               "name": "features",
-              "type": "readonly ILogFeature[]",
+              "type": "F",
               "optional": true,
               "description": "`consolePlugin` 接受 `console`、`stdout`、`features`。console 是拥有 `log`、`warn`、`error` 方法的借用对象；调用保留该对象的 receiver。stdout 拥有 `write(text)`，可提供 `isTTY`。默认分别取全局 console 与识别到的宿主 process.stdout；卸载不关闭这些能力。",
               "descriptionEn": "",
@@ -423,8 +441,8 @@
         {
           "name": "LogConsoleErrorCode",
           "kind": "const",
-          "signature": "export declare const LogConsoleErrorCode: {};",
-          "declarationLine": 2,
+          "signature": "export declare const LogConsoleErrorCode: { /** * Reading a `consolePlugin` or `prettyFeature` option threw (a throwing getter or Proxy trap). * The original error is on `cause`; pass plain option values instead. */ readonly invalidOption: 'INVALID_OPTION'; };",
+          "declarationLine": 4,
           "source": "packages/log-plugin-console/dist/error-code.d.ts",
           "purpose": "Semantic codes owned by this package. This empty table declares no package-owned errors.",
           "core": "Semantic codes owned by this package. This empty table declares no package-owned errors.",
@@ -435,11 +453,23 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
+              "description": "Reading a `consolePlugin` or `prettyFeature` option threw (a throwing getter or Proxy trap). * The original error is on `cause`; pass plain option values instead.",
+              "parameterDetails": [],
+              "returns": "'INVALID_OPTION'"
+            }
+          ],
           "composes": [],
           "aliasOf": "LogConsoleErrorCode",
           "exportPath": ".",
-          "overloadSignatures": ["export declare const LogConsoleErrorCode: {};"],
+          "overloadSignatures": [
+            "export declare const LogConsoleErrorCode: { /** * Reading a `consolePlugin` or `prettyFeature` option threw (a throwing getter or Proxy trap). * The original error is on `cause`; pass plain option values instead. */ readonly invalidOption: 'INVALID_OPTION'; };"
+          ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -477,7 +507,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/log-plugin-console/dist/error-code.d.ts:LogConsoleErrorCode:export declare const LogConsoleErrorCode: {};",
+          "identity": "packages/log-plugin-console/dist/error-code.d.ts:LogConsoleErrorCode:export declare const LogConsoleErrorCode: { /** * Reading a `consolePlugin` or `prettyFeature` option threw (a throwing getter or Proxy trap). * The original error is on `cause`; pass plain option values instead. */ readonly invalidOption: 'INVALID_OPTION'; };",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -486,8 +516,8 @@
         {
           "name": "prettyFeature",
           "kind": "function",
-          "signature": "export declare function prettyFeature(options?: IPrettyOptions): Extract<ILogFeature, { phase: 'format'; }>;",
-          "declarationLine": 23,
+          "signature": "export declare function prettyFeature(options?: IPrettyOptions): ILogFeature;",
+          "declarationLine": 21,
           "source": "packages/log-plugin-console/dist/pretty.d.ts",
           "purpose": "Issue a format descriptor recognized by the console by opaque identity. Preserve native args/Error and the host's separate shallow metadata copy.",
           "core": "options: Optional color mode (auto) and timestamp flag (true).\nA host-recognized format descriptor whose native argument handling is recognized by the console output.\ncolor: Explicit always/never wins; auto checks NO_COLOR, FORCE_COLOR, TTY, then CI.\nauto.\ntimestamp: Include the entry's original ISO timestamp in the pretty prefix.\ntrue.\nIssue a format descriptor recognized by the console by opaque identity. Preserve native args/Error and the host's separate shallow metadata copy.",
@@ -500,19 +530,19 @@
               "optional": true
             }
           ],
-          "returns": "Extract<ILogFeature, { phase: 'format'; }>",
+          "returns": "ILogFeature",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin({ console: globalThis.console })],\n  features: [prettyFeature({ color: 'never', timestamp: false })]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: [formatFeature({ format: 'json' })] })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin()],\n  features: [prettyFeature({ color: 'auto' })]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({\n      console: globalThis.console,\n      features: { pretty: prettyFeature({ color: 'never', timestamp: false }) }\n    })\n  ]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: { format: formatFeature({ format: 'json' }) } })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })\n  ]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
           "aliasOf": "prettyFeature",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function prettyFeature(options?: IPrettyOptions): Extract<ILogFeature, { phase: 'format'; }>;"
+            "export declare function prettyFeature(options?: IPrettyOptions): ILogFeature;"
           ],
           "overloadParameterDetails": [
             [
@@ -523,7 +553,7 @@
               }
             ]
           ],
-          "overloadReturns": ["Extract<ILogFeature, { phase: 'format'; }>"],
+          "overloadReturns": ["ILogFeature"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -572,7 +602,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/log-plugin-console/dist/pretty.d.ts:prettyFeature:export declare function prettyFeature(options?: IPrettyOptions): Extract<ILogFeature, { phase: 'format'; }>;",
+          "identity": "packages/log-plugin-console/dist/pretty.d.ts:prettyFeature:export declare function prettyFeature(options?: IPrettyOptions): ILogFeature;",
           "guidance": [],
           "usageScore": 32,
           "configuration": [

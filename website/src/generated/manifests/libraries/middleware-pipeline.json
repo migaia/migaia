@@ -3,8 +3,8 @@
   "library": {
     "slug": "middleware-pipeline",
     "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-    "version": "0.0.9",
-    "exports": ["."],
+    "version": "0.0.10",
+    "exports": [".", "./admission", "./async", "./async-generator", "./generator", "./sync"],
     "readmeLocales": ["zh", "en"],
     "documentation": {
       "readme": {
@@ -66,7 +66,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('结果:', value)\n})"
+                "code": "import { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: syncMode })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('结果:', value)\n})"
               },
               {
                 "type": "paragraph",
@@ -181,7 +181,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "只有根入口；运行时仅依赖 `@migaia/utils`，无需 DOM 或 Node，包标记为 `sideEffects: false`。"
+                "text": "入口：除根入口外，还有四个模式子入口 `/sync`、`/async`、`/generator`、`/async-generator`（各导出一个模式对象，传给 `createPipeline({ mode })`），以及 `/admission` 子入口（供 plugin-host 等宿主在构造期校验管线选项）。运行时仅依赖 `@migaia/utils`，无需 DOM 或 Node，包标记为 `sideEffects: false`。"
               }
             ]
           },
@@ -295,7 +295,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('结果:', value)\n})"
+                "code": "import { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: syncMode })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('结果:', value)\n})"
               },
               {
                 "type": "paragraph",
@@ -323,7 +323,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.async })\nconst trace: string[] = []\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('开始计时')\n      try {\n        await next(value + 1)\n      } finally {\n        trace.push('结束计时')\n      }\n    },\n    async (value, next) => {\n      trace.push('校验')\n      await next(value * 2)\n    }\n  ],\n  2,\n  (value) => {\n    trace.push(`结果 ${value}`)\n  }\n)\nconsole.log(trace.join(' | '))"
+                "code": "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: asyncMode })\nconst trace: string[] = []\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('开始计时')\n      try {\n        await next(value + 1)\n      } finally {\n        trace.push('结束计时')\n      }\n    },\n    async (value, next) => {\n      trace.push('校验')\n      await next(value * 2)\n    }\n  ],\n  2,\n  (value) => {\n    trace.push(`结果 ${value}`)\n  }\n)\nconsole.log(trace.join(' | '))"
               },
               {
                 "type": "paragraph",
@@ -351,7 +351,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\nconst trim = pipeline.lift((value, next) => {\n  console.log('同步步骤调用 next 前')\n  next(value.trim())\n  console.log('同步步骤调用 next 后')\n}, MiddlewarePipelineMode.sync)\nawait pipeline.run(\n  [\n    trim,\n    async (value, next) => {\n      console.log('异步步骤输入:', value)\n      await next(value.toUpperCase())\n    }\n  ],\n  ' ready ',\n  (value) => {\n    console.log('结果:', value)\n  }\n)"
+                "code": "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: asyncMode })\nconst trim = pipeline.lift((value, next) => {\n  console.log('同步步骤调用 next 前')\n  next(value.trim())\n  console.log('同步步骤调用 next 后')\n}, syncMode)\nawait pipeline.run(\n  [\n    trim,\n    async (value, next) => {\n      console.log('异步步骤输入:', value)\n      await next(value.toUpperCase())\n    }\n  ],\n  ' ready ',\n  (value) => {\n    console.log('结果:', value)\n  }\n)"
               },
               {
                 "type": "paragraph",
@@ -379,7 +379,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst application = new AbortController()\napplication.abort(new Error('应用已停止'))\nconst request = new AbortController()\nconst pipeline = createPipeline<number>({\n  mode: MiddlewarePipelineMode.async,\n  signal: application.signal\n})\nlet completed = false\ntry {\n  await pipeline.run(\n    [\n      async (value, next, context) => {\n        console.log('采用请求信号:', context?.signal === request.signal)\n        request.abort(new Error('请求已取消'))\n        await next(value + 1)\n      }\n    ],\n    1,\n    () => {\n      completed = true\n    },\n    { signal: request.signal }\n  )\n} catch (error) {\n  console.log('失败:', (error as Error).message)\n}\nconsole.log('终点回调执行:', completed)"
+                "code": "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst application = new AbortController()\napplication.abort(new Error('应用已停止'))\nconst request = new AbortController()\nconst pipeline = createPipeline<number>({\n  mode: asyncMode,\n  signal: application.signal\n})\nlet completed = false\ntry {\n  await pipeline.run(\n    [\n      async (value, next, context) => {\n        console.log('采用请求信号:', context?.signal === request.signal)\n        request.abort(new Error('请求已取消'))\n        await next(value + 1)\n      }\n    ],\n    1,\n    () => {\n      completed = true\n    },\n    { signal: request.signal }\n  )\n} catch (error) {\n  console.log('失败:', (error as Error).message)\n}\nconsole.log('终点回调执行:', completed)"
               },
               {
                 "type": "paragraph",
@@ -407,7 +407,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('写入步骤执行:', written)\nconsole.log('终点回调执行:', completed)"
+                "code": "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: generatorMode })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('写入步骤执行:', written)\nconsole.log('终点回调执行:', completed)"
               },
               {
                 "type": "paragraph",
@@ -435,7 +435,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: MiddlewarePipelineMode.generator })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  '缓存值',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('普通返回会完成:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  '缓存值',\n  (value) => {\n    console.log('显式空值仍交付:', value === undefined)\n  }\n)"
+                "code": "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: generatorMode })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  '缓存值',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('普通返回会完成:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  '缓存值',\n  (value) => {\n    console.log('显式空值仍交付:', value === undefined)\n  }\n)"
               },
               {
                 "type": "paragraph",
@@ -486,7 +486,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createPipeline } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('第二个值失败')\nconst received: number[] = []\nconst reported: unknown[] = []\nconst pipeline = createPipeline<number>({ mode: 'async', next: 'multiple' })\nawait pipeline.run(\n  [\n    async (_value, next) => {\n      await next(1)\n      try {\n        await next(2)\n      } catch (error) {\n        reported.push(error)\n      }\n      await next(3)\n    }\n  ],\n  0,\n  (value) => {\n    received.push(value)\n    if (value === 2) throw failure\n  }\n)\nconsole.log(received.join(','), reported[0] === failure)"
+                "code": "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { createPipeline } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('第二个值失败')\nconst received: number[] = []\nconst reported: unknown[] = []\nconst pipeline = createPipeline<number>({ mode: asyncMode, next: 'multiple' })\nawait pipeline.run(\n  [\n    async (_value, next) => {\n      await next(1)\n      try {\n        await next(2)\n      } catch (error) {\n        reported.push(error)\n      }\n      await next(3)\n    }\n  ],\n  0,\n  (value) => {\n    received.push(value)\n    if (value === 2) throw failure\n  }\n)\nconsole.log(received.join(','), reported[0] === failure)"
               },
               {
                 "type": "paragraph",
@@ -499,7 +499,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('yield 下游失败')\nconst reported: unknown[] = []\nconst completed: number[] = []\nconst pipeline = createPipeline<number>({ mode: 'generator', next: 'multiple' })\npipeline.run(\n  [\n    function* () {\n      yield 1\n      try {\n        yield 2\n      } catch (error) {\n        reported.push(error)\n      }\n      yield 3\n      return GENERATOR_CONTINUE\n    }\n  ],\n  0,\n  (value) => {\n    if (value === 2) throw failure\n    completed.push(value)\n  }\n)\nconsole.log(completed.join(','), reported[0] === failure)"
+                "code": "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('yield 下游失败')\nconst reported: unknown[] = []\nconst completed: number[] = []\nconst pipeline = createPipeline<number>({ mode: generatorMode, next: 'multiple' })\npipeline.run(\n  [\n    function* () {\n      yield 1\n      try {\n        yield 2\n      } catch (error) {\n        reported.push(error)\n      }\n      yield 3\n      return GENERATOR_CONTINUE\n    }\n  ],\n  0,\n  (value) => {\n    if (value === 2) throw failure\n    completed.push(value)\n  }\n)\nconsole.log(completed.join(','), reported[0] === failure)"
               },
               {
                 "type": "paragraph",
@@ -513,7 +513,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "只有根入口 `@migaia/middleware-pipeline`，运行时依赖为 `@migaia/utils`，不依赖 DOM、Node 或外部生命周期宿主。根入口提供 `createPipeline()`、模式与生成器信号常量、公开 stage/control/context 类型，以及错误码；具体执行器和适配器属于包内实现，不能从根入口导入。"
+                "text": "根入口是 `@migaia/middleware-pipeline`。除根入口外，还有四个模式子入口 `/sync`、`/async`、`/generator`、`/async-generator`（各导出一个模式对象，传给 `createPipeline({ mode })`），以及 `/admission` 子入口（供 plugin-host 等宿主在构造期校验管线选项）。运行时依赖为 `@migaia/utils`，不依赖 DOM、Node 或外部生命周期宿主。根入口提供 `createPipeline()`、模式与生成器信号常量、公开 stage/control/context 类型，以及错误码；具体执行器和适配器属于包内实现，不能从根入口导入。"
               },
               {
                 "type": "paragraph",
@@ -540,7 +540,7 @@
                   [
                     "`mode`",
                     "必填，无默认",
-                    "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
+                    "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
                   ],
                   [
                     "`next`",
@@ -893,7 +893,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('result:', value)\n})"
+                  "code": "import { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: syncMode })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('result:', value)\n})"
                 },
                 {
                   "type": "paragraph",
@@ -1046,7 +1046,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "There is one root entry. Its only runtime dependency is `@migaia/utils`; it needs neither DOM nor Node and declares `sideEffects: false`."
+                  "text": "Entries: Besides the root entry there are four mode entries, `/sync`, `/async`, `/generator` and `/async-generator` (each exports one mode object to pass as `createPipeline({ mode })`), and the `/admission` entry, which hosts such as plugin-host use to check pipeline options at construction. The only runtime dependency is `@migaia/utils`; it needs neither DOM nor Node and declares `sideEffects: false`."
                 }
               ]
             },
@@ -1183,7 +1183,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('result:', value)\n})"
+                  "code": "import { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: syncMode })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('result:', value)\n})"
                 },
                 {
                   "type": "paragraph",
@@ -1211,7 +1211,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.async })\nconst trace: string[] = []\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('start timing')\n      try {\n        await next(value + 1)\n      } finally {\n        trace.push('finish timing')\n      }\n    },\n    async (value, next) => {\n      trace.push('validate')\n      await next(value * 2)\n    }\n  ],\n  2,\n  (value) => {\n    trace.push(`result ${value}`)\n  }\n)\nconsole.log(trace.join(' | '))"
+                  "code": "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: asyncMode })\nconst trace: string[] = []\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('start timing')\n      try {\n        await next(value + 1)\n      } finally {\n        trace.push('finish timing')\n      }\n    },\n    async (value, next) => {\n      trace.push('validate')\n      await next(value * 2)\n    }\n  ],\n  2,\n  (value) => {\n    trace.push(`result ${value}`)\n  }\n)\nconsole.log(trace.join(' | '))"
                 },
                 {
                   "type": "paragraph",
@@ -1239,7 +1239,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\nconst trim = pipeline.lift((value, next) => {\n  console.log('sync before next')\n  next(value.trim())\n  console.log('sync after next')\n}, MiddlewarePipelineMode.sync)\nawait pipeline.run(\n  [\n    trim,\n    async (value, next) => {\n      console.log('async input:', value)\n      await next(value.toUpperCase())\n    }\n  ],\n  ' ready ',\n  (value) => {\n    console.log('result:', value)\n  }\n)"
+                  "code": "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: asyncMode })\nconst trim = pipeline.lift((value, next) => {\n  console.log('sync before next')\n  next(value.trim())\n  console.log('sync after next')\n}, syncMode)\nawait pipeline.run(\n  [\n    trim,\n    async (value, next) => {\n      console.log('async input:', value)\n      await next(value.toUpperCase())\n    }\n  ],\n  ' ready ',\n  (value) => {\n    console.log('result:', value)\n  }\n)"
                 },
                 {
                   "type": "paragraph",
@@ -1267,7 +1267,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst application = new AbortController()\napplication.abort(new Error('application stopped'))\nconst request = new AbortController()\nconst pipeline = createPipeline<number>({\n  mode: MiddlewarePipelineMode.async,\n  signal: application.signal\n})\nlet completed = false\ntry {\n  await pipeline.run(\n    [\n      async (value, next, context) => {\n        console.log('request signal:', context?.signal === request.signal)\n        request.abort(new Error('request cancelled'))\n        await next(value + 1)\n      }\n    ],\n    1,\n    () => {\n      completed = true\n    },\n    { signal: request.signal }\n  )\n} catch (error) {\n  console.log('failure:', (error as Error).message)\n}\nconsole.log('final callback:', completed)"
+                  "code": "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst application = new AbortController()\napplication.abort(new Error('application stopped'))\nconst request = new AbortController()\nconst pipeline = createPipeline<number>({\n  mode: asyncMode,\n  signal: application.signal\n})\nlet completed = false\ntry {\n  await pipeline.run(\n    [\n      async (value, next, context) => {\n        console.log('request signal:', context?.signal === request.signal)\n        request.abort(new Error('request cancelled'))\n        await next(value + 1)\n      }\n    ],\n    1,\n    () => {\n      completed = true\n    },\n    { signal: request.signal }\n  )\n} catch (error) {\n  console.log('failure:', (error as Error).message)\n}\nconsole.log('final callback:', completed)"
                 },
                 {
                   "type": "paragraph",
@@ -1295,7 +1295,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('write ran:', written)\nconsole.log('final callback:', completed)"
+                  "code": "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: generatorMode })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('write ran:', written)\nconsole.log('final callback:', completed)"
                 },
                 {
                   "type": "paragraph",
@@ -1323,7 +1323,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: MiddlewarePipelineMode.generator })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  'cached',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('ordinary return completes:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  'cached',\n  (value) => {\n    console.log('explicit empty value delivered:', value === undefined)\n  }\n)"
+                  "code": "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: generatorMode })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  'cached',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('ordinary return completes:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  'cached',\n  (value) => {\n    console.log('explicit empty value delivered:', value === undefined)\n  }\n)"
                 },
                 {
                   "type": "paragraph",
@@ -1377,7 +1377,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createPipeline } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('second value failed')\nconst received: number[] = []\nconst reported: unknown[] = []\nconst pipeline = createPipeline<number>({ mode: 'async', next: 'multiple' })\nawait pipeline.run(\n  [\n    async (_value, next) => {\n      await next(1)\n      try {\n        await next(2)\n      } catch (error) {\n        reported.push(error)\n      }\n      await next(3)\n    }\n  ],\n  0,\n  (value) => {\n    received.push(value)\n    if (value === 2) throw failure\n  }\n)\nconsole.log(received.join(','), reported[0] === failure)"
+                  "code": "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { createPipeline } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('second value failed')\nconst received: number[] = []\nconst reported: unknown[] = []\nconst pipeline = createPipeline<number>({ mode: asyncMode, next: 'multiple' })\nawait pipeline.run(\n  [\n    async (_value, next) => {\n      await next(1)\n      try {\n        await next(2)\n      } catch (error) {\n        reported.push(error)\n      }\n      await next(3)\n    }\n  ],\n  0,\n  (value) => {\n    received.push(value)\n    if (value === 2) throw failure\n  }\n)\nconsole.log(received.join(','), reported[0] === failure)"
                 },
                 {
                   "type": "paragraph",
@@ -1390,7 +1390,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('yielded suffix failed')\nconst reported: unknown[] = []\nconst completed: number[] = []\nconst pipeline = createPipeline<number>({ mode: 'generator', next: 'multiple' })\npipeline.run(\n  [\n    function* () {\n      yield 1\n      try {\n        yield 2\n      } catch (error) {\n        reported.push(error)\n      }\n      yield 3\n      return GENERATOR_CONTINUE\n    }\n  ],\n  0,\n  (value) => {\n    if (value === 2) throw failure\n    completed.push(value)\n  }\n)\nconsole.log(completed.join(','), reported[0] === failure)"
+                  "code": "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('yielded suffix failed')\nconst reported: unknown[] = []\nconst completed: number[] = []\nconst pipeline = createPipeline<number>({ mode: generatorMode, next: 'multiple' })\npipeline.run(\n  [\n    function* () {\n      yield 1\n      try {\n        yield 2\n      } catch (error) {\n        reported.push(error)\n      }\n      yield 3\n      return GENERATOR_CONTINUE\n    }\n  ],\n  0,\n  (value) => {\n    if (value === 2) throw failure\n    completed.push(value)\n  }\n)\nconsole.log(completed.join(','), reported[0] === failure)"
                 },
                 {
                   "type": "paragraph",
@@ -1404,7 +1404,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "The module has one entry, `@migaia/middleware-pipeline`, and one runtime dependency, `@migaia/utils`. It depends on neither DOM nor Node nor a lifecycle host. The root exports `createPipeline()`, mode and generator-signal constants, public stage/control/context types, and error codes. Concrete executors and adapters are internal and cannot be imported from the root."
+                  "text": "The root entry is `@migaia/middleware-pipeline`. Besides the root entry there are four mode entries, `/sync`, `/async`, `/generator` and `/async-generator` (each exports one mode object to pass as `createPipeline({ mode })`), and the `/admission` entry, which hosts such as plugin-host use to check pipeline options at construction. The module has one runtime dependency, `@migaia/utils`. It depends on neither DOM nor Node nor a lifecycle host. The root exports `createPipeline()`, mode and generator-signal constants, public stage/control/context types, and error codes. Concrete executors and adapters are internal and cannot be imported from the root."
                 },
                 {
                   "type": "paragraph",
@@ -1431,7 +1431,7 @@
                     [
                       "`mode`",
                       "Required; no default",
-                      "`'sync'`, `'async'`, `'generator'` or `'async-generator'`, exposed as `MiddlewarePipelineMode.sync`, `async`, `generator` and `asyncGenerator`. Fixed after creation."
+                      "The authentic `syncMode`, `asyncMode`, `generatorMode` or `asyncGeneratorMode` object from its corresponding module subpath. Fixed after creation."
                     ],
                     [
                       "`next`",
@@ -1763,7 +1763,7 @@
           "name": "createPipeline",
           "kind": "function",
           "signature": "export declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator> & { readonly signals?: undefined; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator> & { readonly signals?: undefined; }): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode> & { readonly signals: IGeneratorMiddlewareSignals; }): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode> & { readonly signals?: undefined; }): IMiddlewarePipeline<TMode, TValue>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue>(options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue, IGeneratorMiddlewareSignals>;\nexport declare function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(options: ICreatePipelineOptions<TMode>): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>;",
-          "declarationLine": 118,
+          "declarationLine": 127,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Creates a reusable, stateless middleware runner for one execution mode. The runner owns no stage list: each `run()` receives the stages, the input value and a final callback, so one pipeline can serve many hosts and concurrent runs. A sync/async stage continues by calling `next(value)`. Generator stages must return a payload, the configured continue signal (using the last yield), or the explicit undefined signal; yielding alone followed by an implicit undefined return halts without calling done.",
           "core": "An `IMiddlewarePipeline` for the chosen mode and TSignals control domain, separate from TValue. Options are read once and frozen; invalid values or throwing option getters produce TypeError/INVALID_OPTION with the original getter failure on cause.\nmode: Execution mode of every run. Stages must be written for this mode or converted with `lift()`.\nChoose sync for ordinary transforms, async for stages that await downstream work, generator for synchronous generator stages, or async-generator for asynchronous generators. Generator modes reduce returned values instead of calling next(). mode is required; there is no default.\nonViolation: Receives `duplicate` or `late` when a stage misuses `next()`. The misuse never starts a second downstream run.\nNot set: misuse is ignored silently.\nSet it when diagnosing a stage that calls next() twice or after returning. duplicate means a repeated call; late means the stage already ended. Both calls are ignored, and without this callback neither is reported.\nassertActive: Called on entry and after each stage; throwing stops the run before the next stage starts. Hosts use it to stop runs once they are closing.\nNot set: no lifecycle check.\nUse it when the host has a closing flag rather than an AbortSignal. Throw to prevent the next stage from starting. Return normally while the host is active; omitting it skips host lifetime checks.\nsignal: Default cancellation signal for every run; checked on entry, before and after each stage and before `done`. A run-level `signal` overrides it.\nNot set: runs cannot be cancelled unless `run()` passes a signal.\nsignals: Replacement generator control signals `{ undefined, halt, continue }` for hosts with their own sentinels; three distinct symbols, read once at creation.\n`MiddlewarePipelineGeneratorSignals` (the exported `GENERATOR_*` symbols).\ncombineStageAndDownstreamError: Only in async onion mode, combines independent stage and downstream failures. The same object propagated through await next is thrown once without calling the combiner; equal primitive values can still be independent failures. A successful custom result must retain both errors through cause/errors. If the combiner throws, its failure stays primary with both originals reachable.\nNot set: an `AggregateError` with code `EXECUTION_FAILED` holds both errors.\nUse it in async mode when a stage fails independently of downstream work and your application needs a specific combined message. Keep both original failures in cause or errors. Without it, the runner creates its own AggregateError; other modes do not use it.",
@@ -1842,14 +1842,14 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('结果:', value)\n})",
-            "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.async })\nconst trace: string[] = []\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('开始计时')\n      try {\n        await next(value + 1)\n      } finally {\n        trace.push('结束计时')\n      }\n    },\n    async (value, next) => {\n      trace.push('校验')\n      await next(value * 2)\n    }\n  ],\n  2,\n  (value) => {\n    trace.push(`结果 ${value}`)\n  }\n)\nconsole.log(trace.join(' | '))",
-            "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\nconst trim = pipeline.lift((value, next) => {\n  console.log('同步步骤调用 next 前')\n  next(value.trim())\n  console.log('同步步骤调用 next 后')\n}, MiddlewarePipelineMode.sync)\nawait pipeline.run(\n  [\n    trim,\n    async (value, next) => {\n      console.log('异步步骤输入:', value)\n      await next(value.toUpperCase())\n    }\n  ],\n  ' ready ',\n  (value) => {\n    console.log('结果:', value)\n  }\n)",
-            "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst application = new AbortController()\napplication.abort(new Error('应用已停止'))\nconst request = new AbortController()\nconst pipeline = createPipeline<number>({\n  mode: MiddlewarePipelineMode.async,\n  signal: application.signal\n})\nlet completed = false\ntry {\n  await pipeline.run(\n    [\n      async (value, next, context) => {\n        console.log('采用请求信号:', context?.signal === request.signal)\n        request.abort(new Error('请求已取消'))\n        await next(value + 1)\n      }\n    ],\n    1,\n    () => {\n      completed = true\n    },\n    { signal: request.signal }\n  )\n} catch (error) {\n  console.log('失败:', (error as Error).message)\n}\nconsole.log('终点回调执行:', completed)",
-            "import { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('写入步骤执行:', written)\nconsole.log('终点回调执行:', completed)",
-            "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: MiddlewarePipelineMode.generator })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  '缓存值',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('普通返回会完成:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  '缓存值',\n  (value) => {\n    console.log('显式空值仍交付:', value === undefined)\n  }\n)",
-            "import { createPipeline } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('第二个值失败')\nconst received: number[] = []\nconst reported: unknown[] = []\nconst pipeline = createPipeline<number>({ mode: 'async', next: 'multiple' })\nawait pipeline.run(\n  [\n    async (_value, next) => {\n      await next(1)\n      try {\n        await next(2)\n      } catch (error) {\n        reported.push(error)\n      }\n      await next(3)\n    }\n  ],\n  0,\n  (value) => {\n    received.push(value)\n    if (value === 2) throw failure\n  }\n)\nconsole.log(received.join(','), reported[0] === failure)",
-            "import { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('yield 下游失败')\nconst reported: unknown[] = []\nconst completed: number[] = []\nconst pipeline = createPipeline<number>({ mode: 'generator', next: 'multiple' })\npipeline.run(\n  [\n    function* () {\n      yield 1\n      try {\n        yield 2\n      } catch (error) {\n        reported.push(error)\n      }\n      yield 3\n      return GENERATOR_CONTINUE\n    }\n  ],\n  0,\n  (value) => {\n    if (value === 2) throw failure\n    completed.push(value)\n  }\n)\nconsole.log(completed.join(','), reported[0] === failure)"
+            "import { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: syncMode })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('结果:', value)\n})",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: asyncMode })\nconst trace: string[] = []\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('开始计时')\n      try {\n        await next(value + 1)\n      } finally {\n        trace.push('结束计时')\n      }\n    },\n    async (value, next) => {\n      trace.push('校验')\n      await next(value * 2)\n    }\n  ],\n  2,\n  (value) => {\n    trace.push(`结果 ${value}`)\n  }\n)\nconsole.log(trace.join(' | '))",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: asyncMode })\nconst trim = pipeline.lift((value, next) => {\n  console.log('同步步骤调用 next 前')\n  next(value.trim())\n  console.log('同步步骤调用 next 后')\n}, syncMode)\nawait pipeline.run(\n  [\n    trim,\n    async (value, next) => {\n      console.log('异步步骤输入:', value)\n      await next(value.toUpperCase())\n    }\n  ],\n  ' ready ',\n  (value) => {\n    console.log('结果:', value)\n  }\n)",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst application = new AbortController()\napplication.abort(new Error('应用已停止'))\nconst request = new AbortController()\nconst pipeline = createPipeline<number>({\n  mode: asyncMode,\n  signal: application.signal\n})\nlet completed = false\ntry {\n  await pipeline.run(\n    [\n      async (value, next, context) => {\n        console.log('采用请求信号:', context?.signal === request.signal)\n        request.abort(new Error('请求已取消'))\n        await next(value + 1)\n      }\n    ],\n    1,\n    () => {\n      completed = true\n    },\n    { signal: request.signal }\n  )\n} catch (error) {\n  console.log('失败:', (error as Error).message)\n}\nconsole.log('终点回调执行:', completed)",
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: generatorMode })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('写入步骤执行:', written)\nconsole.log('终点回调执行:', completed)",
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: generatorMode })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  '缓存值',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('普通返回会完成:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  '缓存值',\n  (value) => {\n    console.log('显式空值仍交付:', value === undefined)\n  }\n)",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { createPipeline } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('第二个值失败')\nconst received: number[] = []\nconst reported: unknown[] = []\nconst pipeline = createPipeline<number>({ mode: asyncMode, next: 'multiple' })\nawait pipeline.run(\n  [\n    async (_value, next) => {\n      await next(1)\n      try {\n        await next(2)\n      } catch (error) {\n        reported.push(error)\n      }\n      await next(3)\n    }\n  ],\n  0,\n  (value) => {\n    received.push(value)\n    if (value === 2) throw failure\n  }\n)\nconsole.log(received.join(','), reported[0] === failure)",
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('yield 下游失败')\nconst reported: unknown[] = []\nconst completed: number[] = []\nconst pipeline = createPipeline<number>({ mode: generatorMode, next: 'multiple' })\npipeline.run(\n  [\n    function* () {\n      yield 1\n      try {\n        yield 2\n      } catch (error) {\n        reported.push(error)\n      }\n      yield 3\n      return GENERATOR_CONTINUE\n    }\n  ],\n  0,\n  (value) => {\n    if (value === 2) throw failure\n    completed.push(value)\n  }\n)\nconsole.log(completed.join(','), reported[0] === failure)"
           ],
           "members": [],
           "composes": [],
@@ -1994,7 +1994,7 @@
           "declaredConfiguration": [
             {
               "name": "mode",
-              "type": "TMode",
+              "type": "IPipelineModeObject<TMode>",
               "optional": false,
               "description": "Required execution mode: sync, async, generator, or async-generator. Determines stage shape, downstream timing, and whether run throws synchronously or returns a promise."
             },
@@ -2052,7 +2052,7 @@
                     [
                       "`mode`",
                       "必填，无默认",
-                      "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
                     ],
                     [
                       "`next`",
@@ -2108,15 +2108,15 @@
               ]
             }
           ],
-          "usageScore": 126,
+          "usageScore": 132,
           "configuration": [
             {
               "name": "mode",
-              "type": "TMode",
+              "type": "IPipelineModeObject<TMode>",
               "optional": false,
-              "description": "pipeline 是执行规则固定的对象，只含只读 `mode`、`lift()` 和 `run()`。每次运行的当前值、索引、取消上下文与 `next` 状态都属于该次 `run()`；同一个 pipeline 可以复用，各次运行相互隔离。每次运行都复制一份 stage 列表，之后替换、插入或删除原数组的项，不改变本轮执行的函数列表。",
+              "description": "根入口是 `@migaia/middleware-pipeline`。除根入口外，还有四个模式子入口 `/sync`、`/async`、`/generator`、`/async-generator`（各导出一个模式对象，传给 `createPipeline({ mode })`），以及 `/admission` 子入口（供 plugin-host 等宿主在构造期校验管线选项）。运行时依赖为 `@migaia/utils`，不依赖 DOM、Node 或外部生命周期宿主。根入口提供 `createPipeline()`、模式与生成器信号常量、公开 stage/control/context 类型，以及错误码；具体执行器和适配器属于包内实现，不能从根入口导入。",
               "descriptionEn": "Required execution mode: sync, async, generator, or async-generator. Determines stage shape, downstream timing, and whether run throws synchronously or returns a promise.",
-              "descriptionZh": "pipeline 是执行规则固定的对象，只含只读 `mode`、`lift()` 和 `run()`。每次运行的当前值、索引、取消上下文与 `next` 状态都属于该次 `run()`；同一个 pipeline 可以复用，各次运行相互隔离。每次运行都复制一份 stage 列表，之后替换、插入或删除原数组的项，不改变本轮执行的函数列表。"
+              "descriptionZh": "根入口是 `@migaia/middleware-pipeline`。除根入口外，还有四个模式子入口 `/sync`、`/async`、`/generator`、`/async-generator`（各导出一个模式对象，传给 `createPipeline({ mode })`），以及 `/admission` 子入口（供 plugin-host 等宿主在构造期校验管线选项）。运行时依赖为 `@migaia/utils`，不依赖 DOM、Node 或外部生命周期宿主。根入口提供 `createPipeline()`、模式与生成器信号常量、公开 stage/control/context 类型，以及错误码；具体执行器和适配器属于包内实现，不能从根入口导入。"
             },
             {
               "name": "next",
@@ -2184,7 +2184,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('yield 下游失败')\nconst reported: unknown[] = []\nconst completed: number[] = []\nconst pipeline = createPipeline<number>({ mode: 'generator', next: 'multiple' })\npipeline.run(\n  [\n    function* () {\n      yield 1\n      try {\n        yield 2\n      } catch (error) {\n        reported.push(error)\n      }\n      yield 3\n      return GENERATOR_CONTINUE\n    }\n  ],\n  0,\n  (value) => {\n    if (value === 2) throw failure\n    completed.push(value)\n  }\n)\nconsole.log(completed.join(','), reported[0] === failure)"
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('yield 下游失败')\nconst reported: unknown[] = []\nconst completed: number[] = []\nconst pipeline = createPipeline<number>({ mode: generatorMode, next: 'multiple' })\npipeline.run(\n  [\n    function* () {\n      yield 1\n      try {\n        yield 2\n      } catch (error) {\n        reported.push(error)\n      }\n      yield 3\n      return GENERATOR_CONTINUE\n    }\n  ],\n  0,\n  (value) => {\n    if (value === 2) throw failure\n    completed.push(value)\n  }\n)\nconsole.log(completed.join(','), reported[0] === failure)"
           ],
           "members": [],
           "composes": [],
@@ -2245,7 +2245,7 @@
                     [
                       "`mode`",
                       "必填，无默认",
-                      "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
                     ],
                     [
                       "`next`",
@@ -2320,7 +2320,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('写入步骤执行:', written)\nconsole.log('终点回调执行:', completed)"
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: generatorMode })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('写入步骤执行:', written)\nconsole.log('终点回调执行:', completed)"
           ],
           "members": [],
           "composes": [],
@@ -2381,7 +2381,7 @@
                     [
                       "`mode`",
                       "必填，无默认",
-                      "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
                     ],
                     [
                       "`next`",
@@ -2456,7 +2456,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: MiddlewarePipelineMode.generator })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  '缓存值',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('普通返回会完成:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  '缓存值',\n  (value) => {\n    console.log('显式空值仍交付:', value === undefined)\n  }\n)"
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: generatorMode })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  '缓存值',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('普通返回会完成:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  '缓存值',\n  (value) => {\n    console.log('显式空值仍交付:', value === undefined)\n  }\n)"
           ],
           "members": [],
           "composes": [],
@@ -2517,7 +2517,7 @@
                     [
                       "`mode`",
                       "必填，无默认",
-                      "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
                     ],
                     [
                       "`next`",
@@ -2581,8 +2581,8 @@
           "name": "IAsyncGeneratorMiddlewareStage",
           "kind": "type",
           "signature": "export type IAsyncGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue | IGeneratorUndefinedSignal<TValue, TSignals>, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;",
-          "declarationLine": 50,
-          "source": "packages/middleware-pipeline/dist/runtime.d.ts",
+          "declarationLine": 47,
+          "source": "packages/middleware-pipeline/dist/runtime-types.d.ts",
           "purpose": "Async generator stage (value, context?) with the same TValue/TSignals separation and return-signal protocol as the synchronous generator; it belongs to async-generator mode.",
           "core": "Async generator stage (value, context?) with the same TValue/TSignals separation and return-signal protocol as the synchronous generator; it belongs to async-generator mode.",
           "advanced": "",
@@ -2636,7 +2636,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IAsyncGeneratorMiddlewareStage:export type IAsyncGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue | IGeneratorUndefinedSignal<TValue, TSignals>, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;",
+          "identity": "packages/middleware-pipeline/dist/runtime-types.d.ts:IAsyncGeneratorMiddlewareStage:export type IAsyncGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue | IGeneratorUndefinedSignal<TValue, TSignals>, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -2646,8 +2646,8 @@
           "name": "IAsyncMiddlewareStage",
           "kind": "type",
           "signature": "export type IAsyncMiddlewareStage<TValue, TResult = void> = (value: TValue, next: (value: TValue) => Promise<TResult>, context?: IMiddlewarePipelineContext) => void | Promise<unknown>;",
-          "declarationLine": 34,
-          "source": "packages/middleware-pipeline/dist/runtime.d.ts",
+          "declarationLine": 31,
+          "source": "packages/middleware-pipeline/dist/runtime-types.d.ts",
           "purpose": "An async stage `(value, next, context?)`. `next(value)` starts downstream and returns its Promise, so code after `await next()` runs afterwards.",
           "core": "An async stage `(value, next, context?)`. `next(value)` starts downstream and returns its Promise, so code after `await next()` runs afterwards.",
           "advanced": "",
@@ -2701,7 +2701,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IAsyncMiddlewareStage:export type IAsyncMiddlewareStage<TValue, TResult = void> = (value: TValue, next: (value: TValue) => Promise<TResult>, context?: IMiddlewarePipelineContext) => void | Promise<unknown>;",
+          "identity": "packages/middleware-pipeline/dist/runtime-types.d.ts:IAsyncMiddlewareStage:export type IAsyncMiddlewareStage<TValue, TResult = void> = (value: TValue, next: (value: TValue) => Promise<TResult>, context?: IMiddlewarePipelineContext) => void | Promise<unknown>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2710,8 +2710,8 @@
         {
           "name": "ICreatePipelineOptions",
           "kind": "type",
-          "signature": "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Required execution mode: sync, async, generator, or async-generator. Determines stage shape, * downstream timing, and whether run throws synchronously or returns a promise. */ readonly mode: TMode; /** Number of values one active stage may submit; omitted preserves single semantics. */ readonly next?: MiddlewarePipelineNext; /** * Optional duplicate/late next reporter; defaults to a no-op. A rejected next never starts * downstream again. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** * Optional host lifetime assertion at entry and after successful stages. Async onion frames also * check while returning, even after done ran; a later failure does not undo completed side * effects. */ readonly assertActive?: () => void; /** * Optional default cooperative signal. A supplied run-level signal overrides it; none is created * by default. */ readonly signal?: IAbortSignal; /** * Optional generator control symbols; defaults to MiddlewarePipelineGeneratorSignals. * undefined/halt/continue must be distinct symbols, read once and snapshotted at construction. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Optional async-onion dual-failure policy, called with stage failure first and downstream * second. Without it, independent failures become EXECUTION_FAILED with both on * AggregateError.errors. A returned custom error must retain both originals through cause/errors; * a thrown combiner failure keeps the preexisting failures reachable. The same propagated object * is not combined twice. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
-          "declarationLine": 45,
+          "signature": "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Required execution mode: sync, async, generator, or async-generator. Determines stage shape, * downstream timing, and whether run throws synchronously or returns a promise. */ readonly mode: IPipelineModeObject<TMode>; /** Number of values one active stage may submit; omitted preserves single semantics. */ readonly next?: MiddlewarePipelineNext; /** * Optional duplicate/late next reporter; defaults to a no-op. A rejected next never starts * downstream again. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** * Optional host lifetime assertion at entry and after successful stages. Async onion frames also * check while returning, even after done ran; a later failure does not undo completed side * effects. */ readonly assertActive?: () => void; /** * Optional default cooperative signal. A supplied run-level signal overrides it; none is created * by default. */ readonly signal?: IAbortSignal; /** * Optional generator control symbols; defaults to MiddlewarePipelineGeneratorSignals. * undefined/halt/continue must be distinct symbols, read once and snapshotted at construction. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Optional async-onion dual-failure policy, called with stage failure first and downstream * second. Without it, independent failures become EXECUTION_FAILED with both on * AggregateError.errors. A returned custom error must retain both originals through cause/errors; * a thrown combiner failure keeps the preexisting failures reachable. The same propagated object * is not combined twice. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
+          "declarationLine": 46,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Options of createPipeline(); mode is required. Every public option and control getter is read once for its snapshot; getter failure becomes TypeError/INVALID_OPTION with cause. The validated mode is the value published by the runner.",
           "core": "mode: Execution mode of every run. Stages must be written for this mode or converted with `lift()`.\nChoose sync for ordinary transforms, async for stages that await downstream work, generator for synchronous generator stages, or async-generator for asynchronous generators. Generator modes reduce returned values instead of calling next(). mode is required; there is no default.\nonViolation: Receives `duplicate` or `late` when a stage misuses `next()`. The misuse never starts a second downstream run.\nNot set: misuse is ignored silently.\nSet it when diagnosing a stage that calls next() twice or after returning. duplicate means a repeated call; late means the stage already ended. Both calls are ignored, and without this callback neither is reported.\nassertActive: Called on entry and after each stage; throwing stops the run before the next stage starts. Hosts use it to stop runs once they are closing.\nNot set: no lifecycle check.\nUse it when the host has a closing flag rather than an AbortSignal. Throw to prevent the next stage from starting. Return normally while the host is active; omitting it skips host lifetime checks.\nsignal: Default cancellation signal for every run; checked on entry, before and after each stage and before `done`. A run-level `signal` overrides it.\nNot set: runs cannot be cancelled unless `run()` passes a signal.\nsignals: Replacement generator control signals `{ undefined, halt, continue }` for hosts with their own sentinels; three distinct symbols, read once at creation.\n`MiddlewarePipelineGeneratorSignals` (the exported `GENERATOR_*` symbols).\ncombineStageAndDownstreamError: Only in async onion mode, combines independent stage and downstream failures. The same object propagated through await next is thrown once without calling the combiner; equal primitive values can still be independent failures. A successful custom result must retain both errors through cause/errors. If the combiner throws, its failure stays primary with both originals reachable.\nNot set: an `AggregateError` with code `EXECUTION_FAILED` holds both errors.\nUse it in async mode when a stage fails independently of downstream work and your application needs a specific combined message. Keep both original failures in cause or errors. Without it, the runner creates its own AggregateError; other modes do not use it.",
@@ -2727,10 +2727,10 @@
               "name": "mode",
               "kind": "property",
               "optional": false,
-              "signature": "readonly mode: TMode;",
+              "signature": "readonly mode: IPipelineModeObject<TMode>;",
               "description": "Required execution mode: sync, async, generator, or async-generator. Determines stage shape, downstream timing, and whether run throws synchronously or returns a promise.",
               "parameterDetails": [],
-              "returns": "TMode"
+              "returns": "IPipelineModeObject<TMode>"
             },
             {
               "name": "next",
@@ -2791,7 +2791,7 @@
           "aliasOf": "ICreatePipelineOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Required execution mode: sync, async, generator, or async-generator. Determines stage shape, * downstream timing, and whether run throws synchronously or returns a promise. */ readonly mode: TMode; /** Number of values one active stage may submit; omitted preserves single semantics. */ readonly next?: MiddlewarePipelineNext; /** * Optional duplicate/late next reporter; defaults to a no-op. A rejected next never starts * downstream again. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** * Optional host lifetime assertion at entry and after successful stages. Async onion frames also * check while returning, even after done ran; a later failure does not undo completed side * effects. */ readonly assertActive?: () => void; /** * Optional default cooperative signal. A supplied run-level signal overrides it; none is created * by default. */ readonly signal?: IAbortSignal; /** * Optional generator control symbols; defaults to MiddlewarePipelineGeneratorSignals. * undefined/halt/continue must be distinct symbols, read once and snapshotted at construction. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Optional async-onion dual-failure policy, called with stage failure first and downstream * second. Without it, independent failures become EXECUTION_FAILED with both on * AggregateError.errors. A returned custom error must retain both originals through cause/errors; * a thrown combiner failure keeps the preexisting failures reachable. The same propagated object * is not combined twice. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;"
+            "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Required execution mode: sync, async, generator, or async-generator. Determines stage shape, * downstream timing, and whether run throws synchronously or returns a promise. */ readonly mode: IPipelineModeObject<TMode>; /** Number of values one active stage may submit; omitted preserves single semantics. */ readonly next?: MiddlewarePipelineNext; /** * Optional duplicate/late next reporter; defaults to a no-op. A rejected next never starts * downstream again. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** * Optional host lifetime assertion at entry and after successful stages. Async onion frames also * check while returning, even after done ran; a later failure does not undo completed side * effects. */ readonly assertActive?: () => void; /** * Optional default cooperative signal. A supplied run-level signal overrides it; none is created * by default. */ readonly signal?: IAbortSignal; /** * Optional generator control symbols; defaults to MiddlewarePipelineGeneratorSignals. * undefined/halt/continue must be distinct symbols, read once and snapshotted at construction. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Optional async-onion dual-failure policy, called with stage failure first and downstream * second. Without it, independent failures become EXECUTION_FAILED with both on * AggregateError.errors. A returned custom error must retain both originals through cause/errors; * a thrown combiner failure keeps the preexisting failures reachable. The same propagated object * is not combined twice. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2830,7 +2830,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:ICreatePipelineOptions:export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Required execution mode: sync, async, generator, or async-generator. Determines stage shape, * downstream timing, and whether run throws synchronously or returns a promise. */ readonly mode: TMode; /** Number of values one active stage may submit; omitted preserves single semantics. */ readonly next?: MiddlewarePipelineNext; /** * Optional duplicate/late next reporter; defaults to a no-op. A rejected next never starts * downstream again. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** * Optional host lifetime assertion at entry and after successful stages. Async onion frames also * check while returning, even after done ran; a later failure does not undo completed side * effects. */ readonly assertActive?: () => void; /** * Optional default cooperative signal. A supplied run-level signal overrides it; none is created * by default. */ readonly signal?: IAbortSignal; /** * Optional generator control symbols; defaults to MiddlewarePipelineGeneratorSignals. * undefined/halt/continue must be distinct symbols, read once and snapshotted at construction. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Optional async-onion dual-failure policy, called with stage failure first and downstream * second. Without it, independent failures become EXECUTION_FAILED with both on * AggregateError.errors. A returned custom error must retain both originals through cause/errors; * a thrown combiner failure keeps the preexisting failures reachable. The same propagated object * is not combined twice. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
+          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:ICreatePipelineOptions:export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Required execution mode: sync, async, generator, or async-generator. Determines stage shape, * downstream timing, and whether run throws synchronously or returns a promise. */ readonly mode: IPipelineModeObject<TMode>; /** Number of values one active stage may submit; omitted preserves single semantics. */ readonly next?: MiddlewarePipelineNext; /** * Optional duplicate/late next reporter; defaults to a no-op. A rejected next never starts * downstream again. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** * Optional host lifetime assertion at entry and after successful stages. Async onion frames also * check while returning, even after done ran; a later failure does not undo completed side * effects. */ readonly assertActive?: () => void; /** * Optional default cooperative signal. A supplied run-level signal overrides it; none is created * by default. */ readonly signal?: IAbortSignal; /** * Optional generator control symbols; defaults to MiddlewarePipelineGeneratorSignals. * undefined/halt/continue must be distinct symbols, read once and snapshotted at construction. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Optional async-onion dual-failure policy, called with stage failure first and downstream * second. Without it, independent failures become EXECUTION_FAILED with both on * AggregateError.errors. A returned custom error must retain both originals through cause/errors; * a thrown combiner failure keeps the preexisting failures reachable. The same propagated object * is not combined twice. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
           "guidance": [
             {
               "id": "创建选项及全部默认值",
@@ -2847,7 +2847,7 @@
                     [
                       "`mode`",
                       "必填，无默认",
-                      "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
                     ],
                     [
                       "`next`",
@@ -3004,8 +3004,8 @@
           "name": "IGeneratorMiddlewareStage",
           "kind": "type",
           "signature": "export type IGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue | IGeneratorUndefinedSignal<TValue, TSignals>, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;",
-          "declarationLine": 42,
-          "source": "packages/middleware-pipeline/dist/runtime.d.ts",
+          "declarationLine": 39,
+          "source": "packages/middleware-pipeline/dist/runtime-types.d.ts",
           "purpose": "Generator stage function* (value, context?). TSignals selects the control symbols without widening TValue; yield stores a candidate, while return chooses payload, continue, halt or explicit undefined. Default GENERATOR_UNDEFINED requires TValue to include undefined.",
           "core": "Generator stage function* (value, context?). TSignals selects the control symbols without widening TValue; yield stores a candidate, while return chooses payload, continue, halt or explicit undefined. Default GENERATOR_UNDEFINED requires TValue to include undefined.",
           "advanced": "",
@@ -3059,7 +3059,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IGeneratorMiddlewareStage:export type IGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue | IGeneratorUndefinedSignal<TValue, TSignals>, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;",
+          "identity": "packages/middleware-pipeline/dist/runtime-types.d.ts:IGeneratorMiddlewareStage:export type IGeneratorMiddlewareStage<TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue | IGeneratorUndefinedSignal<TValue, TSignals>, TValue | IGeneratorUndefinedSignal<TValue, TSignals> | TSignals['halt'] | TSignals['continue'] | undefined, void>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -3069,7 +3069,7 @@
           "name": "IMiddlewarePipeline",
           "kind": "type",
           "signature": "export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = Readonly<{ /** Fixed construction mode; changing caller-owned options does not change it. */ readonly mode: TMode; /** * Adapts an allowed source stage to this runner's mode. Same-mode lifting returns the same * function; unsupported directions throw INVALID_OPTION. Lifted sync stages keep next as a local * value submission, so code after next still runs before downstream and a throw prevents * downstream entry. */ lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(stage: IMiddlewarePipelineStage<TFrom, TValue, TSignals>, from: TFrom): IMiddlewarePipelineStage<TMode, TValue, TSignals>; /** * Runs a snapshot of stages from value, calling done only if the sequence continues to the end. * control.signal optionally overrides the construction signal. An effective signal is supplied to * callbacks as context; cancellation is cooperative and never detaches already-started work. * Sync/generator failures throw; async modes reject after their started work settles. Original * failures retain identity where attachable, otherwise remain reachable through the error chain. */ run(stages: readonly IMiddlewarePipelineStage<TMode, TValue, TSignals>[], value: TValue, done: IMiddlewarePipelineDone<TMode, TValue>, control?: IMiddlewarePipelineControlOptions): IMiddlewarePipelineRunResult<TMode>; }>;",
-          "declarationLine": 87,
+          "declarationLine": 88,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "The stateless runner returned by `createPipeline()`. It keeps only the mode and options; stages and values are supplied per run, so runs are isolated from each other.",
           "core": "mode: The execution mode chosen at creation (`sync`, `async`, `generator`, `async-generator`); it never changes.\nlift: Converts a stage written for another mode into this pipeline mode, in lossless directions only: sync into any mode, generator into async-generator. A lifted sync stage keeps its behaviour: code after `next()` still runs before downstream.\nlift.stage: The stage to convert.\nlift.from: Mode the stage was written for (`MiddlewarePipelineMode.*`).\nA stage of this pipeline mode; same-mode lift preserves the stage. Sync-to-generator adapters use the configured runner halt/continue symbols, so no control symbol reaches done as payload and halt never calls done. Unsupported directions throw INVALID_OPTION.\nReuse simple sync stages (trim, validate, tag) in async or generator pipelines.\nrun: Runs `stages` in order on `value`. Sync and async stages call `next(value)` to continue; omitting it stops the run. Generator modes continue or stop according to the final return value or control symbol; yielding alone does not advance downstream. After the last stage, `done(value)` receives the final value. In `sync` mode `next()` only hands the value over and downstream starts after the stage returns; in `async` mode `next()` starts downstream immediately and returns its Promise (onion model).\nrun.stages: Stages of this mode (lift others first); read only for this run.\nrun.value: Input value of the first stage.\nrun.done: Final callback; not called when a stage stops or a generator returns `GENERATOR_HALT`.\nrun.control: Optional `{ signal }` for this run. `control.signal` defaults to the construction-time signal when omitted; with neither, no signal or context is supplied. A supplied run signal overrides the construction signal and is visible as `context.signal`.\n`void` in sync/generator and Promise<void> in async/async-generator. Error cancellation reasons retain native identity when writable; unclassified reasons receive ABORTED, foreign identities stay unchanged, and primitive or undefined reasons use ordinary Error with cause. Every async outer stage checks activity after returning, even after done; rejection does not undo done.",
@@ -3202,7 +3202,7 @@
                     [
                       "`mode`",
                       "必填，无默认",
-                      "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
                     ],
                     [
                       "`next`",
@@ -3266,8 +3266,8 @@
           "name": "IMiddlewarePipelineContext",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineContext = { /** * Host-owned effective signal after run-level override; running work must cooperate with * cancellation. */ readonly signal: IAbortSignal; };",
-          "declarationLine": 8,
-          "source": "packages/middleware-pipeline/dist/runtime.d.ts",
+          "declarationLine": 5,
+          "source": "packages/middleware-pipeline/dist/runtime-types.d.ts",
           "purpose": "Optional run context: third argument of sync/async stages, second argument of generator/async-generator stages and done. It is supplied only when an effective signal exists.",
           "core": "signal: The signal this run actually uses (run-level first, then creation-time); pass it to your own I/O to stop early.",
           "advanced": "",
@@ -3331,7 +3331,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineContext:export type IMiddlewarePipelineContext = { /** * Host-owned effective signal after run-level override; running work must cooperate with * cancellation. */ readonly signal: IAbortSignal; };",
+          "identity": "packages/middleware-pipeline/dist/runtime-types.d.ts:IMiddlewarePipelineContext:export type IMiddlewarePipelineContext = { /** * Host-owned effective signal after run-level override; running work must cooperate with * cancellation. */ readonly signal: IAbortSignal; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3341,8 +3341,8 @@
           "name": "IMiddlewarePipelineControlOptions",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineControlOptions = { /** Overrides the construction signal when supplied; undefined falls back to that default. */ readonly signal?: IAbortSignal; };",
-          "declarationLine": 16,
-          "source": "packages/middleware-pipeline/dist/runtime.d.ts",
+          "declarationLine": 13,
+          "source": "packages/middleware-pipeline/dist/runtime-types.d.ts",
           "purpose": "Fourth argument of `run()`: per-run controls.",
           "core": "signal: Cancellation signal for this run only; overrides the creation-time signal.\nNot set: the creation-time `signal` is used, if any.",
           "advanced": "",
@@ -3406,7 +3406,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineControlOptions:export type IMiddlewarePipelineControlOptions = { /** Overrides the construction signal when supplied; undefined falls back to that default. */ readonly signal?: IAbortSignal; };",
+          "identity": "packages/middleware-pipeline/dist/runtime-types.d.ts:IMiddlewarePipelineControlOptions:export type IMiddlewarePipelineControlOptions = { /** Overrides the construction signal when supplied; undefined falls back to that default. */ readonly signal?: IAbortSignal; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3416,7 +3416,7 @@
           "name": "IMiddlewarePipelineDone",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineDone<TMode extends IMiddlewarePipelineMode, TValue> = TMode extends IMiddlewarePipelineSyncMode ? (value: TValue, context?: IMiddlewarePipelineContext) => void : (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>;",
-          "declarationLine": 23,
+          "declarationLine": 24,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Final callback of `run()`; may return a Promise in async modes.",
           "core": "Final callback of `run()`; may return a Promise in async modes.",
@@ -3546,7 +3546,7 @@
           "name": "IMiddlewarePipelineLiftSource",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineLiftSource<TMode extends IMiddlewarePipelineMode> = { readonly sync: 'sync'; readonly async: 'sync' | 'async'; readonly generator: 'sync' | 'generator'; readonly 'async-generator': 'sync' | 'generator' | 'async-generator'; }[TMode];",
-          "declarationLine": 34,
+          "declarationLine": 35,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Source-mode string union accepted by `lift()` for the selected target. Target `sync` accepts only `sync`; target `async` accepts `sync` or `async`; target `generator` accepts `sync` or `generator`; target `async-generator` accepts `sync`, `generator`, or `async-generator`. Same-mode stages are used unchanged. Lifted sync stages retain sync ordering; async onion stages cannot be lifted into async-generator mode.",
           "core": "Source-mode string union accepted by `lift()` for the selected target. Target `sync` accepts only `sync`; target `async` accepts `sync` or `async`; target `generator` accepts `sync` or `generator`; target `async-generator` accepts `sync`, `generator`, or `async-generator`. Same-mode stages are used unchanged. Lifted sync stages retain sync ordering; async onion stages cannot be lifted into async-generator mode.",
@@ -3676,7 +3676,7 @@
           "name": "IMiddlewarePipelineRunResult",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineRunResult<TMode extends IMiddlewarePipelineMode> = TMode extends IMiddlewarePipelineSyncMode ? void : Promise<void>;",
-          "declarationLine": 28,
+          "declarationLine": 29,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Return type of `run()`: `void` in sync modes, `Promise<void>` in async modes.",
           "core": "Return type of `run()`: `void` in sync modes, `Promise<void>` in async modes.",
@@ -3741,7 +3741,7 @@
           "name": "IMiddlewarePipelineStage",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineStage<TMode extends IMiddlewarePipelineMode, TValue, TSignals extends IGeneratorMiddlewareSignals = typeof MiddlewarePipelineGeneratorSignals> = { readonly sync: ISyncMiddlewareStage<TValue>; readonly async: IAsyncMiddlewareStage<TValue>; readonly generator: IGeneratorMiddlewareStage<TValue, TSignals>; readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue, TSignals>; }[TMode];",
-          "declarationLine": 10,
+          "declarationLine": 11,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Stage function type selected by `TMode`. `sync` selects `ISyncMiddlewareStage`; `async` selects `IAsyncMiddlewareStage`; `generator` selects `IGeneratorMiddlewareStage`; `async-generator` selects `IAsyncGeneratorMiddlewareStage`. `TSignals` keeps generator controls separate from `TValue` and defaults to the exported unique-symbol signal set.",
           "core": "Stage function type selected by `TMode`. `sync` selects `ISyncMiddlewareStage`; `async` selects `IAsyncMiddlewareStage`; `generator` selects `IGeneratorMiddlewareStage`; `async-generator` selects `IAsyncGeneratorMiddlewareStage`. `TSignals` keeps generator controls separate from `TValue` and defaults to the exported unique-symbol signal set.",
@@ -3933,11 +3933,86 @@
           "fragment": "middleware-pipeline-index--IMiddlewarePipelineViolationHandler"
         },
         {
+          "name": "IPipelineModeObject",
+          "kind": "type",
+          "signature": "export type IPipelineModeObject<TMode extends IMiddlewarePipelineMode> = Readonly<{ key: TMode; }>;",
+          "declarationLine": 5,
+          "source": "packages/middleware-pipeline/dist/mode-registry.d.ts",
+          "purpose": "Opaque mode identity exposes only its stable execution key.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPipelineModeObject.",
+          "advanced": "No additional advanced behavior is declared for IPipelineModeObject.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IPipelineModeObject."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPipelineModeObject.",
+          "examples": [],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: TMode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TMode"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPipelineModeObject",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPipelineModeObject<TMode extends IMiddlewarePipelineMode> = Readonly<{ key: TMode; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IPipelineModeObject when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IPipelineModeObject does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Opaque mode identity exposes only its stable execution key."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPipelineModeObject from @migaia/middleware-pipeline, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPipelineModeObject when its type contract and declared inputs match the result you need. Choose a different public symbol when IPipelineModeObject does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPipelineModeObject."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IPipelineModeObject."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/middleware-pipeline/dist/mode-registry.d.ts:IPipelineModeObject:export type IPipelineModeObject<TMode extends IMiddlewarePipelineMode> = Readonly<{ key: TMode; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "middleware-pipeline-index--IPipelineModeObject"
+        },
+        {
           "name": "ISyncMiddlewareStage",
           "kind": "type",
           "signature": "export type ISyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => void, context?: IMiddlewarePipelineContext) => void;",
-          "declarationLine": 26,
-          "source": "packages/middleware-pipeline/dist/runtime.d.ts",
+          "declarationLine": 23,
+          "source": "packages/middleware-pipeline/dist/runtime-types.d.ts",
           "purpose": "A sync stage `(value, next, context?) => void`. `next(value)` hands the value over; downstream starts after the stage returns.",
           "core": "A sync stage `(value, next, context?) => void`. `next(value)` hands the value over; downstream starts after the stage returns.",
           "advanced": "",
@@ -3991,7 +4066,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:ISyncMiddlewareStage:export type ISyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => void, context?: IMiddlewarePipelineContext) => void;",
+          "identity": "packages/middleware-pipeline/dist/runtime-types.d.ts:ISyncMiddlewareStage:export type ISyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => void, context?: IMiddlewarePipelineContext) => void;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4385,7 +4460,7 @@
                     [
                       "`mode`",
                       "必填，无默认",
-                      "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
                     ],
                     [
                       "`next`",
@@ -4460,12 +4535,12 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.sync })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('结果:', value)\n})",
-            "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.async })\nconst trace: string[] = []\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('开始计时')\n      try {\n        await next(value + 1)\n      } finally {\n        trace.push('结束计时')\n      }\n    },\n    async (value, next) => {\n      trace.push('校验')\n      await next(value * 2)\n    }\n  ],\n  2,\n  (value) => {\n    trace.push(`结果 ${value}`)\n  }\n)\nconsole.log(trace.join(' | '))",
-            "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\nconst trim = pipeline.lift((value, next) => {\n  console.log('同步步骤调用 next 前')\n  next(value.trim())\n  console.log('同步步骤调用 next 后')\n}, MiddlewarePipelineMode.sync)\nawait pipeline.run(\n  [\n    trim,\n    async (value, next) => {\n      console.log('异步步骤输入:', value)\n      await next(value.toUpperCase())\n    }\n  ],\n  ' ready ',\n  (value) => {\n    console.log('结果:', value)\n  }\n)",
-            "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst application = new AbortController()\napplication.abort(new Error('应用已停止'))\nconst request = new AbortController()\nconst pipeline = createPipeline<number>({\n  mode: MiddlewarePipelineMode.async,\n  signal: application.signal\n})\nlet completed = false\ntry {\n  await pipeline.run(\n    [\n      async (value, next, context) => {\n        console.log('采用请求信号:', context?.signal === request.signal)\n        request.abort(new Error('请求已取消'))\n        await next(value + 1)\n      }\n    ],\n    1,\n    () => {\n      completed = true\n    },\n    { signal: request.signal }\n  )\n} catch (error) {\n  console.log('失败:', (error as Error).message)\n}\nconsole.log('终点回调执行:', completed)",
-            "import { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('写入步骤执行:', written)\nconsole.log('终点回调执行:', completed)",
-            "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: MiddlewarePipelineMode.generator })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  '缓存值',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('普通返回会完成:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  '缓存值',\n  (value) => {\n    console.log('显式空值仍交付:', value === undefined)\n  }\n)"
+            "import { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: syncMode })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('结果:', value)\n})",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: asyncMode })\nconst trace: string[] = []\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('开始计时')\n      try {\n        await next(value + 1)\n      } finally {\n        trace.push('结束计时')\n      }\n    },\n    async (value, next) => {\n      trace.push('校验')\n      await next(value * 2)\n    }\n  ],\n  2,\n  (value) => {\n    trace.push(`结果 ${value}`)\n  }\n)\nconsole.log(trace.join(' | '))",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: asyncMode })\nconst trim = pipeline.lift((value, next) => {\n  console.log('同步步骤调用 next 前')\n  next(value.trim())\n  console.log('同步步骤调用 next 后')\n}, syncMode)\nawait pipeline.run(\n  [\n    trim,\n    async (value, next) => {\n      console.log('异步步骤输入:', value)\n      await next(value.toUpperCase())\n    }\n  ],\n  ' ready ',\n  (value) => {\n    console.log('结果:', value)\n  }\n)",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst application = new AbortController()\napplication.abort(new Error('应用已停止'))\nconst request = new AbortController()\nconst pipeline = createPipeline<number>({\n  mode: asyncMode,\n  signal: application.signal\n})\nlet completed = false\ntry {\n  await pipeline.run(\n    [\n      async (value, next, context) => {\n        console.log('采用请求信号:', context?.signal === request.signal)\n        request.abort(new Error('请求已取消'))\n        await next(value + 1)\n      }\n    ],\n    1,\n    () => {\n      completed = true\n    },\n    { signal: request.signal }\n  )\n} catch (error) {\n  console.log('失败:', (error as Error).message)\n}\nconsole.log('终点回调执行:', completed)",
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: generatorMode })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('写入步骤执行:', written)\nconsole.log('终点回调执行:', completed)",
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: generatorMode })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  '缓存值',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('普通返回会完成:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  '缓存值',\n  (value) => {\n    console.log('显式空值仍交付:', value === undefined)\n  }\n)"
           ],
           "members": [
             {
@@ -4549,79 +4624,8 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/middleware-pipeline/dist/state-constants.d.ts:MiddlewarePipelineMode:export declare const MiddlewarePipelineMode: { /** Linear synchronous stages: next only submits a value; downstream runs after the stage returns. */ readonly sync: 'sync'; /** Awaitable onion stages: the first next starts downstream and returns its promise. */ readonly async: 'async'; /** Synchronous generators: drain each stage and reduce its final return before continuing. */ readonly generator: 'generator'; /** Await each generator iteration and terminal callback; run returns a promise. */ readonly asyncGenerator: 'async-generator'; };",
-          "guidance": [
-            {
-              "id": "创建选项及全部默认值",
-              "heading": "创建选项及全部默认值",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "`createPipeline<TValue>(options)` 必须明确选择模式。返回类型为该模式的 `IMiddlewarePipeline<TMode, TValue, TSignals>`；模式决定 stage、done、run 返回值和允许的提升方向。选项类型是 `ICreatePipelineOptions<TMode>`。"
-                },
-                {
-                  "type": "table",
-                  "headers": ["字段", "默认值", "含义与所有取值"],
-                  "rows": [
-                    [
-                      "`mode`",
-                      "必填，无默认",
-                      "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
-                    ],
-                    [
-                      "`next`",
-                      "`'single'`",
-                      "`'single'` 或 `'multiple'`，对应 `MiddlewarePipelineNext`。整条 pipeline 与 lift 共用；multiple 在四种模式下都允许独立的多次遍历。"
-                    ],
-                    [
-                      "`onViolation(kind)`",
-                      "空操作函数",
-                      "同步接收 `'duplicate'` 或 `'late'`；分别对应 `MiddlewarePipelineViolation.duplicate`、`late`。用于记录非法 next 调用，不重新执行下游。"
-                    ],
-                    [
-                      "`assertActive()`",
-                      "`undefined`",
-                      "宿主提供的同步生命周期断言。入口和每个 stage 后执行；异步模式进入下游时也会检查。抛错会阻止继续执行，包不替宿主改变状态。"
-                    ],
-                    [
-                      "`signal`",
-                      "`undefined`",
-                      "默认取消信号，供未提供调用级信号的 run 使用。信号的结构和状态在 run 入口校验，不在创建时提前读取。"
-                    ],
-                    [
-                      "`signals`",
-                      "`MiddlewarePipelineGeneratorSignals`",
-                      "生成器的三个控制 symbol；字段为 `undefined`、`halt`、`continue`，必须互不相同。默认集已冻结。"
-                    ],
-                    [
-                      "`signals.undefined`",
-                      "`GENERATOR_UNDEFINED`",
-                      "把 undefined 当作显式业务值继续，而不是结束。"
-                    ],
-                    [
-                      "`signals.halt`",
-                      "`GENERATOR_HALT`",
-                      "single 终止整条链；multiple 不增加终值遍历，也不撤销先前的 yield。"
-                    ],
-                    [
-                      "`signals.continue`",
-                      "`GENERATOR_CONTINUE`",
-                      "single 采用最后一次 yield 或输入；multiple 不增加终值遍历。"
-                    ],
-                    [
-                      "`combineStageAndDownstreamError(stage, downstream)`",
-                      "`undefined`",
-                      "只用于异步洋葱执行中两个独立失败：第一个参数来自当前 stage，第二个来自它已启动的下游。返回值作为组合失败抛出；调用方要让两个原错通过 cause 或 AggregateError.errors 可达。"
-                    ]
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "构造选项必须是对象，不能为 null 或数组。支持的字段及自定义信号的三个属性只读取一次，再冻结内部快照；修改调用方对象不会改变已创建的 pipeline。`mode` 属性发布的就是这一份已验证值。非法模式、next 取值、回调、控制对象、信号结构、信号集或提升方向以原生 `TypeError` 和 `INVALID_OPTION` 报告。选项 getter 抛错时，原始失败保留在 `cause`。"
-                }
-              ]
-            }
-          ],
-          "usageScore": 102,
+          "guidance": [],
+          "usageScore": 68,
           "configuration": [],
           "fragment": "middleware-pipeline-index--MiddlewarePipelineMode"
         },
@@ -4721,7 +4725,7 @@
                     [
                       "`mode`",
                       "必填，无默认",
-                      "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
                     ],
                     [
                       "`next`",
@@ -4876,7 +4880,7 @@
                     [
                       "`mode`",
                       "必填，无默认",
-                      "`'sync'`、`'async'`、`'generator'`、`'async-generator'`，分别对应 `MiddlewarePipelineMode.sync`、`async`、`generator`、`asyncGenerator`。创建后不能改变。"
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
                     ],
                     [
                       "`next`",
@@ -4935,6 +4939,769 @@
           "usageScore": 4,
           "configuration": [],
           "fragment": "middleware-pipeline-index--MiddlewarePipelineViolation"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "middleware-pipeline:admission",
+      "library": "middleware-pipeline",
+      "module": "admission",
+      "exportPath": "./admission",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/middleware-pipeline/getting-started",
+      "architecturePath": "/en/docs/middleware-pipeline",
+      "symbols": [
+        {
+          "name": "admitPipelineNext",
+          "kind": "function",
+          "signature": "export declare function admitPipelineNext(value: unknown): MiddlewarePipelineNext;",
+          "declarationLine": 3,
+          "source": "packages/middleware-pipeline/dist/option-admission.d.ts",
+          "purpose": "Pure next-policy admission preserves the same native error without constructing a mode runner.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for admitPipelineNext.",
+          "advanced": "No additional advanced behavior is declared for admitPipelineNext.",
+          "parameters": ["value: unknown"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "MiddlewarePipelineNext",
+          "errors": ["No documented errors are declared for admitPipelineNext."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for admitPipelineNext.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./admission",
+          "overloadSignatures": [
+            "export declare function admitPipelineNext(value: unknown): MiddlewarePipelineNext;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["MiddlewarePipelineNext"],
+          "whenToUse": "Use admitPipelineNext when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when admitPipelineNext does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Pure next-policy admission preserves the same native error without constructing a mode runner."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import admitPipelineNext from @migaia/middleware-pipeline/admission, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use admitPipelineNext when its function contract and declared inputs match the result you need. Choose a different public symbol when admitPipelineNext does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for admitPipelineNext."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for admitPipelineNext."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/middleware-pipeline/dist/option-admission.d.ts:admitPipelineNext:export declare function admitPipelineNext(value: unknown): MiddlewarePipelineNext;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "middleware-pipeline-admission--admitPipelineNext"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "middleware-pipeline:async",
+      "library": "middleware-pipeline",
+      "module": "async",
+      "exportPath": "./async",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/middleware-pipeline/getting-started",
+      "architecturePath": "/en/docs/middleware-pipeline",
+      "symbols": [
+        {
+          "name": "asyncMode",
+          "kind": "const",
+          "signature": "export declare const asyncMode: Readonly<{ key: \"async\"; }>;",
+          "declarationLine": 2,
+          "source": "packages/middleware-pipeline/dist/modes/async.d.ts",
+          "purpose": "Real async runner and lift behavior, installed only through this identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for asyncMode.",
+          "advanced": "No additional advanced behavior is declared for asyncMode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for asyncMode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for asyncMode.",
+          "examples": [
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: asyncMode })\nconst trace: string[] = []\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('开始计时')\n      try {\n        await next(value + 1)\n      } finally {\n        trace.push('结束计时')\n      }\n    },\n    async (value, next) => {\n      trace.push('校验')\n      await next(value * 2)\n    }\n  ],\n  2,\n  (value) => {\n    trace.push(`结果 ${value}`)\n  }\n)\nconsole.log(trace.join(' | '))",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: asyncMode })\nconst trim = pipeline.lift((value, next) => {\n  console.log('同步步骤调用 next 前')\n  next(value.trim())\n  console.log('同步步骤调用 next 后')\n}, syncMode)\nawait pipeline.run(\n  [\n    trim,\n    async (value, next) => {\n      console.log('异步步骤输入:', value)\n      await next(value.toUpperCase())\n    }\n  ],\n  ' ready ',\n  (value) => {\n    console.log('结果:', value)\n  }\n)",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst application = new AbortController()\napplication.abort(new Error('应用已停止'))\nconst request = new AbortController()\nconst pipeline = createPipeline<number>({\n  mode: asyncMode,\n  signal: application.signal\n})\nlet completed = false\ntry {\n  await pipeline.run(\n    [\n      async (value, next, context) => {\n        console.log('采用请求信号:', context?.signal === request.signal)\n        request.abort(new Error('请求已取消'))\n        await next(value + 1)\n      }\n    ],\n    1,\n    () => {\n      completed = true\n    },\n    { signal: request.signal }\n  )\n} catch (error) {\n  console.log('失败:', (error as Error).message)\n}\nconsole.log('终点回调执行:', completed)",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { createPipeline } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('第二个值失败')\nconst received: number[] = []\nconst reported: unknown[] = []\nconst pipeline = createPipeline<number>({ mode: asyncMode, next: 'multiple' })\nawait pipeline.run(\n  [\n    async (_value, next) => {\n      await next(1)\n      try {\n        await next(2)\n      } catch (error) {\n        reported.push(error)\n      }\n      await next(3)\n    }\n  ],\n  0,\n  (value) => {\n    received.push(value)\n    if (value === 2) throw failure\n  }\n)\nconsole.log(received.join(','), reported[0] === failure)"
+          ],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: \"async\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"async\""
+            }
+          ],
+          "composes": [],
+          "exportPath": "./async",
+          "overloadSignatures": ["export declare const asyncMode: Readonly<{ key: \"async\"; }>;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use asyncMode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when asyncMode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Real async runner and lift behavior, installed only through this identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import asyncMode from @migaia/middleware-pipeline/async, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use asyncMode when its const contract and declared inputs match the result you need. Choose a different public symbol when asyncMode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for asyncMode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for asyncMode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/middleware-pipeline/dist/modes/async.d.ts:asyncMode:export declare const asyncMode: Readonly<{ key: \"async\"; }>;",
+          "guidance": [
+            {
+              "id": "创建选项及全部默认值",
+              "heading": "创建选项及全部默认值",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createPipeline<TValue>(options)` 必须明确选择模式。返回类型为该模式的 `IMiddlewarePipeline<TMode, TValue, TSignals>`；模式决定 stage、done、run 返回值和允许的提升方向。选项类型是 `ICreatePipelineOptions<TMode>`。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["字段", "默认值", "含义与所有取值"],
+                  "rows": [
+                    [
+                      "`mode`",
+                      "必填，无默认",
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
+                    ],
+                    [
+                      "`next`",
+                      "`'single'`",
+                      "`'single'` 或 `'multiple'`，对应 `MiddlewarePipelineNext`。整条 pipeline 与 lift 共用；multiple 在四种模式下都允许独立的多次遍历。"
+                    ],
+                    [
+                      "`onViolation(kind)`",
+                      "空操作函数",
+                      "同步接收 `'duplicate'` 或 `'late'`；分别对应 `MiddlewarePipelineViolation.duplicate`、`late`。用于记录非法 next 调用，不重新执行下游。"
+                    ],
+                    [
+                      "`assertActive()`",
+                      "`undefined`",
+                      "宿主提供的同步生命周期断言。入口和每个 stage 后执行；异步模式进入下游时也会检查。抛错会阻止继续执行，包不替宿主改变状态。"
+                    ],
+                    [
+                      "`signal`",
+                      "`undefined`",
+                      "默认取消信号，供未提供调用级信号的 run 使用。信号的结构和状态在 run 入口校验，不在创建时提前读取。"
+                    ],
+                    [
+                      "`signals`",
+                      "`MiddlewarePipelineGeneratorSignals`",
+                      "生成器的三个控制 symbol；字段为 `undefined`、`halt`、`continue`，必须互不相同。默认集已冻结。"
+                    ],
+                    [
+                      "`signals.undefined`",
+                      "`GENERATOR_UNDEFINED`",
+                      "把 undefined 当作显式业务值继续，而不是结束。"
+                    ],
+                    [
+                      "`signals.halt`",
+                      "`GENERATOR_HALT`",
+                      "single 终止整条链；multiple 不增加终值遍历，也不撤销先前的 yield。"
+                    ],
+                    [
+                      "`signals.continue`",
+                      "`GENERATOR_CONTINUE`",
+                      "single 采用最后一次 yield 或输入；multiple 不增加终值遍历。"
+                    ],
+                    [
+                      "`combineStageAndDownstreamError(stage, downstream)`",
+                      "`undefined`",
+                      "只用于异步洋葱执行中两个独立失败：第一个参数来自当前 stage，第二个来自它已启动的下游。返回值作为组合失败抛出；调用方要让两个原错通过 cause 或 AggregateError.errors 可达。"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造选项必须是对象，不能为 null 或数组。支持的字段及自定义信号的三个属性只读取一次，再冻结内部快照；修改调用方对象不会改变已创建的 pipeline。`mode` 属性发布的就是这一份已验证值。非法模式、next 取值、回调、控制对象、信号结构、信号集或提升方向以原生 `TypeError` 和 `INVALID_OPTION` 报告。选项 getter 抛错时，原始失败保留在 `cause`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 60,
+          "configuration": [],
+          "fragment": "middleware-pipeline-async--asyncMode"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "middleware-pipeline:async-generator",
+      "library": "middleware-pipeline",
+      "module": "async-generator",
+      "exportPath": "./async-generator",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/middleware-pipeline/getting-started",
+      "architecturePath": "/en/docs/middleware-pipeline",
+      "symbols": [
+        {
+          "name": "asyncGeneratorMode",
+          "kind": "const",
+          "signature": "export declare const asyncGeneratorMode: Readonly<{ key: \"async-generator\"; }>;",
+          "declarationLine": 2,
+          "source": "packages/middleware-pipeline/dist/modes/async-generator.d.ts",
+          "purpose": "Real async-generator runner and lift behavior, installed only through this identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for asyncGeneratorMode.",
+          "advanced": "No additional advanced behavior is declared for asyncGeneratorMode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for asyncGeneratorMode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for asyncGeneratorMode.",
+          "examples": [],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: \"async-generator\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"async-generator\""
+            }
+          ],
+          "composes": [],
+          "exportPath": "./async-generator",
+          "overloadSignatures": [
+            "export declare const asyncGeneratorMode: Readonly<{ key: \"async-generator\"; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use asyncGeneratorMode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when asyncGeneratorMode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Real async-generator runner and lift behavior, installed only through this identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import asyncGeneratorMode from @migaia/middleware-pipeline/async-generator, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use asyncGeneratorMode when its const contract and declared inputs match the result you need. Choose a different public symbol when asyncGeneratorMode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for asyncGeneratorMode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for asyncGeneratorMode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/middleware-pipeline/dist/modes/async-generator.d.ts:asyncGeneratorMode:export declare const asyncGeneratorMode: Readonly<{ key: \"async-generator\"; }>;",
+          "guidance": [
+            {
+              "id": "创建选项及全部默认值",
+              "heading": "创建选项及全部默认值",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createPipeline<TValue>(options)` 必须明确选择模式。返回类型为该模式的 `IMiddlewarePipeline<TMode, TValue, TSignals>`；模式决定 stage、done、run 返回值和允许的提升方向。选项类型是 `ICreatePipelineOptions<TMode>`。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["字段", "默认值", "含义与所有取值"],
+                  "rows": [
+                    [
+                      "`mode`",
+                      "必填，无默认",
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
+                    ],
+                    [
+                      "`next`",
+                      "`'single'`",
+                      "`'single'` 或 `'multiple'`，对应 `MiddlewarePipelineNext`。整条 pipeline 与 lift 共用；multiple 在四种模式下都允许独立的多次遍历。"
+                    ],
+                    [
+                      "`onViolation(kind)`",
+                      "空操作函数",
+                      "同步接收 `'duplicate'` 或 `'late'`；分别对应 `MiddlewarePipelineViolation.duplicate`、`late`。用于记录非法 next 调用，不重新执行下游。"
+                    ],
+                    [
+                      "`assertActive()`",
+                      "`undefined`",
+                      "宿主提供的同步生命周期断言。入口和每个 stage 后执行；异步模式进入下游时也会检查。抛错会阻止继续执行，包不替宿主改变状态。"
+                    ],
+                    [
+                      "`signal`",
+                      "`undefined`",
+                      "默认取消信号，供未提供调用级信号的 run 使用。信号的结构和状态在 run 入口校验，不在创建时提前读取。"
+                    ],
+                    [
+                      "`signals`",
+                      "`MiddlewarePipelineGeneratorSignals`",
+                      "生成器的三个控制 symbol；字段为 `undefined`、`halt`、`continue`，必须互不相同。默认集已冻结。"
+                    ],
+                    [
+                      "`signals.undefined`",
+                      "`GENERATOR_UNDEFINED`",
+                      "把 undefined 当作显式业务值继续，而不是结束。"
+                    ],
+                    [
+                      "`signals.halt`",
+                      "`GENERATOR_HALT`",
+                      "single 终止整条链；multiple 不增加终值遍历，也不撤销先前的 yield。"
+                    ],
+                    [
+                      "`signals.continue`",
+                      "`GENERATOR_CONTINUE`",
+                      "single 采用最后一次 yield 或输入；multiple 不增加终值遍历。"
+                    ],
+                    [
+                      "`combineStageAndDownstreamError(stage, downstream)`",
+                      "`undefined`",
+                      "只用于异步洋葱执行中两个独立失败：第一个参数来自当前 stage，第二个来自它已启动的下游。返回值作为组合失败抛出；调用方要让两个原错通过 cause 或 AggregateError.errors 可达。"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造选项必须是对象，不能为 null 或数组。支持的字段及自定义信号的三个属性只读取一次，再冻结内部快照；修改调用方对象不会改变已创建的 pipeline。`mode` 属性发布的就是这一份已验证值。非法模式、next 取值、回调、控制对象、信号结构、信号集或提升方向以原生 `TypeError` 和 `INVALID_OPTION` 报告。选项 getter 抛错时，原始失败保留在 `cause`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "middleware-pipeline-async-generator--asyncGeneratorMode"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "middleware-pipeline:generator",
+      "library": "middleware-pipeline",
+      "module": "generator",
+      "exportPath": "./generator",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/middleware-pipeline/getting-started",
+      "architecturePath": "/en/docs/middleware-pipeline",
+      "symbols": [
+        {
+          "name": "generatorMode",
+          "kind": "const",
+          "signature": "export declare const generatorMode: Readonly<{ key: \"generator\"; }>;",
+          "declarationLine": 2,
+          "source": "packages/middleware-pipeline/dist/modes/generator.d.ts",
+          "purpose": "Real generator runner and lift behavior, installed only through this identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for generatorMode.",
+          "advanced": "No additional advanced behavior is declared for generatorMode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for generatorMode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for generatorMode.",
+          "examples": [
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, MiddlewarePipelineMode, GENERATOR_HALT } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: generatorMode })\nlet written = false\nlet completed = false\npipeline.run(\n  [\n    function* (value) {\n      return value < 0 ? GENERATOR_HALT : value\n    },\n    function* (value) {\n      written = true\n      return value\n    }\n  ],\n  -1,\n  () => {\n    completed = true\n  }\n)\nconsole.log('写入步骤执行:', written)\nconsole.log('终点回调执行:', completed)",
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport {\n  createPipeline,\n  MiddlewarePipelineMode,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string | undefined>({ mode: generatorMode })\nlet ordinaryCompleted = false\npipeline.run(\n  [\n    function* () {\n      return undefined\n    }\n  ],\n  '缓存值',\n  () => {\n    ordinaryCompleted = true\n  }\n)\nconsole.log('普通返回会完成:', ordinaryCompleted)\npipeline.run(\n  [\n    function* () {\n      return GENERATOR_UNDEFINED\n    }\n  ],\n  '缓存值',\n  (value) => {\n    console.log('显式空值仍交付:', value === undefined)\n  }\n)",
+            "import { generatorMode } from '@migaia/middleware-pipeline/generator'\nimport { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'\n\nconst failure = new Error('yield 下游失败')\nconst reported: unknown[] = []\nconst completed: number[] = []\nconst pipeline = createPipeline<number>({ mode: generatorMode, next: 'multiple' })\npipeline.run(\n  [\n    function* () {\n      yield 1\n      try {\n        yield 2\n      } catch (error) {\n        reported.push(error)\n      }\n      yield 3\n      return GENERATOR_CONTINUE\n    }\n  ],\n  0,\n  (value) => {\n    if (value === 2) throw failure\n    completed.push(value)\n  }\n)\nconsole.log(completed.join(','), reported[0] === failure)"
+          ],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: \"generator\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"generator\""
+            }
+          ],
+          "composes": [],
+          "exportPath": "./generator",
+          "overloadSignatures": [
+            "export declare const generatorMode: Readonly<{ key: \"generator\"; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use generatorMode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when generatorMode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Real generator runner and lift behavior, installed only through this identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import generatorMode from @migaia/middleware-pipeline/generator, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use generatorMode when its const contract and declared inputs match the result you need. Choose a different public symbol when generatorMode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for generatorMode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for generatorMode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/middleware-pipeline/dist/modes/generator.d.ts:generatorMode:export declare const generatorMode: Readonly<{ key: \"generator\"; }>;",
+          "guidance": [
+            {
+              "id": "创建选项及全部默认值",
+              "heading": "创建选项及全部默认值",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createPipeline<TValue>(options)` 必须明确选择模式。返回类型为该模式的 `IMiddlewarePipeline<TMode, TValue, TSignals>`；模式决定 stage、done、run 返回值和允许的提升方向。选项类型是 `ICreatePipelineOptions<TMode>`。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["字段", "默认值", "含义与所有取值"],
+                  "rows": [
+                    [
+                      "`mode`",
+                      "必填，无默认",
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
+                    ],
+                    [
+                      "`next`",
+                      "`'single'`",
+                      "`'single'` 或 `'multiple'`，对应 `MiddlewarePipelineNext`。整条 pipeline 与 lift 共用；multiple 在四种模式下都允许独立的多次遍历。"
+                    ],
+                    [
+                      "`onViolation(kind)`",
+                      "空操作函数",
+                      "同步接收 `'duplicate'` 或 `'late'`；分别对应 `MiddlewarePipelineViolation.duplicate`、`late`。用于记录非法 next 调用，不重新执行下游。"
+                    ],
+                    [
+                      "`assertActive()`",
+                      "`undefined`",
+                      "宿主提供的同步生命周期断言。入口和每个 stage 后执行；异步模式进入下游时也会检查。抛错会阻止继续执行，包不替宿主改变状态。"
+                    ],
+                    [
+                      "`signal`",
+                      "`undefined`",
+                      "默认取消信号，供未提供调用级信号的 run 使用。信号的结构和状态在 run 入口校验，不在创建时提前读取。"
+                    ],
+                    [
+                      "`signals`",
+                      "`MiddlewarePipelineGeneratorSignals`",
+                      "生成器的三个控制 symbol；字段为 `undefined`、`halt`、`continue`，必须互不相同。默认集已冻结。"
+                    ],
+                    [
+                      "`signals.undefined`",
+                      "`GENERATOR_UNDEFINED`",
+                      "把 undefined 当作显式业务值继续，而不是结束。"
+                    ],
+                    [
+                      "`signals.halt`",
+                      "`GENERATOR_HALT`",
+                      "single 终止整条链；multiple 不增加终值遍历，也不撤销先前的 yield。"
+                    ],
+                    [
+                      "`signals.continue`",
+                      "`GENERATOR_CONTINUE`",
+                      "single 采用最后一次 yield 或输入；multiple 不增加终值遍历。"
+                    ],
+                    [
+                      "`combineStageAndDownstreamError(stage, downstream)`",
+                      "`undefined`",
+                      "只用于异步洋葱执行中两个独立失败：第一个参数来自当前 stage，第二个来自它已启动的下游。返回值作为组合失败抛出；调用方要让两个原错通过 cause 或 AggregateError.errors 可达。"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造选项必须是对象，不能为 null 或数组。支持的字段及自定义信号的三个属性只读取一次，再冻结内部快照；修改调用方对象不会改变已创建的 pipeline。`mode` 属性发布的就是这一份已验证值。非法模式、next 取值、回调、控制对象、信号结构、信号集或提升方向以原生 `TypeError` 和 `INVALID_OPTION` 报告。选项 getter 抛错时，原始失败保留在 `cause`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 46,
+          "configuration": [],
+          "fragment": "middleware-pipeline-generator--generatorMode"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "middleware-pipeline:sync",
+      "library": "middleware-pipeline",
+      "module": "sync",
+      "exportPath": "./sync",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/middleware-pipeline/getting-started",
+      "architecturePath": "/en/docs/middleware-pipeline",
+      "symbols": [
+        {
+          "name": "syncMode",
+          "kind": "const",
+          "signature": "export declare const syncMode: Readonly<{ key: \"sync\"; }>;",
+          "declarationLine": 2,
+          "source": "packages/middleware-pipeline/dist/modes/sync.d.ts",
+          "purpose": "Real sync runner and lift behavior, installed only through this identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for syncMode.",
+          "advanced": "No additional advanced behavior is declared for syncMode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for syncMode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for syncMode.",
+          "examples": [
+            "import { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: syncMode })\npipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)], 2, (value) => {\n  console.log('结果:', value)\n})",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({ mode: asyncMode })\nconst trace: string[] = []\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('开始计时')\n      try {\n        await next(value + 1)\n      } finally {\n        trace.push('结束计时')\n      }\n    },\n    async (value, next) => {\n      trace.push('校验')\n      await next(value * 2)\n    }\n  ],\n  2,\n  (value) => {\n    trace.push(`结果 ${value}`)\n  }\n)\nconsole.log(trace.join(' | '))",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: asyncMode })\nconst trim = pipeline.lift((value, next) => {\n  console.log('同步步骤调用 next 前')\n  next(value.trim())\n  console.log('同步步骤调用 next 后')\n}, syncMode)\nawait pipeline.run(\n  [\n    trim,\n    async (value, next) => {\n      console.log('异步步骤输入:', value)\n      await next(value.toUpperCase())\n    }\n  ],\n  ' ready ',\n  (value) => {\n    console.log('结果:', value)\n  }\n)",
+            "import { asyncMode } from '@migaia/middleware-pipeline/async'\nimport { syncMode } from '@migaia/middleware-pipeline/sync'\nimport { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst application = new AbortController()\napplication.abort(new Error('应用已停止'))\nconst request = new AbortController()\nconst pipeline = createPipeline<number>({\n  mode: asyncMode,\n  signal: application.signal\n})\nlet completed = false\ntry {\n  await pipeline.run(\n    [\n      async (value, next, context) => {\n        console.log('采用请求信号:', context?.signal === request.signal)\n        request.abort(new Error('请求已取消'))\n        await next(value + 1)\n      }\n    ],\n    1,\n    () => {\n      completed = true\n    },\n    { signal: request.signal }\n  )\n} catch (error) {\n  console.log('失败:', (error as Error).message)\n}\nconsole.log('终点回调执行:', completed)"
+          ],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: \"sync\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"sync\""
+            }
+          ],
+          "composes": [],
+          "exportPath": "./sync",
+          "overloadSignatures": ["export declare const syncMode: Readonly<{ key: \"sync\"; }>;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use syncMode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when syncMode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Real sync runner and lift behavior, installed only through this identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import syncMode from @migaia/middleware-pipeline/sync, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use syncMode when its const contract and declared inputs match the result you need. Choose a different public symbol when syncMode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for syncMode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for syncMode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/middleware-pipeline/dist/modes/sync.d.ts:syncMode:export declare const syncMode: Readonly<{ key: \"sync\"; }>;",
+          "guidance": [
+            {
+              "id": "创建选项及全部默认值",
+              "heading": "创建选项及全部默认值",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createPipeline<TValue>(options)` 必须明确选择模式。返回类型为该模式的 `IMiddlewarePipeline<TMode, TValue, TSignals>`；模式决定 stage、done、run 返回值和允许的提升方向。选项类型是 `ICreatePipelineOptions<TMode>`。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["字段", "默认值", "含义与所有取值"],
+                  "rows": [
+                    [
+                      "`mode`",
+                      "必填，无默认",
+                      "对应包子路径导出的真实 `syncMode`、`asyncMode`、`generatorMode` 或 `asyncGeneratorMode` 对象。创建后不能改变。"
+                    ],
+                    [
+                      "`next`",
+                      "`'single'`",
+                      "`'single'` 或 `'multiple'`，对应 `MiddlewarePipelineNext`。整条 pipeline 与 lift 共用；multiple 在四种模式下都允许独立的多次遍历。"
+                    ],
+                    [
+                      "`onViolation(kind)`",
+                      "空操作函数",
+                      "同步接收 `'duplicate'` 或 `'late'`；分别对应 `MiddlewarePipelineViolation.duplicate`、`late`。用于记录非法 next 调用，不重新执行下游。"
+                    ],
+                    [
+                      "`assertActive()`",
+                      "`undefined`",
+                      "宿主提供的同步生命周期断言。入口和每个 stage 后执行；异步模式进入下游时也会检查。抛错会阻止继续执行，包不替宿主改变状态。"
+                    ],
+                    [
+                      "`signal`",
+                      "`undefined`",
+                      "默认取消信号，供未提供调用级信号的 run 使用。信号的结构和状态在 run 入口校验，不在创建时提前读取。"
+                    ],
+                    [
+                      "`signals`",
+                      "`MiddlewarePipelineGeneratorSignals`",
+                      "生成器的三个控制 symbol；字段为 `undefined`、`halt`、`continue`，必须互不相同。默认集已冻结。"
+                    ],
+                    [
+                      "`signals.undefined`",
+                      "`GENERATOR_UNDEFINED`",
+                      "把 undefined 当作显式业务值继续，而不是结束。"
+                    ],
+                    [
+                      "`signals.halt`",
+                      "`GENERATOR_HALT`",
+                      "single 终止整条链；multiple 不增加终值遍历，也不撤销先前的 yield。"
+                    ],
+                    [
+                      "`signals.continue`",
+                      "`GENERATOR_CONTINUE`",
+                      "single 采用最后一次 yield 或输入；multiple 不增加终值遍历。"
+                    ],
+                    [
+                      "`combineStageAndDownstreamError(stage, downstream)`",
+                      "`undefined`",
+                      "只用于异步洋葱执行中两个独立失败：第一个参数来自当前 stage，第二个来自它已启动的下游。返回值作为组合失败抛出；调用方要让两个原错通过 cause 或 AggregateError.errors 可达。"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造选项必须是对象，不能为 null 或数组。支持的字段及自定义信号的三个属性只读取一次，再冻结内部快照；修改调用方对象不会改变已创建的 pipeline。`mode` 属性发布的就是这一份已验证值。非法模式、next 取值、回调、控制对象、信号结构、信号集或提升方向以原生 `TypeError` 和 `INVALID_OPTION` 报告。选项 getter 抛错时，原始失败保留在 `cause`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 62,
+          "configuration": [],
+          "fragment": "middleware-pipeline-sync--syncMode"
         }
       ],
       "aliases": []

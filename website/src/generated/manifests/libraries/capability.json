@@ -3,7 +3,7 @@
   "library": {
     "slug": "capability",
     "description": "Store-neutral capability lifecycle and feature gate.",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"],
     "readmeLocales": ["zh", "en"],
     "documentation": {
@@ -10962,7 +10962,7 @@
           "name": "createTopologyIndex",
           "kind": "function",
           "signature": "export declare function createTopologyIndex(adapter: ITopologyIndexAdapter): ITopologyIndex;",
-          "declarationLine": 76,
+          "declarationLine": 81,
           "source": "packages/capability/dist/graph/topology-index.d.ts",
           "purpose": "Creates an empty incremental topology index with copied error adapters. Add provider facts, inspect canonical order and open isolated transactions; no lifecycle resources are started or owned.",
           "core": "adapter: Application callbacks onCycle(path) and onInvalid(reason, nodeId?, failure?) must synchronously throw caller-owned errors; IDs originate from node definitions and failure.cause is the captured original access failure, automatically retained by the pure owner.\nITopologyIndex with no disposal requirement; settle each transaction through commit or rollback.",
@@ -11243,7 +11243,7 @@
           "name": "ITopologyIndex",
           "kind": "type",
           "signature": "export type ITopologyIndex = ITopologyIndexReader & ITopologyIndexWriter & Readonly<{ /** Opens an isolated working view; base mutations and a second begin reject until settlement. */ begin(): ITopologyTransaction; }>;",
-          "declarationLine": 66,
+          "declarationLine": 71,
           "source": "packages/capability/dist/graph/topology-index.d.ts",
           "purpose": "Incremental canonical adjacency and scheduling owner returned by createTopologyIndex; no resources are started.",
           "core": "size: Number of nodes currently present in this index or isolated transaction view.\nhas: Tests node membership without constructing a diagnostic.\nhas.id: Application-assigned id from a node admitted through index.add().\nTrue when this view contains that node ID; false otherwise.\nregistrationOrdinal: Reads the stable registration ordinal owned by this index or open transaction; removals never renumber surviving nodes.\nregistrationOrdinal.id: Application-assigned id from a node admitted through index.add().\nThe admitted node’s ordinal. Unknown IDs invoke onInvalid. Unlike snapshot().ordinal, this number is not densely compacted after removals.\ndependencies: Reads the frozen declared provider edges of one present node.\ndependencies.id: Application-assigned id from a node admitted through index.add().\nProvider edges in declaration order; an unknown node invokes onInvalid.\ndependents: Reads present direct consumers split by required and optional edges.\ndependents.id: Application-assigned id from a node admitted through index.add().\nIGraphDependents containing registration-order required and optional consumer IDs.\nmissing: Reads declared provider edges whose providers are currently absent.\nmissing.id: Application-assigned id from a node admitted through index.add().\nFrozen missing required and optional edges in declaration order; unknown consumers invoke onInvalid.\nclosure: Collects roots and their transitive required consumers, excluding optional propagation.\nclosure.roots: Application-selected IDs already admitted to this index; duplicates do not create duplicate work.\nFrozen IDs in canonical provider-first order; unknown roots invoke onInvalid.\norder: Orders all present nodes or a validated subset by dependency level and registration ordinal.\norder.ids: Optional iterable of application-assigned admitted IDs; omitted selects all nodes.\nFrozen, deduplicated canonical IDs; unknown subset IDs invoke onInvalid.\nsnapshot: Builds an immutable static projection with dense registration ordinals and read-only map facades.\nICapabilityTopology with ordered nodes, provider/consumer maps, indegree, level and ordinal.\nadd: Atomically adds a copied node and reconciles edges that previously named this missing provider.\nadd.node: Application-owned nonempty id and direct required/optional dependencies. The index assigns a stable internal registration ordinal.\nNo return value; the admitted topology update is complete.\nremove: Removes one node while retaining consumers dangling provider facts for later reconciliation.\nremove.id: Application-assigned id from a node admitted through index.add().\nsetDependencies: Atomically replaces direct dependencies and recomputes the affected topology; failed cycle admission leaves prior facts.\nsetDependencies.id: Application-assigned id from a node admitted through index.add().\nsetDependencies.dependencies: Application-created complete next provider-edge list, replacing all previous edges.\nbegin: Opens one isolated copy-on-write transaction and temporarily forbids base-index writes.\nITopologyTransaction; pair commit() or rollback() to return mutation authority. Nested transactions invoke onInvalid(transaction-open).",
@@ -11674,7 +11674,7 @@
         {
           "name": "ITopologyIndexWriter",
           "kind": "type",
-          "signature": "export type ITopologyIndexWriter = Readonly<{ /** Captures a new node and assigns an ordinal; duplicate IDs and cycles reject the edit. */ add(node: ITopologyIndexNode): void; /** Removes a present node, retaining its consumers' edges as dangling provider references. */ remove(id: string): void; /** Replaces captured edges without changing the node's ordinal; malformed edges or cycles reject. */ setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void; }>;",
+          "signature": "export type ITopologyIndexWriter = Readonly<{ /** Captures a new node and assigns an ordinal; duplicate IDs and cycles reject the edit. */ add(node: ITopologyIndexNode): void; /** Removes a present node, retaining its consumers' edges as dangling provider references. */ remove(id: string): void; /** Replaces captured edges without changing the node's ordinal; malformed edges or cycles reject. */ setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void; /** * Runs the same structural and cycle checks as `setDependencies` without changing anything, so a * caller can reject a replacement before it starts any irreversible work. */ checkDependencies(id: string, dependencies: readonly ITopologyDependency[]): void; }>;",
           "declarationLine": 50,
           "source": "packages/capability/dist/graph/topology-index.d.ts",
           "purpose": "Mutation protocol implemented by an index or its current transaction owner.",
@@ -11736,13 +11736,33 @@
                 }
               ],
               "returns": "void"
+            },
+            {
+              "name": "checkDependencies",
+              "kind": "method",
+              "optional": false,
+              "signature": "checkDependencies(id: string, dependencies: readonly ITopologyDependency[]): void;",
+              "description": "Runs the same structural and cycle checks as `setDependencies` without changing anything, so a caller can reject a replacement before it starts any irreversible work.",
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "dependencies",
+                  "type": "readonly ITopologyDependency[]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
             }
           ],
           "composes": [],
           "aliasOf": "ITopologyIndexWriter",
           "exportPath": "./graph/topology",
           "overloadSignatures": [
-            "export type ITopologyIndexWriter = Readonly<{ /** Captures a new node and assigns an ordinal; duplicate IDs and cycles reject the edit. */ add(node: ITopologyIndexNode): void; /** Removes a present node, retaining its consumers' edges as dangling provider references. */ remove(id: string): void; /** Replaces captured edges without changing the node's ordinal; malformed edges or cycles reject. */ setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void; }>;"
+            "export type ITopologyIndexWriter = Readonly<{ /** Captures a new node and assigns an ordinal; duplicate IDs and cycles reject the edit. */ add(node: ITopologyIndexNode): void; /** Removes a present node, retaining its consumers' edges as dangling provider references. */ remove(id: string): void; /** Replaces captured edges without changing the node's ordinal; malformed edges or cycles reject. */ setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void; /** * Runs the same structural and cycle checks as `setDependencies` without changing anything, so a * caller can reject a replacement before it starts any irreversible work. */ checkDependencies(id: string, dependencies: readonly ITopologyDependency[]): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -11781,7 +11801,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/topology-index.d.ts:ITopologyIndexWriter:export type ITopologyIndexWriter = Readonly<{ /** Captures a new node and assigns an ordinal; duplicate IDs and cycles reject the edit. */ add(node: ITopologyIndexNode): void; /** Removes a present node, retaining its consumers' edges as dangling provider references. */ remove(id: string): void; /** Replaces captured edges without changing the node's ordinal; malformed edges or cycles reject. */ setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void; }>;",
+          "identity": "packages/capability/dist/graph/topology-index.d.ts:ITopologyIndexWriter:export type ITopologyIndexWriter = Readonly<{ /** Captures a new node and assigns an ordinal; duplicate IDs and cycles reject the edit. */ add(node: ITopologyIndexNode): void; /** Removes a present node, retaining its consumers' edges as dangling provider references. */ remove(id: string): void; /** Replaces captured edges without changing the node's ordinal; malformed edges or cycles reject. */ setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void; /** * Runs the same structural and cycle checks as `setDependencies` without changing anything, so a * caller can reject a replacement before it starts any irreversible work. */ checkDependencies(id: string, dependencies: readonly ITopologyDependency[]): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -11947,7 +11967,7 @@
           "name": "ITopologyTransaction",
           "kind": "type",
           "signature": "export type ITopologyTransaction = ITopologyIndexReader & ITopologyIndexWriter & Readonly<{ /** Publishes the working changes to the base and permanently closes this transaction. */ commit(): void; /** Discards working changes, releases the base writer, and permanently closes this transaction. */ rollback(): void; }>;",
-          "declarationLine": 59,
+          "declarationLine": 64,
           "source": "packages/capability/dist/graph/topology-index.d.ts",
           "purpose": "Isolated copy-on-write topology view; commit or rollback closes it and restores base mutation authority.",
           "core": "size: Number of nodes currently present in this index or isolated transaction view.\nhas: Tests node membership without constructing a diagnostic.\nhas.id: Application-assigned id from a node admitted through index.add().\nTrue when this view contains that node ID; false otherwise.\nregistrationOrdinal: Reads the stable registration ordinal owned by this index or open transaction; removals never renumber surviving nodes.\nregistrationOrdinal.id: Application-assigned id from a node admitted through index.add().\nThe admitted node’s ordinal. Unknown IDs invoke onInvalid. Unlike snapshot().ordinal, this number is not densely compacted after removals.\ndependencies: Reads the frozen declared provider edges of one present node.\ndependencies.id: Application-assigned id from a node admitted through index.add().\nProvider edges in declaration order; an unknown node invokes onInvalid.\ndependents: Reads present direct consumers split by required and optional edges.\ndependents.id: Application-assigned id from a node admitted through index.add().\nIGraphDependents containing registration-order required and optional consumer IDs.\nmissing: Reads declared provider edges whose providers are currently absent.\nmissing.id: Application-assigned id from a node admitted through index.add().\nFrozen missing required and optional edges in declaration order; unknown consumers invoke onInvalid.\nclosure: Collects roots and their transitive required consumers, excluding optional propagation.\nclosure.roots: Application-selected IDs already admitted to this index; duplicates do not create duplicate work.\nFrozen IDs in canonical provider-first order; unknown roots invoke onInvalid.\norder: Orders all present nodes or a validated subset by dependency level and registration ordinal.\norder.ids: Optional iterable of application-assigned admitted IDs; omitted selects all nodes.\nFrozen, deduplicated canonical IDs; unknown subset IDs invoke onInvalid.\nsnapshot: Builds an immutable static projection with dense registration ordinals and read-only map facades.\nICapabilityTopology with ordered nodes, provider/consumer maps, indegree, level and ordinal.\nadd: Atomically adds a copied node and reconciles edges that previously named this missing provider.\nadd.node: Application-owned nonempty id and direct required/optional dependencies. The index assigns a stable internal registration ordinal.\nNo return value; the admitted topology update is complete.\nremove: Removes one node while retaining consumers dangling provider facts for later reconciliation.\nremove.id: Application-assigned id from a node admitted through index.add().\nsetDependencies: Atomically replaces direct dependencies and recomputes the affected topology; failed cycle admission leaves prior facts.\nsetDependencies.id: Application-assigned id from a node admitted through index.add().\nsetDependencies.dependencies: Application-created complete next provider-edge list, replacing all previous edges.\ncommit: Publishes overlay changes to the parent and closes the transaction.\nNo return value; later transaction use invokes onInvalid(transaction-closed).\nrollback: Discards overlay changes and returns write authority to the unchanged parent.\nNo return value; repeated rollback or any transaction access after settlement invokes onInvalid(transaction-closed).",

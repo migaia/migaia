@@ -4,7 +4,7 @@
     {
       "slug": "capability",
       "description": "Store-neutral capability lifecycle and feature gate.",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "exports": [".", "./graph", "./graph/dependency", "./graph/dynamic", "./graph/topology"],
       "readmeLocales": ["zh", "en"]
     },
@@ -18,7 +18,7 @@
     {
       "slug": "lifecycle",
       "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "exports": [
         ".",
         "./abort",
@@ -45,7 +45,7 @@
         "./features/threshold",
         "./features/timeout",
         "./features/uuid",
-        "./plugin"
+        "./sdk"
       ],
       "readmeLocales": ["zh", "en"]
     },
@@ -101,15 +101,29 @@
     {
       "slug": "middleware-pipeline",
       "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-      "version": "0.0.9",
-      "exports": ["."],
+      "version": "0.0.10",
+      "exports": [".", "./admission", "./async", "./async-generator", "./generator", "./sync"],
       "readmeLocales": ["zh", "en"]
     },
     {
       "slug": "plugin-host",
       "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
-      "version": "0.0.11",
-      "exports": [".", "./composition"],
+      "version": "0.0.12",
+      "exports": [
+        ".",
+        "./activation",
+        "./composition",
+        "./enablement",
+        "./feature-dependencies",
+        "./feature-overlay",
+        "./feature-overlay/notifications",
+        "./features",
+        "./named-pipelines",
+        "./pipeline-modes/async",
+        "./pipeline-modes/async-generator",
+        "./pipeline-modes/generator",
+        "./pipeline-modes/sync"
+      ],
       "readmeLocales": ["zh", "en"]
     },
     {
@@ -150,18 +164,17 @@
         ".",
         "./contract",
         "./features",
+        "./features/auth",
+        "./features/batch",
+        "./features/chunk",
+        "./features/error-map",
+        "./features/idempotency",
+        "./features/limits",
         "./features/retry",
+        "./features/schema",
         "./features/timeout",
         "./plugins",
-        "./plugins/auth",
-        "./plugins/batch",
-        "./plugins/chunk",
-        "./plugins/error-map",
-        "./plugins/idempotency",
-        "./plugins/limits",
-        "./plugins/link-policy",
         "./plugins/probe",
-        "./plugins/schema",
         "./plugins/typegen",
         "./sdk"
       ],
@@ -465,7 +478,7 @@
     {
       "slug": "utils",
       "description": "Runtime-neutral reusable utility primitives.",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "exports": [
         ".",
         "./bytes",

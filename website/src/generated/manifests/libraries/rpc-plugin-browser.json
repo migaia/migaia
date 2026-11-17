@@ -83,7 +83,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+                "text": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
               },
               {
                 "type": "paragraph",
@@ -275,11 +275,11 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    }\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] })\n    ]\n  })\n}"
+                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    }\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: { timeout: timeoutFeature({ ms: 1500 }) } })\n    ]\n  })\n}"
               },
               {
                 "type": "paragraph",
-                "text": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。"
+                "text": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。"
               },
               {
                 "type": "paragraph",
@@ -293,7 +293,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`rpc-contract` 提供纯协议/能力类型/错误契约，Host 管理调用与会话，Browser 管理原生来源和 I/O；业务 schema 交给 `/plugins/schema`。自定义载体作者使用 `@migaia/rpc-host/sdk` 的 canonical carrier，不再创建第二个 Host 或并行 codec。"
+                "text": "`rpc-contract` 提供纯协议/能力类型/错误契约，Host 管理调用与会话，Browser 管理原生来源和 I/O；业务 schema 交给 `/features/schema`。自定义载体作者使用 `@migaia/rpc-host/sdk` 的 canonical carrier，不再创建第二个 Host 或并行 codec。"
               },
               {
                 "type": "paragraph",
@@ -384,7 +384,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Common options include `name`, `namespace`, `expose`, `connect: { timeoutMs }` and complete business `features`. SharedWorker/ServiceWorker source alternatives are exclusive. Root exports are these factories, their option types, `RpcBrowserErrorCode` and `RPC_BROWSER_ERROR_SOURCE`."
+                  "text": "Common options include `name`, `namespace`, `expose`, `connect: { timeoutMs }` and business `features: { localName: feature }`. SharedWorker/ServiceWorker source alternatives are exclusive. Root exports are these factories, their option types, `RpcBrowserErrorCode` and `RPC_BROWSER_ERROR_SOURCE`."
                 },
                 {
                   "type": "paragraph",
@@ -576,11 +576,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    }\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] })\n    ]\n  })\n}"
+                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    }\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: { timeout: timeoutFeature({ ms: 1500 }) } })\n    ]\n  })\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "The caller closes the returned Host. Timeout/retry are complete transport-selected business features in that factory's `features`. Probe/schema/auth/chunk/batch/typegen are actual host intervention plugins under `@migaia/rpc-host/plugins/*`, installed before startup. `connect.timeoutMs` bounds handshake only; per-call timeoutMs and signal concern business work. Cancellation does not prove remote non-execution."
+                  "text": "The caller closes the returned Host. Timeout/retry factories return native tokens for the transport's `features: { localName: feature }` record. Schema/auth/chunk/batch also assemble through a `defineFlowPlugin` `features` record or a transport record, with factories under `@migaia/rpc-host/features/*`; probe/typegen are host observer plugins under `@migaia/rpc-host/plugins/*`. `connect.timeoutMs` bounds handshake only; business calls use `timeout: { ms }` and `signal`. Cancellation does not prove remote non-execution."
                 },
                 {
                   "type": "paragraph",
@@ -594,7 +594,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Contract owns pure protocol/capability types/error contracts, Host owns calls/sessions, and Browser owns native sources/I/O. `/plugins/schema` performs business validation. Custom carrier authors use canonical carriers from `@migaia/rpc-host/sdk`, without another Host or codec."
+                  "text": "Contract owns pure protocol/capability types/error contracts, Host owns calls/sessions, and Browser owns native sources/I/O. `/features/schema` performs business validation. Custom carrier authors use canonical carriers from `@migaia/rpc-host/sdk`, without another Host or codec."
                 },
                 {
                   "type": "paragraph",
@@ -631,7 +631,7 @@
         {
           "name": "broadcastChannelPlugin",
           "kind": "function",
-          "signature": "export declare function broadcastChannelPlugin<const N extends string = 'broadcastChannel', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "signature": "export declare function broadcastChannelPlugin<const N extends string = 'broadcastChannel', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "declarationLine": 8,
           "source": "packages/rpc-plugin-browser/dist/browser/broadcast-channel-plugin.d.ts",
           "purpose": "Join a real multiparty BroadcastChannel using original discovery, join/leave, and independent source proofs. The channel name is not peer identity; no transfer list exists.",
@@ -647,7 +647,7 @@
               "optional": false
             }
           ],
-          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>",
+          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -658,7 +658,7 @@
           "aliasOf": "broadcastChannelPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function broadcastChannelPlugin<const N extends string = 'broadcastChannel', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;"
+            "export declare function broadcastChannelPlugin<const N extends string = 'broadcastChannel', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;"
           ],
           "overloadParameterDetails": [
             [
@@ -670,7 +670,7 @@
             ]
           ],
           "overloadReturns": [
-            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>"
+            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -715,7 +715,7 @@
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
               "description": "Complete call policies and opaque flow features share the actual transport scope."
             },
@@ -756,7 +756,7 @@
               "description": "Native receiver Sessions override auth retention through the same local connection context."
             }
           ],
-          "identity": "packages/rpc-plugin-browser/dist/browser/broadcast-channel-plugin.d.ts:broadcastChannelPlugin:export declare function broadcastChannelPlugin<const N extends string = 'broadcastChannel', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "identity": "packages/rpc-plugin-browser/dist/browser/broadcast-channel-plugin.d.ts:broadcastChannelPlugin:export declare function broadcastChannelPlugin<const N extends string = 'broadcastChannel', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "guidance": [],
           "usageScore": 16,
           "configuration": [
@@ -764,17 +764,17 @@
               "name": "namespace",
               "type": "N",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "A caller may install this physical source under its own unique host namespace.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Complete call policies and opaque flow features share the actual transport scope.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "channel",
@@ -788,33 +788,33 @@
               "name": "name",
               "type": "string",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Local native plugin registration name, independent of remote handshake identity.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "expose",
               "type": "readonly string[]",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Explicit methods exposed by an ordinary plugin-host installation.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect",
               "type": "Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "One budget for the existing message identity and agreement exchange.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect.timeoutMs",
               "type": "number",
               "optional": true,
-              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。",
+              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。",
               "descriptionEn": "",
-              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。"
+              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。"
             },
             {
               "name": "connect.retain",
@@ -830,7 +830,7 @@
         {
           "name": "dedicatedWorkerPlugin",
           "kind": "function",
-          "signature": "export declare function dedicatedWorkerPlugin<const N extends string = 'worker', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "signature": "export declare function dedicatedWorkerPlugin<const N extends string = 'worker', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "declarationLine": 5,
           "source": "packages/rpc-plugin-browser/dist/browser/dedicated-worker-plugin.d.ts",
           "purpose": "Borrow an actual page Worker or Worker self through the original EventTarget transport. No terminate is acquired.",
@@ -846,7 +846,7 @@
               "optional": false
             }
           ],
-          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>",
+          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -859,7 +859,7 @@
           "aliasOf": "dedicatedWorkerPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function dedicatedWorkerPlugin<const N extends string = 'worker', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;"
+            "export declare function dedicatedWorkerPlugin<const N extends string = 'worker', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;"
           ],
           "overloadParameterDetails": [
             [
@@ -871,7 +871,7 @@
             ]
           ],
           "overloadReturns": [
-            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>"
+            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -916,7 +916,7 @@
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
               "description": "Complete call policies and opaque flow features share the actual transport scope."
             },
@@ -957,7 +957,7 @@
               "description": "Native receiver Sessions override auth retention through the same local connection context."
             }
           ],
-          "identity": "packages/rpc-plugin-browser/dist/browser/dedicated-worker-plugin.d.ts:dedicatedWorkerPlugin:export declare function dedicatedWorkerPlugin<const N extends string = 'worker', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "identity": "packages/rpc-plugin-browser/dist/browser/dedicated-worker-plugin.d.ts:dedicatedWorkerPlugin:export declare function dedicatedWorkerPlugin<const N extends string = 'worker', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "guidance": [],
           "usageScore": 30,
           "configuration": [
@@ -971,11 +971,11 @@
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Complete call policies and opaque flow features share the actual transport scope.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "worker",
@@ -989,33 +989,33 @@
               "name": "name",
               "type": "string",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Local native plugin registration name, independent of remote handshake identity.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "expose",
               "type": "readonly string[]",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Explicit methods exposed by an ordinary plugin-host installation.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect",
               "type": "Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "One budget for the existing message identity and agreement exchange.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect.timeoutMs",
               "type": "number",
               "optional": true,
-              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。",
+              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。",
               "descriptionEn": "",
-              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。"
+              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。"
             },
             {
               "name": "connect.retain",
@@ -1106,7 +1106,7 @@
         {
           "name": "IBrowserPluginOptions",
           "kind": "type",
-          "signature": "export type IBrowserPluginOptions<N extends string = string> = Readonly<{ /** Local native plugin registration name, independent of remote handshake identity. */ name?: string; /** A caller may install this physical source under its own unique host namespace. */ namespace?: N; /** Explicit methods exposed by an ordinary plugin-host installation. */ expose?: readonly string[]; /** One budget for the existing message identity and agreement exchange. */ connect?: Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>; /** Complete call policies and opaque flow features share the actual transport scope. */ features?: readonly IBrowserFeature[]; }>;",
+          "signature": "export type IBrowserPluginOptions<N extends string = string> = Readonly<{ /** Local native plugin registration name, independent of remote handshake identity. */ name?: string; /** A caller may install this physical source under its own unique host namespace. */ namespace?: N; /** Explicit methods exposed by an ordinary plugin-host installation. */ expose?: readonly string[]; /** One budget for the existing message identity and agreement exchange. */ connect?: Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>; /** Complete call policies and opaque flow features share the actual transport scope. */ features?: Readonly<Record<string, IBrowserFeature>>; }>;",
           "declarationLine": 7,
           "source": "packages/rpc-plugin-browser/dist/browser/plugin-types.d.ts",
           "purpose": "Shared cold registration, exposure and handshake policy; it provides no source authority by itself.",
@@ -1159,17 +1159,17 @@
               "name": "features",
               "kind": "property",
               "optional": true,
-              "signature": "features?: readonly IBrowserFeature[];",
+              "signature": "features?: Readonly<Record<string, IBrowserFeature>>;",
               "description": "Complete call policies and opaque flow features share the actual transport scope.",
               "parameterDetails": [],
-              "returns": "readonly IBrowserFeature[]"
+              "returns": "Readonly<Record<string, IBrowserFeature>>"
             }
           ],
           "composes": [],
           "aliasOf": "IBrowserPluginOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IBrowserPluginOptions<N extends string = string> = Readonly<{ /** Local native plugin registration name, independent of remote handshake identity. */ name?: string; /** A caller may install this physical source under its own unique host namespace. */ namespace?: N; /** Explicit methods exposed by an ordinary plugin-host installation. */ expose?: readonly string[]; /** One budget for the existing message identity and agreement exchange. */ connect?: Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>; /** Complete call policies and opaque flow features share the actual transport scope. */ features?: readonly IBrowserFeature[]; }>;"
+            "export type IBrowserPluginOptions<N extends string = string> = Readonly<{ /** Local native plugin registration name, independent of remote handshake identity. */ name?: string; /** A caller may install this physical source under its own unique host namespace. */ namespace?: N; /** Explicit methods exposed by an ordinary plugin-host installation. */ expose?: readonly string[]; /** One budget for the existing message identity and agreement exchange. */ connect?: Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>; /** Complete call policies and opaque flow features share the actual transport scope. */ features?: Readonly<Record<string, IBrowserFeature>>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1208,7 +1208,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-browser/dist/browser/plugin-types.d.ts:IBrowserPluginOptions:export type IBrowserPluginOptions<N extends string = string> = Readonly<{ /** Local native plugin registration name, independent of remote handshake identity. */ name?: string; /** A caller may install this physical source under its own unique host namespace. */ namespace?: N; /** Explicit methods exposed by an ordinary plugin-host installation. */ expose?: readonly string[]; /** One budget for the existing message identity and agreement exchange. */ connect?: Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>; /** Complete call policies and opaque flow features share the actual transport scope. */ features?: readonly IBrowserFeature[]; }>;",
+          "identity": "packages/rpc-plugin-browser/dist/browser/plugin-types.d.ts:IBrowserPluginOptions:export type IBrowserPluginOptions<N extends string = string> = Readonly<{ /** Local native plugin registration name, independent of remote handshake identity. */ name?: string; /** A caller may install this physical source under its own unique host namespace. */ namespace?: N; /** Explicit methods exposed by an ordinary plugin-host installation. */ expose?: readonly string[]; /** One budget for the existing message identity and agreement exchange. */ connect?: Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>; /** Complete call policies and opaque flow features share the actual transport scope. */ features?: Readonly<Record<string, IBrowserFeature>>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2011,7 +2011,7 @@
         {
           "name": "rtcDataChannelPlugin",
           "kind": "function",
-          "signature": "export declare function rtcDataChannelPlugin<const N extends string = 'rtcDataChannel', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IRtcDataChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "signature": "export declare function rtcDataChannelPlugin<const N extends string = 'rtcDataChannel', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IRtcDataChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "declarationLine": 5,
           "source": "packages/rpc-plugin-browser/dist/browser/rtc-data-channel-plugin.d.ts",
           "purpose": "Admit only ordered=true with maxRetransmits and maxPacketLifeTime both null. Applications own WebRTC negotiation and final native close.",
@@ -2027,7 +2027,7 @@
               "optional": false
             }
           ],
-          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>",
+          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -2038,7 +2038,7 @@
           "aliasOf": "rtcDataChannelPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function rtcDataChannelPlugin<const N extends string = 'rtcDataChannel', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IRtcDataChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;"
+            "export declare function rtcDataChannelPlugin<const N extends string = 'rtcDataChannel', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IRtcDataChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;"
           ],
           "overloadParameterDetails": [
             [
@@ -2050,7 +2050,7 @@
             ]
           ],
           "overloadReturns": [
-            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>"
+            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2095,7 +2095,7 @@
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
               "description": "Complete call policies and opaque flow features share the actual transport scope."
             },
@@ -2136,7 +2136,7 @@
               "description": "Use an already-open channel; the factory does not wait for open or close the native channel."
             }
           ],
-          "identity": "packages/rpc-plugin-browser/dist/browser/rtc-data-channel-plugin.d.ts:rtcDataChannelPlugin:export declare function rtcDataChannelPlugin<const N extends string = 'rtcDataChannel', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IRtcDataChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "identity": "packages/rpc-plugin-browser/dist/browser/rtc-data-channel-plugin.d.ts:rtcDataChannelPlugin:export declare function rtcDataChannelPlugin<const N extends string = 'rtcDataChannel', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IRtcDataChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "guidance": [],
           "usageScore": 16,
           "configuration": [
@@ -2144,49 +2144,49 @@
               "name": "namespace",
               "type": "N",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "A caller may install this physical source under its own unique host namespace.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Complete call policies and opaque flow features share the actual transport scope.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "name",
               "type": "string",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Local native plugin registration name, independent of remote handshake identity.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "expose",
               "type": "readonly string[]",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Explicit methods exposed by an ordinary plugin-host installation.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect",
               "type": "Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "One budget for the existing message identity and agreement exchange.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect.timeoutMs",
               "type": "number",
               "optional": true,
-              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。",
+              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。",
               "descriptionEn": "",
-              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。"
+              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。"
             },
             {
               "name": "connect.retain",
@@ -2210,7 +2210,7 @@
         {
           "name": "serviceWorkerPlugin",
           "kind": "function",
-          "signature": "export declare function serviceWorkerPlugin<const N extends string = 'serviceWorker', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "signature": "export declare function serviceWorkerPlugin<const N extends string = 'serviceWorker', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "declarationLine": 5,
           "source": "packages/rpc-plugin-browser/dist/browser/service-worker-plugin.d.ts",
           "purpose": "Separate page send target from receiver. Worker mode resolves actual event.source.id through clients.get before per-client handshake; payload claims grant no authority.",
@@ -2226,7 +2226,7 @@
               "optional": false
             }
           ],
-          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>",
+          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -2237,7 +2237,7 @@
           "aliasOf": "serviceWorkerPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function serviceWorkerPlugin<const N extends string = 'serviceWorker', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;"
+            "export declare function serviceWorkerPlugin<const N extends string = 'serviceWorker', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;"
           ],
           "overloadParameterDetails": [
             [
@@ -2249,7 +2249,7 @@
             ]
           ],
           "overloadReturns": [
-            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>"
+            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2294,7 +2294,7 @@
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
               "description": "Complete call policies and opaque flow features share the actual transport scope."
             },
@@ -2347,7 +2347,7 @@
               "description": "Native receiver Sessions override auth retention through the same local connection context."
             }
           ],
-          "identity": "packages/rpc-plugin-browser/dist/browser/service-worker-plugin.d.ts:serviceWorkerPlugin:export declare function serviceWorkerPlugin<const N extends string = 'serviceWorker', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "identity": "packages/rpc-plugin-browser/dist/browser/service-worker-plugin.d.ts:serviceWorkerPlugin:export declare function serviceWorkerPlugin<const N extends string = 'serviceWorker', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "guidance": [],
           "usageScore": 20,
           "configuration": [
@@ -2355,17 +2355,17 @@
               "name": "namespace",
               "type": "N",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "A caller may install this physical source under its own unique host namespace.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Complete call policies and opaque flow features share the actual transport scope.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "serviceWorker",
@@ -2395,33 +2395,33 @@
               "name": "name",
               "type": "string",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Local native plugin registration name, independent of remote handshake identity.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "expose",
               "type": "readonly string[]",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Explicit methods exposed by an ordinary plugin-host installation.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect",
               "type": "Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "One budget for the existing message identity and agreement exchange.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect.timeoutMs",
               "type": "number",
               "optional": true,
-              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。",
+              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。",
               "descriptionEn": "",
-              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。"
+              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。"
             },
             {
               "name": "connect.retain",
@@ -2437,7 +2437,7 @@
         {
           "name": "sharedWorkerPlugin",
           "kind": "function",
-          "signature": "export declare function sharedWorkerPlugin<const N extends string = 'sharedWorker', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: ISharedWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "signature": "export declare function sharedWorkerPlugin<const N extends string = 'sharedWorker', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: ISharedWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "declarationLine": 5,
           "source": "packages/rpc-plugin-browser/dist/browser/shared-worker-plugin.d.ts",
           "purpose": "Choose sharedWorker on the page or listen on a real connect-event scope. Each MessagePort has independent acceptance; closing one leaves other sessions intact.",
@@ -2453,7 +2453,7 @@
               "optional": false
             }
           ],
-          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>",
+          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -2464,7 +2464,7 @@
           "aliasOf": "sharedWorkerPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function sharedWorkerPlugin<const N extends string = 'sharedWorker', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: ISharedWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;"
+            "export declare function sharedWorkerPlugin<const N extends string = 'sharedWorker', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: ISharedWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;"
           ],
           "overloadParameterDetails": [
             [
@@ -2476,7 +2476,7 @@
             ]
           ],
           "overloadReturns": [
-            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>"
+            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2521,7 +2521,7 @@
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
               "description": "Complete call policies and opaque flow features share the actual transport scope."
             },
@@ -2574,7 +2574,7 @@
               "description": "Native receiver Sessions override auth retention through the same local connection context."
             }
           ],
-          "identity": "packages/rpc-plugin-browser/dist/browser/shared-worker-plugin.d.ts:sharedWorkerPlugin:export declare function sharedWorkerPlugin<const N extends string = 'sharedWorker', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: ISharedWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "identity": "packages/rpc-plugin-browser/dist/browser/shared-worker-plugin.d.ts:sharedWorkerPlugin:export declare function sharedWorkerPlugin<const N extends string = 'sharedWorker', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: ISharedWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "guidance": [],
           "usageScore": 20,
           "configuration": [
@@ -2582,17 +2582,17 @@
               "name": "namespace",
               "type": "N",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "A caller may install this physical source under its own unique host namespace.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Complete call policies and opaque flow features share the actual transport scope.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "sharedWorker",
@@ -2622,33 +2622,33 @@
               "name": "name",
               "type": "string",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Local native plugin registration name, independent of remote handshake identity.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "expose",
               "type": "readonly string[]",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Explicit methods exposed by an ordinary plugin-host installation.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect",
               "type": "Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "One budget for the existing message identity and agreement exchange.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect.timeoutMs",
               "type": "number",
               "optional": true,
-              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。",
+              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。",
               "descriptionEn": "",
-              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。"
+              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。"
             },
             {
               "name": "connect.retain",
@@ -2664,7 +2664,7 @@
         {
           "name": "webTransportPlugin",
           "kind": "function",
-          "signature": "export declare function webTransportPlugin<const N extends string = 'webTransport', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IWebTransportPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "signature": "export declare function webTransportPlugin<const N extends string = 'webTransport', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IWebTransportPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "declarationLine": 5,
           "source": "packages/rpc-plugin-browser/dist/browser/web-transport-plugin.d.ts",
           "purpose": "Await the borrowed session.ready and create exactly one reliable bidirectional byte stream. Own reader/writer cleanup, not session.close; no datagram RPC.",
@@ -2680,7 +2680,7 @@
               "optional": false
             }
           ],
-          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>",
+          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -2691,7 +2691,7 @@
           "aliasOf": "webTransportPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function webTransportPlugin<const N extends string = 'webTransport', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IWebTransportPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;"
+            "export declare function webTransportPlugin<const N extends string = 'webTransport', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IWebTransportPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;"
           ],
           "overloadParameterDetails": [
             [
@@ -2703,7 +2703,7 @@
             ]
           ],
           "overloadReturns": [
-            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>"
+            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2748,7 +2748,7 @@
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
               "description": "Complete call policies and opaque flow features share the actual transport scope."
             },
@@ -2789,7 +2789,7 @@
               "description": "Native receiver Sessions override auth retention through the same local connection context."
             }
           ],
-          "identity": "packages/rpc-plugin-browser/dist/browser/web-transport-plugin.d.ts:webTransportPlugin:export declare function webTransportPlugin<const N extends string = 'webTransport', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IWebTransportPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "identity": "packages/rpc-plugin-browser/dist/browser/web-transport-plugin.d.ts:webTransportPlugin:export declare function webTransportPlugin<const N extends string = 'webTransport', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IWebTransportPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "guidance": [],
           "usageScore": 16,
           "configuration": [
@@ -2797,17 +2797,17 @@
               "name": "namespace",
               "type": "N",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "A caller may install this physical source under its own unique host namespace.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Complete call policies and opaque flow features share the actual transport scope.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "session",
@@ -2821,33 +2821,33 @@
               "name": "name",
               "type": "string",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Local native plugin registration name, independent of remote handshake identity.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "expose",
               "type": "readonly string[]",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Explicit methods exposed by an ordinary plugin-host installation.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect",
               "type": "Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "One budget for the existing message identity and agreement exchange.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect.timeoutMs",
               "type": "number",
               "optional": true,
-              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。",
+              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。",
               "descriptionEn": "",
-              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。"
+              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。"
             },
             {
               "name": "connect.retain",
@@ -2863,7 +2863,7 @@
         {
           "name": "windowPlugin",
           "kind": "function",
-          "signature": "export declare function windowPlugin<const N extends string = 'window', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IWindowPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "signature": "export declare function windowPlugin<const N extends string = 'window', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IWindowPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "declarationLine": 5,
           "source": "packages/rpc-plugin-browser/dist/browser/window-plugin.d.ts",
           "purpose": "Create a Window transport that accepts messages only when both the configured origin and native event.source match the intended peer.",
@@ -2879,19 +2879,19 @@
               "optional": false
             }
           ],
-          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>",
+          "returns": "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
             "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\n\nexport async function callFrame(target: Window, origin: string) {\n  const host = await createRpcHost({\n    plugins: [windowPlugin({ window: target, origin, receiver: window })]\n  })\n  try {\n    return await host.window.request('title')\n  } finally {\n    await host.close()\n  }\n}",
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    }\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: [timeoutFeature({ ms: 1500 })] })\n    ]\n  })\n}"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { windowPlugin } from '@migaia/rpc-plugin-browser'\nimport { timeoutFeature } from '@migaia/rpc-host/features/timeout'\nimport { probe } from '@migaia/rpc-host/plugins/probe'\n\nexport async function observeFrame(target: Window, origin: string) {\n  const observer = probe({\n    stages: ['peer'],\n    emit(view) {\n      console.log(view.lifecycle)\n    }\n  })\n  return createRpcHost({\n    plugins: [\n      observer,\n      windowPlugin({ window: target, origin, features: { timeout: timeoutFeature({ ms: 1500 }) } })\n    ]\n  })\n}"
           ],
           "members": [],
           "composes": [],
           "aliasOf": "windowPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function windowPlugin<const N extends string = 'window', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IWindowPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;"
+            "export declare function windowPlugin<const N extends string = 'window', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IWindowPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;"
           ],
           "overloadParameterDetails": [
             [
@@ -2903,7 +2903,7 @@
             ]
           ],
           "overloadReturns": [
-            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>"
+            "IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -2948,7 +2948,7 @@
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
               "description": "Complete call policies and opaque flow features share the actual transport scope."
             },
@@ -3007,7 +3007,7 @@
               "description": "Only true permits '*'; omitted/false still requires an exact origin, and never relaxes source identity."
             }
           ],
-          "identity": "packages/rpc-plugin-browser/dist/browser/window-plugin.d.ts:windowPlugin:export declare function windowPlugin<const N extends string = 'window', const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]>(options: IWindowPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>;",
+          "identity": "packages/rpc-plugin-browser/dist/browser/window-plugin.d.ts:windowPlugin:export declare function windowPlugin<const N extends string = 'window', const TFeatures extends Readonly<Record<string, IBrowserFeature>> = Readonly<Record<string, IBrowserFeature>>>(options: IWindowPluginOptions & Readonly<{ namespace?: N; features?: TFeatures; }>): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures>, true>;",
           "guidance": [],
           "usageScore": 30,
           "configuration": [
@@ -3015,49 +3015,49 @@
               "name": "namespace",
               "type": "N",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "A caller may install this physical source under its own unique host namespace.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "features",
-              "type": "readonly IBrowserFeature[]",
+              "type": "Readonly<Record<string, IBrowserFeature>>",
               "optional": true,
-              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。",
+              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。",
               "descriptionEn": "Complete call policies and opaque flow features share the actual transport scope.",
-              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。"
+              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。"
             },
             {
               "name": "name",
               "type": "string",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Local native plugin registration name, independent of remote handshake identity.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "expose",
               "type": "readonly string[]",
               "optional": true,
-              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
+              "description": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。",
               "descriptionEn": "Explicit methods exposed by an ordinary plugin-host installation.",
-              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与完整业务 `features`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
+              "descriptionZh": "公共选项包括 `name`、`namespace`、`expose`、`connect: { timeoutMs }` 与业务 `features: { localName: feature }`。SharedWorker/ServiceWorker 两种来源互斥。根入口只导出这些工厂、对应选项类型以及 `RpcBrowserErrorCode`、`RPC_BROWSER_ERROR_SOURCE`。"
             },
             {
               "name": "connect",
               "type": "Readonly<{ timeoutMs?: number; /** Native receiver Sessions override auth retention through the same local connection context. */ retain?: IRpcAuthenticationRetain; }>",
               "optional": true,
-              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。",
+              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。",
               "descriptionEn": "One budget for the existing message identity and agreement exchange.",
-              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。"
+              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。"
             },
             {
               "name": "connect.timeoutMs",
               "type": "number",
               "optional": true,
-              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。",
+              "description": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。",
               "descriptionEn": "",
-              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 是传输选择的完整业务 feature，放在该工厂的 `features`。probe/schema/auth/chunk/batch/typegen 是实际 host 介入插件，入口是 `@migaia/rpc-host/plugins/*`，启动前安装。`connect.timeoutMs` 只约束握手；业务 `timeoutMs` 与 `signal` 约束调用，不能把取消当成远端从未执行。"
+              "descriptionZh": "调用者负责关闭返回的 Host。`timeoutFeature`/`retryFeature` 返回原生 token，以 `{ localName: feature }` 放入传输的 `features`。schema/auth/chunk/batch 也通过 `defineFlowPlugin` 的 `features` 或传输 plugin 的 record 组装，工厂入口为 `@migaia/rpc-host/features/*`；probe/typegen 是 host 观察插件，入口为 `@migaia/rpc-host/plugins/*`。`connect.timeoutMs` 只约束握手；业务调用使用 `timeout: { ms }` 与 `signal`，取消不能证明远端从未执行。"
             },
             {
               "name": "connect.retain",

@@ -49,7 +49,7 @@
                   "派生值只声明一次，依赖自动登记。 手写时每个修改点都要记得重算；`computed` 在读取 `price.value` 时就记下了依赖，任何一个输入变化都会让它重算。示例",
                   "多次写入只更新一次，看不到一半新一半旧的值。 每次写入都立刻通知会渲染出混合值；Runtime 写入时只标记过期，副作用在下一次冲刷时按最终输入运行，从多条路径读取同一组值的派生值也一致。示例",
                   "没人读取的派生值不计算。 关着的面板也在重算是常见的浪费；`computed` 没人读取就不运行，最后一个读者离开后自动和输入断开，下次读取时才按需重算。示例",
-                  "副作用死循环会被截断，而不是卡死页面。 互相触发的副作用可能无限运行；每次冲刷最多 `maxFlushPasses` 轮（默认 100），超过后停止并报告 `FLUSH_LOOP` 和相关的 `debugName`。示例",
+                  "副作用死循环会被截断，而不是卡死页面。 互相触发的副作用可能无限运行；一次冲刷中，同一个副作用最多运行 `maxFlushPasses` 次（默认 100），超过后停止并报告 `FLUSH_LOOP` 和相关的 `debugName`。示例",
                   "每个 Runtime 完全隔离，混用会立刻报错。 全局状态在服务端请求之间串用很难发现；不同 Runtime 的节点不能互相依赖，跨 Runtime 读取立刻抛 `CROSS_RUNTIME`。示例"
                 ]
               }
@@ -512,7 +512,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。"
+                "text": "一次冲刷中，同一个副作用最多运行 `maxFlushPasses` 次（默认 100），这个上限按每个副作用分别计数。某个副作用超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。"
               },
               {
                 "type": "code",
@@ -534,7 +534,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "循环在 20 轮（示例里设的 `maxFlushPasses`）后被截断，而不是一直运行下去；报告里带的 `debugName` 指出了互相触发的副作用。"
+                "text": "循环在某个副作用运行满 20 次（示例里设的 `maxFlushPasses`）后被截断，而不是一直运行下去；报告里带的 `debugName` 指出了互相触发的副作用。"
               }
             ]
           },
@@ -762,7 +762,7 @@
                 "items": [
                   "`batch(fn)`：显式合并多次写入为一次副作用刷新；进入时计深度，只有最外层退出才真正 `flush()`。若 `fn` 抛错且随后的收尾 `flush()` 也抛错，可写的普通 `Error` 保持原对象并在 `cause` 附上 flush 错误；非 `Error` 或不可写 `Error` 用携带 `ACTION_FLUSH_FAILED` 码的 `AggregateError` 保留原值。若业务错误的 `cause` getter 抛错，聚合错误的 `errors` 依次保留业务错误、flush 错误、getter 抛出值；`onError` 另收到 getter 抛出值及 `cause-read` phase。",
                   "`untracked(fn)`：`fn` 执行期间关闭依赖收集，读取任何 `Signal`/`Computed` 都不会建立依赖边。",
-                  "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。",
+                  "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。",
                   "`schedulerStrategy` 创建期选项只改变何时 `flush`，不交出 Scheduler 队列。策略须同步返回；返回 thenable 会触发 `INVALID_OPTION` 诊断并回退到已验证的安全策略。Runtime 存活期间不公开替换入口。",
                   "`runTracedAction(name, fn)`：执行并追踪一段真实 action；`name` 必须是非空字符串，否则抛 `INVALID_OPTION`。未启用 trace（无监听器）时只执行 fn 与同一 callback 错误边界，不创建 trace 事件。",
                   "`reportError(error, context)`：诊断通道；`context.observer`/`context.observable` 是原始节点对象，内部会先脱敏为 `IRuntimeNodeDescriptor` 再转发给 `onError`。reporter 自身 throw/rejection 交 utils 共享宿主异常队列，不反向破坏图操作。",
@@ -995,7 +995,7 @@
                   [
                     "`flushLoop`",
                     "`FLUSH_LOOP`",
-                    "一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）"
+                    "一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）"
                   ],
                   [
                     "`observerFailed`",
@@ -1231,7 +1231,7 @@
                     "A derived value is declared once, and its dependencies register themselves. Hand-written code must remember to recalculate at every change; a `computed` records a dependency the moment it reads `price.value`, and any input change makes it recompute. Example",
                     "Several writes produce one update, with no half-updated values. Notifying on every write renders mixed values; the Runtime only marks dependents as stale on write and runs effects in the next flush with the final inputs, so derived values read through several paths agree too. Example",
                     "A derived value nobody reads is not computed. Recomputing for a closed panel is a common waste; a `computed` does not run until something reads it, disconnects from its inputs when its last reader leaves, and recomputes on demand at the next read. Example",
-                    "An endless effect loop is cut off instead of freezing the page. Effects that trigger each other may run forever; each flush is capped at `maxFlushPasses` passes (default 100), after which it stops and reports `FLUSH_LOOP` with the `debugName`s involved. Example",
+                    "An endless effect loop is cut off instead of freezing the page. Effects that trigger each other may run forever; within one flush, each effect may run at most `maxFlushPasses` times (default 100), after which it stops and reports `FLUSH_LOOP` with the `debugName`s involved. Example",
                     "Every Runtime is isolated, and mixing them fails at once. Global state leaking between server requests is hard to notice; nodes of different Runtimes cannot depend on each other, and a cross-Runtime read throws `CROSS_RUNTIME` immediately. Example"
                   ]
                 }
@@ -1738,7 +1738,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Each flush is capped at `maxFlushPasses` passes (default 100). Past the cap the Runtime stops, drops the remaining queued effects and reports `FLUSH_LOOP` with their `debugName`s: to `onError` for automatic flushes, or as a thrown error from a manual `flush()`."
+                  "text": "Within one flush, each effect may run at most `maxFlushPasses` times (default 100); the cap is counted per effect. When an effect passes it the Runtime stops, drops the remaining queued effects and reports `FLUSH_LOOP` with their `debugName`s: to `onError` for automatic flushes, or as a thrown error from a manual `flush()`."
                 },
                 {
                   "type": "code",
@@ -1760,7 +1760,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The loop was cut after 20 passes (the `maxFlushPasses` set in the example) instead of running forever, and the reported `debugName`s point at the effects feeding each other."
+                  "text": "The loop was cut once an effect had run 20 times (the `maxFlushPasses` set in the example) instead of running forever, and the reported `debugName`s point at the effects feeding each other."
                 }
               ]
             },
@@ -1988,7 +1988,7 @@
                   "items": [
                     "`batch(fn)`: merges several writes into one effect flush; it counts nesting depth on entry and only the outermost exit actually calls `flush()`. If `fn` throws and the closing `flush()` also throws, a writable plain `Error` stays the same object and gets the flush error attached on `cause`; a non-`Error` or a non-writable `Error` is preserved through an `AggregateError` with code `ACTION_FLUSH_FAILED`. If the `cause` getter of the application error throws, the aggregate's `errors` keep, in order, the application error, the flush error and the value the getter threw; `onError` also receives the getter's thrown value with phase `cause-read`.",
                     "`untracked(fn)`: turns dependency tracking off while `fn` runs, so reading any `Signal` / `Computed` registers no edge.",
-                    "`flush()`: flushes the current queue synchronously. Reentrancy: calling `flush()` again inside an observer's `tick()` returns `'deferred'` (the outer flush is still running and this call does not flush); the outermost call returns `'completed'` once it has drained the queue. When one flush exceeds `maxFlushPasses` recomputation passes it throws `FLUSH_LOOP` (see the error codes), clears the rest of the queue, and the error message lists at most 8 dropped `debugName`s.",
+                    "`flush()`: flushes the current queue synchronously. Reentrancy: calling `flush()` again inside an observer's `tick()` returns `'deferred'` (the outer flush is still running and this call does not flush); the outermost call returns `'completed'` once it has drained the queue. When one observer runs more than `maxFlushPasses` times within one flush, it throws `FLUSH_LOOP` (see the error codes), clears the rest of the queue, and the error message lists at most 8 dropped `debugName`s.",
                     "The creation option `schedulerStrategy` only changes when `flush` happens and does not hand out the Scheduler queue. A strategy must return synchronously; returning a thenable triggers an `INVALID_OPTION` diagnostic and falls back to the validated safe strategy. There is no public way to replace it while the Runtime lives.",
                     "`runTracedAction(name, fn)`: runs and traces one real action; `name` must be a non-empty string, otherwise it throws `INVALID_OPTION`. Without trace listeners it only runs `fn` inside the same callback error boundary and creates no trace event.",
                     "`reportError(error, context)`: the diagnostic channel. `context.observer` / `context.observable` are raw node objects that are first reduced to an `IRuntimeNodeDescriptor` before reaching `onError`. A throw or rejection from the reporter itself goes to the shared host exception queue of utils and never breaks graph operations in return.",
@@ -2220,7 +2220,7 @@
                     [
                       "`flushLoop`",
                       "`FLUSH_LOOP`",
-                      "One flush exceeded `maxFlushPasses` recomputation passes (default 100)"
+                      "One observer ran more than `maxFlushPasses` times (default 100) within one flush"
                     ],
                     [
                       "`observerFailed`",
@@ -2553,7 +2553,7 @@
                     [
                       "`flushLoop`",
                       "`FLUSH_LOOP`",
-                      "一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）"
+                      "一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）"
                     ],
                     [
                       "`observerFailed`",
@@ -2798,7 +2798,7 @@
                     [
                       "`flushLoop`",
                       "`FLUSH_LOOP`",
-                      "一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）"
+                      "一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）"
                     ],
                     [
                       "`observerFailed`",
@@ -2915,9 +2915,9 @@
               "name": "onError",
               "type": "(error: unknown, context: IRuntimeErrorContext) => void",
               "optional": true,
-              "description": "每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。",
+              "description": "一次冲刷中，同一个副作用最多运行 `maxFlushPasses` 次（默认 100），这个上限按每个副作用分别计数。某个副作用超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。",
               "descriptionEn": "",
-              "descriptionZh": "每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。"
+              "descriptionZh": "一次冲刷中，同一个副作用最多运行 `maxFlushPasses` 次（默认 100），这个上限按每个副作用分别计数。某个副作用超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。"
             },
             {
               "name": "onTrace",
@@ -2931,9 +2931,9 @@
               "name": "maxFlushPasses",
               "type": "number",
               "optional": true,
-              "description": "每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。",
+              "description": "一次冲刷中，同一个副作用最多运行 `maxFlushPasses` 次（默认 100），这个上限按每个副作用分别计数。某个副作用超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。",
               "descriptionEn": "Maximum executions for one observer within one flush. The default is 100. Exceeding the limit is treated as a self-triggering cycle and throws after clearing the queue. The limit is configurable scheduling policy, not a physical constant.",
-              "descriptionZh": "每次冲刷最多运行 `maxFlushPasses` 轮（默认 100）。超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。"
+              "descriptionZh": "一次冲刷中，同一个副作用最多运行 `maxFlushPasses` 次（默认 100），这个上限按每个副作用分别计数。某个副作用超过上限后，Runtime 停止本次冲刷，丢弃剩下排队的副作用，并报告 `FLUSH_LOOP`，附上它们的 `debugName`：自动冲刷交给 `onError`，手动调用 `flush()` 时直接抛出。"
             },
             {
               "name": "scheduleIdle",
@@ -3718,7 +3718,7 @@
                     [
                       "`flushLoop`",
                       "`FLUSH_LOOP`",
-                      "一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）"
+                      "一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）"
                     ],
                     [
                       "`observerFailed`",
@@ -3898,7 +3898,7 @@
                     [
                       "`flushLoop`",
                       "`FLUSH_LOOP`",
-                      "一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）"
+                      "一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）"
                     ],
                     [
                       "`observerFailed`",
@@ -5308,7 +5308,7 @@
                     [
                       "`flushLoop`",
                       "`FLUSH_LOOP`",
-                      "一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）"
+                      "一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）"
                     ],
                     [
                       "`observerFailed`",
@@ -7667,7 +7667,7 @@
                     [
                       "`flushLoop`",
                       "`FLUSH_LOOP`",
-                      "一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）"
+                      "一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）"
                     ],
                     [
                       "`observerFailed`",
@@ -7907,7 +7907,7 @@
                     [
                       "`flushLoop`",
                       "`FLUSH_LOOP`",
-                      "一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）"
+                      "一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）"
                     ],
                     [
                       "`observerFailed`",

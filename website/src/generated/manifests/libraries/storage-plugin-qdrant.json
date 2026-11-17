@@ -170,7 +170,10 @@
                 "type": "table",
                 "headers": ["API", "用途"],
                 "rows": [
-                  ["`qdrantBackendPlugin(options, features?)`", "连接、命名空间和可选功能。"],
+                  [
+                    "`qdrantBackendPlugin({ ...options, features? })`",
+                    "连接、命名空间和可选功能。"
+                  ],
                   ["`collection.upsert(points, options?)`", "写入向量和 payload。"],
                   ["`collection.near(query).topK(k)`", "创建近邻查询。"],
                   ["`similarTo(id)` / `recommend(...)`", "使用已存样本创建标准查询。"],
@@ -190,7 +193,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`url` 必填；`id` 默认 `qdrant`，`collectionPrefix` 默认 `migaia_`。`apiKey`、自备 `http` 可选。自备 HTTP/SDK client 由调用方管理，host 不关闭它们。默认创建 host 时检测；关闭自动检测后，先 `await host.detect()`。"
+                "text": "`url` 必填；`name` 默认 `qdrant`，`collectionPrefix` 默认 `migaia_`。`apiKey`、自备 `http` 可选。自备 HTTP/SDK client 由调用方管理，host 不关闭它们。默认创建 host 时检测；关闭自动检测后，先 `await host.detect()`。"
               },
               {
                 "type": "paragraph",
@@ -311,7 +314,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\n\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst documents = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors(name, [\n  {\n    id: 'a',\n    vector: [\n      [0, 1],\n      [0, 1]\n    ]\n  },\n  {\n    id: 'b',\n    vector: [\n      [3, 0],\n      [3, 0]\n    ]\n  }\n])\nconst hits = await documents\n  .near([1, 0])\n  .topK(2)\n  .rescore({\n    query: [\n      [1, 0],\n      [1, 0]\n    ],\n    topN: 1\n  })\n  .all()\nconsole.log(hits.map((hit) => hit.id).join(','))"
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\n\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin({\n      url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333',\n      features: {\n        rescore: qdrantRescoreFeature({\n          collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }\n        })\n      }\n    })\n  ]\n})\nconst store = host.backend('qdrant')\nconst documents = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors(name, [\n  {\n    id: 'a',\n    vector: [\n      [0, 1],\n      [0, 1]\n    ]\n  },\n  {\n    id: 'b',\n    vector: [\n      [3, 0],\n      [3, 0]\n    ]\n  }\n])\nconst hits = await documents\n  .near([1, 0])\n  .topK(2)\n  .rescore({\n    query: [\n      [1, 0],\n      [1, 0]\n    ],\n    topN: 1\n  })\n  .all()\nconsole.log(hits.map((hit) => hit.id).join(','))"
               },
               {
                 "type": "paragraph",
@@ -370,7 +373,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "工厂第二参数选择 Feature，增加 store.api 下的方法，没有事务投影。"
+                "text": "在工厂选项的 `features` 里选择 Feature，增加 store.api 下的方法，没有事务投影。"
               },
               {
                 "type": "table",
@@ -599,7 +602,7 @@
                   "headers": ["API", "Purpose"],
                   "rows": [
                     [
-                      "`qdrantBackendPlugin(options, features?)`",
+                      "`qdrantBackendPlugin({ ...options, features? })`",
                       "Connection, namespace and optional features."
                     ],
                     ["`collection.upsert(points, options?)`", "Write vectors and payloads."],
@@ -627,7 +630,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`url` is required. `id` defaults to `qdrant`, and `collectionPrefix` to `migaia_`. `apiKey` and a supplied `http` port are optional. Supplied HTTP/SDK clients remain with the caller and are never closed by the host. Hosts detect by default; if disabled, call `await host.detect()` first."
+                  "text": "`url` is required. `name` defaults to `qdrant`, and `collectionPrefix` to `migaia_`. `apiKey` and a supplied `http` port are optional. Supplied HTTP/SDK clients remain with the caller and are never closed by the host. Hosts detect by default; if disabled, call `await host.detect()` first."
                 },
                 {
                   "type": "paragraph",
@@ -748,7 +751,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\n\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst documents = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors(name, [\n  {\n    id: 'a',\n    vector: [\n      [0, 1],\n      [0, 1]\n    ]\n  },\n  {\n    id: 'b',\n    vector: [\n      [3, 0],\n      [3, 0]\n    ]\n  }\n])\nconst hits = await documents\n  .near([1, 0])\n  .topK(2)\n  .rescore({\n    query: [\n      [1, 0],\n      [1, 0]\n    ],\n    topN: 1\n  })\n  .all()\nconsole.log(hits.map((hit) => hit.id).join(','))"
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\n\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin({\n      url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333',\n      features: {\n        rescore: qdrantRescoreFeature({\n          collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }\n        })\n      }\n    })\n  ]\n})\nconst store = host.backend('qdrant')\nconst documents = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors(name, [\n  {\n    id: 'a',\n    vector: [\n      [0, 1],\n      [0, 1]\n    ]\n  },\n  {\n    id: 'b',\n    vector: [\n      [3, 0],\n      [3, 0]\n    ]\n  }\n])\nconst hits = await documents\n  .near([1, 0])\n  .topK(2)\n  .rescore({\n    query: [\n      [1, 0],\n      [1, 0]\n    ],\n    topN: 1\n  })\n  .all()\nconsole.log(hits.map((hit) => hit.id).join(','))"
                 },
                 {
                   "type": "paragraph",
@@ -807,7 +810,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Pass Features as the factory's second argument to add methods under store.api. None has a transaction projection."
+                  "text": "Pass Features in the factory's `features` option to add methods under store.api. None has a transaction projection."
                 },
                 {
                   "type": "table",
@@ -881,6 +884,71 @@
       "guidePath": "/en/docs/storage-plugin-qdrant/getting-started",
       "architecturePath": "/en/docs/storage-plugin-qdrant",
       "symbols": [
+        {
+          "name": "IQdrantBackend",
+          "kind": "type",
+          "signature": "export type IQdrantBackend = IStorageBackendType<IQdrantStore, IQdrantHttp, { selectRescore(configuration: IQdrantRescoreConfiguration): void; }>;",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-qdrant/dist/plugin.d.ts",
+          "purpose": "The Qdrant engine as a type: its Store, the caller-owned HTTP port and rescore selection.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantBackend.",
+          "advanced": "No additional advanced behavior is declared for IQdrantBackend.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantBackend."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantBackend.",
+          "examples": [],
+          "members": [],
+          "composes": ["IStorageBackendType"],
+          "aliasOf": "IQdrantBackend",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IQdrantBackend = IStorageBackendType<IQdrantStore, IQdrantHttp, { selectRescore(configuration: IQdrantRescoreConfiguration): void; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantBackend when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantBackend does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The Qdrant engine as a type: its Store, the caller-owned HTTP port and rescore selection."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantBackend from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantBackend when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantBackend does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantBackend."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantBackend."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/plugin.d.ts:IQdrantBackend:export type IQdrantBackend = IStorageBackendType<IQdrantStore, IQdrantHttp, { selectRescore(configuration: IQdrantRescoreConfiguration): void; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--IQdrantBackend"
+        },
         {
           "name": "IQdrantHttp",
           "kind": "type",
@@ -1407,102 +1475,31 @@
           "fragment": "storage-plugin-qdrant-index--IQdrantUpdateResult"
         },
         {
-          "name": "qdrantBackendKind",
-          "kind": "const",
-          "signature": "export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, { selectRescore(configuration: IQdrantRescoreConfiguration): void; }>;",
-          "declarationLine": 5,
-          "source": "packages/storage-plugin-qdrant/dist/plugin.d.ts",
-          "purpose": "Identify the exact native vector backend when authenticating selected Feature installation.",
-          "core": "Identify the exact native vector backend when authenticating selected Feature installation.",
-          "advanced": "",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": [],
-          "lifecycleConcurrency": "",
-          "examples": [],
-          "members": [],
-          "composes": [],
-          "aliasOf": "qdrantBackendKind",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, { selectRescore(configuration: IQdrantRescoreConfiguration): void; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "",
-          "notUse": "",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Identify the exact native vector backend when authenticating selected Feature installation."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import qdrantBackendKind from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use qdrantBackendKind when its const contract and declared inputs match the result you need. Choose a different public symbol when qdrantBackendKind does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "Identify the exact native vector backend when authenticating selected Feature installation."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": ""
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-qdrant/dist/plugin.d.ts:qdrantBackendKind:export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, { selectRescore(configuration: IQdrantRescoreConfiguration): void; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "storage-plugin-qdrant-index--qdrantBackendKind"
-        },
-        {
           "name": "qdrantBackendPlugin",
           "kind": "function",
-          "signature": "export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>): IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>;",
-          "declarationLine": 9,
+          "signature": "export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { /** Plugin name and backend lookup key; `'qdrant'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IQdrantBackend, NoInfer<F>, IQdrantStore>; }): IStorageBackendPlugin<IQdrantBackend, NoInfer<TId>, F, IQdrantStore>;",
+          "declarationLine": 11,
           "source": "packages/storage-plugin-qdrant/dist/plugin.d.ts",
           "purpose": "Install native vector and expiry operations through the original host lifetime and capability owners.",
           "core": "features: Selected exact-kind native Features; no transaction projection.\nA pure plugin descriptor; only explicit host.detect probes native service readiness.\nid: Application-assigned backend identifier used by host.backend.\nqdrant is the default backend identifier.\nurl: Absolute HTTP or HTTPS service URL configured by application deployment.\napiKey: Authentication key issued by the deployment; it is never included in hook payloads.\nNo API key header is sent.\ncollectionPrefix: Configured managed namespace used to derive deterministic physical collection names.\nmigaia_ is the default namespace prefix.\nhttp: Borrowed finite protocol port; original SDK or fetch ownership remains with the caller.\nCreate the native fetchHttp port from url and apiKey.",
           "advanced": "",
           "parameters": [
-            "options: IQdrantOptions & { readonly id?: TId; }",
-            "features: F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore> (optional)"
+            "options: IQdrantOptions & { /** Plugin name and backend lookup key; `'qdrant'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IQdrantBackend, NoInfer<F>, IQdrantStore>; }"
           ],
           "parameterDetails": [
             {
               "name": "options",
-              "type": "IQdrantOptions & { readonly id?: TId; }",
+              "type": "IQdrantOptions & { /** Plugin name and backend lookup key; `'qdrant'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IQdrantBackend, NoInfer<F>, IQdrantStore>; }",
               "optional": false
-            },
-            {
-              "name": "features",
-              "type": "F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>",
-              "optional": true
             }
           ],
-          "returns": "IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>",
+          "returns": "IStorageBackendPlugin<IQdrantBackend, NoInfer<TId>, F, IQdrantStore>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
             "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\n\nawait using host = await createStorageHost({\n  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]\n})\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nconst documents = host\n  .backend('qdrant')\n  .use(vector)\n  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([\n  { id: 'a', vector: [2, 0], payload: { category: 'guide' } },\n  { id: 'b', vector: [1, 0], payload: { category: 'news' } }\n])\nconst query = documents.near([1, 0], { exact: true }).where({ category: 'guide' }).topK(2)\nconst hits = await query.withVector().all()\nconsole.log(hits.map((hit) => hit.id).join(','))\nconsole.log(hits[0]?.vector?.join(','))",
             "import { createStorageHost } from '@migaia/storage-host'\nimport { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/sdk'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\n\nawait using host = await createStorageHost({\n  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]\n})\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nconst documents = host\n  .backend('qdrant')\n  .use(vector)\n  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([{ id: 'a', vector: [1, 0], payload: { category: 'guide' } }], {\n  ttlMs: 60_000\n})\nconst ttlApi = host.backend('qdrant').use(ttl)\nconst target = lockKey.vector(name, 'a')\nconsole.log(await ttlApi.persist(target))\nconsole.log(await ttlApi.remaining(target))\nconsole.log(await documents.deleteWhere({ category: 'guide' }, { count: DeleteCountMode.scroll }))",
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\n\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst documents = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors(name, [\n  {\n    id: 'a',\n    vector: [\n      [0, 1],\n      [0, 1]\n    ]\n  },\n  {\n    id: 'b',\n    vector: [\n      [3, 0],\n      [3, 0]\n    ]\n  }\n])\nconst hits = await documents\n  .near([1, 0])\n  .topK(2)\n  .rescore({\n    query: [\n      [1, 0],\n      [1, 0]\n    ],\n    topN: 1\n  })\n  .all()\nconsole.log(hits.map((hit) => hit.id).join(','))",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\n\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin({\n      url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333',\n      features: {\n        rescore: qdrantRescoreFeature({\n          collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }\n        })\n      }\n    })\n  ]\n})\nconst store = host.backend('qdrant')\nconst documents = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors(name, [\n  {\n    id: 'a',\n    vector: [\n      [0, 1],\n      [0, 1]\n    ]\n  },\n  {\n    id: 'b',\n    vector: [\n      [3, 0],\n      [3, 0]\n    ]\n  }\n])\nconst hits = await documents\n  .near([1, 0])\n  .topK(2)\n  .rescore({\n    query: [\n      [1, 0],\n      [1, 0]\n    ],\n    topN: 1\n  })\n  .all()\nconsole.log(hits.map((hit) => hit.id).join(','))",
             "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\n\nawait using host = await createStorageHost({\n  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]\n})\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nconst documents = host\n  .backend('qdrant')\n  .use(vector)\n  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })\nconst tenant = host\n  .org('11111111-1111-4111-8111-111111111111')\n  .backend('qdrant')\n  .use(vector)\n  .collection(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([{ id: 'a', vector: [1, 0] }])\nawait tenant.upsert([{ id: 'a', vector: [2, 0] }])\nconsole.log((await documents.near([1, 0]).topK(1).all())[0]?.score)\nconsole.log((await tenant.near([1, 0]).topK(1).all())[0]?.score)",
             "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\n\nawait using host = await createStorageHost({\n  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]\n})\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nconst documents = host\n  .backend('qdrant')\n  .use(vector)\n  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([{ id: 'a', vector: [2, 0], payload: { category: 'guide' } }])\nconsole.log((await documents.near([1, 0], { exact: true }).topK(1).all())[0]?.id)"
           ],
@@ -1511,24 +1508,19 @@
           "aliasOf": "qdrantBackendPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>): IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>;"
+            "export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { /** Plugin name and backend lookup key; `'qdrant'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IQdrantBackend, NoInfer<F>, IQdrantStore>; }): IStorageBackendPlugin<IQdrantBackend, NoInfer<TId>, F, IQdrantStore>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
-                "type": "IQdrantOptions & { readonly id?: TId; }",
+                "type": "IQdrantOptions & { /** Plugin name and backend lookup key; `'qdrant'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IQdrantBackend, NoInfer<F>, IQdrantStore>; }",
                 "optional": false
-              },
-              {
-                "name": "features",
-                "type": "F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>",
-                "optional": true
               }
             ]
           ],
           "overloadReturns": [
-            "IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>"
+            "IStorageBackendPlugin<IQdrantBackend, NoInfer<TId>, F, IQdrantStore>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -1566,10 +1558,16 @@
           ],
           "declaredConfiguration": [
             {
-              "name": "id",
+              "name": "name",
               "type": "TId",
               "optional": true,
-              "description": ""
+              "description": "Plugin name and backend lookup key; `'qdrant'` when omitted."
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<IQdrantBackend, NoInfer<F>, IQdrantStore>",
+              "optional": true,
+              "description": "Features installed on this backend."
             },
             {
               "name": "url",
@@ -1596,17 +1594,25 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-plugin-qdrant/dist/plugin.d.ts:qdrantBackendPlugin:export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>): IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>;",
+          "identity": "packages/storage-plugin-qdrant/dist/plugin.d.ts:qdrantBackendPlugin:export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { /** Plugin name and backend lookup key; `'qdrant'` when omitted. */ readonly name?: TId; /** Features installed on this backend. */ readonly features?: F & IStorageFeatureStoreCompatibility<IQdrantBackend, NoInfer<F>, IQdrantStore>; }): IStorageBackendPlugin<IQdrantBackend, NoInfer<TId>, F, IQdrantStore>;",
           "guidance": [],
           "usageScore": 70,
           "configuration": [
             {
-              "name": "id",
+              "name": "name",
               "type": "TId",
               "optional": true,
-              "description": "`near` 使用查询向量；`similarTo(id)` 读取原样本；标准 `recommend` 用正样本均值减负样本均值构成查询。Cosine 使用搜索槽和原样本槽，`withVector()` 保留输入幅度，受原生 float32 精度限制。Euclid 距离取负成为 score。标准 `groupBy` 只处理已选出的 top-k 命中。",
-              "descriptionEn": "",
-              "descriptionZh": "`near` 使用查询向量；`similarTo(id)` 读取原样本；标准 `recommend` 用正样本均值减负样本均值构成查询。Cosine 使用搜索槽和原样本槽，`withVector()` 保留输入幅度，受原生 float32 精度限制。Euclid 距离取负成为 score。标准 `groupBy` 只处理已选出的 top-k 命中。"
+              "description": "`collection(name, options)` — 描述逻辑集合，首次执行核对或创建真实 schema。",
+              "descriptionEn": "Plugin name and backend lookup key; `'qdrant'` when omitted.",
+              "descriptionZh": "`collection(name, options)` — 描述逻辑集合，首次执行核对或创建真实 schema。"
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<IQdrantBackend, NoInfer<F>, IQdrantStore>",
+              "optional": true,
+              "description": "`qdrantBackendPlugin({ ...options, features? })` — 连接、命名空间和可选功能。",
+              "descriptionEn": "Features installed on this backend.",
+              "descriptionZh": "`qdrantBackendPlugin({ ...options, features? })` — 连接、命名空间和可选功能。"
             },
             {
               "name": "url",
@@ -2048,7 +2054,7 @@
         {
           "name": "qdrantGroupByFeature",
           "kind": "function",
-          "signature": "export declare function qdrantGroupByFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantGroupByOutput>;",
+          "signature": "export declare function qdrantGroupByFeature(): IStorageFeature<IQdrantBackend, IQdrantGroupByOutput>;",
           "declarationLine": 5,
           "source": "packages/storage-plugin-qdrant/dist/features/group-by.d.ts",
           "purpose": "Expose native multivalue groups while excluding lookup options the original SDK cannot forward.",
@@ -2056,7 +2062,7 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "IStorageFeature<typeof qdrantBackendKind, IQdrantGroupByOutput>",
+          "returns": "IStorageFeature<IQdrantBackend, IQdrantGroupByOutput>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -2064,10 +2070,10 @@
           "composes": [],
           "exportPath": "./features/group-by",
           "overloadSignatures": [
-            "export declare function qdrantGroupByFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantGroupByOutput>;"
+            "export declare function qdrantGroupByFeature(): IStorageFeature<IQdrantBackend, IQdrantGroupByOutput>;"
           ],
           "overloadParameterDetails": [[]],
-          "overloadReturns": ["IStorageFeature<typeof qdrantBackendKind, IQdrantGroupByOutput>"],
+          "overloadReturns": ["IStorageFeature<IQdrantBackend, IQdrantGroupByOutput>"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -2103,7 +2109,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-qdrant/dist/features/group-by.d.ts:qdrantGroupByFeature:export declare function qdrantGroupByFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantGroupByOutput>;",
+          "identity": "packages/storage-plugin-qdrant/dist/features/group-by.d.ts:qdrantGroupByFeature:export declare function qdrantGroupByFeature(): IStorageFeature<IQdrantBackend, IQdrantGroupByOutput>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -2685,7 +2691,7 @@
         {
           "name": "qdrantHybridFeature",
           "kind": "function",
-          "signature": "export declare function qdrantHybridFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantHybridOutput>;",
+          "signature": "export declare function qdrantHybridFeature(): IStorageFeature<IQdrantBackend, IQdrantHybridOutput>;",
           "declarationLine": 5,
           "source": "packages/storage-plugin-qdrant/dist/features/hybrid.d.ts",
           "purpose": "Expose native RRF fusion and sparse-only updates while leaving all ranking in the original engine.",
@@ -2693,7 +2699,7 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "IStorageFeature<typeof qdrantBackendKind, IQdrantHybridOutput>",
+          "returns": "IStorageFeature<IQdrantBackend, IQdrantHybridOutput>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -2701,10 +2707,10 @@
           "composes": [],
           "exportPath": "./features/hybrid",
           "overloadSignatures": [
-            "export declare function qdrantHybridFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantHybridOutput>;"
+            "export declare function qdrantHybridFeature(): IStorageFeature<IQdrantBackend, IQdrantHybridOutput>;"
           ],
           "overloadParameterDetails": [[]],
-          "overloadReturns": ["IStorageFeature<typeof qdrantBackendKind, IQdrantHybridOutput>"],
+          "overloadReturns": ["IStorageFeature<IQdrantBackend, IQdrantHybridOutput>"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -2740,7 +2746,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-qdrant/dist/features/hybrid.d.ts:qdrantHybridFeature:export declare function qdrantHybridFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantHybridOutput>;",
+          "identity": "packages/storage-plugin-qdrant/dist/features/hybrid.d.ts:qdrantHybridFeature:export declare function qdrantHybridFeature(): IStorageFeature<IQdrantBackend, IQdrantHybridOutput>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -2954,7 +2960,7 @@
         {
           "name": "qdrantManagementFeature",
           "kind": "function",
-          "signature": "export declare function qdrantManagementFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantManagementOutput>;",
+          "signature": "export declare function qdrantManagementFeature(): IStorageFeature<IQdrantBackend, IQdrantManagementOutput>;",
           "declarationLine": 8,
           "source": "packages/storage-plugin-qdrant/dist/features/management.d.ts",
           "purpose": "Expose native operation-record deletion and expiry purge without changing standard numeric deleteWhere.",
@@ -2962,7 +2968,7 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "IStorageFeature<typeof qdrantBackendKind, IQdrantManagementOutput>",
+          "returns": "IStorageFeature<IQdrantBackend, IQdrantManagementOutput>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -2970,10 +2976,10 @@
           "composes": [],
           "exportPath": "./features/management",
           "overloadSignatures": [
-            "export declare function qdrantManagementFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantManagementOutput>;"
+            "export declare function qdrantManagementFeature(): IStorageFeature<IQdrantBackend, IQdrantManagementOutput>;"
           ],
           "overloadParameterDetails": [[]],
-          "overloadReturns": ["IStorageFeature<typeof qdrantBackendKind, IQdrantManagementOutput>"],
+          "overloadReturns": ["IStorageFeature<IQdrantBackend, IQdrantManagementOutput>"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -3009,7 +3015,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-qdrant/dist/features/management.d.ts:qdrantManagementFeature:export declare function qdrantManagementFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantManagementOutput>;",
+          "identity": "packages/storage-plugin-qdrant/dist/features/management.d.ts:qdrantManagementFeature:export declare function qdrantManagementFeature(): IStorageFeature<IQdrantBackend, IQdrantManagementOutput>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -3323,7 +3329,7 @@
         {
           "name": "qdrantRecommendFeature",
           "kind": "function",
-          "signature": "export declare function qdrantRecommendFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantRecommendOutput>;",
+          "signature": "export declare function qdrantRecommendFeature(): IStorageFeature<IQdrantBackend, IQdrantRecommendOutput>;",
           "declarationLine": 5,
           "source": "packages/storage-plugin-qdrant/dist/features/recommend.d.ts",
           "purpose": "Expose native best_score and lookup semantics independently from the shared centroid recommendation chain.",
@@ -3331,7 +3337,7 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "IStorageFeature<typeof qdrantBackendKind, IQdrantRecommendOutput>",
+          "returns": "IStorageFeature<IQdrantBackend, IQdrantRecommendOutput>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -3339,10 +3345,10 @@
           "composes": [],
           "exportPath": "./features/recommend",
           "overloadSignatures": [
-            "export declare function qdrantRecommendFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantRecommendOutput>;"
+            "export declare function qdrantRecommendFeature(): IStorageFeature<IQdrantBackend, IQdrantRecommendOutput>;"
           ],
           "overloadParameterDetails": [[]],
-          "overloadReturns": ["IStorageFeature<typeof qdrantBackendKind, IQdrantRecommendOutput>"],
+          "overloadReturns": ["IStorageFeature<IQdrantBackend, IQdrantRecommendOutput>"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -3378,7 +3384,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-qdrant/dist/features/recommend.d.ts:qdrantRecommendFeature:export declare function qdrantRecommendFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantRecommendOutput>;",
+          "identity": "packages/storage-plugin-qdrant/dist/features/recommend.d.ts:qdrantRecommendFeature:export declare function qdrantRecommendFeature(): IStorageFeature<IQdrantBackend, IQdrantRecommendOutput>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -4049,7 +4055,7 @@
         {
           "name": "qdrantRescoreFeature",
           "kind": "function",
-          "signature": "export declare function qdrantRescoreFeature(options: IQdrantRescoreOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", import(\"../types.ts\").IQdrantStore, import(\"../types.ts\").IQdrantHttp, { selectRescore(configuration: import(\"../feature-types.ts\").IQdrantRescoreConfiguration): void; }>, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>;",
+          "signature": "export declare function qdrantRescoreFeature(options: IQdrantRescoreOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IQdrantBackend, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-qdrant/dist/features/rescore.d.ts",
           "purpose": "Select one extra native dense or max_sim vector slot per configured logical collection. Adds the bounded rescore chain and an organization-bound vector update API without changing the original search/source slots.",
@@ -4063,17 +4069,17 @@
               "optional": false
             }
           ],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", import(\"../types.ts\").IQdrantStore, import(\"../types.ts\").IQdrantHttp, { selectRescore(configuration: import(\"../feature-types.ts\").IQdrantRescoreConfiguration): void; }>, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IQdrantBackend, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\n\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst documents = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors(name, [\n  {\n    id: 'a',\n    vector: [\n      [0, 1],\n      [0, 1]\n    ]\n  },\n  {\n    id: 'b',\n    vector: [\n      [3, 0],\n      [3, 0]\n    ]\n  }\n])\nconst hits = await documents\n  .near([1, 0])\n  .topK(2)\n  .rescore({\n    query: [\n      [1, 0],\n      [1, 0]\n    ],\n    topN: 1\n  })\n  .all()\nconsole.log(hits.map((hit) => hit.id).join(','))"
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\n\nconst name = 'guide_' + crypto.randomUUID().replaceAll('-', '')\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin({\n      url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333',\n      features: {\n        rescore: qdrantRescoreFeature({\n          collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }\n        })\n      }\n    })\n  ]\n})\nconst store = host.backend('qdrant')\nconst documents = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })\nawait documents.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors(name, [\n  {\n    id: 'a',\n    vector: [\n      [0, 1],\n      [0, 1]\n    ]\n  },\n  {\n    id: 'b',\n    vector: [\n      [3, 0],\n      [3, 0]\n    ]\n  }\n])\nconst hits = await documents\n  .near([1, 0])\n  .topK(2)\n  .rescore({\n    query: [\n      [1, 0],\n      [1, 0]\n    ],\n    topN: 1\n  })\n  .all()\nconsole.log(hits.map((hit) => hit.id).join(','))"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/rescore",
           "overloadSignatures": [
-            "export declare function qdrantRescoreFeature(options: IQdrantRescoreOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", import(\"../types.ts\").IQdrantStore, import(\"../types.ts\").IQdrantHttp, { selectRescore(configuration: import(\"../feature-types.ts\").IQdrantRescoreConfiguration): void; }>, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>;"
+            "export declare function qdrantRescoreFeature(options: IQdrantRescoreOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IQdrantBackend, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>;"
           ],
           "overloadParameterDetails": [
             [
@@ -4085,7 +4091,7 @@
             ]
           ],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", import(\"../types.ts\").IQdrantStore, import(\"../types.ts\").IQdrantHttp, { selectRescore(configuration: import(\"../feature-types.ts\").IQdrantRescoreConfiguration): void; }>, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IQdrantBackend, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -4129,7 +4135,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-plugin-qdrant/dist/features/rescore.d.ts:qdrantRescoreFeature:export declare function qdrantRescoreFeature(options: IQdrantRescoreOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", import(\"../types.ts\").IQdrantStore, import(\"../types.ts\").IQdrantHttp, { selectRescore(configuration: import(\"../feature-types.ts\").IQdrantRescoreConfiguration): void; }>, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>;",
+          "identity": "packages/storage-plugin-qdrant/dist/features/rescore.d.ts:qdrantRescoreFeature:export declare function qdrantRescoreFeature(options: IQdrantRescoreOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"../plugin.ts\").IQdrantBackend, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>;",
           "guidance": [],
           "usageScore": 20,
           "configuration": [

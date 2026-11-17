@@ -43,11 +43,11 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 2000 })\n  tools.collector.pause()\n  console.log(tools.describe().paused)\n  tools.collector.resume()\n  console.log(tools.describe().paused)\n  const text = tools.collector.exportRecord(recording.stop())\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
+                "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 2000 })\n  tools.collector.pause()\n  console.log(tools.collector.describe().paused)\n  tools.collector.resume()\n  console.log(tools.collector.describe().paused)\n  const text = tools.collector.exportRecord(recording.stop())\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.collector.close()\n}"
               },
               {
                 "type": "paragraph",
-                "text": "输出 `true`、`false`、`1`。采集真实业务时将同一个 tools 与所选 transport 放在 `createRpcHost({ plugins: [tools, transport] })`；完整 Coroutine 示例见使用指南。无需另装一个 probe 转发器。"
+                "text": "输出 `true`、`false`、`1`。采集真实业务时将同一个 tools 与所选 transport 放在 `createRpcHost({ plugins: [tools.plugin, transport] })`；完整 Coroutine 示例见使用指南。无需另装一个 probe 转发器。"
               }
             ]
           },
@@ -57,11 +57,11 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "同一 tools 可安装到多个真实 Host，每个安装有自己的观察寿命，事件进入同一个 collector。每个 Host 内只安装一次同一定义。一个 Host 允许不同 namespace 的 transport；业务仍在 `host.<ns>.*`，Devtools 不增加根调用方法。"
+                "text": "同一 tools.plugin 可安装到多个真实 Host，每个安装有自己的观察寿命，事件进入同一个 collector。每个 Host 内只安装一次同一定义。一个 Host 允许不同 namespace 的 transport；业务仍在 `host.<ns>.*`，Devtools 不增加根调用方法。"
               },
               {
                 "type": "paragraph",
-                "text": "Host.close 撤回其观察；应用在所有使用结束后调用 tools.close 或 collector.close。关闭 collector 不关闭业务 Host。query/watch/stats/describe/close 便捷方法直接借用同一个 collector；pause/resume、record、clear、export/import 和 service 使用 tools.collector。"
+                "text": "Host.close 撤回其观察；应用在所有使用结束后调用 tools.collector.close()。关闭 collector 不关闭业务 Host。query/watch/stats/describe/close、pause/resume、record、clear、export/import 和 service 均通过 tools.collector 操作。"
               }
             ]
           },
@@ -125,12 +125,12 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "此示例另需安装 `@migaia/rpc-plugin-coroutines`。将同一 tools 安装到父子两个真实 Host，watch 首次 next 先订阅未来事件，再发业务。安装 flow plugin 时使用 Host.plugins，而非 transport.features。"
+                "text": "此示例另需安装 `@migaia/rpc-plugin-coroutines`。将同一 tools.plugin 安装到父子两个真实 Host，watch 首次 next 先订阅未来事件，再发业务。安装 flow plugin 时使用 Host.plugins，而非 transport.features。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}"
+                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools.plugin, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools.plugin, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.collector.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.collector.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.collector.close()\n}"
               },
               {
                 "type": "paragraph",
@@ -172,7 +172,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
+                "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.collector.close()\n}"
               },
               {
                 "type": "paragraph",
@@ -245,11 +245,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 2000 })\n  tools.collector.pause()\n  console.log(tools.describe().paused)\n  tools.collector.resume()\n  console.log(tools.describe().paused)\n  const text = tools.collector.exportRecord(recording.stop())\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
+                  "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 2000 })\n  tools.collector.pause()\n  console.log(tools.collector.describe().paused)\n  tools.collector.resume()\n  console.log(tools.collector.describe().paused)\n  const text = tools.collector.exportRecord(recording.stop())\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.collector.close()\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "It prints `true`, `false`, and `1`. Observe real work by installing the same tools with a selected transport in `createRpcHost({ plugins: [tools, transport] })`; see the guide for a complete Coroutine example. No additional probe forwarding plugin is needed."
+                  "text": "It prints `true`, `false`, and `1`. Observe real work by installing tools.plugin with a selected transport in `createRpcHost({ plugins: [tools.plugin, transport] })`; see the guide for a complete Coroutine example. No additional probe forwarding plugin is needed."
                 }
               ]
             },
@@ -263,7 +263,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Host.close removes its observation. The application calls tools.close or collector.close after all uses end. Collector closure does not close business Hosts. Convenience query/watch/stats/describe/close methods borrow the same collector. Use tools.collector for pause/resume, record, clear, export/import, and service."
+                  "text": "Host.close removes its observation. The application calls tools.collector.close() after all uses end. Collector closure does not close business Hosts. Use tools.collector for query/watch/stats/describe/close, pause/resume, record, clear, export/import, and service."
                 }
               ]
             },
@@ -339,12 +339,12 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "This example additionally needs `@migaia/rpc-plugin-coroutines`. Install the same tools on two real parent/child Hosts. The watch's first next subscribes to future events before business begins. Flow plugins go in Host.plugins rather than transport.features."
+                  "text": "This example additionally needs `@migaia/rpc-plugin-coroutines`. Install tools.plugin on two real parent/child Hosts. The watch's first next subscribes to future events before business begins. Flow plugins go in Host.plugins rather than transport.features."
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}"
+                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools.plugin, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools.plugin, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.collector.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.collector.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.collector.close()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -386,7 +386,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
+                  "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.collector.close()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -445,7 +445,7 @@
         {
           "name": "devtoolsPlugin",
           "kind": "function",
-          "signature": "export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin;",
+          "signature": "export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsBundle;",
           "declarationLine": 9,
           "source": "packages/rpc-plugin-devtools/dist/plugin.d.ts",
           "purpose": "Install one genuine observe flow plugin backed by the caller-owned collector. Direct query/watch/stats/describe/close methods refer to that same collector.",
@@ -459,21 +459,21 @@
               "optional": true
             }
           ],
-          "returns": "IDevtoolsPlugin",
+          "returns": "IDevtoolsBundle",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}",
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools.plugin, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools.plugin, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.collector.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.collector.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.collector.close()\n}",
             "import { devtoolsPlugin, type IRpcDevtools } from '@migaia/rpc-plugin-devtools'\nimport type { IRpcHost } from '@migaia/rpc-host'\n\nexport const tools = devtoolsPlugin({\n  stages: ['message', 'peer', 'carrier'],\n  capture: ['message'],\n  redact: () => ({ redacted: true }),\n  maxEvents: 2000,\n  maxContentBytes: 1024 * 1024,\n  onError: (error) => console.error(error)\n})\n\nexport function readPage(collector: IRpcDevtools, afterSeq: number) {\n  const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })\n  return { events: page.events, cursor: page.nextSeq, loss: page.counters }\n}\n\nexport function exposeDiagnostics(host: IRpcHost) {\n  host.provide({ diagnostics: tools.collector.service })\n}",
-            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}",
-            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 2000 })\n  tools.collector.pause()\n  console.log(tools.describe().paused)\n  tools.collector.resume()\n  console.log(tools.describe().paused)\n  const text = tools.collector.exportRecord(recording.stop())\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
+            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.collector.close()\n}",
+            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 2000 })\n  tools.collector.pause()\n  console.log(tools.collector.describe().paused)\n  tools.collector.resume()\n  console.log(tools.collector.describe().paused)\n  const text = tools.collector.exportRecord(recording.stop())\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.collector.close()\n}"
           ],
           "members": [],
           "composes": [],
           "aliasOf": "devtoolsPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin;"
+            "export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsBundle;"
           ],
           "overloadParameterDetails": [
             [
@@ -484,7 +484,7 @@
               }
             ]
           ],
-          "overloadReturns": ["IDevtoolsPlugin"],
+          "overloadReturns": ["IDevtoolsBundle"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -581,7 +581,7 @@
               "description": "Optional diagnostic sink; omission or a throwing sink uses Core's host failure route."
             }
           ],
-          "identity": "packages/rpc-plugin-devtools/dist/plugin.d.ts:devtoolsPlugin:export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin;",
+          "identity": "packages/rpc-plugin-devtools/dist/plugin.d.ts:devtoolsPlugin:export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsBundle;",
           "guidance": [],
           "usageScore": 54,
           "configuration": [
@@ -669,21 +669,30 @@
           "fragment": "rpc-plugin-devtools-index--devtoolsPlugin"
         },
         {
-          "name": "IDevtoolsPlugin",
+          "name": "IDevtoolsBundle",
           "kind": "type",
-          "signature": "export type IDevtoolsPlugin = IRpcFlowPlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;",
-          "declarationLine": 5,
+          "signature": "export type IDevtoolsBundle = Readonly<{ plugin: IRpcFlowPlugin; collector: IRpcDevtools; }>;",
+          "declarationLine": 4,
           "source": "packages/rpc-plugin-devtools/dist/plugin.d.ts",
-          "purpose": "Complete flow plugin retaining its collector and the same query, watch, stats, describe and close methods. Collector close does not close observing Hosts.",
-          "core": "collector: Exact original collector; the application owns its final close.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED.",
-          "advanced": "Share a collector across two actual hosts while preserving separate host cleanup.",
+          "purpose": "Caller explicitly owns the collector; the thin native plugin carries only install identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDevtoolsBundle.",
+          "advanced": "No additional advanced behavior is declared for IDevtoolsBundle.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": [],
-          "lifecycleConcurrency": "",
+          "errors": ["No documented errors are declared for IDevtoolsBundle."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDevtoolsBundle.",
           "examples": [],
           "members": [
+            {
+              "name": "plugin",
+              "kind": "property",
+              "optional": false,
+              "signature": "plugin: IRpcFlowPlugin;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcFlowPlugin"
+            },
             {
               "name": "collector",
               "kind": "property",
@@ -692,90 +701,33 @@
               "description": null,
               "parameterDetails": [],
               "returns": "IRpcDevtools"
-            },
-            {
-              "name": "query",
-              "kind": "method",
-              "optional": false,
-              "signature": "query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage;",
-              "description": "Read retained history after a sequence cursor; locally captured content is available.",
-              "parameterDetails": [
-                {
-                  "name": "input",
-                  "type": "IRpcDevtoolsQuery",
-                  "optional": true
-                }
-              ],
-              "returns": "IRpcDevtoolsPage"
-            },
-            {
-              "name": "watch",
-              "kind": "method",
-              "optional": false,
-              "signature": "watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>;",
-              "description": "A local iterator return wakes its pending next and releases only that watch, not the Collector. First next subscribes to future events; query reads history. Batches contain at most 256 events with 64 queued batches and a loss count. Collector close rejects pending next with CLOSED rather than leaving it suspended.",
-              "parameterDetails": [
-                {
-                  "name": "input",
-                  "type": "Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>",
-                  "optional": true
-                }
-              ],
-              "returns": "AsyncGenerator<IRpcDevtoolsWatchBatch>"
-            },
-            {
-              "name": "stats",
-              "kind": "method",
-              "optional": false,
-              "signature": "stats(): IRpcDevtoolsStats;",
-              "description": "Snapshot cumulative eligible message statistics; ring eviction does not reset them.",
-              "parameterDetails": [],
-              "returns": "IRpcDevtoolsStats"
-            },
-            {
-              "name": "describe",
-              "kind": "method",
-              "optional": false,
-              "signature": "describe(): IRpcDevtoolsDescribe;",
-              "description": "Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after close.",
-              "parameterDetails": [],
-              "returns": "IRpcDevtoolsDescribe"
-            },
-            {
-              "name": "close",
-              "kind": "method",
-              "optional": false,
-              "signature": "close(): void;",
-              "description": "Synchronously retire storage and wake watches; idempotent, without closing any serving Peer.",
-              "parameterDetails": [],
-              "returns": "void"
             }
           ],
-          "composes": ["IRpcFlowPlugin"],
-          "aliasOf": "IDevtoolsPlugin",
+          "composes": [],
+          "aliasOf": "IDevtoolsBundle",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IDevtoolsPlugin = IRpcFlowPlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;"
+            "export type IDevtoolsBundle = Readonly<{ plugin: IRpcFlowPlugin; collector: IRpcDevtools; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Share a collector across two actual hosts while preserving separate host cleanup.",
-          "notUse": "",
+          "whenToUse": "Use IDevtoolsBundle when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IDevtoolsBundle does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Complete flow plugin retaining its collector and the same query, watch, stats, describe and close methods. Collector close does not close observing Hosts."
+              "content": "Caller explicitly owns the collector; the thin native plugin carries only install identity."
             },
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import IDevtoolsPlugin from @migaia/rpc-plugin-devtools, then follow a maintained task example for your use case."
+              "content": "Import IDevtoolsBundle from @migaia/rpc-plugin-devtools, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
               "title": "适用场景",
-              "content": "Use IDevtoolsPlugin when its type contract and declared inputs match the result you need. Choose a different public symbol when IDevtoolsPlugin does not match the required inputs or return contract."
+              "content": "Use IDevtoolsBundle when its type contract and declared inputs match the result you need. Choose a different public symbol when IDevtoolsBundle does not match the required inputs or return contract."
             },
             {
               "id": "quick-implementation",
@@ -785,20 +737,20 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "collector: Exact original collector; the application owns its final close.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED."
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDevtoolsBundle."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "Share a collector across two actual hosts while preserving separate host cleanup."
+              "content": "No additional advanced behavior is declared for IDevtoolsBundle."
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-devtools/dist/plugin.d.ts:IDevtoolsPlugin:export type IDevtoolsPlugin = IRpcFlowPlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;",
+          "identity": "packages/rpc-plugin-devtools/dist/plugin.d.ts:IDevtoolsBundle:export type IDevtoolsBundle = Readonly<{ plugin: IRpcFlowPlugin; collector: IRpcDevtools; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "rpc-plugin-devtools-index--IDevtoolsPlugin"
+          "fragment": "rpc-plugin-devtools-index--IDevtoolsBundle"
         },
         {
           "name": "IRpcDevtools",

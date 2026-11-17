@@ -14,7 +14,7 @@
       "./features/threshold",
       "./features/timeout",
       "./features/uuid",
-      "./plugin"
+      "./sdk"
     ],
     "readmeLocales": ["zh", "en"],
     "documentation": {
@@ -52,7 +52,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
               },
               {
                 "type": "paragraph",
@@ -60,7 +60,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "输出级同 kind 策略覆盖 host 默认值。每个作用域只允许一个 format，无论 kind 是否相同；输出级 format 覆盖 host format。交付顺序固定为门槛、过滤、自定义 gate、格式、批量、重试、超时、输出，与内置 feature 的数组顺序无关。"
+                "text": "feature 工厂返回 `@migaia/plugin-host` 的原生 opaque 定义，不暴露 descriptor 字段或控制方法。`defineLogPlugin` 基于 `definePlugin` 组装普通 host-wide 插件；`createLogHost` 只通过 `plugins` 接收策略。`features` 一律使用 `{ alias: feature }` record。每次插件安装独立创建状态，控制通过 `${pluginName}_${alias}_${method}` 扩展调用，例如 `log.policy_threshold_setLevel('warn')`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出插件的 features 只作用于自身。同 key 的输出级 feature 覆盖 host-wide feature；format、batch、retry、timeout 这四类每个输出只取一个，输出自己配了哪一类，就替换 host-wide 的同类 feature（即使 key 不同）。不同 key 的 gate 都会执行，即使来自同一工厂。一个插件的 record 里同类 format/batch/retry/timeout 只能有一个；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类 format/batch/retry/timeout，违反时以既有 `INVALID_OPTION` 拒绝。执行按 entry、gate、format、batch、retry、timeout、输出阶段组织，gate 保留有效 record 声明顺序。没有有效显式 format 时才采用输出默认格式。"
               },
               {
                 "type": "paragraph",
@@ -97,8 +101,8 @@
                     "`createLogHost`、`levelPlugin`、`forwardPlugin`、状态、默认 reporter 与 host 类型"
                   ],
                   [
-                    "`@migaia/log-host/plugin`",
-                    "`defineLogFeature`、`defineOutputPlugin`、`projectLogEntry` 与插件作者类型"
+                    "`@migaia/log-host/sdk`",
+                    "`defineLogFeature`、`defineLogPlugin`、`defineOutputPlugin`、`projectLogEntry` 与插件作者类型"
                   ],
                   ["`@migaia/log-host/features`", "七个内置 feature"],
                   ["`@migaia/log-host/features/<name>`", "对应 feature 的默认导出"]
@@ -111,6 +115,10 @@
               {
                 "type": "paragraph",
                 "text": "完整用法见 USEGUIDE.md。"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出 Feature 可使用 `false` 禁用继承角色。本地 format、batch、retry、timeout 替换对应全局角色，entry 与 gate 按别名替换。两个全局载体重复提供同一单例角色时，以 `plugin.host / FEATURE_ROLE_CONFLICT` 拒绝；重复宿主别名与单个记录格式错误仍使用 `logging / INVALID_OPTION`。全局默认值通过共享 overlay 在策略安装提交或移除后通知已安装输出。"
               }
             ]
           }
@@ -129,7 +137,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
+                "text": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
               },
               {
                 "type": "paragraph",
@@ -152,7 +160,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** 每个 add 返回的撤销函数只移除该次注册。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')"
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')"
               },
               {
                 "type": "paragraph",
@@ -166,24 +174,31 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "每个输出端按门槛、过滤、自定义 gate、格式、批量、重试、超时、实际输出的固定顺序交付。内置 feature 的数组顺序不会改变这条顺序。"
+                "text": "entry 在 host 入口执行一次；每个输出端随后按 gate、format、batch、retry、timeout、实际输出的阶段顺序交付。同一 gate 阶段保留有效 record 的声明顺序，不用工厂类别决定名称或覆盖。"
               },
               {
                 "type": "paragraph",
-                "text": "host 级 output feature 是默认值，输出级相同 kind 的 feature 覆盖它。未覆盖的 host 自定义 gate 先运行，输出级 gate 随后按声明顺序运行。entry feature 只允许装在 host 级。"
+                "text": "`defineLogPlugin({ name, features })` 通过原生 `definePlugin` 安装 host-wide 策略。`createLogHost` 没有 `features` 选项；所有策略随调用者声明的插件进入。`defineOutputPlugin` 的策略只作用于自己的输出。两者一律使用 `{ alias: feature }` record，保留属性声明顺序。"
               },
               {
                 "type": "paragraph",
-                "text": "同一作用域重复 kind 会在创建时抛 `INVALID_OPTION`。format 还按阶段唯一：即使 kind 不同，一个作用域也只允许一个 format。跨作用域允许各有一个，最终优先级是输出级显式 format、host 级显式 format、输出插件 `defaultFormat`。"
+                "text": "record key 是 feature 的名称：输出级 `features.<key>` 覆盖 host-wide 同 key 的 feature。不同 key 即使使用同一工厂也都保留，例如 `{ a: thresholdFeature(), b: thresholdFeature() }` 会应用两个 gate。未覆盖的 host gate 先运行，输出级 gate 随后按声明顺序运行。entry feature 只允许装在 host-wide carrier。"
+              },
+              {
+                "type": "paragraph",
+                "text": "format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类，动态 `use()` 同样检查。违反时以既有 `INVALID_OPTION` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。"
               },
               {
                 "type": "table",
                 "headers": ["Feature", "作用"],
                 "rows": [
-                  ["`thresholdFeature({ level })`", "标准级别门槛，支持 `setLevel()`"],
+                  [
+                    "`thresholdFeature({ level })`",
+                    "标准级别门槛，安装后暴露 `${pluginName}_${alias}_setLevel()`"
+                  ],
                   [
                     "`filterFeature({ filters })`",
-                    "按顺序运行 predicates，任一返回 false 即停止；支持 `add()`"
+                    "按顺序运行 predicates；安装后暴露 `${pluginName}_${alias}_add()`，返回独立撤销函数"
                   ],
                   ["`uuidFeature({ display })`", "用当前 host 的生成器丰富条目"],
                   ["`formatFeature({ format })`", "`json` 或不着色的 `plain` 文本"],
@@ -216,23 +231,23 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+                "code": "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
               },
               {
                 "type": "paragraph",
-                "text": "`deliver` 接收 `readonly ILogOutputRecord[]` 和只读 `{ signal, format }`。record 同时包含原生 `entry` 与已选格式的 `text`。context.format 与最终选中的 descriptor 是同一个对象。输出包可由自己的 pretty descriptor 身份选择原生参数渲染，不猜测文本或重做格式优先级。"
+                "text": "`deliver` 接收 `readonly ILogOutputRecord[]` 和只读 `{ signal, format }`。record 同时包含原生 `entry` 与已选格式的 `text`。`context.format` 是实际安装后的 formatter implementation，不是冷 feature token；通过其格式函数或可选 pretty 渲染能力观察行为，不比较 token 身份。"
               },
               {
                 "type": "paragraph",
-                "text": "不消费文本的输出声明 `consumesText: false` 并省略 `defaultFormat`。其回调收到只含 `entry` 的 record 与只含 `signal` 的 context；host 跳过该输出的格式阶段，输出级配置任何 format 都在创建时抛 `INVALID_OPTION`。entry、gate、批量、重试与超时照常执行。省略 consumesText 则保留原文本回调类型与必填 defaultFormat。"
+                "text": "不消费文本的输出声明 `consumesText: false` 并省略 `defaultFormat`。其回调收到只含 `entry` 的 record 与只含 `signal` 的 context；host 跳过该输出的格式阶段，输出级配置任何 format 都在安装该输出时抛 `INVALID_OPTION`。entry、gate、批量、重试与超时照常执行。省略 consumesText 则保留原文本回调类型与必填 defaultFormat。"
               },
               {
                 "type": "paragraph",
-                "text": "`defineOutputPlugin` 的可选 `install(core)` 返回扩展对象，host 与动态 use 句柄会保留其精确类型。非输出插件使用 `ILogPlugin` 形状。插件 core 提供安装期资源登记、scoped config、lifecycle、scheduler、sink、failure、defer、flush 与 shutdown 能力；资源通过真实 plugin-host 生命周期回滚与释放。"
+                "text": "`defineLogPlugin` 与 `defineOutputPlugin` 都在真实 native `features` record 中声明 feature；可选 `install(core)` 通过 `core.features[alias]` 读取原生安装输出并返回扩展。host 与动态 use 句柄保留扩展的精确类型。filter/threshold 的控制自动以 `${pluginName}_${alias}_${method}` 命名暴露，完整扩展重名由 plugin-host 拒绝。复用同一 token 不会共享不同插件或 host 的可变状态；一个 carrier 的控制会影响所有继承其默认策略的输出。插件 core 提供安装期资源登记、scoped config、lifecycle、scheduler、sink、failure、defer、flush 与 shutdown 能力；资源通过真实 plugin-host 生命周期回滚与释放。"
               },
               {
                 "type": "paragraph",
-                "text": "第三方 feature 用 `defineLogFeature()` 签发，完整实现 entry、gate 或 format 中一种。delivery 阶段只由内置 batch/retry/timeout 工厂提供。描述对象被冻结；普通字面量、浅复制和类型断言都不能制造运行期签发身份。"
+                "text": "第三方使用 `defineLogFeature()`，完整实现 entry、gate 或 format 中一种，例如 `defineLogFeature({ phase: 'gate', accept: () => true })`；delivery 只由内置 batch/retry/timeout 工厂提供。所有工厂返回真实 `defineFeature` 原生 opaque token，不带 phase、stage、setLevel 或 add 字段。定义不接受名称字段，名称仅来自 record key。phase 与内置交付策略从每个 feature 的安装输出读取，所以 phase 与作用域规则在安装声明它的插件时检查；状态和控制由原生 install 输出拥有。普通字面量、浅复制和类型断言都不能制造 plugin-host 身份。"
               }
             ]
           },
@@ -310,7 +325,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** Host policies are output defaults; entry enrichment executes once per entry. */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** Host policies are output defaults; entry enrichment executes once per entry. */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
@@ -318,7 +333,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Output-local policies replace host defaults of the same kind. Each scope admits one format regardless of kind; an output format replaces the host format. The fixed delivery order is threshold, filter, custom gates, format, batch, retry, timeout and transport, independently of built-in descriptor array order."
+                  "text": "Feature factories return opaque native `@migaia/plugin-host` definitions without descriptor fields or controls. `defineLogPlugin` uses `definePlugin` to assemble an ordinary host-wide plugin; `createLogHost` receives policies only through `plugins`. Every `features` declaration uses a `{ alias: feature }` record. Each plugin installation owns independent state. Controls are plugin extensions named `${pluginName}_${alias}_${method}`, for example `log.policy_threshold_setLevel('warn')`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Features on an output plugin apply only to that output. An output feature replaces the host-wide feature with the same key, and an output that configures its own format, batch, retry or timeout replaces the host-wide one of that kind even under a different key. Gates under different keys both execute, including two instances of the same factory. One plugin record holds at most one format, batch, retry and timeout; host-wide carriers cannot share a key or each supply the same one of those four kinds. Duplicate host aliases and invalid individual records retain `logging / INVALID_OPTION`; two global carriers contributing the same singular format, batch, retry or timeout role fail with `plugin.host / FEATURE_ROLE_CONFLICT`. Execution follows entry, gate, format, batch, retry, timeout and transport phases, retaining effective record order within the gate phase. The output default format applies only when no explicit format survives."
                 },
                 {
                   "type": "paragraph",
@@ -355,8 +374,8 @@
                       "Host factory, level/forward plugins, status, default reporter and host types"
                     ],
                     [
-                      "`@migaia/log-host/plugin`",
-                      "Feature/output definitions, shared error projection and plugin author types"
+                      "`@migaia/log-host/sdk`",
+                      "`defineLogFeature`, `defineLogPlugin`, `defineOutputPlugin`, shared error projection and author types"
                     ],
                     ["`@migaia/log-host/features`", "All seven built-in features"],
                     [
@@ -372,6 +391,10 @@
                 {
                   "type": "paragraph",
                   "text": "See USEGUIDE.en.md for complete usage."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Output feature selections accept `false` to disable an inherited role. A local singular format, batch, retry or timeout replaces that whole inherited role; entry and gate selections replace the matching alias. Host defaults are published through the shared overlay and propagated to installed outputs on committed policy installation or removal."
                 }
               ]
             }
@@ -390,7 +413,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Options are `plugins`, `features`, `context`, `topic`, `maxPending`, `scheduler`, `randomUUID`, `report` and plugin-host `execution`. The scheduler defaults to utils `systemScheduler`; UUID generation defaults to `globalThis.crypto.randomUUID()`. Both may be injected per host."
+                  "text": "Options are `plugins`, `context`, `topic`, `maxPending`, `scheduler`, `randomUUID`, `report` and plugin-host `execution`. The scheduler defaults to utils `systemScheduler`; UUID generation defaults to `globalThis.crypto.randomUUID()`. Both may be injected per host."
                 },
                 {
                   "type": "paragraph",
@@ -413,7 +436,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** Reusing this descriptor deliberately shares its live threshold state. */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** Every added filter has an independently revocable registration. */\nconst filters = filterFeature()\n/** Entry enrichment runs once per entry at host scope. */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** Revocation removes only this added occurrence. */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')"
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** A cold definition can be reused; each plugin installation owns its live threshold state. */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** The cold filter has no controls; its installed plugin extension provides add. */\nconst filters = filterFeature()\n/** Entry enrichment runs once per entry at host scope. */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** Revocation removes only this added occurrence. */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
@@ -427,20 +450,23 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "The fixed order is threshold, filter, custom gates, format, batch, retry, timeout and transport, independently of built-in descriptor array order. Output-local policies replace host defaults of the same kind. Surviving host gates precede local gates, retaining each scope's declaration order. Entry features are allowed only at host scope."
+                  "text": "Entry features execute once at host ingress. Each output then follows gate, format, batch, retry, timeout and transport phases, retaining effective record declaration order within the gate phase. `defineLogPlugin({ name, features })` installs host-wide policy through native `definePlugin`. `createLogHost` has no `features` option; policies arrive through caller-declared plugins. `defineOutputPlugin` policies apply only to their own output. Both use `{ alias: feature }` records in property declaration order. The record key is the feature name: output `features.<key>` overrides the same host-wide key. Different keys retain both features even when they use the same factory; `{ a: thresholdFeature(), b: thresholdFeature() }` applies both gates. Surviving host gates precede local gates in declaration order. Entry features belong only to host-wide carriers."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Duplicate kinds fail at creation with `INVALID_OPTION`. A scope also admits at most one format, regardless of kind. Across scopes, selection is output explicit format, host explicit format, then the output's `defaultFormat`."
+                  "text": "Each output applies at most one format, batch, retry and timeout. When an output configures one of these itself, it replaces the host-wide one of the same kind, even under a different key. One plugin record holds at most one of each, checked when the plugin is installed (`createLogHost` or `use()`). Host-wide carriers cannot share a key or each supply the same kind, including during dynamic `use()`. Duplicate host aliases and invalid individual records retain `logging / INVALID_OPTION`; two global carriers contributing the same singular format, batch, retry or timeout role fail with `plugin.host / FEATURE_ROLE_CONFLICT`. The output's `defaultFormat` applies only when no explicit formatter survives."
                 },
                 {
                   "type": "table",
                   "headers": ["Feature", "Behavior"],
                   "rows": [
-                    ["`thresholdFeature({ level })`", "Standard level threshold with `setLevel()`"],
+                    [
+                      "`thresholdFeature({ level })`",
+                      "Standard threshold; installed `${pluginName}_${alias}_setLevel()` control"
+                    ],
                     [
                       "`filterFeature({ filters })`",
-                      "Ordered predicates and independently revocable `add()`"
+                      "Ordered predicates; installed `${pluginName}_${alias}_add()` returns an independent remover"
                     ],
                     [
                       "`uuidFeature({ display })`",
@@ -476,23 +502,23 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** The transport owns its destination while the host owns delivery policy and resources. */\nconst lines: string[] = []\n/** Local policy replaces host defaults without duplicating batching or formatting. */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** The general log method works without installing standard level methods. */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+                  "code": "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** The transport owns its destination while the host owns delivery policy and resources. */\nconst lines: string[] = []\n/** Local policy replaces host defaults without duplicating batching or formatting. */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** The general log method works without installing standard level methods. */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`deliver` receives readonly records and `{ signal, format }`. Each record carries native entry and selected text. `context.format` is the exact selected descriptor, allowing a pretty output owner to recognize its own format without guessing text or repeating priority resolution."
+                  "text": "`deliver` receives readonly records and `{ signal, format }`. Each record carries native entry and selected text. `context.format` is the selected installed formatter implementation, rather than the cold feature token. Observe its formatter or optional pretty-rendering behavior instead of comparing token identity."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Set `consumesText: false` and omit `defaultFormat` for an entry-only output. Its callback receives records containing only `entry` and a context containing only `signal`. Host formatting is skipped for that output; configuring any output-local format throws `INVALID_OPTION` at creation. Entry features, gates, batching, retry and timeout still apply. Omitting `consumesText` keeps the existing text callback types and required defaultFormat."
+                  "text": "Set `consumesText: false` and omit `defaultFormat` for an entry-only output. Its callback receives records containing only `entry` and a context containing only `signal`. Host formatting is skipped for that output; configuring any output-local format throws `INVALID_OPTION` when the output is installed. Entry features, gates, batching, retry and timeout still apply. Omitting `consumesText` keeps the existing text callback types and required defaultFormat."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Optional `install(core)` returns precisely inferred extensions on the initial host and dynamic plugin handles. Other plugins use `ILogPlugin`. The real core provides scoped config, lifecycle, scheduler, install-owned resources, sinks, failures, deferred work, flush and shutdown. Plugin-host retains rollback and resource ownership."
+                  "text": "`defineLogPlugin` and `defineOutputPlugin` declare real native `features` records. Their optional `install(core)` reads native outputs through `core.features[alias]` and returns precisely inferred host and dynamic-handle extensions. Filter and threshold controls automatically use `${pluginName}_${alias}_${method}` names; plugin-host rejects duplicate complete extension names. Reusing a token never shares mutable state between plugin or host installations. A carrier control affects every output inheriting that carrier policy. The real core provides scoped config, lifecycle, scheduler, install-owned resources, sinks, failures, deferred work, flush and shutdown. Plugin-host retains rollback and resource ownership."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Use `defineLogFeature()` to issue complete entry, gate or format implementations. Delivery descriptors are internal to built-in batch/retry/timeout factories. Descriptors are frozen; object literals, shallow copies and type assertions cannot manufacture runtime issuance."
+                  "text": "Use `defineLogFeature()` for a complete entry, gate or format implementation, for example `defineLogFeature({ phase: 'gate', accept: () => true })`. Delivery remains limited to built-in batch/retry/timeout factories. Every factory returns an opaque native `defineFeature` token without phase, stage, setLevel or add fields. The definition accepts no feature name; the record key supplies it. The phase and the built-in delivery policy are read from each feature's installed output, so phase and scope rules are checked when the declaring plugin is installed; native installation outputs own state and controls. Object literals, shallow copies and type assertions cannot manufacture plugin-host identity."
                 }
               ]
             },
@@ -559,7 +585,7 @@
           "name": "createLogHost",
           "kind": "function",
           "signature": "export declare function createLogHost<const P extends readonly ILogPluginConstraint[] = readonly []>(options?: ILogHostOptions<P>): ILogHost<P>;",
-          "declarationLine": 49,
+          "declarationLine": 53,
           "source": "packages/log-host/dist/host.d.ts",
           "purpose": "Capture construction options once, install the initial tuple synchronously and return a frozen facade. Log methods return before ordered asynchronous admission; flush/shutdown always fulfill and report failures.",
           "core": "options: Optional plugin tuple, host features, context and borrowed runtime capabilities.\nA frozen host facade whose extension methods are inferred from the initial plugin tuple.\nplugins: Initial typed plugin tuple installed synchronously.\nEmpty tuple.\nfeatures: Host policies used as defaults for compatible outputs.\nNo explicit features.\ncontext: Copied initial display context path.\nEmpty path.\ntopic: Display topic appended during forwarding.\nEmpty topic.\nmaxPending: Bound unprocessed entries; overflow drops the oldest and reports QUEUE_OVERFLOW.\n10000.\nscheduler: Borrow one scheduler source; callbacks must run after schedule returns its receipt.\nCanonical system scheduler.\nrandomUUID: Borrow the identifier generator used by UUID features.\nNative UUID generator.\nreport: Receive failures without successful onFailure handling; reporter errors are contained.\ndefaultLogFailureReporter.\nexecution: Peer plugin-host mutation and drain budgets.\nPeer defaults.",
@@ -577,11 +603,11 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 每个 host 独立拥有上下文、插件与交付队列。 */\nconst log = createLogHost({\n  context: ['orders'],\n  topic: 'api',\n  maxPending: 10000,\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.info('created', { orderId: 'o1' })\nlog.log('audit', 'arbitrary tags remain valid')\nawait log.flush()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** 每个 add 返回的撤销函数只移除该次注册。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')",
-            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')",
+            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')",
             "import { createLogHost } from '@migaia/log-host'\n\n/** 单独的 reporter 接收无人处理的失败和失败监听器自身的异常。 */\nconst log = createLogHost({ report: (error) => console.error(error) })\n/** 撤销函数只移除这一监听器。 */\nconst off = log.onFailure(({ source, error }) => console.error(source, error))\nlog.log('audit', 'event')\nawait log.flush()\noff()\nawait log.shutdown('manual')",
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 拥有插件安装、日志交付与最终释放。 */\nconst log = createLogHost({ plugins: [levelPlugin(), consolePlugin()] })\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -638,12 +664,6 @@
             {
               "name": "plugins",
               "type": "P",
-              "optional": true,
-              "description": ""
-            },
-            {
-              "name": "features",
-              "type": "readonly ILogFeature[]",
               "optional": true,
               "description": ""
             },
@@ -716,79 +736,71 @@
               ]
             }
           ],
-          "usageScore": 78,
+          "usageScore": 88,
           "configuration": [
             {
               "name": "plugins",
               "type": "P",
               "optional": true,
-              "description": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
+              "description": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
               "descriptionEn": "",
-              "descriptionZh": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
-            },
-            {
-              "name": "features",
-              "type": "readonly ILogFeature[]",
-              "optional": true,
-              "description": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
-              "descriptionEn": "",
-              "descriptionZh": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
+              "descriptionZh": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
             },
             {
               "name": "context",
               "type": "readonly string[]",
               "optional": true,
-              "description": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
+              "description": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
               "descriptionEn": "",
-              "descriptionZh": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
+              "descriptionZh": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
             },
             {
               "name": "topic",
               "type": "string",
               "optional": true,
-              "description": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
+              "description": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
               "descriptionEn": "",
-              "descriptionZh": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
+              "descriptionZh": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
             },
             {
               "name": "maxPending",
               "type": "number",
               "optional": true,
-              "description": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
+              "description": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
               "descriptionEn": "",
-              "descriptionZh": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
+              "descriptionZh": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
             },
             {
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
+              "description": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
               "descriptionEn": "Captured scheduler identity also identifies a process-plugin clock domain.",
-              "descriptionZh": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
+              "descriptionZh": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
             },
             {
               "name": "randomUUID",
               "type": "() => string",
               "optional": true,
-              "description": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
+              "description": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
               "descriptionEn": "",
-              "descriptionZh": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
+              "descriptionZh": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
             },
             {
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
+              "description": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
               "descriptionEn": "",
-              "descriptionZh": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
+              "descriptionZh": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
             },
             {
               "name": "execution",
               "type": "IPluginHostOptions['execution']",
               "optional": true,
-              "description": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
+              "description": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。",
               "descriptionEn": "",
-              "descriptionZh": "选项包括 `plugins`、`features`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
+              "descriptionZh": "选项包括 `plugins`、`context`、`topic`、`maxPending`、`scheduler`、`randomUUID`、`report` 与 plugin-host 的 `execution`。调度器默认使用 utils `systemScheduler`；UUID 默认使用 `globalThis.crypto.randomUUID()`，也可按 host 注入。"
             }
           ],
           "fragment": "log-host-index--createLogHost"
@@ -988,7 +1000,7 @@
           "name": "ILevelPluginExt",
           "kind": "type",
           "signature": "export type ILevelPluginExt = { debug(...args: unknown[]): void; info(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void; fatal(...args: unknown[]): void; atLevel(level: LogLevel, entry: IRawEntryInput): void; };",
-          "declarationLine": 105,
+          "declarationLine": 119,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Severity methods preserve message placeholders and native argument order. Install levelPlugin for these methods; thresholdFeature and filterFeature independently decide each output admission.",
           "core": "debug: Creates a log entry tagged `debug`.\ndebug.args: Message text followed by extra values, as with `console`.\nNothing; filtered entries are dropped silently.\ninfo: Creates a log entry tagged `info`.\ninfo.args: Message text followed by extra values, as with `console`.\nwarn: Creates a log entry tagged `warn`.\nwarn.args: Message text followed by extra values, as with `console`.\nerror: Creates a log entry tagged `error`.\nerror.args: Message text followed by extra values, as with `console`.\nfatal: Creates a log entry tagged `fatal`.\nfatal.args: Message text followed by extra values, as with `console`.\natLevel: Attach an explicit severity to a category entry without replacing its tag; independent gate features decide delivery.\natLevel.level: debug, info, warn, error or fatal.\natLevel.entry: The existing IRawEntryInput schema.\nNo return value; category entries use the same ordered asynchronous admission as log().",
@@ -1148,8 +1160,8 @@
         {
           "name": "ILogHost",
           "kind": "type",
-          "signature": "export type ILogHost<P extends readonly ILogPluginConstraint[] = readonly []> = Readonly<{ ctx: ILogContext; config: IHostHandle<ILogPluginCore, ILogEntry, P>['config']; status: LogHostStatus; log(tag: string, message: string, ...args: unknown[]): void; dispatchRaw(input: IRawEntryInput): void; usePipeline(stage: IAsyncMiddlewareStage<ILogEntry>): () => void; onFailure(fn: (failure: ILogFailure) => void): () => void; onShutdown(fn: (reason: IShutdownReason) => void | Promise<void>): () => void; flush(): Promise<void>; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILogPluginConstraint[]>(...plugins: NewP): Promise<IPluginHandleTuple<NewP>>; unUse: IHostHandle<ILogPluginCore, ILogEntry, P>['unUse']; }> & IPluginExtensions<P>;",
-          "declarationLine": 126,
+          "signature": "export type ILogHost<P extends readonly ILogPluginConstraint[] = readonly []> = Readonly<{ ctx: ILogContext; config: IHostHandle<ILogPluginCore, ILogEntry, readonly [ typeof import('@migaia/plugin-host/features').featuresModule, typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule ], 'async', P>['config']; status: LogHostStatus; log(tag: string, message: string, ...args: unknown[]): void; dispatchRaw(input: IRawEntryInput): void; usePipeline(stage: IAsyncMiddlewareStage<ILogEntry>): () => void; onFailure(fn: (failure: ILogFailure) => void): () => void; onShutdown(fn: (reason: IShutdownReason) => void | Promise<void>): () => void; flush(): Promise<void>; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILogPluginConstraint[]>(...plugins: NewP): Promise<IPluginHandleTuple<NewP>>; unUse: IHostHandle<ILogPluginCore, ILogEntry, readonly [ typeof import('@migaia/plugin-host/features').featuresModule, typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule ], 'async', P>['unUse']; }> & IPluginExtensions<P>;",
+          "declarationLine": 139,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Frozen factory facade with original peer configuration and plugin handles; no public raw/useSink/runtime-manager authority.",
           "core": "ctx: Frozen construction context shared with installed plugins.\nconfig: Original peer configuration handle; mutation remains serialized.\nstatus: Current host lifecycle and admission phase.\nlog: Return synchronously and queue one structured entry for ordered asynchronous processing.\nlog.tag: Entry category; thresholdFeature checks standard levels and the explicit atLevel severity, while filterFeature checks every tag.\nlog.message: Message text; `%s`, `%d`, `%o` placeholders are left for the console sink.\nlog.args: Extra values stored in `entry.args` in order.\nNo return value; ordered asynchronous delivery failures are reported through onFailure.\ndispatchRaw: Queue an explicit entry while preserving host-generated identity and shallow containers.\ndispatchRaw.input: Required tag and message, plus optional args (default []), meta (undefined), data ({}), context (constructor context), error (first Error argument projected to name/message/stack/raw, otherwise undefined) and time (current Date). The core assigns id; callers cannot supply it. Metadata/data keys such as orderId and route are application-defined. Containers are copied, nested application values stay shared.\nNo return value; every accepted entry follows the ordered asynchronous pipeline.\nusePipeline: Install an asynchronous entry stage and retain its idempotent removal handle.\nusePipeline.stage: The stage function; call `next` at most once.\nAn idempotent function removing this middleware stage.\nonFailure: Register one failure observer; observer failures go to the terminal reporter without recursion.\nonFailure.fn: `({ source, error }) => void`; see `ILogFailure`.\nAn idempotent function removing this failure listener.\nonShutdown: Register a final handler; structured logs remain admitted during handlers.\nonShutdown.fn: `(reason) => void | Promise<void>`; `reason` is the value passed to `shutdown()`.\nAn idempotent function removing this shutdown listener.\nflush: Share the current bounded drain and wait for accepted entries and output work; always fulfill.\nA Promise<void> that fulfills after accepted work settles; failures use the failure channel.\nshutdown: Share the terminal Promise, run final handlers, drain and dispose the original plugins; always fulfill.\nshutdown.reason: Why it closes: `manual` from application code; `signal`, `uncaughtException`, `unhandledRejection` are passed by `process()`.\nThe terminal disposal-result Promise; repeated shutdown calls reuse the same Promise.\nuse: Install an additional typed tuple through the original plugin-host mutation queue.\nuse.plugins: Plugin objects created by factories such as `level()` or `http(config)`.\nA Promise of per-plugin handles; initial host extension inference is unchanged by later installation.\nunUse: Release an installed plugin through the original peer removal result and cleanup ordering.\nunUse.name: Plugin name, such as `LEVEL_PLUGIN_NAME` (`level`).",
@@ -1174,10 +1186,10 @@
               "name": "config",
               "kind": "property",
               "optional": false,
-              "signature": "config: IHostHandle<ILogPluginCore, ILogEntry, P>['config'];",
+              "signature": "config: IHostHandle<ILogPluginCore, ILogEntry, readonly [ typeof import('@migaia/plugin-host/features').featuresModule, typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule ], 'async', P>['config'];",
               "description": null,
               "parameterDetails": [],
-              "returns": "IHostHandle<ILogPluginCore, ILogEntry, P>['config']"
+              "returns": "IHostHandle<ILogPluginCore, ILogEntry, readonly [ typeof import('@migaia/plugin-host/features').featuresModule, typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule ], 'async', P>['config']"
             },
             {
               "name": "status",
@@ -1316,17 +1328,17 @@
               "name": "unUse",
               "kind": "property",
               "optional": false,
-              "signature": "unUse: IHostHandle<ILogPluginCore, ILogEntry, P>['unUse'];",
+              "signature": "unUse: IHostHandle<ILogPluginCore, ILogEntry, readonly [ typeof import('@migaia/plugin-host/features').featuresModule, typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule ], 'async', P>['unUse'];",
               "description": null,
               "parameterDetails": [],
-              "returns": "IHostHandle<ILogPluginCore, ILogEntry, P>['unUse']"
+              "returns": "IHostHandle<ILogPluginCore, ILogEntry, readonly [ typeof import('@migaia/plugin-host/features').featuresModule, typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule ], 'async', P>['unUse']"
             }
           ],
           "composes": ["IMergePluginExts"],
           "aliasOf": "ILogHost",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ILogHost<P extends readonly ILogPluginConstraint[] = readonly []> = Readonly<{ ctx: ILogContext; config: IHostHandle<ILogPluginCore, ILogEntry, P>['config']; status: LogHostStatus; log(tag: string, message: string, ...args: unknown[]): void; dispatchRaw(input: IRawEntryInput): void; usePipeline(stage: IAsyncMiddlewareStage<ILogEntry>): () => void; onFailure(fn: (failure: ILogFailure) => void): () => void; onShutdown(fn: (reason: IShutdownReason) => void | Promise<void>): () => void; flush(): Promise<void>; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILogPluginConstraint[]>(...plugins: NewP): Promise<IPluginHandleTuple<NewP>>; unUse: IHostHandle<ILogPluginCore, ILogEntry, P>['unUse']; }> & IPluginExtensions<P>;"
+            "export type ILogHost<P extends readonly ILogPluginConstraint[] = readonly []> = Readonly<{ ctx: ILogContext; config: IHostHandle<ILogPluginCore, ILogEntry, readonly [ typeof import('@migaia/plugin-host/features').featuresModule, typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule ], 'async', P>['config']; status: LogHostStatus; log(tag: string, message: string, ...args: unknown[]): void; dispatchRaw(input: IRawEntryInput): void; usePipeline(stage: IAsyncMiddlewareStage<ILogEntry>): () => void; onFailure(fn: (failure: ILogFailure) => void): () => void; onShutdown(fn: (reason: IShutdownReason) => void | Promise<void>): () => void; flush(): Promise<void>; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILogPluginConstraint[]>(...plugins: NewP): Promise<IPluginHandleTuple<NewP>>; unUse: IHostHandle<ILogPluginCore, ILogEntry, readonly [ typeof import('@migaia/plugin-host/features').featuresModule, typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule ], 'async', P>['unUse']; }> & IPluginExtensions<P>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1365,7 +1377,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/log-host/dist/typing.d.ts:ILogHost:export type ILogHost<P extends readonly ILogPluginConstraint[] = readonly []> = Readonly<{ ctx: ILogContext; config: IHostHandle<ILogPluginCore, ILogEntry, P>['config']; status: LogHostStatus; log(tag: string, message: string, ...args: unknown[]): void; dispatchRaw(input: IRawEntryInput): void; usePipeline(stage: IAsyncMiddlewareStage<ILogEntry>): () => void; onFailure(fn: (failure: ILogFailure) => void): () => void; onShutdown(fn: (reason: IShutdownReason) => void | Promise<void>): () => void; flush(): Promise<void>; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILogPluginConstraint[]>(...plugins: NewP): Promise<IPluginHandleTuple<NewP>>; unUse: IHostHandle<ILogPluginCore, ILogEntry, P>['unUse']; }> & IPluginExtensions<P>;",
+          "identity": "packages/log-host/dist/typing.d.ts:ILogHost:export type ILogHost<P extends readonly ILogPluginConstraint[] = readonly []> = Readonly<{ ctx: ILogContext; config: IHostHandle<ILogPluginCore, ILogEntry, readonly [ typeof import('@migaia/plugin-host/features').featuresModule, typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule ], 'async', P>['config']; status: LogHostStatus; log(tag: string, message: string, ...args: unknown[]): void; dispatchRaw(input: IRawEntryInput): void; usePipeline(stage: IAsyncMiddlewareStage<ILogEntry>): () => void; onFailure(fn: (failure: ILogFailure) => void): () => void; onShutdown(fn: (reason: IShutdownReason) => void | Promise<void>): () => void; flush(): Promise<void>; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; use<const NewP extends readonly ILogPluginConstraint[]>(...plugins: NewP): Promise<IPluginHandleTuple<NewP>>; unUse: IHostHandle<ILogPluginCore, ILogEntry, readonly [ typeof import('@migaia/plugin-host/features').featuresModule, typeof import('@migaia/plugin-host/pipeline-modes/async').asyncPipelineModule ], 'async', P>['unUse']; }> & IPluginExtensions<P>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1439,8 +1451,8 @@
         {
           "name": "ILogHostOptions",
           "kind": "type",
-          "signature": "export type ILogHostOptions<P extends readonly ILogPluginConstraint[] = readonly []> = { readonly plugins?: P; readonly features?: readonly ILogFeature[]; readonly context?: readonly string[]; readonly topic?: string; readonly maxPending?: number; readonly scheduler?: IScheduler; readonly randomUUID?: () => string; readonly report?: (error: unknown) => void; readonly execution?: IPluginHostOptions['execution']; };",
-          "declarationLine": 114,
+          "signature": "export type ILogHostOptions<P extends readonly ILogPluginConstraint[] = readonly []> = { readonly plugins?: P; readonly context?: readonly string[]; readonly topic?: string; readonly maxPending?: number; readonly scheduler?: IScheduler; readonly randomUUID?: () => string; readonly report?: (error: unknown) => void; readonly execution?: IPluginHostOptions['execution']; };",
+          "declarationLine": 128,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Capture construction options once, install the initial tuple synchronously and return a frozen facade. Log methods return before ordered asynchronous admission; flush/shutdown always fulfill and report failures.",
           "core": "plugins: Initial typed plugin tuple installed synchronously.\nEmpty tuple.\nfeatures: Host policies used as defaults for compatible outputs.\nNo explicit features.\ncontext: Copied initial display context path.\nEmpty path.\ntopic: Display topic appended during forwarding.\nEmpty topic.\nmaxPending: Bound unprocessed entries; overflow drops the oldest and reports QUEUE_OVERFLOW.\n10000.\nscheduler: Borrow one scheduler source; callbacks must run after schedule returns its receipt.\nCanonical system scheduler.\nrandomUUID: Borrow the identifier generator used by UUID features.\nNative UUID generator.\nreport: Receive failures without successful onFailure handling; reporter errors are contained.\ndefaultLogFailureReporter.\nexecution: Peer plugin-host mutation and drain budgets.\nPeer defaults.",
@@ -1460,15 +1472,6 @@
               "description": null,
               "parameterDetails": [],
               "returns": "P"
-            },
-            {
-              "name": "features",
-              "kind": "property",
-              "optional": true,
-              "signature": "readonly features?: readonly ILogFeature[];",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "readonly ILogFeature[]"
             },
             {
               "name": "context",
@@ -1538,7 +1541,7 @@
           "aliasOf": "ILogHostOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ILogHostOptions<P extends readonly ILogPluginConstraint[] = readonly []> = { readonly plugins?: P; readonly features?: readonly ILogFeature[]; readonly context?: readonly string[]; readonly topic?: string; readonly maxPending?: number; readonly scheduler?: IScheduler; readonly randomUUID?: () => string; readonly report?: (error: unknown) => void; readonly execution?: IPluginHostOptions['execution']; };"
+            "export type ILogHostOptions<P extends readonly ILogPluginConstraint[] = readonly []> = { readonly plugins?: P; readonly context?: readonly string[]; readonly topic?: string; readonly maxPending?: number; readonly scheduler?: IScheduler; readonly randomUUID?: () => string; readonly report?: (error: unknown) => void; readonly execution?: IPluginHostOptions['execution']; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1577,7 +1580,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/log-host/dist/typing.d.ts:ILogHostOptions:export type ILogHostOptions<P extends readonly ILogPluginConstraint[] = readonly []> = { readonly plugins?: P; readonly features?: readonly ILogFeature[]; readonly context?: readonly string[]; readonly topic?: string; readonly maxPending?: number; readonly scheduler?: IScheduler; readonly randomUUID?: () => string; readonly report?: (error: unknown) => void; readonly execution?: IPluginHostOptions['execution']; };",
+          "identity": "packages/log-host/dist/typing.d.ts:ILogHostOptions:export type ILogHostOptions<P extends readonly ILogPluginConstraint[] = readonly []> = { readonly plugins?: P; readonly context?: readonly string[]; readonly topic?: string; readonly maxPending?: number; readonly scheduler?: IScheduler; readonly randomUUID?: () => string; readonly report?: (error: unknown) => void; readonly execution?: IPluginHostOptions['execution']; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1599,9 +1602,9 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 每个 host 独立拥有上下文、插件与交付队列。 */\nconst log = createLogHost({\n  context: ['orders'],\n  topic: 'api',\n  maxPending: 10000,\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.info('created', { orderId: 'o1' })\nlog.log('audit', 'arbitrary tags remain valid')\nawait log.flush()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** 每个 add 返回的撤销函数只移除该次注册。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')",
             "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 拥有插件安装、日志交付与最终释放。 */\nconst log = createLogHost({ plugins: [levelPlugin(), consolePlugin()] })\nlog.info('request completed', { requestId: 'r1' })\nawait log.flush()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -2126,14 +2129,34 @@
       ],
       "aliases": [
         {
+          "identity": "packages/log-host/dist/typing.d.ts:IDefinedLogPlugin:export type IDefinedLogPlugin<N extends string, O extends Record<string, unknown>, C extends IPluginConfig, F extends IFeatureRecord> = IDefinedPluginConstraint<ILogPluginCore, ILogEntry, O, C, Record<never, never>, N, F>;",
+          "name": "IDefinedLogPlugin",
+          "signature": "export type IDefinedLogPlugin<N extends string, O extends Record<string, unknown>, C extends IPluginConfig, F extends IFeatureRecord> = IDefinedPluginConstraint<ILogPluginCore, ILogEntry, O, C, Record<never, never>, N, F>;",
+          "source": "packages/log-host/dist/typing.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--IDefinedLogPlugin"
+        },
+        {
+          "identity": "packages/log-host/dist/typing.d.ts:IEnabledLogFeatures:export type IEnabledLogFeatures<F extends ILogOutputFeatureRecord> = { readonly [K in keyof F as F[K] extends false ? never : K]: Exclude<F[K], false>; };",
+          "name": "IEnabledLogFeatures",
+          "signature": "export type IEnabledLogFeatures<F extends ILogOutputFeatureRecord> = { readonly [K in keyof F as F[K] extends false ? never : K]: Exclude<F[K], false>; };",
+          "source": "packages/log-host/dist/typing.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--IEnabledLogFeatures"
+        },
+        {
           "identity": "packages/log-host/dist/typing.d.ts:IErrorInfo:export type IErrorInfo = { name: string; message: string; stack?: string | undefined; raw: Error; };",
           "name": "IErrorInfo",
           "signature": "export type IErrorInfo = { name: string; message: string; stack?: string | undefined; raw: Error; };",
           "source": "packages/log-host/dist/typing.d.ts",
           "exportPath": ".",
-          "ownerExportPath": "./plugin",
-          "ownerModule": "plugin",
-          "ownerFragment": "log-host-plugin--IErrorInfo"
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--IErrorInfo"
         },
         {
           "identity": "packages/log-host/dist/typing.d.ts:ILogContext:export type ILogContext = Readonly<{ id: string; options: Readonly<Record<string, unknown>>; path: readonly string[]; topic: string; createdAt: Date; env: Readonly<{ isTTY: boolean; isCI: boolean; }>; }>;",
@@ -2141,9 +2164,9 @@
           "signature": "export type ILogContext = Readonly<{ id: string; options: Readonly<Record<string, unknown>>; path: readonly string[]; topic: string; createdAt: Date; env: Readonly<{ isTTY: boolean; isCI: boolean; }>; }>;",
           "source": "packages/log-host/dist/typing.d.ts",
           "exportPath": ".",
-          "ownerExportPath": "./plugin",
-          "ownerModule": "plugin",
-          "ownerFragment": "log-host-plugin--ILogContext"
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--ILogContext"
         },
         {
           "identity": "packages/log-host/dist/typing.d.ts:ILogEntry:export type ILogEntry = { readonly id: string; readonly tag: string; readonly time: Date; readonly message: string; readonly args: readonly unknown[]; readonly meta?: Record<string, unknown> | undefined; readonly context: readonly string[]; readonly error?: IErrorInfo | undefined; readonly data: Record<string, unknown>; };",
@@ -2151,9 +2174,9 @@
           "signature": "export type ILogEntry = { readonly id: string; readonly tag: string; readonly time: Date; readonly message: string; readonly args: readonly unknown[]; readonly meta?: Record<string, unknown> | undefined; readonly context: readonly string[]; readonly error?: IErrorInfo | undefined; readonly data: Record<string, unknown>; };",
           "source": "packages/log-host/dist/typing.d.ts",
           "exportPath": ".",
-          "ownerExportPath": "./plugin",
-          "ownerModule": "plugin",
-          "ownerFragment": "log-host-plugin--ILogEntry"
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--ILogEntry"
         },
         {
           "identity": "packages/log-host/dist/typing.d.ts:ILogFailure:export type ILogFailure = { readonly source: 'defer' | 'hook' | 'sink' | 'pipeline' | 'flush' | 'forward' | 'shutdown'; readonly error: unknown; };",
@@ -2161,9 +2184,19 @@
           "signature": "export type ILogFailure = { readonly source: 'defer' | 'hook' | 'sink' | 'pipeline' | 'flush' | 'forward' | 'shutdown'; readonly error: unknown; };",
           "source": "packages/log-host/dist/typing.d.ts",
           "exportPath": ".",
-          "ownerExportPath": "./plugin",
-          "ownerModule": "plugin",
-          "ownerFragment": "log-host-plugin--ILogFailure"
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--ILogFailure"
+        },
+        {
+          "identity": "packages/log-host/dist/typing.d.ts:ILogOutputFeatureRecord:export type ILogOutputFeatureRecord = Readonly<Record<string, ILogFeature<any> | false>>;",
+          "name": "ILogOutputFeatureRecord",
+          "signature": "export type ILogOutputFeatureRecord = Readonly<Record<string, ILogFeature<any> | false>>;",
+          "source": "packages/log-host/dist/typing.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--ILogOutputFeatureRecord"
         },
         {
           "identity": "packages/log-host/dist/typing.d.ts:ILogPlugin:export type ILogPlugin<O extends Record<string, unknown> = Record<string, never>, C extends IPluginConfig = IPluginConfig, F extends IFeatureRecord = Record<never, never>, E extends object = Record<never, never>> = IPlugin<ILogPluginCore, O, C, Record<never, never>, F, E>;",
@@ -2171,19 +2204,19 @@
           "signature": "export type ILogPlugin<O extends Record<string, unknown> = Record<string, never>, C extends IPluginConfig = IPluginConfig, F extends IFeatureRecord = Record<never, never>, E extends object = Record<never, never>> = IPlugin<ILogPluginCore, O, C, Record<never, never>, F, E>;",
           "source": "packages/log-host/dist/typing.d.ts",
           "exportPath": ".",
-          "ownerExportPath": "./plugin",
-          "ownerModule": "plugin",
-          "ownerFragment": "log-host-plugin--ILogPlugin"
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--ILogPlugin"
         },
         {
-          "identity": "packages/log-host/dist/typing.d.ts:ILogPluginConstraint:export type ILogPluginConstraint = IPluginConstraint<ILogPluginCore>;",
+          "identity": "packages/log-host/dist/typing.d.ts:ILogPluginConstraint:export type ILogPluginConstraint = IPluginConstraint<any>;",
           "name": "ILogPluginConstraint",
-          "signature": "export type ILogPluginConstraint = IPluginConstraint<ILogPluginCore>;",
+          "signature": "export type ILogPluginConstraint = IPluginConstraint<any>;",
           "source": "packages/log-host/dist/typing.d.ts",
           "exportPath": ".",
-          "ownerExportPath": "./plugin",
-          "ownerModule": "plugin",
-          "ownerFragment": "log-host-plugin--ILogPluginConstraint"
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--ILogPluginConstraint"
         },
         {
           "identity": "packages/log-host/dist/typing.d.ts:ILogPluginCore:export type ILogPluginCore = Pick<IPluginHostCore<ILogEntry>, 'config' | 'lifecycle' | 'onDispose'> & { readonly ctx: ILogContext; readonly scheduler: IScheduler; log(tag: string, message: string, ...args: unknown[]): void; dispatchRaw(input: IRawEntryInput): void; useSink(sink: (entry: ILogEntry) => void | Promise<void>): () => void; onFailure(fn: (failure: ILogFailure) => void): () => void; reportFailure(failure: ILogFailure): void; defer(task: () => void | Promise<void>): void; onFlush(fn: () => void | Promise<void>): () => void; flush(): Promise<void>; onShutdown(fn: (reason: IShutdownReason) => void | Promise<void>): () => void; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; };",
@@ -2191,9 +2224,9 @@
           "signature": "export type ILogPluginCore = Pick<IPluginHostCore<ILogEntry>, 'config' | 'lifecycle' | 'onDispose'> & { readonly ctx: ILogContext; readonly scheduler: IScheduler; log(tag: string, message: string, ...args: unknown[]): void; dispatchRaw(input: IRawEntryInput): void; useSink(sink: (entry: ILogEntry) => void | Promise<void>): () => void; onFailure(fn: (failure: ILogFailure) => void): () => void; reportFailure(failure: ILogFailure): void; defer(task: () => void | Promise<void>): void; onFlush(fn: () => void | Promise<void>): () => void; flush(): Promise<void>; onShutdown(fn: (reason: IShutdownReason) => void | Promise<void>): () => void; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; };",
           "source": "packages/log-host/dist/typing.d.ts",
           "exportPath": ".",
-          "ownerExportPath": "./plugin",
-          "ownerModule": "plugin",
-          "ownerFragment": "log-host-plugin--ILogPluginCore"
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--ILogPluginCore"
         },
         {
           "identity": "packages/log-host/dist/typing.d.ts:IPluginExtensions:export type IPluginExtensions<P extends readonly ILogPluginConstraint[]> = IMergePluginExts<P>;",
@@ -2201,9 +2234,9 @@
           "signature": "export type IPluginExtensions<P extends readonly ILogPluginConstraint[]> = IMergePluginExts<P>;",
           "source": "packages/log-host/dist/typing.d.ts",
           "exportPath": ".",
-          "ownerExportPath": "./plugin",
-          "ownerModule": "plugin",
-          "ownerFragment": "log-host-plugin--IPluginExtensions"
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--IPluginExtensions"
         },
         {
           "identity": "packages/log-host/dist/typing.d.ts:IRawEntryInput:export type IRawEntryInput = Partial<Omit<ILogEntry, 'id'>> & { tag: string; message: string; };",
@@ -2211,9 +2244,9 @@
           "signature": "export type IRawEntryInput = Partial<Omit<ILogEntry, 'id'>> & { tag: string; message: string; };",
           "source": "packages/log-host/dist/typing.d.ts",
           "exportPath": ".",
-          "ownerExportPath": "./plugin",
-          "ownerModule": "plugin",
-          "ownerFragment": "log-host-plugin--IRawEntryInput"
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--IRawEntryInput"
         },
         {
           "identity": "packages/log-host/dist/typing.d.ts:IShutdownReason:export type IShutdownReason = 'signal' | 'uncaughtException' | 'unhandledRejection' | 'manual';",
@@ -2221,9 +2254,9 @@
           "signature": "export type IShutdownReason = 'signal' | 'uncaughtException' | 'unhandledRejection' | 'manual';",
           "source": "packages/log-host/dist/typing.d.ts",
           "exportPath": ".",
-          "ownerExportPath": "./plugin",
-          "ownerModule": "plugin",
-          "ownerFragment": "log-host-plugin--IShutdownReason"
+          "ownerExportPath": "./sdk",
+          "ownerModule": "sdk",
+          "ownerFragment": "log-host-sdk--IShutdownReason"
         }
       ]
     },
@@ -2255,9 +2288,9 @@
           "ownerFragment": "log-host-features/batch--batchFeature"
         },
         {
-          "identity": "packages/log-host/dist/features/filter.d.ts:filterFeature:export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; };",
+          "identity": "packages/log-host/dist/features/filter.d.ts:filterFeature:export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature<IFilterControls>;",
           "name": "filterFeature",
-          "signature": "export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; };",
+          "signature": "export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature<IFilterControls>;",
           "source": "packages/log-host/dist/features/filter.d.ts",
           "exportPath": "./features",
           "ownerExportPath": "./features/filter",
@@ -2265,9 +2298,9 @@
           "ownerFragment": "log-host-features/filter--filterFeature"
         },
         {
-          "identity": "packages/log-host/dist/features/format.d.ts:formatFeature:export declare function formatFeature(options: { format: 'json' | 'plain'; }): Extract<ILogFeature, { phase: 'format'; }>;",
+          "identity": "packages/log-host/dist/features/format.d.ts:formatFeature:export declare function formatFeature(options: { format: 'json' | 'plain'; }): ILogFeature;",
           "name": "formatFeature",
-          "signature": "export declare function formatFeature(options: { format: 'json' | 'plain'; }): Extract<ILogFeature, { phase: 'format'; }>;",
+          "signature": "export declare function formatFeature(options: { format: 'json' | 'plain'; }): ILogFeature;",
           "source": "packages/log-host/dist/features/format.d.ts",
           "exportPath": "./features",
           "ownerExportPath": "./features/format",
@@ -2285,9 +2318,9 @@
           "ownerFragment": "log-host-features/retry--retryFeature"
         },
         {
-          "identity": "packages/log-host/dist/features/threshold.d.ts:thresholdFeature:export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature & { setLevel(level: LogLevel): void; };",
+          "identity": "packages/log-host/dist/features/threshold.d.ts:thresholdFeature:export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature<IThresholdControls>;",
           "name": "thresholdFeature",
-          "signature": "export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature & { setLevel(level: LogLevel): void; };",
+          "signature": "export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature<IThresholdControls>;",
           "source": "packages/log-host/dist/features/threshold.d.ts",
           "exportPath": "./features",
           "ownerExportPath": "./features/threshold",
@@ -2353,7 +2386,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -2506,8 +2539,8 @@
         {
           "name": "filterFeature",
           "kind": "function",
-          "signature": "export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; };",
-          "declarationLine": 3,
+          "signature": "export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature<IFilterControls>;",
+          "declarationLine": 7,
           "source": "packages/log-host/dist/features/filter.d.ts",
           "purpose": "Use an initial predicate and reversible added filters without mutating another owner.",
           "core": "options: Optional filters array in insertion order; default empty.\nAn issued gate descriptor with add(predicate), which returns a removal handle for that registration only.\nUse an initial predicate and reversible added filters without mutating another owner.",
@@ -2522,17 +2555,17 @@
               "optional": true
             }
           ],
-          "returns": "ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; }",
+          "returns": "ILogFeature<IFilterControls>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** 每个 add 返回的撤销函数只移除该次注册。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/filter",
           "overloadSignatures": [
-            "export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; };"
+            "export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature<IFilterControls>;"
           ],
           "overloadParameterDetails": [
             [
@@ -2543,9 +2576,7 @@
               }
             ]
           ],
-          "overloadReturns": [
-            "ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; }"
-          ],
+          "overloadReturns": ["ILogFeature<IFilterControls>"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -2588,7 +2619,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/log-host/dist/features/filter.d.ts:filterFeature:export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature & { add(filter: (entry: ILogEntry) => boolean): () => void; };",
+          "identity": "packages/log-host/dist/features/filter.d.ts:filterFeature:export declare function filterFeature(options?: { filters?: readonly ((entry: ILogEntry) => boolean)[]; }): ILogFeature<IFilterControls>;",
           "guidance": [],
           "usageScore": 20,
           "configuration": [
@@ -2596,9 +2627,9 @@
               "name": "filters",
               "type": "readonly ((entry: ILogEntry) => boolean)[]",
               "optional": true,
-              "description": "`filterFeature({ filters })` — 按顺序运行 predicates，任一返回 false 即停止；支持 `add()`",
+              "description": "`filterFeature({ filters })` — 按顺序运行 predicates；安装后暴露 `${pluginName}_${alias}_add()`，返回独立撤销函数",
               "descriptionEn": "",
-              "descriptionZh": "`filterFeature({ filters })` — 按顺序运行 predicates，任一返回 false 即停止；支持 `add()`"
+              "descriptionZh": "`filterFeature({ filters })` — 按顺序运行 predicates；安装后暴露 `${pluginName}_${alias}_add()`，返回独立撤销函数"
             }
           ],
           "fragment": "log-host-features/filter--filterFeature"
@@ -2625,7 +2656,7 @@
         {
           "name": "formatFeature",
           "kind": "function",
-          "signature": "export declare function formatFeature(options: { format: 'json' | 'plain'; }): Extract<ILogFeature, { phase: 'format'; }>;",
+          "signature": "export declare function formatFeature(options: { format: 'json' | 'plain'; }): ILogFeature;",
           "declarationLine": 3,
           "source": "packages/log-host/dist/features/format.d.ts",
           "purpose": "Select json/plain formatting; every scope admits one format and output format wins.",
@@ -2639,17 +2670,17 @@
               "optional": false
             }
           ],
-          "returns": "Extract<ILogFeature, { phase: 'format'; }>",
+          "returns": "ILogFeature",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/format",
           "overloadSignatures": [
-            "export declare function formatFeature(options: { format: 'json' | 'plain'; }): Extract<ILogFeature, { phase: 'format'; }>;"
+            "export declare function formatFeature(options: { format: 'json' | 'plain'; }): ILogFeature;"
           ],
           "overloadParameterDetails": [
             [
@@ -2660,7 +2691,7 @@
               }
             ]
           ],
-          "overloadReturns": ["Extract<ILogFeature, { phase: 'format'; }>"],
+          "overloadReturns": ["ILogFeature"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -2703,7 +2734,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/log-host/dist/features/format.d.ts:formatFeature:export declare function formatFeature(options: { format: 'json' | 'plain'; }): Extract<ILogFeature, { phase: 'format'; }>;",
+          "identity": "packages/log-host/dist/features/format.d.ts:formatFeature:export declare function formatFeature(options: { format: 'json' | 'plain'; }): ILogFeature;",
           "guidance": [],
           "usageScore": 20,
           "configuration": [
@@ -2711,9 +2742,9 @@
               "name": "format",
               "type": "'json' | 'plain'",
               "optional": false,
-              "description": "同一作用域重复 kind 会在创建时抛 `INVALID_OPTION`。format 还按阶段唯一：即使 kind 不同，一个作用域也只允许一个 format。跨作用域允许各有一个，最终优先级是输出级显式 format、host 级显式 format、输出插件 `defaultFormat`。",
+              "description": "format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类，动态 `use()` 同样检查。违反时以既有 `INVALID_OPTION` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。",
               "descriptionEn": "",
-              "descriptionZh": "同一作用域重复 kind 会在创建时抛 `INVALID_OPTION`。format 还按阶段唯一：即使 kind 不同，一个作用域也只允许一个 format。跨作用域允许各有一个，最终优先级是输出级显式 format、host 级显式 format、输出插件 `defaultFormat`。"
+              "descriptionZh": "format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类，动态 `use()` 同样检查。违反时以既有 `INVALID_OPTION` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。"
             }
           ],
           "fragment": "log-host-features/format--formatFeature"
@@ -2867,8 +2898,8 @@
         {
           "name": "thresholdFeature",
           "kind": "function",
-          "signature": "export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature & { setLevel(level: LogLevel): void; };",
-          "declarationLine": 4,
+          "signature": "export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature<IThresholdControls>;",
+          "declarationLine": 8,
           "source": "packages/log-host/dist/features/threshold.d.ts",
           "purpose": "Apply a severity threshold per output; non-level tags retain their category.",
           "core": "options: Optional level, default debug; change it later through the returned descriptor.setLevel().\nAn issued gate descriptor with setLevel(level), shared deliberately when the descriptor is reused.\nApply a severity threshold per output; non-level tags retain their category.",
@@ -2881,18 +2912,18 @@
               "optional": true
             }
           ],
-          "returns": "ILogFeature & { setLevel(level: LogLevel): void; }",
+          "returns": "ILogFeature<IThresholdControls>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** 每个 add 返回的撤销函数只移除该次注册。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/threshold",
           "overloadSignatures": [
-            "export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature & { setLevel(level: LogLevel): void; };"
+            "export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature<IThresholdControls>;"
           ],
           "overloadParameterDetails": [
             [
@@ -2903,7 +2934,7 @@
               }
             ]
           ],
-          "overloadReturns": ["ILogFeature & { setLevel(level: LogLevel): void; }"],
+          "overloadReturns": ["ILogFeature<IThresholdControls>"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -2946,17 +2977,17 @@
               "description": ""
             }
           ],
-          "identity": "packages/log-host/dist/features/threshold.d.ts:thresholdFeature:export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature & { setLevel(level: LogLevel): void; };",
+          "identity": "packages/log-host/dist/features/threshold.d.ts:thresholdFeature:export declare function thresholdFeature(options?: { level?: LogLevel; }): ILogFeature<IThresholdControls>;",
           "guidance": [],
-          "usageScore": 30,
+          "usageScore": 38,
           "configuration": [
             {
               "name": "level",
               "type": "LogLevel",
               "optional": true,
-              "description": "`thresholdFeature({ level })` — 标准级别门槛，支持 `setLevel()`",
+              "description": "`thresholdFeature({ level })` — 标准级别门槛，安装后暴露 `${pluginName}_${alias}_setLevel()`",
               "descriptionEn": "",
-              "descriptionZh": "`thresholdFeature({ level })` — 标准级别门槛，支持 `setLevel()`"
+              "descriptionZh": "`thresholdFeature({ level })` — 标准级别门槛，安装后暴露 `${pluginName}_${alias}_setLevel()`"
             }
           ],
           "fragment": "log-host-features/threshold--thresholdFeature"
@@ -3114,8 +3145,8 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 门槛的 live setter 影响所有复用同一 descriptor 的作用域。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** 每个 add 返回的撤销函数只移除该次注册。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  features: [threshold, filters, uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = filters.add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nthreshold.setLevel('debug')\noff()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  features: [thresholdFeature({ level: 'info' }), uuidFeature({ display: false })],\n  plugins: [levelPlugin(), consolePlugin()]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
@@ -3194,10 +3225,10 @@
       "aliases": []
     },
     {
-      "id": "log-host:plugin",
+      "id": "log-host:sdk",
       "library": "log-host",
-      "module": "plugin",
-      "exportPath": "./plugin",
+      "module": "sdk",
+      "exportPath": "./sdk",
       "sections": [
         "introduction",
         "getting-started",
@@ -3212,43 +3243,41 @@
         {
           "name": "defineLogFeature",
           "kind": "function",
-          "signature": "export declare function defineLogFeature<const D extends ILogFeatureDefinition>(definition: D): ILogFeature & Readonly<D>;",
-          "declarationLine": 48,
-          "source": "packages/log-host/dist/feature-registry.d.ts",
+          "signature": "export declare function defineLogFeature(definition: ILogFeatureDefinition): ILogFeature;",
+          "declarationLine": 65,
+          "source": "packages/log-host/dist/feature-metadata.d.ts",
           "purpose": "Issue a host-recognized entry/gate/format descriptor; delivery policies remain built-in factories.",
           "core": "definition: A kind and exactly one entry stage, gate predicate or format implementation.\nA frozen, host-recognized descriptor for one entry, gate or format phase.",
           "advanced": "",
-          "parameters": ["definition: D"],
+          "parameters": ["definition: ILogFeatureDefinition"],
           "parameterDetails": [
             {
               "name": "definition",
-              "type": "D",
-              "optional": false,
-              "configurationType": "ILogFeatureDefinition"
+              "type": "ILogFeatureDefinition",
+              "optional": false
             }
           ],
-          "returns": "ILogFeature & Readonly<D>",
+          "returns": "ILogFeature",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
           "aliasOf": "defineLogFeature",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
-            "export declare function defineLogFeature<const D extends ILogFeatureDefinition>(definition: D): ILogFeature & Readonly<D>;"
+            "export declare function defineLogFeature(definition: ILogFeatureDefinition): ILogFeature;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "definition",
-                "type": "D",
-                "optional": false,
-                "configurationType": "ILogFeatureDefinition"
+                "type": "ILogFeatureDefinition",
+                "optional": false
               }
             ]
           ],
-          "overloadReturns": ["ILogFeature & Readonly<D>"],
+          "overloadReturns": ["ILogFeature"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -3260,7 +3289,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import defineLogFeature from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import defineLogFeature from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -3284,52 +3313,138 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/log-host/dist/feature-registry.d.ts:defineLogFeature:export declare function defineLogFeature<const D extends ILogFeatureDefinition>(definition: D): ILogFeature & Readonly<D>;",
+          "identity": "packages/log-host/dist/feature-metadata.d.ts:defineLogFeature:export declare function defineLogFeature(definition: ILogFeatureDefinition): ILogFeature;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 10,
           "configuration": [],
-          "fragment": "log-host-plugin--defineLogFeature"
+          "fragment": "log-host-sdk--defineLogFeature"
         },
         {
-          "name": "defineOutputPlugin",
+          "name": "defineLogPlugin",
           "kind": "function",
-          "signature": "export declare function defineOutputPlugin<O extends Record<string, unknown> = Record<string, never>>(definition: IOutputDefinition<O>): ILogPlugin<O>;",
-          "declarationLine": 38,
-          "source": "packages/log-host/dist/output.d.ts",
-          "purpose": "Install one output with tracked delivery and host-owned policies. Entry-only definitions omit defaultFormat and receive no text or format placeholder.",
-          "core": "definition: Output name, batchability, delivery function and text-consumption branch; optional install, features and retry classifiers.\nAn installable output plugin retaining inferred install() extensions and host-owned delivery policies.",
-          "advanced": "",
-          "parameters": ["definition: IOutputDefinition<O>"],
+          "signature": "export declare function defineLogPlugin<const N extends string, const F extends ILogFeatureRecord = Record<never, never>, O extends Record<string, unknown> = Record<never, never>, C extends IPluginConfig = IPluginConfig>(requested: ILogPluginDefinition<N, F, O, C>): NoInfer<IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, C, F>>;",
+          "declarationLine": 16,
+          "source": "packages/log-host/dist/log-plugin.d.ts",
+          "purpose": "Assemble host-wide policy from declared inputs. The receiving host must not infer phantom extension axes from its broad plugin constraint when the definition omits an installer.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineLogPlugin.",
+          "advanced": "No additional advanced behavior is declared for defineLogPlugin.",
+          "parameters": ["requested: ILogPluginDefinition<N, F, O, C>"],
           "parameterDetails": [
             {
-              "name": "definition",
-              "type": "IOutputDefinition<O>",
+              "name": "requested",
+              "type": "ILogPluginDefinition<N, F, O, C>",
               "optional": false
             }
           ],
-          "returns": "ILogPlugin<O>",
-          "errors": [],
-          "lifecycleConcurrency": "",
+          "returns": "NoInfer<IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, C, F>>",
+          "errors": ["No documented errors are declared for defineLogPlugin."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineLogPlugin.",
           "examples": [
-            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/plugin'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: [batchFeature({ maxSize: 2 }), formatFeature({ format: 'plain' })],\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, filterFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */\nconst threshold = thresholdFeature({ level: 'warn' })\n/** filter 定义不包含控制；安装后的插件扩展提供 add。 */\nconst filters = filterFeature()\n/** entry feature 只在 host 级执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: { threshold, filter: filters, uuid: uuidFeature({ display: false }) }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\n/** 这一过滤器与其它注册保持独立。 */\nconst off = log.policy_filter_add((entry) => entry.message !== 'hidden')\nlog.atLevel('error', { tag: 'storage', message: 'write failed' })\nlog.policy_threshold_setLevel('debug')\noff()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { defineLogPlugin } from '@migaia/log-host/sdk'\nimport { thresholdFeature, uuidFeature } from '@migaia/log-host/features'\nimport { consolePlugin } from '@migaia/log-plugin-console'\n\n/** host 级策略作为每个输出端的默认值；entry 策略只执行一次。 */\nconst log = createLogHost({\n  plugins: [\n    defineLogPlugin({\n      name: 'policy',\n      features: {\n        threshold: thresholdFeature({ level: 'info' }),\n        uuid: uuidFeature({ display: false })\n      }\n    }),\n    levelPlugin(),\n    consolePlugin()\n  ]\n})\nlog.debug('filtered by this output')\nlog.info('accepted')\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
-          "aliasOf": "defineOutputPlugin",
-          "exportPath": "./plugin",
+          "aliasOf": "defineLogPlugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
-            "export declare function defineOutputPlugin<O extends Record<string, unknown> = Record<string, never>>(definition: IOutputDefinition<O>): ILogPlugin<O>;"
+            "export declare function defineLogPlugin<const N extends string, const F extends ILogFeatureRecord = Record<never, never>, O extends Record<string, unknown> = Record<never, never>, C extends IPluginConfig = IPluginConfig>(requested: ILogPluginDefinition<N, F, O, C>): NoInfer<IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, C, F>>;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "definition",
-                "type": "IOutputDefinition<O>",
+                "name": "requested",
+                "type": "ILogPluginDefinition<N, F, O, C>",
                 "optional": false
               }
             ]
           ],
-          "overloadReturns": ["ILogPlugin<O>"],
+          "overloadReturns": [
+            "NoInfer<IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, C, F>>"
+          ],
+          "whenToUse": "Use defineLogPlugin when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when defineLogPlugin does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Assemble host-wide policy from declared inputs. The receiving host must not infer phantom extension axes from its broad plugin constraint when the definition omits an installer."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import defineLogPlugin from @migaia/log-host/sdk, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use defineLogPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when defineLogPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineLogPlugin."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for defineLogPlugin."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-host/dist/log-plugin.d.ts:defineLogPlugin:export declare function defineLogPlugin<const N extends string, const F extends ILogFeatureRecord = Record<never, never>, O extends Record<string, unknown> = Record<never, never>, C extends IPluginConfig = IPluginConfig>(requested: ILogPluginDefinition<N, F, O, C>): NoInfer<IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, C, F>>;",
+          "guidance": [],
+          "usageScore": 36,
+          "configuration": [],
+          "fragment": "log-host-sdk--defineLogPlugin"
+        },
+        {
+          "name": "defineOutputPlugin",
+          "kind": "function",
+          "signature": "export declare function defineOutputPlugin<const N extends string, const F extends ILogOutputFeatureRecord = Record<never, never>, O extends Record<string, unknown> = Record<never, never>>(requested: IOutputDefinition<O, F> & { name: N; }): IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, IPluginConfig, IEnabledLogFeatures<F>>;",
+          "declarationLine": 32,
+          "source": "packages/log-host/dist/output.d.ts",
+          "purpose": "Install one output with tracked delivery and host-owned policies. Entry-only definitions omit defaultFormat and receive no text or format placeholder.",
+          "core": "definition: Output name, batchability, delivery function and text-consumption branch; optional install, features and retry classifiers.\nAn installable output plugin retaining inferred install() extensions and host-owned delivery policies.",
+          "advanced": "",
+          "parameters": ["requested: IOutputDefinition<O, F> & { name: N; }"],
+          "parameterDetails": [
+            {
+              "name": "requested",
+              "type": "IOutputDefinition<O, F> & { name: N; }",
+              "optional": false
+            }
+          ],
+          "returns": "IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, IPluginConfig, IEnabledLogFeatures<F>>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost } from '@migaia/log-host'\nimport { defineOutputPlugin } from '@migaia/log-host/sdk'\nimport { batchFeature, formatFeature } from '@migaia/log-host/features'\n\n/** 输出端拥有最终数据去向；策略与资源仍由 host 管理。 */\nconst lines: string[] = []\n/** 输出级策略覆盖 host 默认值，不复制批量或格式实现。 */\nconst output = defineOutputPlugin({\n  name: 'memory-output',\n  batchable: true,\n  defaultFormat: 'json',\n  features: { batch: batchFeature({ maxSize: 2 }), format: formatFeature({ format: 'plain' }) },\n  deliver(records) {\n    for (const record of records) lines.push(record.text)\n  }\n})\n/** 不安装 levelPlugin 时仍可使用通用 log(tag, message)。 */\nconst log = createLogHost({ plugins: [output] })\nlog.log('info', 'one')\nlog.log('info', 'two')\nawait log.flush()\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "defineOutputPlugin",
+          "exportPath": "./sdk",
+          "overloadSignatures": [
+            "export declare function defineOutputPlugin<const N extends string, const F extends ILogOutputFeatureRecord = Record<never, never>, O extends Record<string, unknown> = Record<never, never>>(requested: IOutputDefinition<O, F> & { name: N; }): IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, IPluginConfig, IEnabledLogFeatures<F>>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "requested",
+                "type": "IOutputDefinition<O, F> & { name: N; }",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, IPluginConfig, IEnabledLogFeatures<F>>"
+          ],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -3341,7 +3456,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import defineOutputPlugin from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import defineOutputPlugin from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -3365,17 +3480,147 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/log-host/dist/output.d.ts:defineOutputPlugin:export declare function defineOutputPlugin<O extends Record<string, unknown> = Record<string, never>>(definition: IOutputDefinition<O>): ILogPlugin<O>;",
+          "identity": "packages/log-host/dist/output.d.ts:defineOutputPlugin:export declare function defineOutputPlugin<const N extends string, const F extends ILogOutputFeatureRecord = Record<never, never>, O extends Record<string, unknown> = Record<never, never>>(requested: IOutputDefinition<O, F> & { name: N; }): IDefinedLogPlugin<N, O & ILogControlExtensions<N, F>, IPluginConfig, IEnabledLogFeatures<F>>;",
           "guidance": [],
-          "usageScore": 20,
+          "usageScore": 24,
           "configuration": [],
-          "fragment": "log-host-plugin--defineOutputPlugin"
+          "fragment": "log-host-sdk--defineOutputPlugin"
+        },
+        {
+          "name": "IDefinedLogPlugin",
+          "kind": "type",
+          "signature": "export type IDefinedLogPlugin<N extends string, O extends Record<string, unknown>, C extends IPluginConfig, F extends IFeatureRecord> = IDefinedPluginConstraint<ILogPluginCore, ILogEntry, O, C, Record<never, never>, N, F>;",
+          "declarationLine": 68,
+          "source": "packages/log-host/dist/typing.d.ts",
+          "purpose": "Native helper results expose the thin identity while raw ILogPlugin remains an authoring input.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDefinedLogPlugin.",
+          "advanced": "No additional advanced behavior is declared for IDefinedLogPlugin.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IDefinedLogPlugin."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDefinedLogPlugin.",
+          "examples": [],
+          "members": [],
+          "composes": ["IDefinedPluginConstraint"],
+          "aliasOf": "IDefinedLogPlugin",
+          "exportPath": "./sdk",
+          "overloadSignatures": [
+            "export type IDefinedLogPlugin<N extends string, O extends Record<string, unknown>, C extends IPluginConfig, F extends IFeatureRecord> = IDefinedPluginConstraint<ILogPluginCore, ILogEntry, O, C, Record<never, never>, N, F>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IDefinedLogPlugin when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IDefinedLogPlugin does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native helper results expose the thin identity while raw ILogPlugin remains an authoring input."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IDefinedLogPlugin from @migaia/log-host/sdk, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IDefinedLogPlugin when its type contract and declared inputs match the result you need. Choose a different public symbol when IDefinedLogPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDefinedLogPlugin."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IDefinedLogPlugin."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-host/dist/typing.d.ts:IDefinedLogPlugin:export type IDefinedLogPlugin<N extends string, O extends Record<string, unknown>, C extends IPluginConfig, F extends IFeatureRecord> = IDefinedPluginConstraint<ILogPluginCore, ILogEntry, O, C, Record<never, never>, N, F>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-host-sdk--IDefinedLogPlugin"
+        },
+        {
+          "name": "IEnabledLogFeatures",
+          "kind": "type",
+          "signature": "export type IEnabledLogFeatures<F extends ILogOutputFeatureRecord> = { readonly [K in keyof F as F[K] extends false ? never : K]: Exclude<F[K], false>; };",
+          "declarationLine": 94,
+          "source": "packages/log-host/dist/typing.d.ts",
+          "purpose": "Disabled selections never enter plugin-host's native feature record.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEnabledLogFeatures.",
+          "advanced": "No additional advanced behavior is declared for IEnabledLogFeatures.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IEnabledLogFeatures."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEnabledLogFeatures.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IEnabledLogFeatures",
+          "exportPath": "./sdk",
+          "overloadSignatures": [
+            "export type IEnabledLogFeatures<F extends ILogOutputFeatureRecord> = { readonly [K in keyof F as F[K] extends false ? never : K]: Exclude<F[K], false>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IEnabledLogFeatures when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IEnabledLogFeatures does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Disabled selections never enter plugin-host's native feature record."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IEnabledLogFeatures from @migaia/log-host/sdk, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IEnabledLogFeatures when its type contract and declared inputs match the result you need. Choose a different public symbol when IEnabledLogFeatures does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEnabledLogFeatures."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IEnabledLogFeatures."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-host/dist/typing.d.ts:IEnabledLogFeatures:export type IEnabledLogFeatures<F extends ILogOutputFeatureRecord> = { readonly [K in keyof F as F[K] extends false ? never : K]: Exclude<F[K], false>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-host-sdk--IEnabledLogFeatures"
         },
         {
           "name": "IErrorInfo",
           "kind": "type",
           "signature": "export type IErrorInfo = { name: string; message: string; stack?: string | undefined; raw: Error; };",
-          "declarationLine": 7,
+          "declarationLine": 8,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Local error projection on entry.error with native raw identity for console/custom sinks. HTTP and formatFeature JSON use the shared bounded source/code/name/message/stack/cause/errors projection without raw; unclassified business errors use diagnostic unknown/UNKNOWN placeholders.",
           "core": "name: Error name such as `TypeError`.\nmessage: Message text of the original error.\nstack: Stack text, when available.\nraw: The exact original Error for local inspection. Generic JSON may serialize enumerable own custom properties even though built-in native fields are usually non-enumerable. Built-in HTTP/formatFeature JSON deliberately omit raw and project the full bounded chain.",
@@ -3426,7 +3671,7 @@
           ],
           "composes": [],
           "aliasOf": "IErrorInfo",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type IErrorInfo = { name: string; message: string; stack?: string | undefined; raw: Error; };"
           ],
@@ -3443,7 +3688,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import IErrorInfo from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import IErrorInfo from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -3471,13 +3716,13 @@
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--IErrorInfo"
+          "fragment": "log-host-sdk--IErrorInfo"
         },
         {
           "name": "ILogContext",
           "kind": "type",
           "signature": "export type ILogContext = Readonly<{ id: string; options: Readonly<Record<string, unknown>>; path: readonly string[]; topic: string; createdAt: Date; env: Readonly<{ isTTY: boolean; isCI: boolean; }>; }>;",
-          "declarationLine": 38,
+          "declarationLine": 39,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Frozen context of a logger, read from `log.ctx` or `core.ctx`.",
           "core": "id: Stable host identity captured from the supplied or native identifier generator; forwarding uses internal ownership bookkeeping.\noptions: The frozen `options` given to `createLogHost()`, readable by every plugin.\npath: Default `context` of entries, from the `context` option.\ntopic: The `topic` option, shown in the forwarding chain of `extends()`.\ncreatedAt: Time at which the logger was constructed.\nenv: Environment detected at construction: `isTTY` and `isCI`.",
@@ -3546,7 +3791,7 @@
           ],
           "composes": [],
           "aliasOf": "ILogContext",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type ILogContext = Readonly<{ id: string; options: Readonly<Record<string, unknown>>; path: readonly string[]; topic: string; createdAt: Date; env: Readonly<{ isTTY: boolean; isCI: boolean; }>; }>;"
           ],
@@ -3563,7 +3808,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import ILogContext from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import ILogContext from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -3591,13 +3836,78 @@
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--ILogContext"
+          "fragment": "log-host-sdk--ILogContext"
+        },
+        {
+          "name": "ILogControlExtensions",
+          "kind": "type",
+          "signature": "export type ILogControlExtensions<N extends string, F extends ILogOutputFeatureRecord> = keyof F extends never ? Record<never, never> : IUnionToIntersection<{ [A in keyof F & string]: F[A] extends ILogFeature<infer C> ? { [M in keyof C & string as `${N}_${A}_${M}`]: C[M]; } : never; }[keyof F & string]> & Record<never, never>;",
+          "declarationLine": 104,
+          "source": "packages/log-host/dist/typing.d.ts",
+          "purpose": "Controls use plugin and record names so host-wide and local policies can coexist.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogControlExtensions.",
+          "advanced": "No additional advanced behavior is declared for ILogControlExtensions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ILogControlExtensions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogControlExtensions.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ILogControlExtensions",
+          "exportPath": "./sdk",
+          "overloadSignatures": [
+            "export type ILogControlExtensions<N extends string, F extends ILogOutputFeatureRecord> = keyof F extends never ? Record<never, never> : IUnionToIntersection<{ [A in keyof F & string]: F[A] extends ILogFeature<infer C> ? { [M in keyof C & string as `${N}_${A}_${M}`]: C[M]; } : never; }[keyof F & string]> & Record<never, never>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ILogControlExtensions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ILogControlExtensions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Controls use plugin and record names so host-wide and local policies can coexist."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ILogControlExtensions from @migaia/log-host/sdk, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ILogControlExtensions when its type contract and declared inputs match the result you need. Choose a different public symbol when ILogControlExtensions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogControlExtensions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ILogControlExtensions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-host/dist/typing.d.ts:ILogControlExtensions:export type ILogControlExtensions<N extends string, F extends ILogOutputFeatureRecord> = keyof F extends never ? Record<never, never> : IUnionToIntersection<{ [A in keyof F & string]: F[A] extends ILogFeature<infer C> ? { [M in keyof C & string as `${N}_${A}_${M}`]: C[M]; } : never; }[keyof F & string]> & Record<never, never>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-host-sdk--ILogControlExtensions"
         },
         {
           "name": "ILogEntry",
           "kind": "type",
           "signature": "export type ILogEntry = { readonly id: string; readonly tag: string; readonly time: Date; readonly message: string; readonly args: readonly unknown[]; readonly meta?: Record<string, unknown> | undefined; readonly context: readonly string[]; readonly error?: IErrorInfo | undefined; readonly data: Record<string, unknown>; };",
-          "declarationLine": 14,
+          "declarationLine": 15,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "One log entry as stages, hooks and sinks see it.",
           "core": "id: Entry id `log_<n>`, increasing within the process.\ntag: Tag given to `log()` / `dispatchRaw()` or by a plugin (`info`, `thinking`).\ntime: Creation time; a replacement entry must keep a `Date` of the current realm.\nmessage: Message text of the entry.\nargs: Extra values passed after the message.\nmeta: Structured metadata given to `dispatchRaw()`.\ncontext: Context path such as [\"api\", \"users\"]; when dispatchRaw omits it, the entry copies ctx.path, whose constructor default is [].\nerror: Local projection of an Error argument, retaining its original native object; HTTP/formatFeature JSON serialize a bounded chain instead of raw. See IErrorInfo.\ndata: Plugin data area: uuid writes uuid and reasoning sets silent so console skips the entry. A forwarded sink copy also contains display-only topicChain; the internal cycle-detection symbol remains hidden.",
@@ -3693,7 +4003,7 @@
           ],
           "composes": [],
           "aliasOf": "ILogEntry",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type ILogEntry = { readonly id: string; readonly tag: string; readonly time: Date; readonly message: string; readonly args: readonly unknown[]; readonly meta?: Record<string, unknown> | undefined; readonly context: readonly string[]; readonly error?: IErrorInfo | undefined; readonly data: Record<string, unknown>; };"
           ],
@@ -3710,7 +4020,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import ILogEntry from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import ILogEntry from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -3738,13 +4048,13 @@
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--ILogEntry"
+          "fragment": "log-host-sdk--ILogEntry"
         },
         {
           "name": "ILogFailure",
           "kind": "type",
           "signature": "export type ILogFailure = { readonly source: 'defer' | 'hook' | 'sink' | 'pipeline' | 'flush' | 'forward' | 'shutdown'; readonly error: unknown; };",
-          "declarationLine": 31,
+          "declarationLine": 32,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Argument of `onFailure()` callbacks.",
           "core": "source: Which stage of the logger failed.\nA task given to `defer()` threw.\nA hook threw or rejected.\nA sink threw or rejected (console, upload, file).\nA stage threw or returned an invalid entry.\nA registered plugin onFlush callback failed.\nA forwardPlugin target failed to accept or flush forwarded work.\nA shutdown handler or plugin cleanup failed.\nerror: The thrown value, often with a `LogHostErrorCode`.",
@@ -3777,7 +4087,7 @@
           ],
           "composes": [],
           "aliasOf": "ILogFailure",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type ILogFailure = { readonly source: 'defer' | 'hook' | 'sink' | 'pipeline' | 'flush' | 'forward' | 'shutdown'; readonly error: unknown; };"
           ],
@@ -3794,7 +4104,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import ILogFailure from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import ILogFailure from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -3822,13 +4132,13 @@
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--ILogFailure"
+          "fragment": "log-host-sdk--ILogFailure"
         },
         {
           "name": "ILogFeature",
           "kind": "type",
-          "signature": "export type ILogFeature = Readonly<{ readonly [logFeatureIdentity]: true; }> & (Readonly<ILogFeatureDefinition> | Readonly<{ kind: 'batch' | 'retry' | 'timeout'; phase: 'delivery'; }>);",
-          "declarationLine": 89,
+          "signature": "export type ILogFeature<C extends object = Record<never, never>> = IFeature<Record<never, never>, ILogFeatureRuntime<C>>;",
+          "declarationLine": 88,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Public ILogFeature contract used at the logging host boundary; retain original peer types and native payload identities.",
           "core": "Public ILogFeature contract used at the logging host boundary; retain original peer types and native payload identities.",
@@ -3839,31 +4149,12 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
-          "members": [
-            {
-              "name": "kind",
-              "kind": "property",
-              "optional": false,
-              "signature": "kind: 'batch' | 'retry' | 'timeout';",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "'batch' | 'retry' | 'timeout'"
-            },
-            {
-              "name": "phase",
-              "kind": "property",
-              "optional": false,
-              "signature": "phase: 'delivery';",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "'delivery'"
-            }
-          ],
-          "composes": ["ILogFeatureDefinition"],
+          "members": [],
+          "composes": ["IFeature"],
           "aliasOf": "ILogFeature",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
-            "export type ILogFeature = Readonly<{ readonly [logFeatureIdentity]: true; }> & (Readonly<ILogFeatureDefinition> | Readonly<{ kind: 'batch' | 'retry' | 'timeout'; phase: 'delivery'; }>);"
+            "export type ILogFeature<C extends object = Record<never, never>> = IFeature<Record<never, never>, ILogFeatureRuntime<C>>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3878,7 +4169,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import ILogFeature from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import ILogFeature from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -3902,17 +4193,17 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/log-host/dist/typing.d.ts:ILogFeature:export type ILogFeature = Readonly<{ readonly [logFeatureIdentity]: true; }> & (Readonly<ILogFeatureDefinition> | Readonly<{ kind: 'batch' | 'retry' | 'timeout'; phase: 'delivery'; }>);",
+          "identity": "packages/log-host/dist/typing.d.ts:ILogFeature:export type ILogFeature<C extends object = Record<never, never>> = IFeature<Record<never, never>, ILogFeatureRuntime<C>>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--ILogFeature"
+          "fragment": "log-host-sdk--ILogFeature"
         },
         {
           "name": "ILogFeatureDefinition",
           "kind": "type",
-          "signature": "export type ILogFeatureDefinition = { kind: string; phase: 'entry'; stage(entry: ILogEntry): ILogEntry | undefined | Promise<ILogEntry | undefined>; } | { kind: string; phase: 'gate'; accept(entry: ILogEntry): boolean; } | { kind: string; phase: 'format'; format(entry: ILogEntry): string; paint?(tag: string, text: string): string; dim?(text: string): string; };",
-          "declarationLine": 73,
+          "signature": "export type ILogFeatureDefinition = { phase: 'entry'; stage(entry: ILogEntry): ILogEntry | undefined | Promise<ILogEntry | undefined>; } | { phase: 'gate'; accept(entry: ILogEntry): boolean; } | { phase: 'format'; format(entry: ILogEntry): string; paint?(tag: string, text: string): string; dim?(text: string): string; arguments?(entry: ILogEntry, isTTY: boolean): unknown[]; };",
+          "declarationLine": 74,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Public ILogFeatureDefinition contract used at the logging host boundary; retain original peer types and native payload identities.",
           "core": "Public ILogFeatureDefinition contract used at the logging host boundary; retain original peer types and native payload identities.",
@@ -3924,15 +4215,6 @@
           "lifecycleConcurrency": "",
           "examples": [],
           "members": [
-            {
-              "name": "kind",
-              "kind": "property",
-              "optional": false,
-              "signature": "kind: string;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "string"
-            },
             {
               "name": "phase",
               "kind": "property",
@@ -3958,15 +4240,6 @@
               "returns": "ILogEntry | undefined | Promise<ILogEntry | undefined>"
             },
             {
-              "name": "kind",
-              "kind": "property",
-              "optional": false,
-              "signature": "kind: string;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "string"
-            },
-            {
               "name": "phase",
               "kind": "property",
               "optional": false,
@@ -3989,15 +4262,6 @@
                 }
               ],
               "returns": "boolean"
-            },
-            {
-              "name": "kind",
-              "kind": "property",
-              "optional": false,
-              "signature": "kind: string;",
-              "description": null,
-              "parameterDetails": [],
-              "returns": "string"
             },
             {
               "name": "phase",
@@ -4057,13 +4321,33 @@
                 }
               ],
               "returns": "string"
+            },
+            {
+              "name": "arguments",
+              "kind": "method",
+              "optional": true,
+              "signature": "arguments?(entry: ILogEntry, isTTY: boolean): unknown[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "entry",
+                  "type": "ILogEntry",
+                  "optional": false
+                },
+                {
+                  "name": "isTTY",
+                  "type": "boolean",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown[]"
             }
           ],
           "composes": [],
           "aliasOf": "ILogFeatureDefinition",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
-            "export type ILogFeatureDefinition = { kind: string; phase: 'entry'; stage(entry: ILogEntry): ILogEntry | undefined | Promise<ILogEntry | undefined>; } | { kind: string; phase: 'gate'; accept(entry: ILogEntry): boolean; } | { kind: string; phase: 'format'; format(entry: ILogEntry): string; paint?(tag: string, text: string): string; dim?(text: string): string; };"
+            "export type ILogFeatureDefinition = { phase: 'entry'; stage(entry: ILogEntry): ILogEntry | undefined | Promise<ILogEntry | undefined>; } | { phase: 'gate'; accept(entry: ILogEntry): boolean; } | { phase: 'format'; format(entry: ILogEntry): string; paint?(tag: string, text: string): string; dim?(text: string): string; arguments?(entry: ILogEntry, isTTY: boolean): unknown[]; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4078,7 +4362,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import ILogFeatureDefinition from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import ILogFeatureDefinition from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -4102,17 +4386,292 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/log-host/dist/typing.d.ts:ILogFeatureDefinition:export type ILogFeatureDefinition = { kind: string; phase: 'entry'; stage(entry: ILogEntry): ILogEntry | undefined | Promise<ILogEntry | undefined>; } | { kind: string; phase: 'gate'; accept(entry: ILogEntry): boolean; } | { kind: string; phase: 'format'; format(entry: ILogEntry): string; paint?(tag: string, text: string): string; dim?(text: string): string; };",
+          "identity": "packages/log-host/dist/typing.d.ts:ILogFeatureDefinition:export type ILogFeatureDefinition = { phase: 'entry'; stage(entry: ILogEntry): ILogEntry | undefined | Promise<ILogEntry | undefined>; } | { phase: 'gate'; accept(entry: ILogEntry): boolean; } | { phase: 'format'; format(entry: ILogEntry): string; paint?(tag: string, text: string): string; dim?(text: string): string; arguments?(entry: ILogEntry, isTTY: boolean): unknown[]; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--ILogFeatureDefinition"
+          "fragment": "log-host-sdk--ILogFeatureDefinition"
+        },
+        {
+          "name": "ILogFeatureRecord",
+          "kind": "type",
+          "signature": "export type ILogFeatureRecord = Readonly<Record<string, ILogFeature<any>>>;",
+          "declarationLine": 90,
+          "source": "packages/log-host/dist/typing.d.ts",
+          "purpose": "Plugin-host aliases retain exact feature output inference.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogFeatureRecord.",
+          "advanced": "No additional advanced behavior is declared for ILogFeatureRecord.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ILogFeatureRecord."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogFeatureRecord.",
+          "examples": [],
+          "members": [],
+          "composes": ["Record"],
+          "aliasOf": "ILogFeatureRecord",
+          "exportPath": "./sdk",
+          "overloadSignatures": [
+            "export type ILogFeatureRecord = Readonly<Record<string, ILogFeature<any>>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ILogFeatureRecord when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ILogFeatureRecord does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Plugin-host aliases retain exact feature output inference."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ILogFeatureRecord from @migaia/log-host/sdk, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ILogFeatureRecord when its type contract and declared inputs match the result you need. Choose a different public symbol when ILogFeatureRecord does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogFeatureRecord."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ILogFeatureRecord."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-host/dist/typing.d.ts:ILogFeatureRecord:export type ILogFeatureRecord = Readonly<Record<string, ILogFeature<any>>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-host-sdk--ILogFeatureRecord"
+        },
+        {
+          "name": "ILogFormat",
+          "kind": "type",
+          "signature": "export type ILogFormat = Extract<IFeatureImplementation, { phase: 'format'; }>;",
+          "declarationLine": 98,
+          "source": "packages/log-host/dist/typing.d.ts",
+          "purpose": "Installed format observations carry behavior without exposing a feature definition token.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogFormat.",
+          "advanced": "No additional advanced behavior is declared for ILogFormat.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ILogFormat."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogFormat.",
+          "examples": [],
+          "members": [
+            {
+              "name": "phase",
+              "kind": "property",
+              "optional": false,
+              "signature": "phase: 'format';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'format'"
+            },
+            {
+              "name": "format",
+              "kind": "method",
+              "optional": false,
+              "signature": "format(entry: ILogEntry): string;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "entry",
+                  "type": "ILogEntry",
+                  "optional": false
+                }
+              ],
+              "returns": "string"
+            },
+            {
+              "name": "paint",
+              "kind": "method",
+              "optional": true,
+              "signature": "paint?(tag: string, text: string): string;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "tag",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "text",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "string"
+            },
+            {
+              "name": "dim",
+              "kind": "method",
+              "optional": true,
+              "signature": "dim?(text: string): string;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "string"
+            },
+            {
+              "name": "arguments",
+              "kind": "method",
+              "optional": true,
+              "signature": "arguments?(entry: ILogEntry, isTTY: boolean): unknown[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "entry",
+                  "type": "ILogEntry",
+                  "optional": false
+                },
+                {
+                  "name": "isTTY",
+                  "type": "boolean",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown[]"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ILogFormat",
+          "exportPath": "./sdk",
+          "overloadSignatures": [
+            "export type ILogFormat = Extract<IFeatureImplementation, { phase: 'format'; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ILogFormat when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ILogFormat does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Installed format observations carry behavior without exposing a feature definition token."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ILogFormat from @migaia/log-host/sdk, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ILogFormat when its type contract and declared inputs match the result you need. Choose a different public symbol when ILogFormat does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogFormat."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ILogFormat."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-host/dist/typing.d.ts:ILogFormat:export type ILogFormat = Extract<IFeatureImplementation, { phase: 'format'; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-host-sdk--ILogFormat"
+        },
+        {
+          "name": "ILogOutputFeatureRecord",
+          "kind": "type",
+          "signature": "export type ILogOutputFeatureRecord = Readonly<Record<string, ILogFeature<any> | false>>;",
+          "declarationLine": 92,
+          "source": "packages/log-host/dist/typing.d.ts",
+          "purpose": "Output-only false entries disable the inherited role named by that record key.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogOutputFeatureRecord.",
+          "advanced": "No additional advanced behavior is declared for ILogOutputFeatureRecord.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ILogOutputFeatureRecord."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogOutputFeatureRecord.",
+          "examples": [],
+          "members": [],
+          "composes": ["Record"],
+          "aliasOf": "ILogOutputFeatureRecord",
+          "exportPath": "./sdk",
+          "overloadSignatures": [
+            "export type ILogOutputFeatureRecord = Readonly<Record<string, ILogFeature<any> | false>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ILogOutputFeatureRecord when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ILogOutputFeatureRecord does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Output-only false entries disable the inherited role named by that record key."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ILogOutputFeatureRecord from @migaia/log-host/sdk, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ILogOutputFeatureRecord when its type contract and declared inputs match the result you need. Choose a different public symbol when ILogOutputFeatureRecord does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogOutputFeatureRecord."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ILogOutputFeatureRecord."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-host/dist/typing.d.ts:ILogOutputFeatureRecord:export type ILogOutputFeatureRecord = Readonly<Record<string, ILogFeature<any> | false>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-host-sdk--ILogOutputFeatureRecord"
         },
         {
           "name": "ILogOutputRecord",
           "kind": "type",
           "signature": "export type ILogOutputRecord = Readonly<{ entry: ILogEntry; text: string; }>;",
-          "declarationLine": 100,
+          "declarationLine": 114,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Public ILogOutputRecord contract used at the logging host boundary; retain original peer types and native payload identities.",
           "core": "Public ILogOutputRecord contract used at the logging host boundary; retain original peer types and native payload identities.",
@@ -4145,7 +4704,7 @@
           ],
           "composes": [],
           "aliasOf": "ILogOutputRecord",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type ILogOutputRecord = Readonly<{ entry: ILogEntry; text: string; }>;"
           ],
@@ -4162,7 +4721,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import ILogOutputRecord from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import ILogOutputRecord from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -4190,13 +4749,13 @@
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
-          "fragment": "log-host-plugin--ILogOutputRecord"
+          "fragment": "log-host-sdk--ILogOutputRecord"
         },
         {
           "name": "ILogPlugin",
           "kind": "type",
           "signature": "export type ILogPlugin<O extends Record<string, unknown> = Record<string, never>, C extends IPluginConfig = IPluginConfig, F extends IFeatureRecord = Record<never, never>, E extends object = Record<never, never>> = IPlugin<ILogPluginCore, O, C, Record<never, never>, F, E>;",
-          "declarationLine": 65,
+          "declarationLine": 66,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Public ILogPlugin contract used at the logging host boundary; retain original peer types and native payload identities.",
           "core": "Public ILogPlugin contract used at the logging host boundary; retain original peer types and native payload identities.",
@@ -4210,7 +4769,7 @@
           "members": [],
           "composes": ["IPlugin"],
           "aliasOf": "ILogPlugin",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type ILogPlugin<O extends Record<string, unknown> = Record<string, never>, C extends IPluginConfig = IPluginConfig, F extends IFeatureRecord = Record<never, never>, E extends object = Record<never, never>> = IPlugin<ILogPluginCore, O, C, Record<never, never>, F, E>;"
           ],
@@ -4227,7 +4786,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import ILogPlugin from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import ILogPlugin from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -4253,15 +4812,15 @@
           "declaredConfiguration": [],
           "identity": "packages/log-host/dist/typing.d.ts:ILogPlugin:export type ILogPlugin<O extends Record<string, unknown> = Record<string, never>, C extends IPluginConfig = IPluginConfig, F extends IFeatureRecord = Record<never, never>, E extends object = Record<never, never>> = IPlugin<ILogPluginCore, O, C, Record<never, never>, F, E>;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--ILogPlugin"
+          "fragment": "log-host-sdk--ILogPlugin"
         },
         {
           "name": "ILogPluginConstraint",
           "kind": "type",
-          "signature": "export type ILogPluginConstraint = IPluginConstraint<ILogPluginCore>;",
-          "declarationLine": 67,
+          "signature": "export type ILogPluginConstraint = IPluginConstraint<any>;",
+          "declarationLine": 70,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Public ILogPluginConstraint contract used at the logging host boundary; retain original peer types and native payload identities.",
           "core": "Public ILogPluginConstraint contract used at the logging host boundary; retain original peer types and native payload identities.",
@@ -4275,10 +4834,8 @@
           "members": [],
           "composes": ["IPluginConstraint"],
           "aliasOf": "ILogPluginConstraint",
-          "exportPath": "./plugin",
-          "overloadSignatures": [
-            "export type ILogPluginConstraint = IPluginConstraint<ILogPluginCore>;"
-          ],
+          "exportPath": "./sdk",
+          "overloadSignatures": ["export type ILogPluginConstraint = IPluginConstraint<any>;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -4292,7 +4849,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import ILogPluginConstraint from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import ILogPluginConstraint from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -4316,17 +4873,17 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/log-host/dist/typing.d.ts:ILogPluginConstraint:export type ILogPluginConstraint = IPluginConstraint<ILogPluginCore>;",
+          "identity": "packages/log-host/dist/typing.d.ts:ILogPluginConstraint:export type ILogPluginConstraint = IPluginConstraint<any>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--ILogPluginConstraint"
+          "fragment": "log-host-sdk--ILogPluginConstraint"
         },
         {
           "name": "ILogPluginCore",
           "kind": "type",
           "signature": "export type ILogPluginCore = Pick<IPluginHostCore<ILogEntry>, 'config' | 'lifecycle' | 'onDispose'> & { readonly ctx: ILogContext; readonly scheduler: IScheduler; log(tag: string, message: string, ...args: unknown[]): void; dispatchRaw(input: IRawEntryInput): void; useSink(sink: (entry: ILogEntry) => void | Promise<void>): () => void; onFailure(fn: (failure: ILogFailure) => void): () => void; reportFailure(failure: ILogFailure): void; defer(task: () => void | Promise<void>): void; onFlush(fn: () => void | Promise<void>): () => void; flush(): Promise<void>; onShutdown(fn: (reason: IShutdownReason) => void | Promise<void>): () => void; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; };",
-          "declarationLine": 50,
+          "declarationLine": 51,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Public ILogPluginCore contract used at the logging host boundary; retain original peer types and native payload identities.",
           "core": "Public ILogPluginCore contract used at the logging host boundary; retain original peer types and native payload identities.",
@@ -4546,7 +5103,7 @@
           ],
           "composes": [],
           "aliasOf": "ILogPluginCore",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type ILogPluginCore = Pick<IPluginHostCore<ILogEntry>, 'config' | 'lifecycle' | 'onDispose'> & { readonly ctx: ILogContext; readonly scheduler: IScheduler; log(tag: string, message: string, ...args: unknown[]): void; dispatchRaw(input: IRawEntryInput): void; useSink(sink: (entry: ILogEntry) => void | Promise<void>): () => void; onFailure(fn: (failure: ILogFailure) => void): () => void; reportFailure(failure: ILogFailure): void; defer(task: () => void | Promise<void>): void; onFlush(fn: () => void | Promise<void>): () => void; flush(): Promise<void>; onShutdown(fn: (reason: IShutdownReason) => void | Promise<void>): () => void; shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>; };"
           ],
@@ -4563,7 +5120,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import ILogPluginCore from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import ILogPluginCore from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -4591,13 +5148,13 @@
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--ILogPluginCore"
+          "fragment": "log-host-sdk--ILogPluginCore"
         },
         {
           "name": "ILogProjectedEntry",
           "kind": "type",
           "signature": "export type ILogProjectedEntry = Omit<ILogEntry, 'error'> & { readonly error?: ISerializedErrorChain | undefined; };",
-          "declarationLine": 96,
+          "declarationLine": 110,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Public ILogProjectedEntry contract used at the logging host boundary; retain original peer types and native payload identities.",
           "core": "Public ILogProjectedEntry contract used at the logging host boundary; retain original peer types and native payload identities.",
@@ -4693,7 +5250,7 @@
           ],
           "composes": [],
           "aliasOf": "ILogProjectedEntry",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type ILogProjectedEntry = Omit<ILogEntry, 'error'> & { readonly error?: ISerializedErrorChain | undefined; };"
           ],
@@ -4710,7 +5267,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import ILogProjectedEntry from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import ILogProjectedEntry from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -4738,13 +5295,13 @@
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--ILogProjectedEntry"
+          "fragment": "log-host-sdk--ILogProjectedEntry"
         },
         {
           "name": "IPluginExtensions",
           "kind": "type",
           "signature": "export type IPluginExtensions<P extends readonly ILogPluginConstraint[]> = IMergePluginExts<P>;",
-          "declarationLine": 69,
+          "declarationLine": 72,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Public IPluginExtensions contract used at the logging host boundary; retain original peer types and native payload identities.",
           "core": "Public IPluginExtensions contract used at the logging host boundary; retain original peer types and native payload identities.",
@@ -4758,7 +5315,7 @@
           "members": [],
           "composes": ["IMergePluginExts"],
           "aliasOf": "IPluginExtensions",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type IPluginExtensions<P extends readonly ILogPluginConstraint[]> = IMergePluginExts<P>;"
           ],
@@ -4775,7 +5332,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import IPluginExtensions from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import IPluginExtensions from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -4803,13 +5360,13 @@
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--IPluginExtensions"
+          "fragment": "log-host-sdk--IPluginExtensions"
         },
         {
           "name": "IRawEntryInput",
           "kind": "type",
           "signature": "export type IRawEntryInput = Partial<Omit<ILogEntry, 'id'>> & { tag: string; message: string; };",
-          "declarationLine": 26,
+          "declarationLine": 27,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Input of `dispatchRaw()`: `tag` and `message` are required, the other entry fields optional.",
           "core": "tag: Tag of the entry, such as `audit`.\ntime: Creation time; a replacement entry must keep a `Date` of the current realm.\nmessage: Message text of the entry.\nargs: Extra values passed after the message.\nmeta: Structured metadata given to `dispatchRaw()`.\ncontext: Context path such as [\"api\", \"users\"]; when dispatchRaw omits it, the entry copies ctx.path, whose constructor default is [].\nerror: Local projection of an Error argument, retaining its original native object; HTTP/formatFeature JSON serialize a bounded chain instead of raw. See IErrorInfo.\ndata: Plugin data area: uuid writes uuid and reasoning sets silent so console skips the entry. A forwarded sink copy also contains display-only topicChain; the internal cycle-detection symbol remains hidden.",
@@ -4914,7 +5471,7 @@
           ],
           "composes": [],
           "aliasOf": "IRawEntryInput",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type IRawEntryInput = Partial<Omit<ILogEntry, 'id'>> & { tag: string; message: string; };"
           ],
@@ -4931,7 +5488,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import IRawEntryInput from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import IRawEntryInput from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -4959,13 +5516,13 @@
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--IRawEntryInput"
+          "fragment": "log-host-sdk--IRawEntryInput"
         },
         {
           "name": "IShutdownReason",
           "kind": "type",
           "signature": "export type IShutdownReason = 'signal' | 'uncaughtException' | 'unhandledRejection' | 'manual';",
-          "declarationLine": 36,
+          "declarationLine": 37,
           "source": "packages/log-host/dist/typing.d.ts",
           "purpose": "Public IShutdownReason contract used at the logging host boundary; retain original peer types and native payload identities.",
           "core": "Public IShutdownReason contract used at the logging host boundary; retain original peer types and native payload identities.",
@@ -4979,7 +5536,7 @@
           "members": [],
           "composes": [],
           "aliasOf": "IShutdownReason",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export type IShutdownReason = 'signal' | 'uncaughtException' | 'unhandledRejection' | 'manual';"
           ],
@@ -4996,7 +5553,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import IShutdownReason from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import IShutdownReason from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -5024,7 +5581,220 @@
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
-          "fragment": "log-host-plugin--IShutdownReason"
+          "fragment": "log-host-sdk--IShutdownReason"
+        },
+        {
+          "name": "LogEntryDataKey",
+          "kind": "const",
+          "signature": "export declare const LogEntryDataKey: { /** Existing public display data survives forwarding while traversal authority stays private. */ readonly topicChain: 'topicChain'; /** A producer that already streamed the text sets this to true; console skips the entry. */ readonly silent: 'silent'; };",
+          "declarationLine": 47,
+          "source": "packages/log-host/dist/state-constants.d.ts",
+          "purpose": "Entry data keys shared by producers and outputs; the values are part of the plugin contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for LogEntryDataKey.",
+          "advanced": "No additional advanced behavior is declared for LogEntryDataKey.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for LogEntryDataKey."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LogEntryDataKey.",
+          "examples": [],
+          "members": [
+            {
+              "name": "topicChain",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly topicChain: 'topicChain';",
+              "description": "Existing public display data survives forwarding while traversal authority stays private.",
+              "parameterDetails": [],
+              "returns": "'topicChain'"
+            },
+            {
+              "name": "silent",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly silent: 'silent';",
+              "description": "A producer that already streamed the text sets this to true; console skips the entry.",
+              "parameterDetails": [],
+              "returns": "'silent'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "LogEntryDataKey",
+          "exportPath": "./sdk",
+          "overloadSignatures": [
+            "export declare const LogEntryDataKey: { /** Existing public display data survives forwarding while traversal authority stays private. */ readonly topicChain: 'topicChain'; /** A producer that already streamed the text sets this to true; console skips the entry. */ readonly silent: 'silent'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use LogEntryDataKey when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when LogEntryDataKey does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Entry data keys shared by producers and outputs; the values are part of the plugin contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import LogEntryDataKey from @migaia/log-host/sdk, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use LogEntryDataKey when its const contract and declared inputs match the result you need. Choose a different public symbol when LogEntryDataKey does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for LogEntryDataKey."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for LogEntryDataKey."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-host/dist/state-constants.d.ts:LogEntryDataKey:export declare const LogEntryDataKey: { /** Existing public display data survives forwarding while traversal authority stays private. */ readonly topicChain: 'topicChain'; /** A producer that already streamed the text sets this to true; console skips the entry. */ readonly silent: 'silent'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-host-sdk--LogEntryDataKey"
+        },
+        {
+          "name": "LogFailureSource",
+          "kind": "const",
+          "signature": "export declare const LogFailureSource: { readonly defer: 'defer'; readonly hook: 'hook'; readonly sink: 'sink'; readonly pipeline: 'pipeline'; readonly flush: 'flush'; readonly forward: 'forward'; readonly shutdown: 'shutdown'; };",
+          "declarationLine": 56,
+          "source": "packages/log-host/dist/state-constants.d.ts",
+          "purpose": "Failure event provenance is shared by queue, lifecycle, forwarding and output owners.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for LogFailureSource.",
+          "advanced": "No additional advanced behavior is declared for LogFailureSource.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for LogFailureSource."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LogFailureSource.",
+          "examples": [],
+          "members": [
+            {
+              "name": "defer",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly defer: 'defer';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'defer'"
+            },
+            {
+              "name": "hook",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hook: 'hook';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'hook'"
+            },
+            {
+              "name": "sink",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sink: 'sink';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'sink'"
+            },
+            {
+              "name": "pipeline",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pipeline: 'pipeline';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'pipeline'"
+            },
+            {
+              "name": "flush",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly flush: 'flush';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'flush'"
+            },
+            {
+              "name": "forward",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly forward: 'forward';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'forward'"
+            },
+            {
+              "name": "shutdown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly shutdown: 'shutdown';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'shutdown'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "LogFailureSource",
+          "exportPath": "./sdk",
+          "overloadSignatures": [
+            "export declare const LogFailureSource: { readonly defer: 'defer'; readonly hook: 'hook'; readonly sink: 'sink'; readonly pipeline: 'pipeline'; readonly flush: 'flush'; readonly forward: 'forward'; readonly shutdown: 'shutdown'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use LogFailureSource when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when LogFailureSource does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Failure event provenance is shared by queue, lifecycle, forwarding and output owners."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import LogFailureSource from @migaia/log-host/sdk, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use LogFailureSource when its const contract and declared inputs match the result you need. Choose a different public symbol when LogFailureSource does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for LogFailureSource."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for LogFailureSource."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-host/dist/state-constants.d.ts:LogFailureSource:export declare const LogFailureSource: { readonly defer: 'defer'; readonly hook: 'hook'; readonly sink: 'sink'; readonly pipeline: 'pipeline'; readonly flush: 'flush'; readonly forward: 'forward'; readonly shutdown: 'shutdown'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-host-sdk--LogFailureSource"
         },
         {
           "name": "projectLogEntry",
@@ -5050,7 +5820,7 @@
           "members": [],
           "composes": [],
           "aliasOf": "projectLogEntry",
-          "exportPath": "./plugin",
+          "exportPath": "./sdk",
           "overloadSignatures": [
             "export declare function projectLogEntry(entry: ILogEntry): ILogProjectedEntry;"
           ],
@@ -5075,7 +5845,7 @@
             {
               "id": "getting-started",
               "title": "上手",
-              "content": "Import projectLogEntry from @migaia/log-host/plugin, then follow a maintained task example for your use case."
+              "content": "Import projectLogEntry from @migaia/log-host/sdk, then follow a maintained task example for your use case."
             },
             {
               "id": "when-to-use",
@@ -5127,7 +5897,7 @@
           ],
           "usageScore": 6,
           "configuration": [],
-          "fragment": "log-host-plugin--projectLogEntry"
+          "fragment": "log-host-sdk--projectLogEntry"
         }
       ],
       "aliases": []

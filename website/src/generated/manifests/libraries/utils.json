@@ -3,7 +3,7 @@
   "library": {
     "slug": "utils",
     "description": "Runtime-neutral reusable utility primitives.",
-    "version": "0.0.8",
+    "version": "0.0.9",
     "exports": [
       ".",
       "./bytes",
@@ -8680,6 +8680,16 @@
           "ownerFragment": "utils-object-path--get"
         },
         {
+          "identity": "packages/utils/dist/internal/error-primitives.d.ts:hasErrorIdentity:export declare function hasErrorIdentity(value: unknown): boolean;",
+          "name": "hasErrorIdentity",
+          "signature": "export declare function hasErrorIdentity(value: unknown): boolean;",
+          "source": "packages/utils/dist/internal/error-primitives.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./error",
+          "ownerModule": "error",
+          "ownerFragment": "utils-error--hasErrorIdentity"
+        },
+        {
           "identity": "packages/utils/dist/promise.d.ts:hostRethrowReporter:export declare const hostRethrowReporter: IUtilsReporter;",
           "name": "hostRethrowReporter",
           "signature": "export declare const hostRethrowReporter: IUtilsReporter;",
@@ -9080,6 +9090,16 @@
           "ownerFragment": "utils-promise--IDeferred"
         },
         {
+          "identity": "packages/utils/dist/internal/error-primitives.d.ts:identifyBoundaryFailure:export declare function identifyBoundaryFailure(failure: unknown, identity: Pick<IErrorIdentity, 'source' | 'code'>, wrap: (cause: unknown) => Error): unknown;",
+          "name": "identifyBoundaryFailure",
+          "signature": "export declare function identifyBoundaryFailure(failure: unknown, identity: Pick<IErrorIdentity, 'source' | 'code'>, wrap: (cause: unknown) => Error): unknown;",
+          "source": "packages/utils/dist/internal/error-primitives.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./error",
+          "ownerModule": "error",
+          "ownerFragment": "utils-error--identifyBoundaryFailure"
+        },
+        {
           "identity": "packages/utils/dist/identify-error.d.ts:IdentifyError:export declare const IdentifyError: typeof IdentifyErrorConstructor;\nexport type IdentifyError<S extends string = string, C extends string = string> = IdentifyErrorConstructor<S, C>;",
           "name": "IdentifyError",
           "signature": "export declare const IdentifyError: typeof IdentifyErrorConstructor;\nexport type IdentifyError<S extends string = string, C extends string = string> = IdentifyErrorConstructor<S, C>;",
@@ -9150,9 +9170,9 @@
           "ownerFragment": "utils-error--IErrorIdentityComparison"
         },
         {
-          "identity": "packages/utils/dist/internal/error-primitives.d.ts:IErrorIdentityHooks:export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
+          "identity": "packages/utils/dist/internal/error-primitives.d.ts:IErrorIdentityHooks:export type IErrorIdentityHooks<T extends object> = { /** * Leaves `source` and `code` configurable instead of locked. An owner that deliberately * reclassifies its own error in place (for example lifecycle across cancellation boundaries) sets * this and redefines `code` from `onConflict`; every other caller keeps the default lock. `phase` * and `detail` stay locked either way. */ readonly reclassifiable?: boolean; readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
           "name": "IErrorIdentityHooks",
-          "signature": "export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
+          "signature": "export type IErrorIdentityHooks<T extends object> = { /** * Leaves `source` and `code` configurable instead of locked. An owner that deliberately * reclassifies its own error in place (for example lifecycle across cancellation boundaries) sets * this and redefines `code` from `onConflict`; every other caller keeps the default lock. `phase` * and `detail` stay locked either way. */ readonly reclassifiable?: boolean; readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./error",
@@ -10100,6 +10120,16 @@
           "ownerFragment": "utils-scheduler--repeat"
         },
         {
+          "identity": "packages/utils/dist/host-report.d.ts:reportUnhandledError:export declare function reportUnhandledError(error: unknown): void;",
+          "name": "reportUnhandledError",
+          "signature": "export declare function reportUnhandledError(error: unknown): void;",
+          "source": "packages/utils/dist/host-report.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./error",
+          "ownerModule": "error",
+          "ownerFragment": "utils-error--reportUnhandledError"
+        },
+        {
           "identity": "packages/utils/dist/internal/async-task.d.ts:resolveAsyncTaskStrategy:export declare function resolveAsyncTaskStrategy(preferred: AsyncTaskStrategy | readonly AsyncTaskStrategy[]): IConcreteAsyncTaskStrategy;",
           "name": "resolveAsyncTaskStrategy",
           "signature": "export declare function resolveAsyncTaskStrategy(preferred: AsyncTaskStrategy | readonly AsyncTaskStrategy[]): IConcreteAsyncTaskStrategy;",
@@ -10178,6 +10208,16 @@
           "ownerExportPath": "./promise",
           "ownerModule": "promise",
           "ownerFragment": "utils-promise--sleep"
+        },
+        {
+          "identity": "packages/utils/dist/object.d.ts:snapshotOptionProperties:export declare function snapshotOptionProperties<T extends object>(value: T): T;",
+          "name": "snapshotOptionProperties",
+          "signature": "export declare function snapshotOptionProperties<T extends object>(value: T): T;",
+          "source": "packages/utils/dist/object.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./object",
+          "ownerModule": "object",
+          "ownerFragment": "utils-object--snapshotOptionProperties"
         },
         {
           "identity": "packages/utils/dist/object.d.ts:snapshotOwnDescriptors:export declare function snapshotOwnDescriptors(value: unknown): IOwnDescriptorsSnapshot;",
@@ -10370,9 +10410,9 @@
           "ownerFragment": "utils-error--UtilsError"
         },
         {
-          "identity": "packages/utils/dist/error-code.d.ts:UtilsErrorCode:export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this package needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
+          "identity": "packages/utils/dist/error-code.d.ts:UtilsErrorCode:export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this package needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; /** * Releasing an operation's timer or abort listeners failed while `sleep`, `withTimeout` or * `raceWithAbort` settled. The rejection is an `AggregateError`: the operation's own rejection, * when there was one, comes first in `errors`, followed by each cleanup failure in release order. * The caller should treat the operation as settled and inspect `errors` for the causes. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
           "name": "UtilsErrorCode",
-          "signature": "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
+          "signature": "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; /** * Releasing an operation's timer or abort listeners failed while `sleep`, `withTimeout` or * `raceWithAbort` settled. The rejection is an `AggregateError`: the operation's own rejection, * when there was one, comes first in `errors`, followed by each cleanup failure in release order. * The caller should treat the operation as settled and inspect `errors` for the causes. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
           "source": "packages/utils/dist/error-code.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./error",
@@ -18018,7 +18058,7 @@
           "name": "attachErrorIdentity",
           "kind": "function",
           "signature": "export declare function attachErrorIdentity<T extends object>(error: T, identity: IErrorIdentity, hooks?: IErrorIdentityHooks<T>): T;",
-          "declarationLine": 94,
+          "declarationLine": 101,
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "purpose": "Adds non-writable `source`, `code`, optional `phase` and `detail` fields to an existing error without wrapping or replacing it. Re-attaching the same values is a no-op; different existing values throw `ERROR_IDENTITY_CONFLICT` unless `hooks` decide.",
           "core": "error: The error object to label.\nidentity: `{ source, code, phase?, detail? }`.\nhooks: `onConflict` / `onFailure` choose a replacement object when a field clashes or cannot be defined.\nThe same error (or the replacement chosen by a hook).",
@@ -18302,7 +18342,7 @@
           "name": "attachSecondaryErrors",
           "kind": "function",
           "signature": "export declare function attachSecondaryErrors(primary: unknown, secondaryErrors: readonly unknown[]): unknown;",
-          "declarationLine": 99,
+          "declarationLine": 106,
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "purpose": "Attaches secondary failures (for example cleanup errors) to a primary error without changing the primary identity. If the primary cannot be extended, an `AggregateError` whose first entry is the primary is returned instead.",
           "core": "primary: The main failure.\nsecondaryErrors: Additional failures, in order.\nThe primary (now carrying the secondaries) or a fallback `AggregateError`.",
@@ -18391,7 +18431,7 @@
           "name": "combineErrors",
           "kind": "function",
           "signature": "export declare function combineErrors(errors: Iterable<unknown>, message: string): Error | undefined;",
-          "declarationLine": 116,
+          "declarationLine": 123,
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "purpose": "Combines failures: none gives `undefined`, one is returned (normalised with `toError`), several become an `AggregateError(errors, message)`.",
           "core": "errors: Failures to combine.\nmessage: Message of the `AggregateError` when several are combined.\n`undefined`, the single error, or an `AggregateError`.",
@@ -18858,6 +18898,188 @@
             }
           ],
           "fragment": "utils-error--deserializeErrorChain"
+        },
+        {
+          "name": "hasErrorIdentity",
+          "kind": "function",
+          "signature": "export declare function hasErrorIdentity(value: unknown): boolean;",
+          "declarationLine": 143,
+          "source": "packages/utils/dist/internal/error-primitives.d.ts",
+          "purpose": "Whether `value` already carries a complete error identity: own data properties `source` and `code` that are both strings. Only own descriptors are read, so no getter runs; a Proxy whose descriptor trap throws lets that failure propagate to the caller's boundary.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for hasErrorIdentity.",
+          "advanced": "No additional advanced behavior is declared for hasErrorIdentity.",
+          "parameters": ["value: unknown"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "boolean",
+          "errors": ["No documented errors are declared for hasErrorIdentity."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for hasErrorIdentity.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "hasErrorIdentity",
+          "exportPath": "./error",
+          "overloadSignatures": [
+            "export declare function hasErrorIdentity(value: unknown): boolean;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["boolean"],
+          "whenToUse": "Use hasErrorIdentity when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when hasErrorIdentity does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Whether `value` already carries a complete error identity: own data properties `source` and `code` that are both strings. Only own descriptors are read, so no getter runs; a Proxy whose descriptor trap throws lets that failure propagate to the caller's boundary."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import hasErrorIdentity from @migaia/utils/error, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use hasErrorIdentity when its function contract and declared inputs match the result you need. Choose a different public symbol when hasErrorIdentity does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for hasErrorIdentity."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for hasErrorIdentity."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/internal/error-primitives.d.ts:hasErrorIdentity:export declare function hasErrorIdentity(value: unknown): boolean;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-error--hasErrorIdentity"
+        },
+        {
+          "name": "identifyBoundaryFailure",
+          "kind": "function",
+          "signature": "export declare function identifyBoundaryFailure(failure: unknown, identity: Pick<IErrorIdentity, 'source' | 'code'>, wrap: (cause: unknown) => Error): unknown;",
+          "declarationLine": 152,
+          "source": "packages/utils/dist/internal/error-primitives.d.ts",
+          "purpose": "identifyBoundaryFailure is part of this module's public function contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identifyBoundaryFailure.",
+          "advanced": "No additional advanced behavior is declared for identifyBoundaryFailure.",
+          "parameters": [
+            "failure: unknown",
+            "identity: Pick<IErrorIdentity, 'source' | 'code'>",
+            "wrap: (cause: unknown) => Error"
+          ],
+          "parameterDetails": [
+            {
+              "name": "failure",
+              "type": "unknown",
+              "optional": false
+            },
+            {
+              "name": "identity",
+              "type": "Pick<IErrorIdentity, 'source' | 'code'>",
+              "optional": false
+            },
+            {
+              "name": "wrap",
+              "type": "(cause: unknown) => Error",
+              "optional": false
+            }
+          ],
+          "returns": "unknown",
+          "errors": ["No documented errors are declared for identifyBoundaryFailure."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for identifyBoundaryFailure.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "identifyBoundaryFailure",
+          "exportPath": "./error",
+          "overloadSignatures": [
+            "export declare function identifyBoundaryFailure(failure: unknown, identity: Pick<IErrorIdentity, 'source' | 'code'>, wrap: (cause: unknown) => Error): unknown;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "failure",
+                "type": "unknown",
+                "optional": false
+              },
+              {
+                "name": "identity",
+                "type": "Pick<IErrorIdentity, 'source' | 'code'>",
+                "optional": false
+              },
+              {
+                "name": "wrap",
+                "type": "(cause: unknown) => Error",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["unknown"],
+          "whenToUse": "Use identifyBoundaryFailure when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when identifyBoundaryFailure does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "identifyBoundaryFailure is part of this module's public function contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import identifyBoundaryFailure from @migaia/utils/error, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use identifyBoundaryFailure when its function contract and declared inputs match the result you need. Choose a different public symbol when identifyBoundaryFailure does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identifyBoundaryFailure."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for identifyBoundaryFailure."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/internal/error-primitives.d.ts:identifyBoundaryFailure:export declare function identifyBoundaryFailure(failure: unknown, identity: Pick<IErrorIdentity, 'source' | 'code'>, wrap: (cause: unknown) => Error): unknown;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-error--identifyBoundaryFailure"
         },
         {
           "name": "IdentifyError",
@@ -19880,7 +20102,7 @@
         {
           "name": "IErrorIdentityHooks",
           "kind": "type",
-          "signature": "export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
+          "signature": "export type IErrorIdentityHooks<T extends object> = { /** * Leaves `source` and `code` configurable instead of locked. An owner that deliberately * reclassifies its own error in place (for example lifecycle across cancellation boundaries) sets * this and redefines `code` from `onConflict`; every other caller keeps the default lock. `phase` * and `detail` stay locked either way. */ readonly reclassifiable?: boolean; readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
           "declarationLine": 74,
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "purpose": "Hooks of `attachErrorIdentity()`.",
@@ -19893,6 +20115,15 @@
           "lifecycleConcurrency": "",
           "examples": [],
           "members": [
+            {
+              "name": "reclassifiable",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly reclassifiable?: boolean;",
+              "description": "Leaves `source` and `code` configurable instead of locked. An owner that deliberately reclassifies its own error in place (for example lifecycle across cancellation boundaries) sets this and redefines `code` from `onConflict`; every other caller keeps the default lock. `phase` and `detail` stay locked either way.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
             {
               "name": "onConflict",
               "kind": "property",
@@ -19916,7 +20147,7 @@
           "aliasOf": "IErrorIdentityHooks",
           "exportPath": "./error",
           "overloadSignatures": [
-            "export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };"
+            "export type IErrorIdentityHooks<T extends object> = { /** * Leaves `source` and `code` configurable instead of locked. An owner that deliberately * reclassifies its own error in place (for example lifecycle across cancellation boundaries) sets * this and redefines `code` from `onConflict`; every other caller keeps the default lock. `phase` * and `detail` stay locked either way. */ readonly reclassifiable?: boolean; readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -19955,7 +20186,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/utils/dist/internal/error-primitives.d.ts:IErrorIdentityHooks:export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
+          "identity": "packages/utils/dist/internal/error-primitives.d.ts:IErrorIdentityHooks:export type IErrorIdentityHooks<T extends object> = { /** * Leaves `source` and `code` configurable instead of locked. An owner that deliberately * reclassifies its own error in place (for example lifecycle across cancellation boundaries) sets * this and redefines `code` from `onConflict`; every other caller keeps the default lock. `phase` * and `detail` stay locked either way. */ readonly reclassifiable?: boolean; readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -21176,7 +21407,7 @@
           "name": "isUtilsAbortError",
           "kind": "function",
           "signature": "export declare function isUtilsAbortError(value: unknown): value is UtilsAbortError;",
-          "declarationLine": 123,
+          "declarationLine": 130,
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "purpose": "Type guard for `UtilsAbortError` (cancellation by a signal).",
           "core": "value: A caught value.\n`true` when the operation was cancelled.",
@@ -21352,7 +21583,7 @@
           "name": "isUtilsError",
           "kind": "function",
           "signature": "export declare function isUtilsError(value: unknown): value is UtilsError;",
-          "declarationLine": 118,
+          "declarationLine": 125,
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "purpose": "Diagnostic guard for an error-like shape with utils `source` and a registered utils `code`. It does not require local `instanceof Error` and does not authenticate the origin.",
           "core": "value: A caught value.\n`true` for errors of this package.",
@@ -21528,7 +21759,7 @@
           "name": "isUtilsTimeoutError",
           "kind": "function",
           "signature": "export declare function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError;",
-          "declarationLine": 128,
+          "declarationLine": 135,
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "purpose": "Type guard for `UtilsTimeoutError` (a deadline passed).",
           "core": "value: A caught value.\n`true` when a deadline was exceeded; read `scope` and `timeoutMs`.",
@@ -21707,7 +21938,7 @@
           "name": "IUtilsErrorCode",
           "kind": "type",
           "signature": "export type IUtilsErrorCode = (typeof UtilsErrorCode)[keyof typeof UtilsErrorCode];",
-          "declarationLine": 133,
+          "declarationLine": 140,
           "source": "packages/utils/dist/error-code.d.ts",
           "purpose": "Union of `UtilsErrorCode` values.",
           "core": "Union of `UtilsErrorCode` values.",
@@ -22165,10 +22396,89 @@
           "fragment": "utils-error--reachErrorChain"
         },
         {
+          "name": "reportUnhandledError",
+          "kind": "function",
+          "signature": "export declare function reportUnhandledError(error: unknown): void;",
+          "declarationLine": 6,
+          "source": "packages/utils/dist/host-report.d.ts",
+          "purpose": "Delivers an unhandled diagnostic through the host's existing exception queue. Shared by promise controls and thenable observation so reporter failures stay observable without creating an unhandled rejected Promise or a function-to-promise dependency.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for reportUnhandledError.",
+          "advanced": "No additional advanced behavior is declared for reportUnhandledError.",
+          "parameters": ["error: unknown"],
+          "parameterDetails": [
+            {
+              "name": "error",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "void",
+          "errors": ["No documented errors are declared for reportUnhandledError."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for reportUnhandledError.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "reportUnhandledError",
+          "exportPath": "./error",
+          "overloadSignatures": [
+            "export declare function reportUnhandledError(error: unknown): void;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "error",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["void"],
+          "whenToUse": "Use reportUnhandledError when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when reportUnhandledError does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Delivers an unhandled diagnostic through the host's existing exception queue. Shared by promise controls and thenable observation so reporter failures stay observable without creating an unhandled rejected Promise or a function-to-promise dependency."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import reportUnhandledError from @migaia/utils/error, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use reportUnhandledError when its function contract and declared inputs match the result you need. Choose a different public symbol when reportUnhandledError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for reportUnhandledError."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for reportUnhandledError."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/host-report.d.ts:reportUnhandledError:export declare function reportUnhandledError(error: unknown): void;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-error--reportUnhandledError"
+        },
+        {
           "name": "safeErrorReason",
           "kind": "function",
           "signature": "export declare function safeErrorReason(error: unknown, fallback: string): string;",
-          "declarationLine": 101,
+          "declarationLine": 108,
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "purpose": "Reads a human-readable reason from any failure once, returning `fallback` when nothing safe can be read.",
           "core": "error: Any failure.\nfallback: Text to use when no message can be read.\nThe message or the fallback.",
@@ -22479,7 +22789,7 @@
           "name": "toError",
           "kind": "function",
           "signature": "export declare function toError(value: unknown, options?: { readonly message?: string; }): Error;",
-          "declarationLine": 103,
+          "declarationLine": 110,
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "purpose": "Normalises a thrown value to an error-like value: error-shaped objects are returned unchanged, including cross-realm objects; other values get an Error wrapper with the original on `cause` (`NON_ERROR_VALUE`). Local `instanceof Error` is not guaranteed.",
           "core": "value: Thrown value.\noptions: `message` overrides the derived message (a thrown string is used as message by default).\nThe same error-shaped object, or a native Error wrapper.\nmessage: Caller-selected wrapper message used only when the input is not already error-shaped.\nA thrown string is its own message; other values use `UtilsErrorText.nonErrorValue`.",
@@ -23556,7 +23866,7 @@
         {
           "name": "UtilsErrorCode",
           "kind": "const",
-          "signature": "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
+          "signature": "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; /** * Releasing an operation's timer or abort listeners failed while `sleep`, `withTimeout` or * `raceWithAbort` settled. The rejection is an `AggregateError`: the operation's own rejection, * when there was one, comes first in `errors`, followed by each cleanup failure in release order. * The caller should treat the operation as settled and inspect `errors` for the causes. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
           "declarationLine": 4,
           "source": "packages/utils/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package (`source: \"foundation.utils\"`); compare `error.code` with these keys instead of matching messages.",
@@ -23795,13 +24105,22 @@
               "description": "Intl rejected a locale, number-format option, currency, or numeric value.",
               "parameterDetails": [],
               "returns": "'NUMBER_FORMAT_INVALID'"
+            },
+            {
+              "name": "cleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupFailed: 'CLEANUP_FAILED';",
+              "description": "Releasing an operation's timer or abort listeners failed while `sleep`, `withTimeout` or * `raceWithAbort` settled. The rejection is an `AggregateError`: the operation's own rejection, * when there was one, comes first in `errors`, followed by each cleanup failure in release order. * The caller should treat the operation as settled and inspect `errors` for the causes.",
+              "parameterDetails": [],
+              "returns": "'CLEANUP_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "UtilsErrorCode",
           "exportPath": "./error",
           "overloadSignatures": [
-            "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };"
+            "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; /** * Releasing an operation's timer or abort listeners failed while `sleep`, `withTimeout` or * `raceWithAbort` settled. The rejection is an `AggregateError`: the operation's own rejection, * when there was one, comes first in `errors`, followed by each cleanup failure in release order. * The caller should treat the operation as settled and inspect `errors` for the causes. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -23840,7 +24159,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/utils/dist/error-code.d.ts:UtilsErrorCode:export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this package needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
+          "identity": "packages/utils/dist/error-code.d.ts:UtilsErrorCode:export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this package needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; /** * Releasing an operation's timer or abort listeners failed while `sleep`, `withTimeout` or * `raceWithAbort` settled. The rejection is an `AggregateError`: the operation's own rejection, * when there was one, comes first in `errors`, followed by each cleanup failure in release order. * The caller should treat the operation as settled and inspect `errors` for the causes. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
           "guidance": [
             {
               "id": "error-模块",
@@ -24246,7 +24565,7 @@
           "name": "walkErrorCauses",
           "kind": "function",
           "signature": "export declare function walkErrorCauses(error: unknown, options?: { readonly maxDepth?: number; }): readonly unknown[];",
-          "declarationLine": 112,
+          "declarationLine": 119,
           "source": "packages/utils/dist/internal/error-primitives.d.ts",
           "purpose": "Lists an error and everything reachable through `cause` and `AggregateError.errors`, each value once.",
           "core": "error: Starting error.\noptions: `maxDepth` limits how deep to follow; default 32.\nThe visited values, starting with `error`.\nmaxDepth: Largest inclusive recursion depth followed through cause and aggregate errors; the starting value is depth zero.\n`32`: visit nodes from depth zero through depth thirty-two, deduplicating identities.",
@@ -27392,6 +27711,86 @@
           "usageScore": 30,
           "configuration": [],
           "fragment": "utils-object--probeProperty"
+        },
+        {
+          "name": "snapshotOptionProperties",
+          "kind": "function",
+          "signature": "export declare function snapshotOptionProperties<T extends object>(value: T): T;",
+          "declarationLine": 59,
+          "source": "packages/utils/dist/object.d.ts",
+          "purpose": "snapshotOptionProperties is part of this module's public function contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for snapshotOptionProperties.",
+          "advanced": "No additional advanced behavior is declared for snapshotOptionProperties.",
+          "parameters": ["value: T"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "T",
+              "optional": false,
+              "configurationType": "object"
+            }
+          ],
+          "returns": "T",
+          "errors": ["No documented errors are declared for snapshotOptionProperties."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for snapshotOptionProperties.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./object",
+          "overloadSignatures": [
+            "export declare function snapshotOptionProperties<T extends object>(value: T): T;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "T",
+                "optional": false,
+                "configurationType": "object"
+              }
+            ]
+          ],
+          "overloadReturns": ["T"],
+          "whenToUse": "Use snapshotOptionProperties when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when snapshotOptionProperties does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "snapshotOptionProperties is part of this module's public function contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import snapshotOptionProperties from @migaia/utils/object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use snapshotOptionProperties when its function contract and declared inputs match the result you need. Choose a different public symbol when snapshotOptionProperties does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for snapshotOptionProperties."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for snapshotOptionProperties."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/object.d.ts:snapshotOptionProperties:export declare function snapshotOptionProperties<T extends object>(value: T): T;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-object--snapshotOptionProperties"
         },
         {
           "name": "snapshotOwnDescriptors",

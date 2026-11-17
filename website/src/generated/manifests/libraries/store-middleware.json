@@ -3680,6 +3680,12 @@
               "description": "Exact policy shared with guarded stores/collections; defaults to a new off policy."
             },
             {
+              "name": "modules",
+              "type": "readonly IHostModule[]",
+              "optional": true,
+              "description": "Optional built-in capabilities installed once during construction."
+            },
+            {
               "name": "identity",
               "type": "Readonly<{ /** Defaults to DEFAULT; a supplied label must be a nonempty string and need not be unique. */ readonly name?: string; }>",
               "optional": true,
@@ -3798,6 +3804,14 @@
               "optional": true,
               "description": "Exact policy shared with guarded stores/collections; defaults to a new off policy.",
               "descriptionEn": "Exact policy shared with guarded stores/collections; defaults to a new off policy.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "modules",
+              "type": "readonly IHostModule[]",
+              "optional": true,
+              "description": "Optional built-in capabilities installed once during construction.",
+              "descriptionEn": "Optional built-in capabilities installed once during construction.",
               "descriptionZh": ""
             },
             {
@@ -5192,7 +5206,7 @@
         {
           "name": "IStoreMiddlewareBinding",
           "kind": "type",
-          "signature": "export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<IStoreMiddlewareCore<Record<string, unknown>>, IMiddlewareEvent<Record<string, unknown>>, readonly [], IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S>; }>;",
+          "signature": "export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<IStoreMiddlewareCore<Record<string, unknown>>, IMiddlewareEvent<Record<string, unknown>>, readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule], 'sync', readonly [], IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S>; }>;",
           "declarationLine": 119,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "Canonical frozen managed handle returned by bindStoreMiddleware, carrying all host capabilities plus the original light Store reference. Live revision/getters and fluent return identity preserve every Store member. Releasing this binding leaves the Store alive.",
@@ -5208,7 +5222,7 @@
           "composes": ["IHostHandle"],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<IStoreMiddlewareCore<Record<string, unknown>>, IMiddlewareEvent<Record<string, unknown>>, readonly [], IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S>; }>;"
+            "export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<IStoreMiddlewareCore<Record<string, unknown>>, IMiddlewareEvent<Record<string, unknown>>, readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule], 'sync', readonly [], IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5247,7 +5261,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareBinding:export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<IStoreMiddlewareCore<Record<string, unknown>>, IMiddlewareEvent<Record<string, unknown>>, readonly [], IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S>; }>;",
+          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareBinding:export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IHostHandle<IStoreMiddlewareCore<Record<string, unknown>>, IMiddlewareEvent<Record<string, unknown>>, readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule], 'sync', readonly [], IStoreMiddlewareSurface<Record<string, unknown>> & { readonly store: IReactiveStore<S>; }>;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -5594,7 +5608,7 @@
         {
           "name": "IStoreMiddlewareHost",
           "kind": "type",
-          "signature": "export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly [], IStoreMiddlewareSurface<S>>;",
+          "signature": "export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule], 'sync', readonly [], IStoreMiddlewareSurface<S>>;",
           "declarationLine": 78,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
           "purpose": "The object returned by createStoreMiddlewareHost for sending store events and managing their plugins. It combines store event methods with [Plugin Host’s IHostHandle](/en/docs/plugin-host/api/IHostHandle) methods for installing and removing plugins, changing configuration, and closing the host. The returned object is frozen, so you cannot add or replace its properties. Its event pipeline, the sequence of steps that handles each event, always runs synchronously.",
@@ -5610,7 +5624,7 @@
           "composes": ["IHostHandle"],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly [], IStoreMiddlewareSurface<S>>;"
+            "export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule], 'sync', readonly [], IStoreMiddlewareSurface<S>>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5649,7 +5663,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareHost:export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly [], IStoreMiddlewareSurface<S>>;",
+          "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareHost:export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly [typeof import('@migaia/plugin-host/pipeline-modes/sync').syncPipelineModule], 'sync', readonly [], IStoreMiddlewareSurface<S>>;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],

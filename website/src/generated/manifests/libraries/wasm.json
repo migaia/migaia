@@ -1241,7 +1241,7 @@
           "name": "__wbg_init",
           "kind": "function",
           "signature": "export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;",
-          "declarationLine": 214,
+          "declarationLine": 215,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Default async initializer imported as init; fetches the bundled wasm asset when omitted, or instantiates application-provided bytes/module. Call before any allocation or conversion. The first completed initialization publishes the exports; concurrent calls return that same memory/arena as named wrappers. Concurrent instantiation may still occur: Promise identity and single compilation are not promised.",
           "core": "module_or_path: Optional initialization argument. Use `{ module_or_path: source }`, where source is `RequestInfo`, `URL`, `Response`, `BufferSource`, a precompiled `WebAssembly.Module`, or `Promise<InitInput>`. Omitting the argument selects the bundled `wasm_provider_bg.wasm` URL; Node should supply bytes or a module instead of fetching a local file URL. Positional input is deprecated.\nPromise of `InitOutput`. Native WebAssembly.CompileError, WebAssembly.LinkError and WebAssembly.RuntimeError cross unchanged without source/code under the registered native pass-through exception. Loading failures reject; the package defines no custom error codes.",

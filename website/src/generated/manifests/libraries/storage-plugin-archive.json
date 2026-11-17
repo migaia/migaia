@@ -60,7 +60,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconsole.log((await host.extensions.archiveRun()).archived)\nconsole.log((await hot.getRecord('event:a')) === undefined)\nconsole.log((await host.extensions.archiveGet('event:a')) !== undefined)"
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconsole.log((await host.extensions.archiveRun()).archived)\nconsole.log((await hot.getRecord('event:a')) === undefined)\nconsole.log((await host.extensions.archiveGet('event:a')) !== undefined)"
               },
               {
                 "type": "paragraph",
@@ -88,7 +88,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { blob } from '@migaia/storage-contract'\n\nawait using host = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst hot = host.backend('hot')\nconst value = await hot.getRecord('event:a')\nawait host\n  .backend('cold')\n  .use(blob)\n  .put('archive:a', new TextEncoder().encode(JSON.stringify(value)))\n// 隐患：上传期间热值可能已被新写入替换。\nawait hot.deleteRecord('event:a')\n// 隐患：中途失败时没有清单支持历史读取或孤儿清理。"
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { blob } from '@migaia/storage-contract'\n\nawait using host = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst hot = host.backend('hot')\nconst value = await hot.getRecord('event:a')\nawait host\n  .backend('cold')\n  .use(blob)\n  .put('archive:a', new TextEncoder().encode(JSON.stringify(value)))\n// 隐患：上传期间热值可能已被新写入替换。\nawait hot.deleteRecord('event:a')\n// 隐患：中途失败时没有清单支持历史读取或孤儿清理。"
               },
               {
                 "type": "paragraph",
@@ -160,7 +160,7 @@
                 "type": "table",
                 "headers": ["API", "用途"],
                 "rows": [
-                  ["`archivePlugin({id, hot, cold, rules})`", "安装普通扩展。"],
+                  ["`archivePlugin({name, hot, cold, rules})`", "安装普通扩展。"],
                   ["`host.extensions.archiveRun(options?)`", "移动匹配记录并返回进度。"],
                   ["`host.extensions.archiveGet(key, options?)`", "读热值或归档值，可显式恢复。"],
                   ["`host.extensions.archiveSweep(ctx?)`", "删除无引用归档对象。"],
@@ -193,7 +193,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "此前草案中的 `host.extensions.archive.run()`、`.get()`、`.sweep()` 改为 `host.extensions.archiveRun()`、`archiveGet()`、`archiveSweep()`。把三种调用分别替换为当前平铺函数；配置 `id: 'history'` 时使用 `historyRun`、`historyGet`、`historySweep`。组织视图同样从 `host.org(id).extensions` 调用。参数与返回值沿用各自操作的契约，不提供旧嵌套对象或兼容别名；资源仍由宿主释放。"
+                "text": "此前草案中的 `host.extensions.archive.run()`、`.get()`、`.sweep()` 改为 `host.extensions.archiveRun()`、`archiveGet()`、`archiveSweep()`。把三种调用分别替换为当前平铺函数；配置 `name: 'history'` 时使用 `historyRun`、`historyGet`、`historySweep`。组织视图同样从 `host.org(id).extensions` 调用。参数与返回值沿用各自操作的契约，不提供旧嵌套对象或兼容别名；资源仍由宿主释放。"
               }
             ]
           }
@@ -228,7 +228,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 'old' }, 'event:old')\nawait hot.putRecord({ createdAt: Date.now(), value: 'new' }, 'event:new')\nconst result = await host.extensions.archiveRun({ rule: 'old', limit: 1 })\nconsole.log(result.archived)\nconsole.log((await hot.getRecord('event:old')) === undefined)\nconsole.log((await hot.getRecord('event:new')) !== undefined)"
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 'old' }, 'event:old')\nawait hot.putRecord({ createdAt: Date.now(), value: 'new' }, 'event:new')\nconst result = await host.extensions.archiveRun({ rule: 'old', limit: 1 })\nconsole.log(result.archived)\nconsole.log((await hot.getRecord('event:old')) === undefined)\nconsole.log((await hot.getRecord('event:new')) !== undefined)"
               },
               {
                 "type": "paragraph",
@@ -241,7 +241,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "id 决定扩展函数前缀；hot/cold 指此前安装的 backend id。rules 非空，name 必须唯一；prefix 是字符串键前缀。olderThanMs 是非负安全整数，where(cutoffMs) 接收本次运行一次采样的当前时间减保留时长，返回记录筛选条件。日期判断由 where 显式表达，插件不会猜测记录哪个字段是时间。"
+                "text": "name 决定扩展函数前缀；hot/cold 指此前安装的后端名称。rules 非空，name 必须唯一；prefix 是字符串键前缀。olderThanMs 是非负安全整数，where(cutoffMs) 接收本次运行一次采样的当前时间减保留时长，返回记录筛选条件。日期判断由 where 显式表达，插件不会猜测记录哪个字段是时间。"
               },
               {
                 "type": "paragraph",
@@ -268,7 +268,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nawait host.extensions.archiveRun()\nconsole.log((await host.extensions.archiveSweep()).removed)\nawait host.extensions.archiveGet('event:a', { restore: true })\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await host.extensions.archiveSweep()).removed)\nconsole.log((await host.extensions.archiveSweep()).removed)"
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nawait host.extensions.archiveRun()\nconsole.log((await host.extensions.archiveSweep()).removed)\nawait host.extensions.archiveGet('event:a', { restore: true })\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await host.extensions.archiveSweep()).removed)\nconsole.log((await host.extensions.archiveSweep()).removed)"
               },
               {
                 "type": "paragraph",
@@ -304,7 +304,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nconst org = host.org('11111111-1111-4111-8111-111111111111')\nawait hot.putRecord({ createdAt: 0, value: 'root' }, 'event:a')\nawait org.backend('hot').putRecord({ createdAt: 0, value: 'tenant' }, 'event:a')\nconsole.log((await org.extensions.historyRun()).archived)\nconsole.log((await org.backend('hot').getRecord('event:a')) === undefined)\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await org.extensions.historyGet('event:a')) !== undefined)"
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nconst org = host.org('11111111-1111-4111-8111-111111111111')\nawait hot.putRecord({ createdAt: 0, value: 'root' }, 'event:a')\nawait org.backend('hot').putRecord({ createdAt: 0, value: 'tenant' }, 'event:a')\nconsole.log((await org.extensions.historyRun()).archived)\nconsole.log((await org.backend('hot').getRecord('event:a')) === undefined)\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await org.extensions.historyGet('event:a')) !== undefined)"
               },
               {
                 "type": "paragraph",
@@ -332,7 +332,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [storageProbe(), memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nhost.extensions.observe('afterArchiveRun', (event) => console.log(event.archived))\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconst result = await host.extensions.archiveRun()\nconsole.log(result.segments)"
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [\n    storageProbe(),\n    memoryBackendPlugin({ name: 'hot' }),\n    memoryBackendPlugin({ name: 'cold' })\n  ]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nhost.extensions.observe('afterArchiveRun', (event) => console.log(event.archived))\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconst result = await host.extensions.archiveRun()\nconsole.log(result.segments)"
               },
               {
                 "type": "paragraph",
@@ -449,7 +449,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconsole.log((await host.extensions.archiveRun()).archived)\nconsole.log((await hot.getRecord('event:a')) === undefined)\nconsole.log((await host.extensions.archiveGet('event:a')) !== undefined)"
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconsole.log((await host.extensions.archiveRun()).archived)\nconsole.log((await hot.getRecord('event:a')) === undefined)\nconsole.log((await host.extensions.archiveGet('event:a')) !== undefined)"
                 },
                 {
                   "type": "paragraph",
@@ -477,7 +477,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { blob } from '@migaia/storage-contract'\n\nawait using host = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst hot = host.backend('hot')\nconst value = await hot.getRecord('event:a')\nawait host\n  .backend('cold')\n  .use(blob)\n  .put('archive:a', new TextEncoder().encode(JSON.stringify(value)))\n// Pitfall: a newer hot value may have appeared during upload.\nawait hot.deleteRecord('event:a')\n// Pitfall: a failure here has no manifest for read-through or orphan cleanup."
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { blob } from '@migaia/storage-contract'\n\nawait using host = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst hot = host.backend('hot')\nconst value = await hot.getRecord('event:a')\nawait host\n  .backend('cold')\n  .use(blob)\n  .put('archive:a', new TextEncoder().encode(JSON.stringify(value)))\n// Pitfall: a newer hot value may have appeared during upload.\nawait hot.deleteRecord('event:a')\n// Pitfall: a failure here has no manifest for read-through or orphan cleanup."
                 },
                 {
                   "type": "paragraph",
@@ -571,7 +571,7 @@
                   "type": "table",
                   "headers": ["API", "Purpose"],
                   "rows": [
-                    ["`archivePlugin({id, hot, cold, rules})`", "Install an ordinary extension."],
+                    ["`archivePlugin({name, hot, cold, rules})`", "Install an ordinary extension."],
                     [
                       "`host.extensions.archiveRun(options?)`",
                       "Move matching records and return progress."
@@ -616,7 +616,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Earlier drafts used `host.extensions.archive.run()`, `.get()` and `.sweep()`. Replace them with `host.extensions.archiveRun()`, `archiveGet()` and `archiveSweep()`. An `id: 'history'` configuration uses `historyRun`, `historyGet` and `historySweep`. Organization views expose the same flat functions through `host.org(id).extensions`. Arguments and results retain each operation's contract. There is no old nested object or compatibility alias; the host still owns resource cleanup."
+                  "text": "Earlier drafts used `host.extensions.archive.run()`, `.get()` and `.sweep()`. Replace them with `host.extensions.archiveRun()`, `archiveGet()` and `archiveSweep()`. A `name: 'history'` configuration uses `historyRun`, `historyGet` and `historySweep`. Organization views expose the same flat functions through `host.org(id).extensions`. Arguments and results retain each operation's contract. There is no old nested object or compatibility alias; the host still owns resource cleanup."
                 }
               ]
             }
@@ -654,7 +654,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 'old' }, 'event:old')\nawait hot.putRecord({ createdAt: Date.now(), value: 'new' }, 'event:new')\nconst result = await host.extensions.archiveRun({ rule: 'old', limit: 1 })\nconsole.log(result.archived)\nconsole.log((await hot.getRecord('event:old')) === undefined)\nconsole.log((await hot.getRecord('event:new')) !== undefined)"
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 'old' }, 'event:old')\nawait hot.putRecord({ createdAt: Date.now(), value: 'new' }, 'event:new')\nconst result = await host.extensions.archiveRun({ rule: 'old', limit: 1 })\nconsole.log(result.archived)\nconsole.log((await hot.getRecord('event:old')) === undefined)\nconsole.log((await hot.getRecord('event:new')) !== undefined)"
                 },
                 {
                   "type": "paragraph",
@@ -667,7 +667,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "id sets extension-function prefixes. hot/cold are previously installed backend IDs. rules must be nonempty, with unique names and string-key prefixes. olderThanMs is a nonnegative safe integer. where(cutoffMs) receives one sampled current time minus retention and returns the record condition. The condition explicitly chooses a time field; the plugin never guesses one."
+                  "text": "name sets extension-function prefixes. hot/cold are the names of previously installed backends. rules must be nonempty, with unique names and string-key prefixes. olderThanMs is a nonnegative safe integer. where(cutoffMs) receives one sampled current time minus retention and returns the record condition. The condition explicitly chooses a time field; the plugin never guesses one."
                 },
                 {
                   "type": "paragraph",
@@ -694,7 +694,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nawait host.extensions.archiveRun()\nconsole.log((await host.extensions.archiveSweep()).removed)\nawait host.extensions.archiveGet('event:a', { restore: true })\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await host.extensions.archiveSweep()).removed)\nconsole.log((await host.extensions.archiveSweep()).removed)"
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nawait host.extensions.archiveRun()\nconsole.log((await host.extensions.archiveSweep()).removed)\nawait host.extensions.archiveGet('event:a', { restore: true })\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await host.extensions.archiveSweep()).removed)\nconsole.log((await host.extensions.archiveSweep()).removed)"
                 },
                 {
                   "type": "paragraph",
@@ -730,7 +730,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nconst org = host.org('11111111-1111-4111-8111-111111111111')\nawait hot.putRecord({ createdAt: 0, value: 'root' }, 'event:a')\nawait org.backend('hot').putRecord({ createdAt: 0, value: 'tenant' }, 'event:a')\nconsole.log((await org.extensions.historyRun()).archived)\nconsole.log((await org.backend('hot').getRecord('event:a')) === undefined)\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await org.extensions.historyGet('event:a')) !== undefined)"
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nconst org = host.org('11111111-1111-4111-8111-111111111111')\nawait hot.putRecord({ createdAt: 0, value: 'root' }, 'event:a')\nawait org.backend('hot').putRecord({ createdAt: 0, value: 'tenant' }, 'event:a')\nconsole.log((await org.extensions.historyRun()).archived)\nconsole.log((await org.backend('hot').getRecord('event:a')) === undefined)\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await org.extensions.historyGet('event:a')) !== undefined)"
                 },
                 {
                   "type": "paragraph",
@@ -758,7 +758,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [storageProbe(), memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nhost.extensions.observe('afterArchiveRun', (event) => console.log(event.archived))\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconst result = await host.extensions.archiveRun()\nconsole.log(result.segments)"
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [\n    storageProbe(),\n    memoryBackendPlugin({ name: 'hot' }),\n    memoryBackendPlugin({ name: 'cold' })\n  ]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nhost.extensions.observe('afterArchiveRun', (event) => console.log(event.archived))\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconst result = await host.extensions.archiveRun()\nconsole.log(result.segments)"
                 },
                 {
                   "type": "paragraph",
@@ -844,47 +844,49 @@
         {
           "name": "archivePlugin",
           "kind": "function",
-          "signature": "export declare function archivePlugin<const N extends string, T = ICollectionsCodecValue>(options: IArchivePluginOptions<T> & { readonly id: N; }): IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly id: N; };",
+          "signature": "export declare function archivePlugin<const N extends string, T = ICollectionsCodecValue>(options: IArchivePluginOptions<T> & { readonly name: N; }): IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly name: N; };",
           "declarationLine": 9,
           "source": "packages/storage-plugin-archive/dist/plugin.d.ts",
           "purpose": "Install explicit run/get/sweep methods without claiming a backend kind or closing borrowed storage.",
           "core": "options: Literal extension ID, earlier hot/cold backend IDs and ordered rules.\nAn ordinary typed extension handle for host.use and current-org methods.\nid: Literal extension identity and private metadata namespace.\nhot: Earlier transactional records backend permitting external I/O.\ncold: Earlier genuine blob backend retaining immutable segments.\nrules: Nonempty declaration order; overlapping candidates belong to the first matching rule.\nAdd three flat functions to root and organization views, prefixed by the plugin id. Each function uses its view’s organization.",
           "advanced": "Explicit retention over published storage.",
-          "parameters": ["options: IArchivePluginOptions<T> & { readonly id: N; }"],
+          "parameters": ["options: IArchivePluginOptions<T> & { readonly name: N; }"],
           "parameterDetails": [
             {
               "name": "options",
-              "type": "IArchivePluginOptions<T> & { readonly id: N; }",
+              "type": "IArchivePluginOptions<T> & { readonly name: N; }",
               "optional": false
             }
           ],
-          "returns": "IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly id: N; }",
+          "returns": "IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly name: N; }",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 'old' }, 'event:old')\nawait hot.putRecord({ createdAt: Date.now(), value: 'new' }, 'event:new')\nconst result = await host.extensions.archiveRun({ rule: 'old', limit: 1 })\nconsole.log(result.archived)\nconsole.log((await hot.getRecord('event:old')) === undefined)\nconsole.log((await hot.getRecord('event:new')) !== undefined)",
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nawait host.extensions.archiveRun()\nconsole.log((await host.extensions.archiveSweep()).removed)\nawait host.extensions.archiveGet('event:a', { restore: true })\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await host.extensions.archiveSweep()).removed)\nconsole.log((await host.extensions.archiveSweep()).removed)",
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nconst org = host.org('11111111-1111-4111-8111-111111111111')\nawait hot.putRecord({ createdAt: 0, value: 'root' }, 'event:a')\nawait org.backend('hot').putRecord({ createdAt: 0, value: 'tenant' }, 'event:a')\nconsole.log((await org.extensions.historyRun()).archived)\nconsole.log((await org.backend('hot').getRecord('event:a')) === undefined)\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await org.extensions.historyGet('event:a')) !== undefined)",
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [storageProbe(), memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nhost.extensions.observe('afterArchiveRun', (event) => console.log(event.archived))\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconst result = await host.extensions.archiveRun()\nconsole.log(result.segments)",
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconsole.log((await host.extensions.archiveRun()).archived)\nconsole.log((await hot.getRecord('event:a')) === undefined)\nconsole.log((await host.extensions.archiveGet('event:a')) !== undefined)"
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 'old' }, 'event:old')\nawait hot.putRecord({ createdAt: Date.now(), value: 'new' }, 'event:new')\nconst result = await host.extensions.archiveRun({ rule: 'old', limit: 1 })\nconsole.log(result.archived)\nconsole.log((await hot.getRecord('event:old')) === undefined)\nconsole.log((await hot.getRecord('event:new')) !== undefined)",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nawait host.extensions.archiveRun()\nconsole.log((await host.extensions.archiveSweep()).removed)\nawait host.extensions.archiveGet('event:a', { restore: true })\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await host.extensions.archiveSweep()).removed)\nconsole.log((await host.extensions.archiveSweep()).removed)",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nconst org = host.org('11111111-1111-4111-8111-111111111111')\nawait hot.putRecord({ createdAt: 0, value: 'root' }, 'event:a')\nawait org.backend('hot').putRecord({ createdAt: 0, value: 'tenant' }, 'event:a')\nconsole.log((await org.extensions.historyRun()).archived)\nconsole.log((await org.backend('hot').getRecord('event:a')) === undefined)\nconsole.log((await hot.getRecord('event:a')) !== undefined)\nconsole.log((await org.extensions.historyGet('event:a')) !== undefined)",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [\n    storageProbe(),\n    memoryBackendPlugin({ name: 'hot' }),\n    memoryBackendPlugin({ name: 'cold' })\n  ]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nhost.extensions.observe('afterArchiveRun', (event) => console.log(event.archived))\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconst result = await host.extensions.archiveRun()\nconsole.log(result.segments)",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nawait using base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    name: 'archive',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [\n      {\n        name: 'old',\n        prefix: 'event:',\n        olderThanMs: 86_400_000,\n        where: (cutoff) => ({ createdAt: { lt: cutoff } })\n      }\n    ]\n  })\n)\nawait host.detect()\nconst hot = host.backend('hot')\nawait hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')\nconsole.log((await host.extensions.archiveRun()).archived)\nconsole.log((await hot.getRecord('event:a')) === undefined)\nconsole.log((await host.extensions.archiveGet('event:a')) !== undefined)"
           ],
           "members": [],
           "composes": [],
           "aliasOf": "archivePlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function archivePlugin<const N extends string, T = ICollectionsCodecValue>(options: IArchivePluginOptions<T> & { readonly id: N; }): IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly id: N; };"
+            "export declare function archivePlugin<const N extends string, T = ICollectionsCodecValue>(options: IArchivePluginOptions<T> & { readonly name: N; }): IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly name: N; };"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
-                "type": "IArchivePluginOptions<T> & { readonly id: N; }",
+                "type": "IArchivePluginOptions<T> & { readonly name: N; }",
                 "optional": false
               }
             ]
           ],
-          "overloadReturns": ["IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly id: N; }"],
+          "overloadReturns": [
+            "IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly name: N; }"
+          ],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -921,10 +923,10 @@
           ],
           "declaredConfiguration": [
             {
-              "name": "id",
+              "name": "name",
               "type": "string",
               "optional": false,
-              "description": ""
+              "description": "Plugin name; it prefixes the archive methods and scopes the manifest keys."
             },
             {
               "name": "hot",
@@ -945,17 +947,17 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-plugin-archive/dist/plugin.d.ts:archivePlugin:export declare function archivePlugin<const N extends string, T = ICollectionsCodecValue>(options: IArchivePluginOptions<T> & { readonly id: N; }): IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly id: N; };",
+          "identity": "packages/storage-plugin-archive/dist/plugin.d.ts:archivePlugin:export declare function archivePlugin<const N extends string, T = ICollectionsCodecValue>(options: IArchivePluginOptions<T> & { readonly name: N; }): IStorageBackendPluginHandle<IArchiveApi<N>> & { readonly name: N; };",
           "guidance": [],
           "usageScore": 70,
           "configuration": [
             {
-              "name": "id",
+              "name": "name",
               "type": "string",
               "optional": false,
-              "description": "id 决定扩展函数前缀；hot/cold 指此前安装的 backend id。rules 非空，name 必须唯一；prefix 是字符串键前缀。olderThanMs 是非负安全整数，where(cutoffMs) 接收本次运行一次采样的当前时间减保留时长，返回记录筛选条件。日期判断由 where 显式表达，插件不会猜测记录哪个字段是时间。",
-              "descriptionEn": "",
-              "descriptionZh": "id 决定扩展函数前缀；hot/cold 指此前安装的 backend id。rules 非空，name 必须唯一；prefix 是字符串键前缀。olderThanMs 是非负安全整数，where(cutoffMs) 接收本次运行一次采样的当前时间减保留时长，返回记录筛选条件。日期判断由 where 显式表达，插件不会猜测记录哪个字段是时间。"
+              "description": "name 决定扩展函数前缀；hot/cold 指此前安装的后端名称。rules 非空，name 必须唯一；prefix 是字符串键前缀。olderThanMs 是非负安全整数，where(cutoffMs) 接收本次运行一次采样的当前时间减保留时长，返回记录筛选条件。日期判断由 where 显式表达，插件不会猜测记录哪个字段是时间。",
+              "descriptionEn": "Plugin name; it prefixes the archive methods and scopes the manifest keys.",
+              "descriptionZh": "name 决定扩展函数前缀；hot/cold 指此前安装的后端名称。rules 非空，name 必须唯一；prefix 是字符串键前缀。olderThanMs 是非负安全整数，where(cutoffMs) 接收本次运行一次采样的当前时间减保留时长，返回记录筛选条件。日期判断由 where 显式表达，插件不会猜测记录哪个字段是时间。"
             },
             {
               "name": "hot",
@@ -977,9 +979,9 @@
               "name": "rules",
               "type": "readonly IArchiveRule<T>[]",
               "optional": false,
-              "description": "`archivePlugin({id, hot, cold, rules})` — 安装普通扩展。",
+              "description": "`archivePlugin({name, hot, cold, rules})` — 安装普通扩展。",
               "descriptionEn": "",
-              "descriptionZh": "`archivePlugin({id, hot, cold, rules})` — 安装普通扩展。"
+              "descriptionZh": "`archivePlugin({name, hot, cold, rules})` — 安装普通扩展。"
             }
           ],
           "fragment": "storage-plugin-archive-index--archivePlugin"
@@ -1127,7 +1129,7 @@
         {
           "name": "IArchivePluginOptions",
           "kind": "type",
-          "signature": "export type IArchivePluginOptions<T = ICollectionsCodecValue> = { readonly id: string; readonly hot: string; readonly cold: string; readonly rules: readonly IArchiveRule<T>[]; };",
+          "signature": "export type IArchivePluginOptions<T = ICollectionsCodecValue> = { /** Plugin name; it prefixes the archive methods and scopes the manifest keys. */ readonly name: string; readonly hot: string; readonly cold: string; readonly rules: readonly IArchiveRule<T>[]; };",
           "declarationLine": 41,
           "source": "packages/storage-plugin-archive/dist/types.d.ts",
           "purpose": "Later-batch ordinary extension borrowing previously published storage.",
@@ -1141,11 +1143,11 @@
           "examples": [],
           "members": [
             {
-              "name": "id",
+              "name": "name",
               "kind": "property",
               "optional": false,
-              "signature": "readonly id: string;",
-              "description": null,
+              "signature": "readonly name: string;",
+              "description": "Plugin name; it prefixes the archive methods and scopes the manifest keys.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -1181,7 +1183,7 @@
           "aliasOf": "IArchivePluginOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IArchivePluginOptions<T = ICollectionsCodecValue> = { readonly id: string; readonly hot: string; readonly cold: string; readonly rules: readonly IArchiveRule<T>[]; };"
+            "export type IArchivePluginOptions<T = ICollectionsCodecValue> = { /** Plugin name; it prefixes the archive methods and scopes the manifest keys. */ readonly name: string; readonly hot: string; readonly cold: string; readonly rules: readonly IArchiveRule<T>[]; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1220,7 +1222,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-archive/dist/types.d.ts:IArchivePluginOptions:export type IArchivePluginOptions<T = ICollectionsCodecValue> = { readonly id: string; readonly hot: string; readonly cold: string; readonly rules: readonly IArchiveRule<T>[]; };",
+          "identity": "packages/storage-plugin-archive/dist/types.d.ts:IArchivePluginOptions:export type IArchivePluginOptions<T = ICollectionsCodecValue> = { /** Plugin name; it prefixes the archive methods and scopes the manifest keys. */ readonly name: string; readonly hot: string; readonly cold: string; readonly rules: readonly IArchiveRule<T>[]; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

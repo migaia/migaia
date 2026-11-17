@@ -20,7 +20,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** host 排空已接纳的日志后释放文件输出插件。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: './application.ndjson', features: [batchFeature({ maxSize: 20 })] })\n  ]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.shutdown('manual')"
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** host 排空已接纳的日志后释放文件输出插件。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: './application.ndjson', features: { batch: batchFeature({ maxSize: 20 }) } })\n  ]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.shutdown('manual')"
               },
               {
                 "type": "paragraph",
@@ -37,6 +37,10 @@
               {
                 "type": "paragraph",
                 "text": "完整选项与注入示例见 USEGUIDE.md。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `file_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `file_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。"
               }
             ]
           }
@@ -65,7 +69,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** 示例 writer 由应用拥有，插件卸载不会关闭它。 */\nclass MemoryWriter {\n  /** 保留每次 append 的完整批次，便于应用转交实际存储。 */\n  readonly writes: { path: string; text: string }[] = []\n  /** append 的兑现表示本批内容已由 writer 接纳。 */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n\n/** 显式 writer 使同一配置可用于浏览器与服务端。 */\nconst writer = new MemoryWriter()\n/** 输出级批量策略由 host 维护缓冲与排空。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: 'application.ndjson', writer, features: [batchFeature({ maxSize: 2 })] })\n  ]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nawait log.shutdown('manual')"
+                "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** 示例 writer 由应用拥有，插件卸载不会关闭它。 */\nclass MemoryWriter {\n  /** 保留每次 append 的完整批次，便于应用转交实际存储。 */\n  readonly writes: { path: string; text: string }[] = []\n  /** append 的兑现表示本批内容已由 writer 接纳。 */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n\n/** 显式 writer 使同一配置可用于浏览器与服务端。 */\nconst writer = new MemoryWriter()\n/** 输出级批量策略由 host 维护缓冲与排空。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({\n      path: 'application.ndjson',\n      writer,\n      features: { batch: batchFeature({ maxSize: 2 }) }\n    })\n  ]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nawait log.shutdown('manual')"
               },
               {
                 "type": "paragraph",
@@ -105,6 +109,10 @@
               {
                 "type": "paragraph",
                 "text": "错误 source 为 `LOG_FILE_ERROR_SOURCE`（`logging.file`）。`INVALID_OPTION` 表示 path/轮转配置不合法；`FILE_SINK_UNAVAILABLE` 表示当前入口没有 writer；两者在创建时同步抛出。`DELIVERY_FAILED` 表示 append 或 rotate 失败，`cause` 保留原异常，失败经 host 的 `onFailure` 观察，日志方法不因此抛出。卸载不会关闭应用的 writer。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `file_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `file_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。"
               }
             ]
           }
@@ -124,7 +132,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** The host drains admitted work before releasing the output plugin. */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: './application.ndjson', features: [batchFeature({ maxSize: 20 })] })\n  ]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.shutdown('manual')"
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** The host drains admitted work before releasing the output plugin. */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: './application.ndjson', features: { batch: batchFeature({ maxSize: 20 }) } })\n  ]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
@@ -141,6 +149,10 @@
                 {
                   "type": "paragraph",
                   "text": "See USEGUIDE.en.md for options and writer injection."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `file_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `file_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/sdk`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported."
                 }
               ]
             }
@@ -169,7 +181,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** The application owns this writer; uninstall never closes it. */\nclass MemoryWriter {\n  /** Retain complete append batches for the application's chosen storage. */\n  readonly writes: { path: string; text: string }[] = []\n  /** Resolution acknowledges that the writer accepted this batch. */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n\n/** An explicit capability works in both browser and server conditions. */\nconst writer = new MemoryWriter()\n/** The host owns buffering and draining for this output's batch policy. */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: 'application.ndjson', writer, features: [batchFeature({ maxSize: 2 })] })\n  ]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nawait log.shutdown('manual')"
+                  "code": "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** The application owns this writer; uninstall never closes it. */\nclass MemoryWriter {\n  /** Retain complete append batches for the application's chosen storage. */\n  readonly writes: { path: string; text: string }[] = []\n  /** Resolution acknowledges that the writer accepted this batch. */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n\n/** An explicit capability works in both browser and server conditions. */\nconst writer = new MemoryWriter()\n/** The host owns buffering and draining for this output's batch policy. */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({\n      path: 'application.ndjson',\n      writer,\n      features: { batch: batchFeature({ maxSize: 2 }) }\n    })\n  ]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nawait log.shutdown('manual')"
                 },
                 {
                   "type": "paragraph",
@@ -218,6 +230,10 @@
                 {
                   "type": "paragraph",
                   "text": "The source is `LOG_FILE_ERROR_SOURCE` (`logging.file`). `INVALID_OPTION` identifies invalid path or rotation options. `FILE_SINK_UNAVAILABLE` identifies a missing writer. Both can throw synchronously during creation. `DELIVERY_FAILED` identifies append or rotation failure and retains the original error on `cause`. Observe it through the host's `onFailure` channel; logging calls do not throw delivery failures. Uninstall leaves application-owned writers open."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `file_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `file_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/sdk`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported."
                 }
               ]
             }
@@ -246,43 +262,43 @@
         {
           "name": "filePlugin",
           "kind": "function",
-          "signature": "export declare function filePlugin(options: IFilePluginConfig): import(\"@migaia/log-host/plugin\").ILogPlugin;",
-          "declarationLine": 3,
+          "signature": "export declare function filePlugin<const F extends ILogFeatureRecord = Record<never, never>>(requested: IFilePluginConfig<F>): ReturnType<typeof createFilePlugin<F>>;",
+          "declarationLine": 5,
           "source": "packages/log-plugin-file/dist/index.d.ts",
           "purpose": "Append one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer.",
           "core": "options: Required file path with optional writer, rotation limits and delivery features.\nA text output plugin whose accepted writes drain through the host; an injected writer remains caller-owned.\npath: Nonempty file path passed unchanged to append and rotate.\nwriter: Borrow append(path,text) and optional rotate(path); the plugin never closes it.\nRuntime-native append; unavailable in browser.\nrotate: Positive entry/byte thresholds; writer.rotate must exist at creation.\nNo rotation.\nfeatures: Select host batching and formatting for this output.\nJSON formatting without implicit batching.\nAppend one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer.",
           "advanced": "Append one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer.",
-          "parameters": ["options: IFilePluginConfig"],
+          "parameters": ["requested: IFilePluginConfig<F>"],
           "parameterDetails": [
             {
-              "name": "options",
-              "type": "IFilePluginConfig",
+              "name": "requested",
+              "type": "IFilePluginConfig<F>",
               "optional": false
             }
           ],
-          "returns": "import(\"@migaia/log-host/plugin\").ILogPlugin",
+          "returns": "ReturnType<typeof createFilePlugin<F>>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** 示例 writer 由应用拥有，插件卸载不会关闭它。 */\nclass MemoryWriter {\n  /** 保留每次 append 的完整批次，便于应用转交实际存储。 */\n  readonly writes: { path: string; text: string }[] = []\n  /** append 的兑现表示本批内容已由 writer 接纳。 */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n\n/** 显式 writer 使同一配置可用于浏览器与服务端。 */\nconst writer = new MemoryWriter()\n/** 输出级批量策略由 host 维护缓冲与排空。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: 'application.ndjson', writer, features: [batchFeature({ maxSize: 2 })] })\n  ]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nawait log.shutdown('manual')",
-            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** host 排空已接纳的日志后释放文件输出插件。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: './application.ndjson', features: [batchFeature({ maxSize: 20 })] })\n  ]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.shutdown('manual')"
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** 示例 writer 由应用拥有，插件卸载不会关闭它。 */\nclass MemoryWriter {\n  /** 保留每次 append 的完整批次，便于应用转交实际存储。 */\n  readonly writes: { path: string; text: string }[] = []\n  /** append 的兑现表示本批内容已由 writer 接纳。 */\n  async append(path: string, text: string): Promise<void> {\n    this.writes.push({ path, text })\n  }\n}\n\n/** 显式 writer 使同一配置可用于浏览器与服务端。 */\nconst writer = new MemoryWriter()\n/** 输出级批量策略由 host 维护缓冲与排空。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({\n      path: 'application.ndjson',\n      writer,\n      features: { batch: batchFeature({ maxSize: 2 }) }\n    })\n  ]\n})\nlog.info('first')\nlog.info('second')\nawait log.flush()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature } from '@migaia/log-host/features'\nimport { filePlugin } from '@migaia/log-plugin-file'\n\n/** host 排空已接纳的日志后释放文件输出插件。 */\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    filePlugin({ path: './application.ndjson', features: { batch: batchFeature({ maxSize: 20 }) } })\n  ]\n})\nlog.info('request completed', { requestId: 'r1' })\nawait log.shutdown('manual')"
           ],
           "members": [],
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare function filePlugin(options: IFilePluginConfig): import(\"@migaia/log-host/plugin\").ILogPlugin;"
+            "export declare function filePlugin<const F extends ILogFeatureRecord = Record<never, never>>(requested: IFilePluginConfig<F>): ReturnType<typeof createFilePlugin<F>>;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "options",
-                "type": "IFilePluginConfig",
+                "name": "requested",
+                "type": "IFilePluginConfig<F>",
                 "optional": false
               }
             ]
           ],
-          "overloadReturns": ["import(\"@migaia/log-host/plugin\").ILogPlugin"],
+          "overloadReturns": ["ReturnType<typeof createFilePlugin<F>>"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -350,12 +366,12 @@
             },
             {
               "name": "features",
-              "type": "readonly ILogFeature[]",
+              "type": "F",
               "optional": true,
               "description": "Host-owned output policies override host defaults without creating a private queue."
             }
           ],
-          "identity": "packages/log-plugin-file/dist/index.d.ts:filePlugin:export declare function filePlugin(options: IFilePluginConfig): import(\"@migaia/log-host/plugin\").ILogPlugin;",
+          "identity": "packages/log-plugin-file/dist/index.d.ts:filePlugin:export declare function filePlugin<const F extends ILogFeatureRecord = Record<never, never>>(requested: IFilePluginConfig<F>): ReturnType<typeof createFilePlugin<F>>;",
           "guidance": [],
           "usageScore": 30,
           "configuration": [
@@ -401,7 +417,7 @@
             },
             {
               "name": "features",
-              "type": "readonly ILogFeature[]",
+              "type": "F",
               "optional": true,
               "description": "`filePlugin({ path, writer?, rotate?, features? })` 在创建时检查配置。默认 writer 不提供轮转；配置 `rotate.maxBytes` 或 `rotate.maxEntries` 时，注入的 writer 必须实现 `rotate(path)`。阈值按每次交付的批次计算。",
               "descriptionEn": "Host-owned output policies override host defaults without creating a private queue.",
@@ -413,7 +429,7 @@
         {
           "name": "IFilePluginConfig",
           "kind": "type",
-          "signature": "export type IFilePluginConfig = { /** Required nonempty destination passed unchanged to the borrowed append capability. */ readonly path: string; /** Defaults to a supported runtime's native append writer in server conditions only. */ readonly writer?: IFileWriter; /** Optional per-delivered-batch thresholds require an explicit rotate capability. */ readonly rotate?: { /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }; /** Host-owned output policies override host defaults without creating a private queue. */ readonly features?: readonly ILogFeature[]; };",
+          "signature": "export type IFilePluginConfig<F extends ILogFeatureRecord = ILogFeatureRecord> = { /** Required nonempty destination passed unchanged to the borrowed append capability. */ readonly path: string; /** Defaults to a supported runtime's native append writer in server conditions only. */ readonly writer?: IFileWriter; /** Optional per-delivered-batch thresholds require an explicit rotate capability. */ readonly rotate?: { /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }; /** Host-owned output policies override host defaults without creating a private queue. */ readonly features?: F; };",
           "declarationLine": 8,
           "source": "packages/log-plugin-file/dist/typing.d.ts",
           "purpose": "Append one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer.",
@@ -457,17 +473,17 @@
               "name": "features",
               "kind": "property",
               "optional": true,
-              "signature": "readonly features?: readonly ILogFeature[];",
+              "signature": "readonly features?: F;",
               "description": "Host-owned output policies override host defaults without creating a private queue.",
               "parameterDetails": [],
-              "returns": "readonly ILogFeature[]"
+              "returns": "F"
             }
           ],
           "composes": [],
           "aliasOf": "IFilePluginConfig",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IFilePluginConfig = { /** Required nonempty destination passed unchanged to the borrowed append capability. */ readonly path: string; /** Defaults to a supported runtime's native append writer in server conditions only. */ readonly writer?: IFileWriter; /** Optional per-delivered-batch thresholds require an explicit rotate capability. */ readonly rotate?: { /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }; /** Host-owned output policies override host defaults without creating a private queue. */ readonly features?: readonly ILogFeature[]; };"
+            "export type IFilePluginConfig<F extends ILogFeatureRecord = ILogFeatureRecord> = { /** Required nonempty destination passed unchanged to the borrowed append capability. */ readonly path: string; /** Defaults to a supported runtime's native append writer in server conditions only. */ readonly writer?: IFileWriter; /** Optional per-delivered-batch thresholds require an explicit rotate capability. */ readonly rotate?: { /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }; /** Host-owned output policies override host defaults without creating a private queue. */ readonly features?: F; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -506,7 +522,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/log-plugin-file/dist/typing.d.ts:IFilePluginConfig:export type IFilePluginConfig = { /** Required nonempty destination passed unchanged to the borrowed append capability. */ readonly path: string; /** Defaults to a supported runtime's native append writer in server conditions only. */ readonly writer?: IFileWriter; /** Optional per-delivered-batch thresholds require an explicit rotate capability. */ readonly rotate?: { /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }; /** Host-owned output policies override host defaults without creating a private queue. */ readonly features?: readonly ILogFeature[]; };",
+          "identity": "packages/log-plugin-file/dist/typing.d.ts:IFilePluginConfig:export type IFilePluginConfig<F extends ILogFeatureRecord = ILogFeatureRecord> = { /** Required nonempty destination passed unchanged to the borrowed append capability. */ readonly path: string; /** Defaults to a supported runtime's native append writer in server conditions only. */ readonly writer?: IFileWriter; /** Optional per-delivered-batch thresholds require an explicit rotate capability. */ readonly rotate?: { /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }; /** Host-owned output policies override host defaults without creating a private queue. */ readonly features?: F; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -578,6 +594,10 @@
                 {
                   "type": "paragraph",
                   "text": "错误 source 为 `LOG_FILE_ERROR_SOURCE`（`logging.file`）。`INVALID_OPTION` 表示 path/轮转配置不合法；`FILE_SINK_UNAVAILABLE` 表示当前入口没有 writer；两者在创建时同步抛出。`DELIVERY_FAILED` 表示 append 或 rotate 失败，`cause` 保留原异常，失败经 host 的 `onFailure` 观察，日志方法不因此抛出。卸载不会关闭应用的 writer。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `file_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `file_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。"
                 }
               ]
             }

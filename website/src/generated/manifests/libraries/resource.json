@@ -822,7 +822,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "彻底终结资源：中止在途请求（`GenerationController.dispose()`）、清理依赖登记、释放内部状态 `Signal`。幂等——二次调用是空操作。清理过程中若某一步失败，第一个失败原样抛出，后续失败的错误挂在其 `.errors` 数组上（不会因为一步失败就跳过其余清理步骤）。释放后数据读取/请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 不抛错。"
+                "text": "彻底终结资源：中止在途请求（`GenerationController.dispose()`）、清理依赖登记、释放内部状态 `Signal`。幂等——二次调用是空操作。清理过程中若某一步失败，抛出第一个失败本身，并在它上面附加码 `DISPOSE_CLEANUP_FAILED`（抛出的不是错误对象时才包装，原值在 `cause` 上），后续失败挂在它的 `.errors` 数组上（不会因为一步失败就跳过其余清理步骤）。释放后数据读取/请求操作抛 `RESOURCE_DISPOSED`；`disposed`、`refreshing`、`observed` 仍可读，`markDirty()`、`onDependencyDisconnected()` 和再次 `dispose()` 不抛错。"
               }
             ]
           },
@@ -985,7 +985,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                "text": "稳定错误码表，14 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
               },
               {
                 "type": "table",
@@ -1035,6 +1035,31 @@
                     "`fetchFailed`",
                     "`FETCH_FAILED`",
                     "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
+                  ],
+                  [
+                    "`setupInvalid`",
+                    "`RESOURCE_SETUP_INVALID`",
+                    "`createResource()` 的 setup 不是函数，或 setup 返回的不是 fetcher 函数；已登记的 setup 清理已执行"
+                  ],
+                  [
+                    "`setupClosed`",
+                    "`RESOURCE_SETUP_CLOSED`",
+                    "setup 返回后才调用 `onDispose()`（例如在异步回调里使用了逃逸的 context）；该清理被拒绝"
+                  ],
+                  [
+                    "`setupFailed`",
+                    "`RESOURCE_SETUP_FAILED`",
+                    "setup 回调本身抛错；已登记的 setup 清理已执行。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                  ],
+                  [
+                    "`mutateFailed`",
+                    "`MUTATE_FAILED`",
+                    "`mutate()` 的 updater 抛错；状态不变。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                  ],
+                  [
+                    "`disposeCleanupFailed`",
+                    "`DISPOSE_CLEANUP_FAILED`",
+                    "`dispose()` 时某个已登记清理抛错；其余清理照常执行；第一个清理错误本身带上这个码，后续错误挂在它的 `.errors` 上"
                   ]
                 ]
               },
@@ -2019,7 +2044,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Ends the resource for good: aborts the running request (`GenerationController.dispose()`), clears the dependency registrations and releases the internal state signal. Idempotent: a second call is a no-op. If a cleanup step fails, the first failure is thrown as is and later failures are attached to its `.errors` array; one failing step never skips the remaining steps. After disposal, data reads and request operations throw `RESOURCE_DISPOSED`; `disposed`, `refreshing` and `observed` stay readable, and `markDirty()`, `onDependencyDisconnected()` and another `dispose()` do not throw."
+                  "text": "Ends the resource for good: aborts the running request (`GenerationController.dispose()`), clears the dependency registrations and releases the internal state signal. Idempotent: a second call is a no-op. If a cleanup step fails, the first failure is thrown with code `DISPOSE_CLEANUP_FAILED` attached to it (a non-error value is wrapped and kept on `cause`), and later failures are attached to its `.errors` array; one failing step never skips the remaining steps. After disposal, data reads and request operations throw `RESOURCE_DISPOSED`; `disposed`, `refreshing` and `observed` stay readable, and `markDirty()`, `onDependencyDisconnected()` and another `dispose()` do not throw."
                 }
               ]
             },
@@ -2135,7 +2160,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The stable error-code table has 9 codes, declared only in `src/error-code.ts`. The module's own errors use the `source` `'resource'`; errors that already carry a full foreign identity keep their original module identity. `RESOURCE_SOURCE` exports this stable source: when classifying errors across module, compare against it and `ResourceErrorCode` instead of copying string literals."
+                  "text": "The stable error-code table has 14 codes, declared only in `src/error-code.ts`. The module's own errors use the `source` `'resource'`; errors that already carry a full foreign identity keep their original module identity. `RESOURCE_SOURCE` exports this stable source: when classifying errors across module, compare against it and `ResourceErrorCode` instead of copying string literals."
                 },
                 {
                   "type": "table",
@@ -2185,6 +2210,31 @@
                       "`fetchFailed`",
                       "`FETCH_FAILED`",
                       "An unclassified fetch failure once retries are exhausted; native errors keep their identity where possible, frozen errors and non-Error values stay on `cause`, existing foreign identities are not rewritten"
+                    ],
+                    [
+                      "`setupInvalid`",
+                      "`RESOURCE_SETUP_INVALID`",
+                      "`createResource()` got a setup that is not a function, or setup returned something other than a fetcher function; registered setup cleanups have already run"
+                    ],
+                    [
+                      "`setupClosed`",
+                      "`RESOURCE_SETUP_CLOSED`",
+                      "`onDispose()` was called after setup returned (for example from an escaped context in an async callback); the cleanup is rejected"
+                    ],
+                    [
+                      "`setupFailed`",
+                      "`RESOURCE_SETUP_FAILED`",
+                      "The setup callback threw; registered setup cleanups have already run. The thrown error carries this code itself; a non-error value is wrapped and kept on `cause`"
+                    ],
+                    [
+                      "`mutateFailed`",
+                      "`MUTATE_FAILED`",
+                      "The `mutate()` updater threw; state is unchanged. The thrown error carries this code itself; a non-error value is wrapped and kept on `cause`"
+                    ],
+                    [
+                      "`disposeCleanupFailed`",
+                      "`DISPOSE_CLEANUP_FAILED`",
+                      "A registered cleanup threw during `dispose()`; the other cleanups still ran; the first cleanup error carries this code and later ones are on its `.errors`"
                     ]
                   ]
                 },
@@ -2505,9 +2555,104 @@
                   "code": "import { createResource } from '@migaia/resource'\nimport { ConfigOwner } from '@migaia/utils/config'\n\n/** Application endpoint returning serialized configuration. */\ndeclare const url: string\n\nconst config = createResource(\n  () =>\n    ({ signal }) =>\n      ConfigOwner.fromAsync(fetch(url, { signal }).then((r) => r.text()))\n)"
                 }
               ]
+            },
+            {
+              "id": "错误码",
+              "heading": "错误码",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "稳定错误码表，14 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["`ResourceErrorCode` 键", "码值", "触发条件"],
+                  "rows": [
+                    [
+                      "`resourceDisposed`",
+                      "`RESOURCE_DISPOSED`",
+                      "在已 `dispose()` 的 `Resource` 上调用任意读取/操作方法"
+                    ],
+                    [
+                      "`requestAborted`",
+                      "`REQUEST_ABORTED`",
+                      "请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause"
+                    ],
+                    [
+                      "`requestCancelled`",
+                      "`REQUEST_CANCELLED`",
+                      "调用方显式 `cancel()` 导致当前 pending 请求被取消，`state` 落入 `cancelled` 所携带的 `DOMException`"
+                    ],
+                    [
+                      "`cancellationCleanupFailed`",
+                      "`CANCELLATION_CLEANUP_FAILED`",
+                      "请求取消已完成状态收敛，但取消期间的 timer/listener cleanup 失败"
+                    ],
+                    [
+                      "`noActivePromise`",
+                      "`NO_ACTIVE_PROMISE`",
+                      "读取 `promise`，或在 `pending`/`idle` 状态下调用 `read()`/`peek()` 时，没有正在进行或已缓存的 Promise 可返回"
+                    ],
+                    [
+                      "`invalidSnapshot`",
+                      "`INVALID_SNAPSHOT`",
+                      "非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败"
+                    ],
+                    [
+                      "`invalidOption`",
+                      "`INVALID_OPTION`",
+                      "构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求"
+                    ],
+                    [
+                      "`suspenseProbeFailed`",
+                      "`SUSPENSE_PROBE_FAILED`",
+                      "`fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable"
+                    ],
+                    [
+                      "`fetchFailed`",
+                      "`FETCH_FAILED`",
+                      "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
+                    ],
+                    [
+                      "`setupInvalid`",
+                      "`RESOURCE_SETUP_INVALID`",
+                      "`createResource()` 的 setup 不是函数，或 setup 返回的不是 fetcher 函数；已登记的 setup 清理已执行"
+                    ],
+                    [
+                      "`setupClosed`",
+                      "`RESOURCE_SETUP_CLOSED`",
+                      "setup 返回后才调用 `onDispose()`（例如在异步回调里使用了逃逸的 context）；该清理被拒绝"
+                    ],
+                    [
+                      "`setupFailed`",
+                      "`RESOURCE_SETUP_FAILED`",
+                      "setup 回调本身抛错；已登记的 setup 清理已执行。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`mutateFailed`",
+                      "`MUTATE_FAILED`",
+                      "`mutate()` 的 updater 抛错；状态不变。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`disposeCleanupFailed`",
+                      "`DISPOSE_CLEANUP_FAILED`",
+                      "`dispose()` 时某个已登记清理抛错；其余清理照常执行；第一个清理错误本身带上这个码，后续错误挂在它的 `.errors` 上"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`requestAborted`/`requestCancelled` 抛出/落入状态的值始终是原生 `DOMException`（`name === 'AbortError'`），调用方通常按 `error.name === 'AbortError'` 判定并静默处理，而不是当作真实失败；`code` 只作为附加字段挂上，不改变类型。调用方应始终以 `error.code === ResourceErrorCode.xxx` 判别，不要硬编码码值字符串。"
+                }
+              ]
             }
           ],
-          "usageScore": 38,
+          "usageScore": 42,
           "configuration": [
             {
               "name": "runtime",
@@ -2529,9 +2674,9 @@
               "name": "ttl",
               "type": "number",
               "optional": true,
-              "description": "Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh until a dependency changes or `refetch()` is called.",
+              "description": "`invalidOption` — `INVALID_OPTION` — 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求",
               "descriptionEn": "Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh until a dependency changes or `refetch()` is called.",
-              "descriptionZh": "`ttl` 默认是 `Infinity`：成功的数据会一直有效，直到依赖变化或调用 `refetch()`。共享只发生在同一个 `Resource` 实例内，参数不同的请求需要各自的实例。"
+              "descriptionZh": "`invalidOption` — `INVALID_OPTION` — 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求"
             },
             {
               "name": "autoStart",
@@ -2553,17 +2698,17 @@
               "name": "retry",
               "type": "IResourceRetryPolicy",
               "optional": true,
-              "description": "Retry count or predicate. Suspense Promise throws do not count.",
+              "description": "`invalidOption` — `INVALID_OPTION` — 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求",
               "descriptionEn": "Retry count or predicate. Suspense Promise throws do not count.",
-              "descriptionZh": "`retry` 可以是一个函数，按第几次失败和错误对象决定要不要再试；`retryDelay` 决定每次等多久。停止重试后，拒绝的仍是最后一次的原始错误，`Resource` 只在它上面附加 `code`。"
+              "descriptionZh": "`invalidOption` — `INVALID_OPTION` — 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求"
             },
             {
               "name": "retryDelay",
               "type": "number | ((failureCount: number, error: unknown) => number)",
               "optional": true,
-              "description": "Milliseconds to wait before the next retry, fixed or computed from the failure number and error. Defaults to 0.",
+              "description": "`invalidOption` — `INVALID_OPTION` — 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求",
               "descriptionEn": "Milliseconds to wait before the next retry, fixed or computed from the failure number and error. Defaults to 0.",
-              "descriptionZh": "`retry` 可以是一个函数，按第几次失败和错误对象决定要不要再试；`retryDelay` 决定每次等多久。停止重试后，拒绝的仍是最后一次的原始错误，`Resource` 只在它上面附加 `code`。"
+              "descriptionZh": "`invalidOption` — `INVALID_OPTION` — 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求"
             },
             {
               "name": "keepAlive",
@@ -2894,7 +3039,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，14 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -2944,6 +3089,31 @@
                       "`fetchFailed`",
                       "`FETCH_FAILED`",
                       "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
+                    ],
+                    [
+                      "`setupInvalid`",
+                      "`RESOURCE_SETUP_INVALID`",
+                      "`createResource()` 的 setup 不是函数，或 setup 返回的不是 fetcher 函数；已登记的 setup 清理已执行"
+                    ],
+                    [
+                      "`setupClosed`",
+                      "`RESOURCE_SETUP_CLOSED`",
+                      "setup 返回后才调用 `onDispose()`（例如在异步回调里使用了逃逸的 context）；该清理被拒绝"
+                    ],
+                    [
+                      "`setupFailed`",
+                      "`RESOURCE_SETUP_FAILED`",
+                      "setup 回调本身抛错；已登记的 setup 清理已执行。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`mutateFailed`",
+                      "`MUTATE_FAILED`",
+                      "`mutate()` 的 updater 抛错；状态不变。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`disposeCleanupFailed`",
+                      "`DISPOSE_CLEANUP_FAILED`",
+                      "`dispose()` 时某个已登记清理抛错；其余清理照常执行；第一个清理错误本身带上这个码，后续错误挂在它的 `.errors` 上"
                     ]
                   ]
                 },
@@ -2962,7 +3132,7 @@
           "name": "IResourceErrorCode",
           "kind": "type",
           "signature": "export type IResourceErrorCode = (typeof ResourceErrorCode)[keyof typeof ResourceErrorCode];",
-          "declarationLine": 85,
+          "declarationLine": 102,
           "source": "packages/resource/dist/error-code.d.ts",
           "purpose": "Union of the `ResourceErrorCode` values.",
           "core": "Union of the `ResourceErrorCode` values.",
@@ -3032,7 +3202,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，14 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -3082,6 +3252,31 @@
                       "`fetchFailed`",
                       "`FETCH_FAILED`",
                       "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
+                    ],
+                    [
+                      "`setupInvalid`",
+                      "`RESOURCE_SETUP_INVALID`",
+                      "`createResource()` 的 setup 不是函数，或 setup 返回的不是 fetcher 函数；已登记的 setup 清理已执行"
+                    ],
+                    [
+                      "`setupClosed`",
+                      "`RESOURCE_SETUP_CLOSED`",
+                      "setup 返回后才调用 `onDispose()`（例如在异步回调里使用了逃逸的 context）；该清理被拒绝"
+                    ],
+                    [
+                      "`setupFailed`",
+                      "`RESOURCE_SETUP_FAILED`",
+                      "setup 回调本身抛错；已登记的 setup 清理已执行。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`mutateFailed`",
+                      "`MUTATE_FAILED`",
+                      "`mutate()` 的 updater 抛错；状态不变。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`disposeCleanupFailed`",
+                      "`DISPOSE_CLEANUP_FAILED`",
+                      "`dispose()` 时某个已登记清理抛错；其余清理照常执行；第一个清理错误本身带上这个码，后续错误挂在它的 `.errors` 上"
                     ]
                   ]
                 },
@@ -4501,7 +4696,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，14 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -4551,6 +4746,31 @@
                       "`fetchFailed`",
                       "`FETCH_FAILED`",
                       "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
+                    ],
+                    [
+                      "`setupInvalid`",
+                      "`RESOURCE_SETUP_INVALID`",
+                      "`createResource()` 的 setup 不是函数，或 setup 返回的不是 fetcher 函数；已登记的 setup 清理已执行"
+                    ],
+                    [
+                      "`setupClosed`",
+                      "`RESOURCE_SETUP_CLOSED`",
+                      "setup 返回后才调用 `onDispose()`（例如在异步回调里使用了逃逸的 context）；该清理被拒绝"
+                    ],
+                    [
+                      "`setupFailed`",
+                      "`RESOURCE_SETUP_FAILED`",
+                      "setup 回调本身抛错；已登记的 setup 清理已执行。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`mutateFailed`",
+                      "`MUTATE_FAILED`",
+                      "`mutate()` 的 updater 抛错；状态不变。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`disposeCleanupFailed`",
+                      "`DISPOSE_CLEANUP_FAILED`",
+                      "`dispose()` 时某个已登记清理抛错；其余清理照常执行；第一个清理错误本身带上这个码，后续错误挂在它的 `.errors` 上"
                     ]
                   ]
                 },
@@ -4745,7 +4965,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，14 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -4795,6 +5015,31 @@
                       "`fetchFailed`",
                       "`FETCH_FAILED`",
                       "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
+                    ],
+                    [
+                      "`setupInvalid`",
+                      "`RESOURCE_SETUP_INVALID`",
+                      "`createResource()` 的 setup 不是函数，或 setup 返回的不是 fetcher 函数；已登记的 setup 清理已执行"
+                    ],
+                    [
+                      "`setupClosed`",
+                      "`RESOURCE_SETUP_CLOSED`",
+                      "setup 返回后才调用 `onDispose()`（例如在异步回调里使用了逃逸的 context）；该清理被拒绝"
+                    ],
+                    [
+                      "`setupFailed`",
+                      "`RESOURCE_SETUP_FAILED`",
+                      "setup 回调本身抛错；已登记的 setup 清理已执行。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`mutateFailed`",
+                      "`MUTATE_FAILED`",
+                      "`mutate()` 的 updater 抛错；状态不变。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`disposeCleanupFailed`",
+                      "`DISPOSE_CLEANUP_FAILED`",
+                      "`dispose()` 时某个已登记清理抛错；其余清理照常执行；第一个清理错误本身带上这个码，后续错误挂在它的 `.errors` 上"
                     ]
                   ]
                 },
@@ -4822,7 +5067,7 @@
         {
           "name": "ResourceErrorCode",
           "kind": "const",
-          "signature": "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: 'REQUEST_CANCELLED'; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors. Record the cleanup failure and continue treating * the `Resource` as cancelled. */ readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED'; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: 'NO_ACTIVE_PROMISE'; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md`. Inspect the * hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: 'FETCH_FAILED'; /** * `createResource()` received a non-function setup, or setup returned something other than a * fetcher function. Registered setup cleanups have already run. Pass a setup callback that * returns `(ctx) => data | Promise<data>`. */ readonly setupInvalid: 'RESOURCE_SETUP_INVALID'; /** * `onDispose()` was called on a setup context after setup returned (for example from an escaped * context inside an async callback). The cleanup is rejected instead of leaking. Register every * cleanup synchronously inside setup. */ readonly setupClosed: 'RESOURCE_SETUP_CLOSED'; };",
+          "signature": "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: 'REQUEST_CANCELLED'; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors. Record the cleanup failure and continue treating * the `Resource` as cancelled. */ readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED'; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: 'NO_ACTIVE_PROMISE'; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md`. Inspect the * hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: 'FETCH_FAILED'; /** * `createResource()` received a non-function setup, or setup returned something other than a * fetcher function. Registered setup cleanups have already run. Pass a setup callback that * returns `(ctx) => data | Promise<data>`. */ readonly setupInvalid: 'RESOURCE_SETUP_INVALID'; /** * `onDispose()` was called on a setup context after setup returned (for example from an escaped * context inside an async callback). The cleanup is rejected instead of leaking. Register every * cleanup synchronously inside setup. */ readonly setupClosed: 'RESOURCE_SETUP_CLOSED'; /** * The `createResource()` setup callback threw. Registered setup cleanups have already run. An * uncoded native error carries this code itself; any other thrown value is on `cause`. Fix the * setup callback. */ readonly setupFailed: 'RESOURCE_SETUP_FAILED'; /** * The updater passed to `mutate()` threw. Resource state is unchanged. An uncoded native error * carries this code itself; any other thrown value is on `cause`. */ readonly mutateFailed: 'MUTATE_FAILED'; /** * One or more cleanups registered on the Resource threw during `dispose()`. Disposal still ran * every cleanup and the Resource is terminal. The first cleanup error is thrown with this code * attached and later cleanup errors attached to it; a non-error first value is on `cause`. */ readonly disposeCleanupFailed: 'DISPOSE_CLEANUP_FAILED'; };",
           "declarationLine": 12,
           "source": "packages/resource/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package. Each key names one failure; the values are the strings found on `error.code`.",
@@ -4935,13 +5180,40 @@
               "description": "`onDispose()` was called on a setup context after setup returned (for example from an escaped * context inside an async callback). The cleanup is rejected instead of leaking. Register every * cleanup synchronously inside setup.",
               "parameterDetails": [],
               "returns": "'RESOURCE_SETUP_CLOSED'"
+            },
+            {
+              "name": "setupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly setupFailed: 'RESOURCE_SETUP_FAILED';",
+              "description": "The `createResource()` setup callback threw. Registered setup cleanups have already run. An * uncoded native error carries this code itself; any other thrown value is on `cause`. Fix the * setup callback.",
+              "parameterDetails": [],
+              "returns": "'RESOURCE_SETUP_FAILED'"
+            },
+            {
+              "name": "mutateFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mutateFailed: 'MUTATE_FAILED';",
+              "description": "The updater passed to `mutate()` threw. Resource state is unchanged. An uncoded native error * carries this code itself; any other thrown value is on `cause`.",
+              "parameterDetails": [],
+              "returns": "'MUTATE_FAILED'"
+            },
+            {
+              "name": "disposeCleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposeCleanupFailed: 'DISPOSE_CLEANUP_FAILED';",
+              "description": "One or more cleanups registered on the Resource threw during `dispose()`. Disposal still ran * every cleanup and the Resource is terminal. The first cleanup error is thrown with this code * attached and later cleanup errors attached to it; a non-error first value is on `cause`.",
+              "parameterDetails": [],
+              "returns": "'DISPOSE_CLEANUP_FAILED'"
             }
           ],
           "composes": [],
           "aliasOf": "ResourceErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: 'REQUEST_CANCELLED'; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors. Record the cleanup failure and continue treating * the `Resource` as cancelled. */ readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED'; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: 'NO_ACTIVE_PROMISE'; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md`. Inspect the * hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: 'FETCH_FAILED'; /** * `createResource()` received a non-function setup, or setup returned something other than a * fetcher function. Registered setup cleanups have already run. Pass a setup callback that * returns `(ctx) => data | Promise<data>`. */ readonly setupInvalid: 'RESOURCE_SETUP_INVALID'; /** * `onDispose()` was called on a setup context after setup returned (for example from an escaped * context inside an async callback). The cleanup is rejected instead of leaking. Register every * cleanup synchronously inside setup. */ readonly setupClosed: 'RESOURCE_SETUP_CLOSED'; };"
+            "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: 'REQUEST_CANCELLED'; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors. Record the cleanup failure and continue treating * the `Resource` as cancelled. */ readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED'; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: 'NO_ACTIVE_PROMISE'; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md`. Inspect the * hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: 'FETCH_FAILED'; /** * `createResource()` received a non-function setup, or setup returned something other than a * fetcher function. Registered setup cleanups have already run. Pass a setup callback that * returns `(ctx) => data | Promise<data>`. */ readonly setupInvalid: 'RESOURCE_SETUP_INVALID'; /** * `onDispose()` was called on a setup context after setup returned (for example from an escaped * context inside an async callback). The cleanup is rejected instead of leaking. Register every * cleanup synchronously inside setup. */ readonly setupClosed: 'RESOURCE_SETUP_CLOSED'; /** * The `createResource()` setup callback threw. Registered setup cleanups have already run. An * uncoded native error carries this code itself; any other thrown value is on `cause`. Fix the * setup callback. */ readonly setupFailed: 'RESOURCE_SETUP_FAILED'; /** * The updater passed to `mutate()` threw. Resource state is unchanged. An uncoded native error * carries this code itself; any other thrown value is on `cause`. */ readonly mutateFailed: 'MUTATE_FAILED'; /** * One or more cleanups registered on the Resource threw during `dispose()`. Disposal still ran * every cleanup and the Resource is terminal. The first cleanup error is thrown with this code * attached and later cleanup errors attached to it; a non-error first value is on `cause`. */ readonly disposeCleanupFailed: 'DISPOSE_CLEANUP_FAILED'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4980,7 +5252,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/resource/dist/error-code.d.ts:ResourceErrorCode:export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: 'REQUEST_CANCELLED'; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors. Record the cleanup failure and continue treating * the `Resource` as cancelled. */ readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED'; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: 'NO_ACTIVE_PROMISE'; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md`. Inspect the * hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating package. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: 'FETCH_FAILED'; /** * `createResource()` received a non-function setup, or setup returned something other than a * fetcher function. Registered setup cleanups have already run. Pass a setup callback that * returns `(ctx) => data | Promise<data>`. */ readonly setupInvalid: 'RESOURCE_SETUP_INVALID'; /** * `onDispose()` was called on a setup context after setup returned (for example from an escaped * context inside an async callback). The cleanup is rejected instead of leaking. Register every * cleanup synchronously inside setup. */ readonly setupClosed: 'RESOURCE_SETUP_CLOSED'; };",
+          "identity": "packages/resource/dist/error-code.d.ts:ResourceErrorCode:export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: 'REQUEST_CANCELLED'; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors. Record the cleanup failure and continue treating * the `Resource` as cancelled. */ readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED'; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: 'NO_ACTIVE_PROMISE'; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md`. Inspect the * hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating package. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: 'FETCH_FAILED'; /** * `createResource()` received a non-function setup, or setup returned something other than a * fetcher function. Registered setup cleanups have already run. Pass a setup callback that * returns `(ctx) => data | Promise<data>`. */ readonly setupInvalid: 'RESOURCE_SETUP_INVALID'; /** * `onDispose()` was called on a setup context after setup returned (for example from an escaped * context inside an async callback). The cleanup is rejected instead of leaking. Register every * cleanup synchronously inside setup. */ readonly setupClosed: 'RESOURCE_SETUP_CLOSED'; /** * The `createResource()` setup callback threw. Registered setup cleanups have already run. An * uncoded native error carries this code itself; any other thrown value is on `cause`. Fix the * setup callback. */ readonly setupFailed: 'RESOURCE_SETUP_FAILED'; /** * The updater passed to `mutate()` threw. Resource state is unchanged. An uncoded native error * carries this code itself; any other thrown value is on `cause`. */ readonly mutateFailed: 'MUTATE_FAILED'; /** * One or more cleanups registered on the Resource threw during `dispose()`. Disposal still ran * every cleanup and the Resource is terminal. The first cleanup error is thrown with this code * attached and later cleanup errors attached to it; a non-error first value is on `cause`. */ readonly disposeCleanupFailed: 'DISPOSE_CLEANUP_FAILED'; };",
           "guidance": [
             {
               "id": "错误码",
@@ -4993,7 +5265,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，14 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -5043,6 +5315,31 @@
                       "`fetchFailed`",
                       "`FETCH_FAILED`",
                       "重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写"
+                    ],
+                    [
+                      "`setupInvalid`",
+                      "`RESOURCE_SETUP_INVALID`",
+                      "`createResource()` 的 setup 不是函数，或 setup 返回的不是 fetcher 函数；已登记的 setup 清理已执行"
+                    ],
+                    [
+                      "`setupClosed`",
+                      "`RESOURCE_SETUP_CLOSED`",
+                      "setup 返回后才调用 `onDispose()`（例如在异步回调里使用了逃逸的 context）；该清理被拒绝"
+                    ],
+                    [
+                      "`setupFailed`",
+                      "`RESOURCE_SETUP_FAILED`",
+                      "setup 回调本身抛错；已登记的 setup 清理已执行。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`mutateFailed`",
+                      "`MUTATE_FAILED`",
+                      "`mutate()` 的 updater 抛错；状态不变。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上"
+                    ],
+                    [
+                      "`disposeCleanupFailed`",
+                      "`DISPOSE_CLEANUP_FAILED`",
+                      "`dispose()` 时某个已登记清理抛错；其余清理照常执行；第一个清理错误本身带上这个码，后续错误挂在它的 `.errors` 上"
                     ]
                   ]
                 },
