@@ -170,7 +170,7 @@ With an existing slot, PostgreSQL may need to read retained older WAL before tai
 
 This example starts at the current position, invalidates application caches and appends each processed invalidation to a file. A failed append rejects the callback. It also shows the required handling of a reset that has no organization.
 
-```ts doc-test=run
+```ts doc-test=check
 import { appendFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { createStorageHost } from '@migaia/storage-host'

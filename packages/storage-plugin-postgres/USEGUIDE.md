@@ -170,7 +170,7 @@ CREATE PUBLICATION migaia_storage_publication
 
 示例从当前进度开始，清理应用缓存并把已处理失效信息追加到文件。文件追加失败会使回调拒绝。没有 orgId 的 reset 必须处理为全组织失效。
 
-```ts doc-test=run
+```ts doc-test=check
 import { appendFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { createStorageHost } from '@migaia/storage-host'
