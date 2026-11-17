@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { assert, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { batchFeature } from '@migaia/rpc-host/plugins/batch'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { batchFeature } from '@migaia/rpc-host/features/batch'
 import {
   defineFlowFeature,
   RpcFlowPoint,
@@ -41,7 +41,8 @@ it('hostile outbound authentication preserves native source/code/cause identity'
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
       }),
       listener.transport
@@ -52,7 +53,8 @@ it('hostile outbound authentication preserves native source/code/cause identity'
     /** The public auth plugin owns the original throwing encrypt callback and its error boundary. */
     const client = await listener.connect('hostile-auth-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               encrypt: (value) => {
@@ -104,7 +106,8 @@ it.each(['throws synchronously', 'rejects asynchronously', 'returns an invalid e
     const server = await createRpcHost({
       ...listener.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               encodedType: 'string',
@@ -121,7 +124,8 @@ it.each(['throws synchronously', 'rejects asynchronously', 'returns an invalid e
       /** Only the public authentication plugin executes the original protect failure conditions. */
       const client = await listener.connect('outbound-auth-client', {
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: {
               auth: authFeature({
                 encodedType: 'string',
@@ -178,7 +182,8 @@ it('keeps the original locally owned authentication failure identity through a p
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
       }),
       listener.transport
@@ -189,7 +194,8 @@ it('keeps the original locally owned authentication failure identity through a p
     /** Original factory-minted Error enters the real public hook rather than a private sender call. */
     const client = await listener.connect('owned-auth-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               sign: (value) => (state.armed ? Promise.reject(authenticationError) : value),
@@ -258,7 +264,8 @@ it('preserves the original inbound decrypt failure through the public authentica
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           auth: authFeature({
             encrypt: (value) => value,
@@ -282,7 +289,8 @@ it('preserves the original inbound decrypt failure through the public authentica
     /** A normal authenticated caller supplies genuine protected metadata to the failing decryptor. */
     const client = await listener.connect('inbound-auth-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
         })
       ]
@@ -327,7 +335,8 @@ it('isolates a public signing failure while the native batch writer is busy and 
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           auth: authFeature({
             encodedType: 'string',
@@ -350,7 +359,8 @@ it('isolates a public signing failure while the native batch writer is busy and 
     /** Real handshakes complete before the selected per-envelope signing rejection is armed. */
     const client = await listener.connect('busy-auth-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               encodedType: 'string',
@@ -460,7 +470,8 @@ it('coalesces two separately authenticated public calls on the same actual sourc
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           auth: authFeature({
             encodedType: 'string',
@@ -483,7 +494,8 @@ it('coalesces two separately authenticated public calls on the same actual sourc
     /** The configured canonical signer returns the same actual input without a new group format. */
     const client = await listener.connect('authenticated-batch-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               encodedType: 'string',

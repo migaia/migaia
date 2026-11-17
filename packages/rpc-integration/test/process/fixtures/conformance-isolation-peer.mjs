@@ -1,4 +1,4 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { readFileSync } from 'node:fs'
 import { inspect } from 'node:util'
 import { randomUUID } from 'node:crypto'
@@ -8,9 +8,9 @@ import { serializeRpcError, isRpcTimeoutError } from '@migaia/rpc-contract/error
 import { PluginHost, definePlugin } from '@migaia/plugin-host'
 import { defineFeature } from '@migaia/plugin-host/features'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import { defineFlowFeature, RpcFlowPoint, RpcFlowLayer, RpcEventByteIO } from '@migaia/rpc-host/sdk'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 /** The published vector owns every original business method and mode. */
@@ -194,7 +194,8 @@ class IsolationService {
         }
       },
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               ...(mode === 'stderr'

@@ -1,9 +1,8 @@
 /** Host-wide call defaults and shared control aliases each have exactly one owner. */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
-import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
-import { defineTransportPlugin, rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineTransportPlugin, defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 
 /** Empty native transports acquire no resources while exercising genuine installation. */
@@ -27,13 +26,16 @@ function emptyTransport() {
   })
 }
 
-/** A link policy and a carrier contribute disjoint roles that both reach the namespace cache. */
+/** Two flow plugins contribute disjoint roles that both reach the namespace cache. */
 async function disjointDefaultsMerge(): Promise<void> {
   const host = await createRpcHost({
     self,
     plugins: [
-      linkPolicy({ features: { replay: retryFeature({ attempts: 1 }) } }),
-      rpcFeaturesPlugin({ name: 'carrier', features: { budget: timeoutFeature({ ms: 100 }) } }),
+      defineFlowPlugin({
+        name: 'rpc-link-policy',
+        features: { replay: retryFeature({ attempts: 1 }) }
+      }),
+      defineFlowPlugin({ name: 'carrier', features: { budget: timeoutFeature({ ms: 100 }) } }),
       emptyTransport()
     ]
   })
@@ -52,8 +54,11 @@ async function duplicateDefaultRoleFails(): Promise<void> {
     createRpcHost({
       self,
       plugins: [
-        linkPolicy({ features: { first: retryFeature({ attempts: 1 }) } }),
-        rpcFeaturesPlugin({ name: 'carrier', features: { second: retryFeature({ attempts: 3 }) } }),
+        defineFlowPlugin({
+          name: 'rpc-link-policy',
+          features: { first: retryFeature({ attempts: 1 }) }
+        }),
+        defineFlowPlugin({ name: 'carrier', features: { second: retryFeature({ attempts: 3 }) } }),
         emptyTransport()
       ]
     })
@@ -66,8 +71,11 @@ async function duplicateSharedAliasFails(): Promise<void> {
     createRpcHost({
       self,
       plugins: [
-        rpcFeaturesPlugin({ name: 'carrier-a', features: { policy: timeoutFeature({ ms: 100 }) } }),
-        linkPolicy({ features: { policy: retryFeature({ attempts: 1 }) } }),
+        defineFlowPlugin({ name: 'carrier-a', features: { policy: timeoutFeature({ ms: 100 }) } }),
+        defineFlowPlugin({
+          name: 'rpc-link-policy',
+          features: { policy: retryFeature({ attempts: 1 }) }
+        }),
         emptyTransport()
       ]
     })
@@ -82,13 +90,56 @@ async function latePolicyRejectedAfterStartup(): Promise<void> {
   const host = await createRpcHost({ self, plugins: [emptyTransport()] })
   try {
     await expect(
-      host.use(linkPolicy({ features: { late: retryFeature({ attempts: 2 }) } }))
+      host.use(
+        defineFlowPlugin({
+          name: 'rpc-link-policy',
+          features: { late: retryFeature({ attempts: 2 }) }
+        })
+      )
     ).rejects.toMatchObject({
       name: 'TypeError',
       code: RpcCoreErrorCode.invalidConfig,
       message: 'RPC flow hooks cannot be installed after transport startup'
     })
     expect(Object.hasOwn(host.local.features, 'late')).toBe(false)
+  } finally {
+    await host.close()
+  }
+}
+
+/** One flow plugin installs its observer and its call default in a single registration. */
+async function observerAndDefaultsShareOnePlugin(): Promise<void> {
+  /** Counts observer setups; each host installation must run it exactly once. */
+  const setup = vi.fn(() => ({}))
+  const host = await createRpcHost({
+    self,
+    plugins: [
+      defineFlowPlugin({
+        name: 'observed-defaults',
+        features: { budget: timeoutFeature({ ms: 100 }) },
+        setup
+      }),
+      emptyTransport()
+    ]
+  })
+  try {
+    expect(setup).toHaveBeenCalledTimes(1)
+    expect(typeof host.local.features.budget.run).toBe('function')
+  } finally {
+    await host.close()
+  }
+}
+
+/** Only a non-empty record makes a flow plugin cold-only; observers stay late-installable. */
+async function observersInstallAfterStartup(): Promise<void> {
+  /** Each late plugin is observed through its own setup call. */
+  const setup = vi.fn(() => ({}))
+  const host = await createRpcHost({ self, plugins: [emptyTransport()] })
+  try {
+    await host.use(defineFlowPlugin({ name: 'late-observer', setup }))
+    await host.use(defineFlowPlugin({ name: 'late-empty-record', features: {}, setup }))
+    await host.use(defineFlowPlugin({ name: 'late-noop' }))
+    expect(setup).toHaveBeenCalledTimes(2)
   } finally {
     await host.close()
   }
@@ -118,7 +169,15 @@ function registerCases(): void {
     'Startup admission rejects a late policy before any policy name was registered',
     latePolicyRejectedAfterStartup
   )
-  it('merges disjoint roles from a link policy and a carrier', disjointDefaultsMerge)
+  it('merges disjoint roles from two flow plugins', disjointDefaultsMerge)
+  it(
+    'installs an observer and a call default from one flow plugin',
+    observerAndDefaultsShareOnePlugin
+  )
+  it(
+    'installs observer, empty-record and empty flow plugins after startup',
+    observersInstallAfterStartup
+  )
   it('rejects a second host-wide owner of one call role', duplicateDefaultRoleFails)
   it('rejects one shared control alias from two owners', duplicateSharedAliasFails)
 }

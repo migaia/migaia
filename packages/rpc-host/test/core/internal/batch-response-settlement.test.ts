@@ -1,10 +1,10 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Real public callers retain both correlations when one native batch carries their replies. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { Session as InspectorSession } from 'node:inspector/promises'
 import type { Runtime } from 'node:inspector'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batchFeature } from '@migaia/rpc-host/plugins/batch'
+import { batchFeature } from '@migaia/rpc-host/features/batch'
 import {
   defineFlowFeature,
   defineTransportPlugin,
@@ -202,7 +202,10 @@ for (const customCodec of [false, true]) {
       const provider = await createRpcHost({
         ...server.options,
         plugins: [
-          rpcFeaturesPlugin({ features: { batch: batchFeature(), feature: witness.feature } }),
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { batch: batchFeature(), feature: witness.feature }
+          }),
           server.transport
         ],
         provide: {
@@ -246,7 +249,7 @@ for (const customCodec of [false, true]) {
       try {
         const caller = await owner.open(
           new RpcFlowProgram([
-            rpcFeaturesPlugin({ features: { batch: batchFeature() } }),
+            defineFlowPlugin({ name: 'rpc-flow-features', features: { batch: batchFeature() } }),
             transport
           ])
         )

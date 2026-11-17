@@ -1,4 +1,3 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public warning subscriptions observe real trusted native parent admission. */
 import { expect, expectTypeOf, it, vi } from 'vitest'
 import {
@@ -9,7 +8,7 @@ import {
   type IRpcWarning
 } from '@migaia/rpc-host'
 import { defineFlowFeature, defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
-import { errorMapFeature } from '@migaia/rpc-host/plugins/error-map'
+import { errorMapFeature } from '@migaia/rpc-host/features/error-map'
 import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
 import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 import { coreMemoryServer } from './core-fixture.ts'
@@ -197,7 +196,8 @@ it('calls SDK setup and observation callbacks without a configuration receiver',
   try {
     await pair.open({
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             defineFlow: defineFlowFeature({
               phase: 1000,
@@ -455,7 +455,7 @@ it('rejects local subscriber plugins and host-only warning callbacks returned by
     createRpcHost({
       report: () => undefined,
       plugins: [
-        rpcFeaturesPlugin({ features: { feature } }),
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { feature } }),
         defineTransportPlugin({
           name: 'warning-invalid-host-feature',
           namespace: 'memory',
@@ -544,8 +544,8 @@ it.each([false, true])(
           throw recipientFailure
         },
         plugins: subscriberFirst
-          ? [subscriber, rpcFeaturesPlugin({ features: { mapping } })]
-          : [rpcFeaturesPlugin({ features: { mapping } }), subscriber],
+          ? [subscriber, defineFlowPlugin({ name: 'rpc-flow-features', features: { mapping } })]
+          : [defineFlowPlugin({ name: 'rpc-flow-features', features: { mapping } }), subscriber],
         report: (error) => reports.push(error)
       })
       expect(await pair.send(42)).toBe(42)

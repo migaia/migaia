@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { timeoutFeature } from '@migaia/rpc-host/features'
-import { defineFlowFeature, defineTransportPlugin, rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowFeature, defineTransportPlugin, defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { definePlugin, type IFeatureRecord } from '@migaia/plugin-host'
 import { defineFeature } from '@migaia/plugin-host/features'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -58,7 +58,7 @@ async function carrierAndLocalOverrideCompose(): Promise<void> {
   const host = await createRpcHost({
     self,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
         name: 'carrier',
         features: { shared, helper, budget: timeoutFeature({ ms: 100 }) }
       }),
@@ -78,11 +78,11 @@ async function duplicateSharedFlowRoleFails(): Promise<void> {
     createRpcHost({
       self,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
           name: 'carrier-a',
           features: { a: defineFlowFeature({ name: 'dup-flow', phase: 1, setup: emptySetup }) }
         }),
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
           name: 'carrier-b',
           features: { b: defineFlowFeature({ name: 'dup-flow', phase: 2, setup: emptySetup }) }
         }),
@@ -107,7 +107,9 @@ async function lateCarrierFails(): Promise<void> {
   const host = await createRpcHost({ self, plugins: [transport()] })
   try {
     await expect(
-      host.use(rpcFeaturesPlugin({ features: { t: timeoutFeature({ ms: 10 }) } }))
+      host.use(
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { t: timeoutFeature({ ms: 10 }) } })
+      )
     ).rejects.toSatisfy(hasCode(RpcCoreErrorCode.invalidConfig))
   } finally {
     await host.close()
@@ -135,7 +137,10 @@ async function localHelperAndSharedFlowCompose(): Promise<void> {
   const local = defineFlowFeature({ name: 'local-only-flow', phase: 4, setup: emptySetup })
   const host = await createRpcHost({
     self,
-    plugins: [rpcFeaturesPlugin({ features: { shared } }), transport({ helper, local })]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { shared } }),
+      transport({ helper, local })
+    ]
   })
   try {
     expect(Object.keys(host.local.features).sort()).toEqual(['helper', 'local', 'shared'])

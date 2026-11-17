@@ -35,7 +35,7 @@ type IAuthentication = {
 type IFlowModule = {
   authFeature: (options: IAuthentication) => unknown
   chunkFeature: () => unknown
-  rpcFeaturesPlugin: (options: { features: Record<string, unknown> }) => unknown
+  defineFlowPlugin: (definition: { name: string; features: Record<string, unknown> }) => unknown
 }
 /** Explicit cold installation inputs avoid a callback capturing several independent owners. */
 type IInstallationInputs = {
@@ -238,12 +238,12 @@ class CorePerformanceCell {
     /** Enhanced arm: auth and chunk Features from their public subpaths, plus the features plugin. */
     const featureModule: IFlowModule | undefined = enhanced
       ? {
-          authFeature: (await import('@migaia/rpc-host/plugins/auth'))
+          authFeature: (await import('@migaia/rpc-host/features/auth'))
             .authFeature as IFlowModule['authFeature'],
-          chunkFeature: (await import('@migaia/rpc-host/plugins/chunk'))
+          chunkFeature: (await import('@migaia/rpc-host/features/chunk'))
             .chunkFeature as IFlowModule['chunkFeature'],
-          rpcFeaturesPlugin: (await import('@migaia/rpc-host/sdk'))
-            .rpcFeaturesPlugin as unknown as IFlowModule['rpcFeaturesPlugin']
+          defineFlowPlugin: (await import('@migaia/rpc-host/sdk'))
+            .defineFlowPlugin as unknown as IFlowModule['defineFlowPlugin']
         }
       : undefined
     /** Old and new transforms receive the exact same public authentication options. */
@@ -281,7 +281,8 @@ class CorePerformanceCell {
     if (context.features) {
       /** Auth and chunk always run together on the enhanced arm, as host-wide Features. */
       plugins.push(
-        context.features.rpcFeaturesPlugin({
+        context.features.defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: context.features.authFeature(context.authentication),
             chunk: context.features.chunkFeature()

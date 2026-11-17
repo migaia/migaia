@@ -1,3 +1,4 @@
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
 import { createNodeThreadChannelFactory } from '../../src/threads/node-launcher.ts'
@@ -6,7 +7,6 @@ import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
 import type { IRpcNotifyOptions } from '@migaia/rpc-host'
 import { threadFrames } from './frame.ts'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
-import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 describe('thread Host facade', () => {
   it.each([false, true])(
     'Host forwards callWallTimeMs as the total request deadline (timeout disabled: %s)',
@@ -22,7 +22,10 @@ describe('thread Host facade', () => {
       try {
         /** The optional larger caller budget uses its real installed Feature's original clock. */
         await host.host.use(
-          linkPolicy({ features: { budget: timeoutFeature({ ms: 200, scheduler }) } })
+          defineFlowPlugin({
+            name: 'rpc-link-policy',
+            features: { budget: timeoutFeature({ ms: 200, scheduler }) }
+          })
         )
         /** Adoption creates the actual Worker-side plugin before its never-finishing request. */
         await host.host.use(host.plugin)

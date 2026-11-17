@@ -1,9 +1,12 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Carrier-owned idempotency entries retire with their connection; shared scopes retain outcomes. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { createRpcIdempotencyStore, idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import {
+  createRpcIdempotencyStore,
+  idempotencyFeature
+} from '@migaia/rpc-host/features/idempotency'
 import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 it.each(['carrier', 'principal', 'custom'] as const)(
@@ -19,7 +22,8 @@ it.each(['carrier', 'principal', 'custom'] as const)(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             idempotency: idempotencyFeature({
               store,
@@ -45,7 +49,8 @@ it.each(['carrier', 'principal', 'custom'] as const)(
         plugins:
           mode === 'principal'
             ? [
-                rpcFeaturesPlugin({
+                defineFlowPlugin({
+                  name: 'rpc-flow-features',
                   features: { authentication: authFeature({ credentials: 'fixture-credential' }) }
                 })
               ]
@@ -62,7 +67,8 @@ it.each(['carrier', 'principal', 'custom'] as const)(
         plugins:
           mode === 'principal'
             ? [
-                rpcFeaturesPlugin({
+                defineFlowPlugin({
+                  name: 'rpc-flow-features',
                   features: { authentication: authFeature({ credentials: 'fixture-credential' }) }
                 })
               ]

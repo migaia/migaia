@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { randomUUID } from 'node:crypto'
 import { createUnitBudget } from '@migaia/supervision'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { createNodeProcessLauncher } from '../../../dist/process/adapters/node-child-process.js'
 
@@ -19,7 +19,10 @@ const host = await createRpcHost({
   self: { name: 'parent', instanceId: 'caller' },
   report: () => undefined,
   plugins: [
-    rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: token }) } }),
+    defineFlowPlugin({
+      name: 'rpc-flow-features',
+      features: { auth: authFeature({ credentials: token }) }
+    }),
     processPlugin({
       name: 'p',
       spawn: {

@@ -1,12 +1,12 @@
 import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 /** Selected wire business uses the canonical codec, installed plugins and original native IO. */
 import { defineHost } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
 import { rpcHostPipelines, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { schemaFeature } from '@migaia/rpc-host/plugins/schema'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { schemaFeature } from '@migaia/rpc-host/features/schema'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
@@ -64,7 +64,8 @@ it('keeps selected schema parsing and Unicode fragment boundaries on the actual 
     createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             chunk: chunkFeature({ chunkBytes: 4 }),
             schema: schemaFeature({ schemas: { echo: { params: parser, result: parser } } })
@@ -77,7 +78,10 @@ it('keeps selected schema parsing and Unicode fragment boundaries on the actual 
     createRpcHost({
       ...rightServer.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { chunk: chunkFeature({ chunkBytes: 8 }) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { chunk: chunkFeature({ chunkBytes: 8 }) }
+        }),
         rightServer.transport
       ],
       provide: { echo: (value: unknown) => value }
@@ -86,10 +90,20 @@ it('keeps selected schema parsing and Unicode fragment boundaries on the actual 
   /** A real peer matches each independent batch's original fragment receiving bound. */
   const [connected, rightConnected] = await Promise.all([
     server.connect('selected-wire-left-peer', {
-      plugins: [rpcFeaturesPlugin({ features: { chunk: chunkFeature({ chunkBytes: 4 }) } })]
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { chunk: chunkFeature({ chunkBytes: 4 }) }
+        })
+      ]
     }),
     rightServer.connect('selected-wire-eight-peer', {
-      plugins: [rpcFeaturesPlugin({ features: { chunk: chunkFeature({ chunkBytes: 8 }) } })]
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { chunk: chunkFeature({ chunkBytes: 8 }) }
+        })
+      ]
     })
   ])
   /** This passthrough spy observes the original post-hook physical write, without another codec. */
@@ -144,7 +158,10 @@ it('reports transport failure from an actual negotiated chunk fragment write', a
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { chunk: chunkFeature({ chunkBytes: 4 }) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { chunk: chunkFeature({ chunkBytes: 4 }) }
+      }),
       listener.transport
     ],
     provide: { echo: (value) => value }
@@ -152,7 +169,12 @@ it('reports transport failure from an actual negotiated chunk fragment write', a
   try {
     /** This is the original connected public Host, not a fabricated sender or selected framer. */
     const client = await listener.connect('chunk-write-caller', {
-      plugins: [rpcFeaturesPlugin({ features: { chunk: chunkFeature({ chunkBytes: 4 }) } })]
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { chunk: chunkFeature({ chunkBytes: 4 }) }
+        })
+      ]
     })
     /** Keep the original raw native failure at the existing carrier's physical write boundary. */
     const failure = new Error('frame send failed')
@@ -232,7 +254,10 @@ it('preserves the original long echo payload through two real eight-unit chunk p
   const provider = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { chunk: chunkFeature({ chunkBytes: 8 }) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { chunk: chunkFeature({ chunkBytes: 8 }) }
+      }),
       listener.transport
     ],
     provide: { echo: (value) => value }
@@ -240,7 +265,12 @@ it('preserves the original long echo payload through two real eight-unit chunk p
   try {
     /** The independent caller negotiates the same original eight-unit fragment boundary. */
     const client = await listener.connect('chunk-client', {
-      plugins: [rpcFeaturesPlugin({ features: { chunk: chunkFeature({ chunkBytes: 8 }) } })]
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { chunk: chunkFeature({ chunkBytes: 8 }) }
+        })
+      ]
     })
     try {
       await expect(
@@ -326,7 +356,7 @@ it('rejects a forged business signature after real chunk assembly and admits a f
   const badServer = await createRpcHost({
     ...badListener.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { serverAuthentication, chunks } }),
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { serverAuthentication, chunks } }),
       badListener.transport
     ],
     provide: { echo },
@@ -334,7 +364,9 @@ it('rejects a forged business signature after real chunk assembly and admits a f
   })
   /** This original sender has finished both real handshakes before its fault can be armed. */
   const badClient = await badListener.connect('c', {
-    plugins: [rpcFeaturesPlugin({ features: { clientAuthentication, chunks } })]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { clientAuthentication, chunks } })
+    ]
   })
   /** Rejection is observed immediately, including when source retirement settles the caller later. */
   let badPending: Promise<unknown> | undefined
@@ -367,7 +399,7 @@ it('rejects a forged business signature after real chunk assembly and admits a f
   const goodServer = await createRpcHost({
     ...goodListener.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { serverAuthentication, chunks } }),
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { serverAuthentication, chunks } }),
       goodListener.transport
     ],
     provide: { echo },
@@ -376,7 +408,9 @@ it('rejects a forged business signature after real chunk assembly and admits a f
   try {
     /** A fresh native source negotiates the same one-unit chunk capability independently. */
     const goodClient = await goodListener.connect('d', {
-      plugins: [rpcFeaturesPlugin({ features: { clientAuthentication, chunks } })]
+      plugins: [
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { clientAuthentication, chunks } })
+      ]
     })
     try {
       /** The original payload must survive the real valid control unchanged. */
@@ -432,7 +466,8 @@ it('preserves contract endpoint roundtrips and protection before actual writes',
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { serverAuthentication, chunk: chunkFeature({ chunkBytes: 4 }) }
       }),
       listener.transport
@@ -443,7 +478,8 @@ it('preserves contract endpoint roundtrips and protection before actual writes',
     /** Both original Hosts have genuinely accepted their peer before the warm call. */
     const client = await listener.connect('contract-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { clientAuthentication, chunk: chunkFeature({ chunkBytes: 4 }) }
         })
       ]

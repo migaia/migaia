@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batchFeature } from '@migaia/rpc-host/plugins/batch'
+import { batchFeature } from '@migaia/rpc-host/features/batch'
 import {
   probe,
   defineProbe,
@@ -72,7 +72,7 @@ describe('public probe non-interference', () => {
       const server = await createRpcHost({
         ...listener.options,
         plugins: [
-          rpcFeaturesPlugin({ features: { batch: batchFeature() } }),
+          defineFlowPlugin({ name: 'rpc-flow-features', features: { batch: batchFeature() } }),
           ...selected,
           listener.transport
         ],
@@ -104,7 +104,10 @@ describe('public probe non-interference', () => {
       })
       /** A separate genuine Host owns its native Session and caller completion. */
       const client = await listener.connect('probe-client', {
-        plugins: [rpcFeaturesPlugin({ features: { batch: batchFeature() } }), ...selected],
+        plugins: [
+          defineFlowPlugin({ name: 'rpc-flow-features', features: { batch: batchFeature() } }),
+          ...selected
+        ],
         report: (error) => business.reports.push(error)
       })
       observed.client = client.host

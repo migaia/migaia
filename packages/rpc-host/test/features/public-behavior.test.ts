@@ -1,10 +1,9 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { retryFeature } from '@migaia/rpc-host/features/retry'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
@@ -35,11 +34,14 @@ it('passes a large payload through the canonical chunk root without duplicate fe
   /** Cold flow installation precedes the native transport's sole handshake. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [rpcFeaturesPlugin({ features: { chunk: chunkFeature() } }), server.transport]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { chunk: chunkFeature() } }),
+      server.transport
+    ]
   })
   /** The remote installation negotiates that same extension, without an adapter facade. */
   const client = await server.connect('client', {
-    plugins: [rpcFeaturesPlugin({ features: { chunk: chunkFeature() } })],
+    plugins: [defineFlowPlugin({ name: 'rpc-flow-features', features: { chunk: chunkFeature() } })],
     provide: { echo: (value: unknown) => value }
   })
   try {
@@ -69,13 +71,21 @@ it('uses canonical authentication transforms on a real connected request and res
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { auth: authFeature(authentication) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { auth: authFeature(authentication) }
+      }),
       server.transport
     ]
   })
   /** The opposite public Host executes the same original provider and authentication pair. */
   const client = await server.connect('client', {
-    plugins: [rpcFeaturesPlugin({ features: { auth: authFeature(authentication) } })],
+    plugins: [
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { auth: authFeature(authentication) }
+      })
+    ],
     provide: { echo: (value: unknown) => value }
   })
   try {
@@ -99,7 +109,13 @@ it('keeps call then transport then link-policy timeout precedence', async () => 
   /** The old 5 ms feature fallback is the actual link policy beneath transport selection. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [linkPolicy({ features: { timeout: timeoutFeature({ ms: 5 }) } }), server.transport]
+    plugins: [
+      defineFlowPlugin({
+        name: 'rpc-link-policy',
+        features: { timeout: timeoutFeature({ ms: 5 }) }
+      }),
+      server.transport
+    ]
   })
   /** Preserve the original 30 ms provider duration rather than changing timing expectations. */
   const client = await server.connect('client', {
@@ -119,7 +135,13 @@ it('keeps call then transport then link-policy timeout precedence', async () => 
   /** No numeric call option or root policy field stands in for the executing instance. */
   const inherited = await createRpcHost({
     ...fallback.options,
-    plugins: [linkPolicy({ features: { timeout: timeoutFeature({ ms: 5 }) } }), fallback.transport]
+    plugins: [
+      defineFlowPlugin({
+        name: 'rpc-link-policy',
+        features: { timeout: timeoutFeature({ ms: 5 }) }
+      }),
+      fallback.transport
+    ]
   })
   /** The second original provider uses the same 30 ms duration. */
   const peer = await fallback.connect('client', {

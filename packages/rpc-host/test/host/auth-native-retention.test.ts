@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Default completed-ID release and invalid retention use actual native Worker sources. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { threadPlugin } from '../../../rpc-plugin-thread/dist/threads/index.js'
 import { createFixtureAuthentication } from '../../../rpc-plugin-thread/test/threads/fixtures/dx-authentication.mjs'
 
@@ -10,7 +10,10 @@ it('releases default completed request IDs beyond1024 on a genuine native Node W
   /** This existing Worker independently installs real Auth; it is not automatic native Auth proof. */
   const host = await createRpcHost({
     plugins: [
-      rpcFeaturesPlugin({ features: { auth: authFeature(createFixtureAuthentication()) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { auth: authFeature(createFixtureAuthentication()) }
+      }),
       threadPlugin({
         name: 'thread',
         spawn: {
@@ -46,7 +49,10 @@ it('preserves invalid connection retention as the public native Worker configura
     await expect(
       createRpcHost({
         plugins: [
-          rpcFeaturesPlugin({ features: { auth: authFeature(createFixtureAuthentication()) } }),
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { auth: authFeature(createFixtureAuthentication()) }
+          }),
           threadPlugin({
             name: 'thread',
             connect: { retain: 0 },

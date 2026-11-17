@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Uses genuine Process and Worker children, with no fabricated Session or close observer. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
@@ -329,7 +329,7 @@ it.each(['process', 'thread'] as const)(
     const gate = new ClosingWriteGate()
     const host = await createRpcHost({
       plugins: [
-        rpcFeaturesPlugin({ features: { feature1: gate.plugin } }),
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { feature1: gate.plugin } }),
         transport(kind)
       ] as const,
       report: () => undefined

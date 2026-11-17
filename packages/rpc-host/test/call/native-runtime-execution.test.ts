@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original completed-group retention survives failure at the genuine native terminal write. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { Session as InspectorSession } from 'node:inspector/promises'
 import type { Runtime } from 'node:inspector'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -9,8 +9,8 @@ import {
   type IRpcIdempotencyClaim,
   type IRpcIdempotencyOutcome,
   type IRpcIdempotencyStore
-} from '@migaia/rpc-host/plugins/idempotency'
-import limits from '@migaia/rpc-host/plugins/limits'
+} from '@migaia/rpc-host/features/idempotency'
+import limits from '@migaia/rpc-host/features/limits'
 import {
   RPC_ENDPOINT_ERROR_SOURCE,
   RpcContractErrorCode,
@@ -114,7 +114,8 @@ it('a send adapter forged FRAME_LIMIT code cannot rewrite the original completed
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { idempotency: idempotencyFeature({ store, scope: () => 'peer' }) }
       }),
       ...server.options.plugins
@@ -204,7 +205,8 @@ it('an original pending keyed claim prevents duplicate execution and seals the c
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           idempotency: idempotencyFeature({ store, scope: () => 'peer' }),
           feature0: limits({ maxGlobal: 6, maxPerPeer: 6 })
@@ -321,7 +323,8 @@ async function clonedStreamReplay(
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           idempotency: idempotencyFeature({ store, scope: () => 'peer' }),
           feature0: limits({ maxGlobal: 6, maxPerPeer: 6 })

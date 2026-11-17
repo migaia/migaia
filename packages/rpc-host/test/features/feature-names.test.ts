@@ -10,17 +10,27 @@ const repository = fileURLToPath(new URL('../../../../', import.meta.url))
 const factories = [
   ['rpc-host', 'features', 'retry', 'retry'],
   ['rpc-host', 'features', 'timeout', 'timeout'],
-  ['rpc-host', 'plugins', 'auth', 'auth'],
-  ['rpc-host', 'plugins', 'chunk', 'chunk'],
-  ['rpc-host', 'plugins', 'batch', 'batch'],
-  ['rpc-host', 'plugins', 'error-map', 'errorMap'],
-  ['rpc-host', 'plugins', 'schema', 'schema'],
-  ['rpc-host', 'plugins', 'limits', 'limits'],
-  ['rpc-host', 'plugins', 'idempotency', 'idempotency'],
+  ['rpc-host', 'features', 'auth', 'auth'],
+  ['rpc-host', 'features', 'chunk', 'chunk'],
+  ['rpc-host', 'features', 'batch', 'batch'],
+  ['rpc-host', 'features', 'error-map', 'errorMap'],
+  ['rpc-host', 'features', 'schema', 'schema'],
+  ['rpc-host', 'features', 'limits', 'limits'],
+  ['rpc-host', 'features', 'idempotency', 'idempotency'],
   ['rpc-plugin-process', 'features', 'send-queue', 'sendQueue'],
   ['rpc-plugin-process', 'features', 'flow-control', 'flowControl'],
   ['rpc-plugin-process', 'features', 'log', 'ipcLog']
 ] as const
+/** The seven host flow factories live under features/<name>/index rather than a direct file. */
+const hostFlowFolders: ReadonlySet<string> = new Set([
+  'auth',
+  'chunk',
+  'batch',
+  'error-map',
+  'schema',
+  'limits',
+  'idempotency'
+])
 /** Consumer scope excludes the separately owned website documentation migration. */
 const consumers = [
   'rpc-host',
@@ -74,17 +84,15 @@ function factoryNames(module: string, file: string): Set<string> {
   for (const [owner, group, subpath, previous] of factories) {
     /** Public paths and their source layout differ only for host flow features. */
     const publicEntry = `@migaia/${owner}/${group}`
-    /** The seven host flow factories live under features/<name>/index. */
-    const sourceGroup = owner === 'rpc-host' && group === 'plugins' ? 'features' : group
     /** Host flow folders have index entries; process and retry/timeout use direct files. */
-    const leaf = owner === 'rpc-host' && group === 'plugins' ? `${subpath}/index` : subpath
+    const leaf = owner === 'rpc-host' && hostFlowFolders.has(subpath) ? `${subpath}/index` : subpath
     if (
       module === publicEntry ||
       module === `${publicEntry}/${subpath}` ||
       relative === resolve(repository, 'packages', owner, 'src', group, 'index') ||
       relative === resolve(repository, 'packages', owner, 'dist', group, 'index') ||
-      relative === resolve(repository, 'packages', owner, 'src', sourceGroup, leaf) ||
-      relative === resolve(repository, 'packages', owner, 'dist', sourceGroup, leaf)
+      relative === resolve(repository, 'packages', owner, 'src', group, leaf) ||
+      relative === resolve(repository, 'packages', owner, 'dist', group, leaf)
     )
       names.add(previous)
   }
@@ -177,12 +185,12 @@ function consumerDirectory(name: string): string {
 function verifyScanControls(): void {
   /** This fixture deliberately includes the three retired export-read forms. */
   const rejected =
-    "import { timeout as local } from '@migaia/rpc-host/features'; const { limits: limited } = await import('@migaia/rpc-host/plugins/limits'); import * as policies from '@migaia/rpc-host/plugins'; policies.auth; policies['chunk']"
+    "import { timeout as local } from '@migaia/rpc-host/features'; const { limits: limited } = await import('@migaia/rpc-host/features/limits'); import * as policies from '@migaia/rpc-host/features'; policies.auth; policies['chunk']"
   expect(legacyReads(rejected, resolve(repository, 'packages/rpc-host/test/example.ts'))).toEqual([
     '@migaia/rpc-host/features:timeout',
-    '@migaia/rpc-host/plugins/limits:limits',
-    '@migaia/rpc-host/plugins:auth',
-    '@migaia/rpc-host/plugins:chunk'
+    '@migaia/rpc-host/features/limits:limits',
+    '@migaia/rpc-host/features:auth',
+    '@migaia/rpc-host/features:chunk'
   ])
   expect(
     legacyReads(

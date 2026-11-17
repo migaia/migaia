@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original group refusal and fail-stop replay use the installed native store and quota owners. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
@@ -8,8 +8,8 @@ import {
   idempotencyFeature,
   type IRpcIdempotencyStore,
   type IRpcOutcomeLookup
-} from '@migaia/rpc-host/plugins/idempotency'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+} from '@migaia/rpc-host/features/idempotency'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import { deferred } from '@migaia/utils/promise'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
 import { coreMemoryServer } from '../host/core-fixture.ts'
@@ -28,7 +28,8 @@ async function connectGroupStore(
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { limits: limitsFeature(), idempotency: idempotencyFeature({ store }) }
       }),
       server.transport
@@ -39,7 +40,12 @@ async function connectGroupStore(
   try {
     /** Only dynamic fixture typing erases the genuine outcome extension's cold declared type. */
     const client = await server.connect('group-store-caller', {
-      plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { idempotency: idempotencyFeature() }
+        })
+      ],
       report: (error) => failures.push(error)
     })
     /** This is the original published callable; no lookup or outcome state is fabricated. */

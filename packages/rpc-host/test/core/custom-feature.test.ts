@@ -1,5 +1,5 @@
 import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 /** Original custom Feature values and lifecycle effects belong to the genuine receiving Host. */
 import {
   defineHost,
@@ -9,7 +9,7 @@ import {
 } from '@migaia/plugin-host'
 import { defineFeature } from '@migaia/plugin-host/features'
 import { createRpcHost } from '@migaia/rpc-host'
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
 import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { RpcError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -146,7 +146,10 @@ async function closeFirstPartyFramer(): Promise<void> {
   /** The ordinary public RPC factory installs real chunk resources through genuine native setup. */
   const endpoint = await createRpcHost({
     ...server.options,
-    plugins: [rpcFeaturesPlugin({ features: { chunk: chunkFeature() } }), server.transport]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { chunk: chunkFeature() } }),
+      server.transport
+    ]
   })
   try {
     await endpoint.close()

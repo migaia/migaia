@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Preserve early business delivery through the current public Process socket and Host owners. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
@@ -100,7 +100,7 @@ class EarlyProcessFrames {
       self: { name: 'early-client', instanceId: 'early-client' },
       provide: { receive: this.#receive },
       plugins: [
-        rpcFeaturesPlugin({ features: { gate } }),
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { gate } }),
         processPlugin({
           connect: {
             target: {

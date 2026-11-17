@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Owner-review failures use public hosts and their real physical carrier pair. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import {
   defineFlowFeature,
@@ -223,7 +223,7 @@ it('physical EOF still uses its native terminal reason and publishes peer closur
     () => undefined,
     { create: () => new RpcJsonCarrierCodec(), nativeBinary: false, closingWrites: true },
     () => undefined,
-    [rpcFeaturesPlugin({ features: { feature0: gate.feature } })]
+    [defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: gate.feature } })]
   )
   const connectionSignal = (await gate.entered.promise).signal
   assert(connectionSignal)

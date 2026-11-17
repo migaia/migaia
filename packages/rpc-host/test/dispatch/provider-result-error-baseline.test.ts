@@ -1,7 +1,7 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original provider error atoms use real namespaces, physical replies and the public report port. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { schemaFeature } from '@migaia/rpc-host/plugins/schema'
+import { schemaFeature } from '@migaia/rpc-host/features/schema'
 
 import { RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -167,7 +167,8 @@ it.each(['params', 'result'] as const)(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             schema: schemaFeature({
               schemas: {

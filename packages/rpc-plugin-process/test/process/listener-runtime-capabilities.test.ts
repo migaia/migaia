@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Native calls and authentication remain after retiring v1 stream/empty-capability offers. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import type { IProcessByteListener } from '../../dist/process/types.js'
 import {
@@ -31,7 +31,8 @@ it('retains public native listener calls and the original credential verificatio
       reports.push(error)
     },
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           auth: authFeature({
             encodedType: 'string',
@@ -70,7 +71,8 @@ it('retains public native listener calls and the original credential verificatio
         reports.push(error)
       },
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               encodedType: 'string',

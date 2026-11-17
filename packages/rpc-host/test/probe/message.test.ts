@@ -1,4 +1,4 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
 import {
   probe,
@@ -9,7 +9,7 @@ import {
   RpcProbeStage,
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
-import limits from '@migaia/rpc-host/plugins/limits'
+import limits from '@migaia/rpc-host/features/limits'
 import { describe, expect, it, vi } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.ts'
 
@@ -43,7 +43,10 @@ describe('probe logical observations', () => {
       ...listener.options,
       plugins: [
         probe(rightProbe),
-        rpcFeaturesPlugin({ features: { feature0: limits({ maxGlobal: 1, maxPerPeer: 1 }) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { feature0: limits({ maxGlobal: 1, maxPerPeer: 1 }) }
+        }),
         ...listener.options.plugins!
       ],
       provide: {

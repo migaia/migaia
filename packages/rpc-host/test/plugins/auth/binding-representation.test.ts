@@ -1,9 +1,9 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Exercises Auth callback representations through public Hosts and the original memory medium. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createHmac } from 'node:crypto'
 import { expect, it } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
+import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/features/auth'
 import { createRpcBackingDigest, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { RpcAuthenticationEnvelope } from '../../../dist/features/auth/constants.js'
@@ -59,7 +59,7 @@ class PublicAuthenticationPair {
     this.#server = await createRpcHost({
       ...this.#listener.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature(server) } }),
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { auth: authFeature(server) } }),
         this.#listener.transport
       ],
       provide: {
@@ -71,7 +71,9 @@ class PublicAuthenticationPair {
     })
     /** The existing listener connects both real Session owners and awaits their original handshakes. */
     const connected = await this.#listener.connect('a29-client', {
-      plugins: [rpcFeaturesPlugin({ features: { auth: authFeature(client) } })]
+      plugins: [
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { auth: authFeature(client) } })
+      ]
     })
     this.#client = connected.host
   }

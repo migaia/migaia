@@ -5,7 +5,7 @@ import {
   defineTransportPlugin,
   type IRpcTransportPlugin
 } from '@migaia/rpc-host/sdk'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
 import type { IRpcOutcomeLookupResult } from '@migaia/rpc-contract/protocol'
 
 /** The real feature factory contributes its public lookup only to its owning transport. */

@@ -1,6 +1,6 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost, type IRpcContext, type IRpcProvide } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { defineFlowFeature, RpcFlowPoint } from '@migaia/rpc-host/sdk'
@@ -236,7 +236,12 @@ class ForeignPeerSession {
       plugins: [
         ...(token === undefined
           ? []
-          : [rpcFeaturesPlugin({ features: peerAuthenticationFeatures(token) })]),
+          : [
+              defineFlowPlugin({
+                name: 'rpc-flow-features',
+                features: peerAuthenticationFeatures(token)
+              })
+            ]),
         processPlugin({
           name: 'foreign-native-peer',
           connect: {
@@ -307,7 +312,10 @@ async function main(): Promise<void> {
       provide: { p: business.provide.p! },
       contract,
       plugins: [
-        rpcFeaturesPlugin({ features: { listenerFaults, ...peerAuthenticationFeatures(token) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { listenerFaults, ...peerAuthenticationFeatures(token) }
+        }),
         processPlugin({ name: 'foreign-native-peer', listen: values['listen-unix'], token })
       ],
       report

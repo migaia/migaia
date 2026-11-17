@@ -15,7 +15,7 @@ import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
 
 import {
   defineFlowFeature,
-  rpcFeaturesPlugin,
+  defineFlowPlugin,
   defineTransportPlugin,
   RpcJsonCarrierCodec,
   type IRpcTransportSetupContext
@@ -359,7 +359,8 @@ function nativeSource(
 function optionalFlows(owners: IRetainedOwners, rejections: unknown[]) {
   /** The fixed observer borrows only its actual output collection. */
   const onRejected = rejectionObserver(rejections)
-  return rpcFeaturesPlugin({
+  return defineFlowPlugin({
+    name: 'rpc-flow-features',
     features: {
       batch: defineFlowFeature({
         phase: 1000,

@@ -4,7 +4,7 @@
  */
 import { RpcProbeStage } from '@migaia/rpc-contract/interfaces'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import type { IRpcFlowFeature } from '@migaia/rpc-host/sdk'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
 import { pool, RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'

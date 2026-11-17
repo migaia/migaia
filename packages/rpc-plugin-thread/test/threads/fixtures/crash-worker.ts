@@ -1,6 +1,6 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
 import { threadId } from 'node:worker_threads'
 
 /** Each generation reports its native thread id; `crash` ends the thread without replying. */

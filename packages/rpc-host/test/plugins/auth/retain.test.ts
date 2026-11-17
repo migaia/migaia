@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public Auth requests distinguish active duplicate suppression from completed-ID retention. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
+import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/features/auth'
 import { defineFlowFeature, defineTransportPlugin, type IRpcFlowStage } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import type {
@@ -107,7 +107,7 @@ class PublicRetentionPair {
     this.#server = await createRpcHost({
       ...this.listener.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature(options) } }),
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { auth: authFeature(options) } }),
         this.listener.transport
       ],
       report: (error) => this.reports.push(error),
@@ -116,7 +116,8 @@ class PublicRetentionPair {
     this.#client = (
       await this.listener.connect('retain-client', {
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: {
               feature: this.replay.feature,
               auth: authFeature({ sign: (value) => value, verify: (value) => value })
@@ -574,7 +575,8 @@ it('gives the public transport connection retain precedence over its installed A
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           feature: replay.feature,
           auth: authFeature({ sign: (value) => value, verify: (value) => value })
@@ -589,7 +591,8 @@ it('gives the public transport connection retain precedence over its installed A
     client = await createRpcHost({
       self: { name: 'retain-override-client', instanceId: 'retain-override-client' },
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({ sign: (value) => value, verify: (value) => value, retain: 1_000 })
           }
@@ -651,7 +654,8 @@ it('rejects invalid public connection numbers, null and unsigned window as confi
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { auth: authFeature({ verifyCredentials: () => undefined }) }
       }),
       listener.transport
@@ -667,7 +671,8 @@ it('rejects invalid public connection numbers, null and unsigned window as confi
           createRpcHost({
             self: { name: 'invalid-retain-client', instanceId: 'invalid-retain-client' },
             plugins: [
-              rpcFeaturesPlugin({
+              defineFlowPlugin({
+                name: 'rpc-flow-features',
                 features: { auth: authFeature({ credentials: 'public-retain-fixture' }) }
               }),
               connection.transport

@@ -1,8 +1,8 @@
 import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 /** A public native removal and a genuine arriving connection share the original Feature lifetime. */
 import { defineHost } from '@migaia/plugin-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { defineFlowFeature, rpcFeaturesPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { defineFlowFeature, defineFlowPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from './core-fixture.ts'
@@ -24,7 +24,8 @@ it('F3 refuses a new connection or shared Auth removal while its accepted cleanu
     })
   })
   /** Both Features use the ordinary SDK wrapper and its actual native registration lifetime. */
-  const flows = rpcFeaturesPlugin({
+  const flows = defineFlowPlugin({
+    name: 'rpc-flow-features',
     features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }), held }
   })
   /** Only this native Host lends candidate and committed pipeline execution authority. */
@@ -59,7 +60,8 @@ it('F3 refuses a new connection or shared Auth removal while its accepted cleanu
     const [connection] = await Promise.allSettled([
       server.connect('f3-arriving-client', {
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
           })
         ]

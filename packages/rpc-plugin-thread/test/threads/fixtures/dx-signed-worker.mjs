@@ -1,6 +1,6 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { workerData } from 'node:worker_threads'
 import { readThreadBootstrap } from '../../../dist/threads/bootstrap.js'
 import { createFixtureAuthentication } from './dx-authentication.mjs'
@@ -24,9 +24,14 @@ await createRpcHost({
   report: (error) => process.stderr.write(`${error?.stack ?? String(error)}\n`),
   plugins: [
     ...(data.signed
-      ? [rpcFeaturesPlugin({ features: { security: authFeature(createFixtureAuthentication()) } })]
+      ? [
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { security: authFeature(createFixtureAuthentication()) }
+          })
+        ]
       : []),
     threadPlugin({ connectToParent: true })
   ]
 })
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'

@@ -1,11 +1,14 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** One existing file-backed completed result survives the fixture's deliberate native crash. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { idempotencyFeature, createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import {
+  idempotencyFeature,
+  createRpcIdempotencyStore
+} from '@migaia/rpc-host/features/idempotency'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 /** This caller-owned temporary directory stores only test counters and completed outcomes. */
 const directory = process.argv[2]
@@ -30,7 +33,7 @@ const store = {
    * @param {string} key The canonical method/key tuple supplied by core.
    * @param {number} now The canonical monotonic claim time.
    * @param {string | undefined} fingerprint The original admitted body fingerprint.
-   * @returns {import('@migaia/rpc-host/plugins/idempotency').IRpcIdempotencyClaim} Existing done
+   * @returns {import('@migaia/rpc-host/features/idempotency').IRpcIdempotencyClaim} Existing done
    *   outcome or canonical claim.
    */
   claim(scope, key, now, fingerprint) {
@@ -46,7 +49,7 @@ const store = {
       /**
        * Persist the canonical completed outcome before a deliberate real crash.
        *
-       * @param {import('@migaia/rpc-host/plugins/idempotency').IRpcIdempotencyOutcome} outcome
+       * @param {import('@migaia/rpc-host/features/idempotency').IRpcIdempotencyOutcome} outcome
        *   Benign fixture result.
        * @param {number} settledAt Canonical settlement timestamp.
        * @returns {void}
@@ -96,7 +99,8 @@ await createRpcHost({
   provide,
   contract,
   plugins: [
-    rpcFeaturesPlugin({
+    defineFlowPlugin({
+      name: 'rpc-flow-features',
       features: {
         auth: authFeature({
           verifyCredentials(received) {

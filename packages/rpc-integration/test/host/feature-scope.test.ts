@@ -1,10 +1,10 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Proves transport override with genuine Process and Worker children at the public boundary. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
-import { schemaFeature } from '@migaia/rpc-host/plugins/schema'
+import { schemaFeature } from '@migaia/rpc-host/features/schema'
 import { FeatureScopeFixture as Fixture, featureScopeAuth } from './fixtures/feature-scope-child.ts'
 
 it('Process overrides Host auth once and scopes schema independently from Thread', async () => {
@@ -15,7 +15,8 @@ it('Process overrides Host auth once and scopes schema independently from Thread
   /** Native children verify the exact expected key, so successful echo is independent proof. */
   const host = await createRpcHost({
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           feature1: featureScopeAuth(Fixture.hostKey, (value, context) => {
             if (value.includes(Fixture.marker))

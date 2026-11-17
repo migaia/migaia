@@ -1,6 +1,6 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
 import { describe, expect, it } from 'vitest'
 
 /** Real Worker entry whose generations can crash on request. */

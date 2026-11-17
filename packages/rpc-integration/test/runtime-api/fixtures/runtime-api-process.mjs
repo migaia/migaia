@@ -1,6 +1,6 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { provide, report } from './runtime-api-provide.mjs'
 
@@ -9,7 +9,10 @@ await createRpcHost({
   provide,
   report,
   plugins: [
-    rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+    defineFlowPlugin({
+      name: 'rpc-flow-features',
+      features: { idempotency: idempotencyFeature() }
+    }),
     processPlugin({ connectToParent: true })
   ]
 })

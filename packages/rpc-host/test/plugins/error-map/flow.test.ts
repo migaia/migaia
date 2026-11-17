@@ -1,9 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Maps only outbound errors while public local diagnostics retain their original identities. */
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/plugins/error-map'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/features/error-map'
 import { defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { reachRpcError, RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -48,7 +47,8 @@ it.each([false, true])(
       ...listener.options,
       plugins: [
         ...(loggerFirst ? [logger] : []),
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({ verifyCredentials: () => ({ principalId: 'a32-client' }) }),
             mapping
@@ -67,7 +67,8 @@ it.each([false, true])(
     /** Only this public caller receives the deliberately mapped remote graph. */
     const client = await listener.connect('mapped-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { auth: authFeature({ credentials: 'a32-public-fixture' }) }
         })
       ]
@@ -128,7 +129,10 @@ it('selects a transport-local mapper only for that namespace and inherits the ho
   const host = await createRpcHost({
     ...first.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { errorMap: errorMapFeature(sharedMap) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { errorMap: errorMapFeature(sharedMap) }
+      }),
       first.transport,
       second.transport
     ],
@@ -173,7 +177,8 @@ it.each(['none', 'throw'] as const)(
     const host = await createRpcHost({
       ...listener.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({ verifyCredentials: () => ({ principalId: 'fallback-client' }) }),
             ...(mode === 'none' ? {} : { mapping: errorMapFeature(map) })
@@ -190,7 +195,8 @@ it.each(['none', 'throw'] as const)(
     })
     const client = await listener.connect('fallback-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { auth: authFeature({ credentials: 'a32-public-fixture' }) }
         })
       ]
@@ -237,7 +243,7 @@ it('falls back to the original remote error and reports one mapped serialization
   const host = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { errorMap: errorMapFeature(map) } }),
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { errorMap: errorMapFeature(map) } }),
       listener.transport
     ],
     provide: {
@@ -303,7 +309,10 @@ it('rejects a returned Promise as configuration, sends the original error and re
   const listener = coreMemoryServer('promise-fallback-provider')
   const host = await createRpcHost({
     ...listener.options,
-    plugins: [rpcFeaturesPlugin({ features: { mapping } }), listener.transport],
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { mapping } }),
+      listener.transport
+    ],
     provide: {
       fail: () => {
         throw primary
@@ -368,7 +377,10 @@ it('delivers the next message on the same Session without waiting for a never-se
   const listener = coreMemoryServer('nonblocking-mapper-provider')
   const host = await createRpcHost({
     ...listener.options,
-    plugins: [rpcFeaturesPlugin({ features: { mapping } }), listener.transport],
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { mapping } }),
+      listener.transport
+    ],
     provide: {
       fail: () => {
         throw primary
@@ -417,7 +429,8 @@ it.each(['verifier', 'resolver'] as const)(
     const host = await createRpcHost({
       ...listener.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({ credentials: 'a32-server', verifyCredentials: () => undefined })
           }
@@ -430,7 +443,8 @@ it.each(['verifier', 'resolver'] as const)(
       const failure = await listener
         .connect('credential-cause-client', {
           plugins: [
-            rpcFeaturesPlugin({
+            defineFlowPlugin({
+              name: 'rpc-flow-features',
               features: {
                 auth: authFeature({
                   credentials:
@@ -475,7 +489,8 @@ it('keeps an unauthenticated wire rejection redacted while the local verifier ca
   const host = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           auth: authFeature({
             verifyCredentials() {
@@ -505,7 +520,8 @@ it('keeps an unauthenticated wire rejection redacted while the local verifier ca
       createRpcHost({
         self: { name: 'redaction-client', instanceId: 'redaction-client' },
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: { auth: authFeature({ credentials: 'a32-untrusted-token' }) }
           }),
           defineTransportPlugin({ name: 'redaction-client', namespace: 'memory', open })

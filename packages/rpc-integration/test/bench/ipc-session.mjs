@@ -1,4 +1,4 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { IpcBenchErrorText } from '../../bench/error-text.mjs'
 import { captureSnapshot } from '../../bench/observe.mjs'
 import { IpcBenchDiagnostic, IpcBenchObservation, RuntimeBench } from '../../bench/text.mjs'
@@ -534,7 +534,7 @@ async function openBareProcess(carrier, cleanup) {
 /** Genuine public hosts own negotiation, directory publication, calls and native supervision. */
 async function openRpc(input, cleanup) {
   const { createRpcHost } = await import('@migaia/rpc-host')
-  const { limitsFeature } = await import('@migaia/rpc-host/plugins/limits')
+  const { limitsFeature } = await import('@migaia/rpc-host/features/limits')
   /** Each selected plugin acquires its own real native resource from the public short recipe. */
   let definition
   if (input.carrier === 'worker') {
@@ -585,7 +585,10 @@ async function openRpc(input, cleanup) {
   }
   const host = await createRpcHost({
     plugins: [
-      rpcFeaturesPlugin({ features: { limits: limitsFeature(nativeProviderLimits) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { limits: limitsFeature(nativeProviderLimits) }
+      }),
       ...(globalThis.__PROBE_BENCH_PROBE ? [globalThis.__PROBE_BENCH_PROBE] : []),
       definition
     ],
@@ -663,7 +666,7 @@ async function childMain(side, carrier, address) {
     return
   }
   const { createRpcHost } = await import('@migaia/rpc-host')
-  const { limitsFeature } = await import('@migaia/rpc-host/plugins/limits')
+  const { limitsFeature } = await import('@migaia/rpc-host/features/limits')
   const module = await import(
     carrier === 'worker' ? '@migaia/rpc-plugin-thread' : '@migaia/rpc-plugin-process'
   )
@@ -681,7 +684,10 @@ async function childMain(side, carrier, address) {
         )
   await createRpcHost({
     plugins: [
-      rpcFeaturesPlugin({ features: { limits: limitsFeature(nativeProviderLimits) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { limits: limitsFeature(nativeProviderLimits) }
+      }),
       definition
     ],
     provide: {

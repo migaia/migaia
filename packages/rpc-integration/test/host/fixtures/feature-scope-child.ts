@@ -1,7 +1,7 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Children use the actual native source and the same canonical authentication Feature. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 import { RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -48,7 +48,10 @@ export async function runFeatureScopeChild(
 ): Promise<void> {
   await createRpcHost({
     plugins: [
-      rpcFeaturesPlugin({ features: { feature1: featureScopeAuth(key) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { feature1: featureScopeAuth(key) }
+      }),
       plugin
     ] as const,
     provide: { echo: (value: unknown) => value },

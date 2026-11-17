@@ -1,10 +1,10 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import process from 'node:process'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRpcHost } from '@migaia/rpc-host'
 import { isRpcErrorInstance, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-host/contract'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
@@ -30,7 +30,13 @@ try {
         })
   host = await createRpcHost({
     self: { name: 'parent-2', instanceId: 'parent-2' },
-    plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }), child],
+    plugins: [
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      }),
+      child
+    ],
     report: (error) =>
       reports.push({
         source: error?.source,

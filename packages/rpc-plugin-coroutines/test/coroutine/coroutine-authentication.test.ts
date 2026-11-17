@@ -1,7 +1,7 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it } from 'vitest'
 import { createRpcHost, RpcWarningCode, type IRpcWarning } from '@migaia/rpc-host'
-import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
+import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/features/auth'
 import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
 
 /** The string signature wraps encrypted frames exactly as a real application boundary does. */
@@ -96,7 +96,10 @@ describe('coroutine authentication cleanup', () => {
           report: (error) => reports.push(error),
           onWarning: (warning) => warnings.push(warning),
           plugins: [
-            rpcFeaturesPlugin({ features: { auth: authFeature(authentication) } }),
+            defineFlowPlugin({
+              name: 'rpc-flow-features',
+              features: { auth: authFeature(authentication) }
+            }),
             coroutinePlugin({ name: 'parent', connectToParent: connect })
           ],
           contract: {
@@ -120,7 +123,13 @@ describe('coroutine authentication cleanup', () => {
     const host = await createRpcHost({
       self: { name: 'math-parent', instanceId: 'authenticated-parent' },
       report: (error) => reports.push(error),
-      plugins: [rpcFeaturesPlugin({ features: { auth: authFeature(authentication) } }), service]
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature(authentication) }
+        }),
+        service
+      ]
     })
     try {
       expect(await host.coroutine.request('math.calc.double', 21)).toBe(42)

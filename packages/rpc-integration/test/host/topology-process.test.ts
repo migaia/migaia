@@ -1,13 +1,13 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /**
  * Mixed-carrier forwarding through one process: origin a calls through forwarding process b into
  * b's thread c, child process d, thread pool and coroutine co, using only public entries.
  */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { RpcProbeDirection, RpcProbeOutcome } from '@migaia/rpc-contract/interfaces'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { TopologyLeaf } from './fixtures/topology-leaf.ts'
@@ -356,7 +356,10 @@ it('host-level auth applies to a late thread while the authenticated coroutine r
   const task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {
     const child = await createRpcHost({
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature(leaf.auth.options(HopSecret.shared)) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature(leaf.auth.options(HopSecret.shared)) }
+        }),
         coroutinePlugin({ connectToParent: connect })
       ],
       provide: leaf.providers()
@@ -376,7 +379,10 @@ it('host-level auth applies to a late thread while the authenticated coroutine r
   const host = await createRpcHost({
     self: { name: Topology.b, instanceId: 'topology-late-auth-b' },
     plugins: [
-      rpcFeaturesPlugin({ features: { auth: authFeature(counter.options(HopSecret.shared)) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { auth: authFeature(counter.options(HopSecret.shared)) }
+      }),
       coroutinePlugin({ namespace: 'baseline', name: Topology.coroutine, spawn: task })
     ],
     report: () => undefined

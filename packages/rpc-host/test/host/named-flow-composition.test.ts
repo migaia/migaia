@@ -1,11 +1,11 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcLifecycleError } from '@migaia/rpc-host/contract'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
-import { batchFeature } from '@migaia/rpc-host/plugins/batch'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
+import { batchFeature } from '@migaia/rpc-host/features/batch'
 import {
   defineFlowFeature,
   RpcFlowLayer,
@@ -45,7 +45,10 @@ async function composition(
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { ...compositionFeatures(), batching: batchFeature() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { ...compositionFeatures(), batching: batchFeature() }
+      }),
       server.transport
     ],
     report: (error) => reports.push(error),
@@ -55,7 +58,8 @@ async function composition(
     /** These extra genuine stages observe real suffix composition without replacing execution. */
     const client = await server.connect('composition-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             ...compositionFeatures(),
             batching: batchFeature(),

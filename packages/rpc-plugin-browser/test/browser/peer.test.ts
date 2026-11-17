@@ -1,4 +1,3 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
 import {
@@ -15,7 +14,7 @@ import {
   type IRpcTransportPlugin,
   type IRpcFlowPlugin
 } from '@migaia/rpc-host/sdk'
-import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/features/idempotency'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import {
   windowPlugin,
@@ -91,7 +90,10 @@ describe('browser public namespace runtime', () => {
       const peers = await Promise.all([
         createRpcHost<IFixtureApi, IBrowserReplayPlugins>({
           plugins: [
-            rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+            defineFlowPlugin({
+              name: 'rpc-flow-features',
+              features: { idempotency: idempotencyFeature() }
+            }),
             carrier === 'window'
               ? windowPlugin({
                   namespace: 'browser',
@@ -108,7 +110,10 @@ describe('browser public namespace runtime', () => {
         }),
         createRpcHost({
           plugins: [
-            rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+            defineFlowPlugin({
+              name: 'rpc-flow-features',
+              features: { idempotency: idempotencyFeature() }
+            }),
             carrier === 'window'
               ? windowPlugin({
                   namespace: 'browser',

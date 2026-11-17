@@ -1,7 +1,7 @@
 /** Thread leaf (b's thread c and its pool members): business providers behind a thread carrier. */
 import { workerData } from 'node:worker_threads'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import type { IRpcFlowFeature } from '@migaia/rpc-host/sdk'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { TopologyLeaf } from './topology-leaf.ts'

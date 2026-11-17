@@ -11,18 +11,17 @@ const expectedEntries = [
   '.',
   './contract',
   './features',
+  './features/auth',
+  './features/batch',
+  './features/chunk',
+  './features/error-map',
+  './features/idempotency',
+  './features/limits',
   './features/retry',
+  './features/schema',
   './features/timeout',
   './plugins',
-  './plugins/auth',
-  './plugins/batch',
-  './plugins/chunk',
-  './plugins/error-map',
-  './plugins/idempotency',
-  './plugins/limits',
-  './plugins/link-policy',
   './plugins/probe',
-  './plugins/schema',
   './plugins/typegen',
   './sdk'
 ]
@@ -68,7 +67,6 @@ const expectedSdk = [
   'createRpcStreamFrameDecoderWithLimit',
   'defaultRpcId',
   'defineFlowPlugin',
-  'defineLinkPolicy',
   'defineTransportPlugin',
   'encodeRpcStreamFrame',
   'encodeRpcStreamTextFrame',
@@ -95,28 +93,28 @@ const expectedSdk = [
   'defineRpcSourcePlugin',
   'isRpcCarrierAdmissionFailure',
   'markRpcCarrierAdmissionFailure',
-  'rpcFeaturesPlugin',
   'registerRpcNativeFeature',
   'readRpcFeature',
   'findRpcNativeFeatureOutput',
   'rpcHostPipelines'
 ]
 
-/** Optional flow behavior is published only through its actual owning plugin entry. */
-const expectedPlugins = [
+/** Every Feature factory, call policy or flow capability, is published from the features entry. */
+const expectedFeatures = [
   'authFeature',
   'batchFeature',
   'chunkFeature',
   'createRpcIdempotencyStore',
-  'defineProbe',
   'errorMapFeature',
   'idempotencyFeature',
   'limitsFeature',
-  'linkPolicy',
-  'probe',
+  'retryFeature',
   'schemaFeature',
-  'typegen'
+  'timeoutFeature'
 ]
+
+/** Only host-level observer plugins remain at the plugins entry. */
+const expectedPlugins = ['defineProbe', 'probe', 'typegen']
 
 it('publishes exactly the final Host package entries and runtime symbols', () => {
   /** This real manifest is independent of generated export metadata. */
@@ -124,7 +122,7 @@ it('publishes exactly the final Host package entries and runtime symbols', () =>
   expect(new Set(Object.keys(manifest.exports))).toEqual(new Set(expectedEntries))
   expect(new Set(Object.keys(root))).toEqual(new Set(expectedRoot))
   expect(new Set(Object.keys(sdk))).toEqual(new Set(expectedSdk))
-  expect(new Set(Object.keys(features))).toEqual(new Set(['retryFeature', 'timeoutFeature']))
+  expect(new Set(Object.keys(features))).toEqual(new Set(expectedFeatures))
   expect(new Set(Object.keys(plugins))).toEqual(new Set(expectedPlugins))
   expect(sdk).not.toHaveProperty('registerJsonObjectPort')
   expect(sdk).not.toHaveProperty('registerBatchAgreement')
@@ -138,29 +136,24 @@ it('publishes exactly the final Host package entries and runtime symbols', () =>
 })
 
 it('publishes the same feature factory through its named and default entry', async () => {
-  for (const name of ['retry', 'timeout'] as const) {
-    /** Resolve the actual package subpath rather than a test alias or source module. */
-    const entry = await import(`@migaia/rpc-host/features/${name}`)
-    expect(entry.default).toBe(features[`${name}Feature`])
-  }
   for (const [name, factory] of [
     ['auth', 'authFeature'],
     ['batch', 'batchFeature'],
     ['chunk', 'chunkFeature'],
+    ['error-map', 'errorMapFeature'],
     ['idempotency', 'idempotencyFeature'],
     ['limits', 'limitsFeature'],
-    ['probe', 'probe'],
+    ['retry', 'retryFeature'],
     ['schema', 'schemaFeature'],
-    ['typegen', 'typegen']
+    ['timeout', 'timeoutFeature']
   ] as const) {
-    /** Each complete optional capability has the same factory at both supported entries. */
-    const entry = await import(`@migaia/rpc-host/plugins/${name}`)
-    expect(entry.default).toBe(plugins[factory])
+    /** Resolve the actual package subpath rather than a test alias or source module. */
+    const entry = await import(`@migaia/rpc-host/features/${name}`)
+    expect(entry.default).toBe(features[factory])
   }
-  /** Camel-case factory and stable hyphenated subpath belong to the same link policy owner. */
-  const entry = await import('@migaia/rpc-host/plugins/link-policy')
-  expect(entry.default).toBe(plugins.linkPolicy)
-  /** Outbound presentation uses the same camel-case factory at its stable hyphenated subpath. */
-  const mapping = await import('@migaia/rpc-host/plugins/error-map')
-  expect(mapping.default).toBe(plugins.errorMapFeature)
+  for (const name of ['probe', 'typegen'] as const) {
+    /** Each observer plugin has the same factory at its index and named entry. */
+    const entry = await import(`@migaia/rpc-host/plugins/${name}`)
+    expect(entry.default).toBe(plugins[name])
+  }
 })

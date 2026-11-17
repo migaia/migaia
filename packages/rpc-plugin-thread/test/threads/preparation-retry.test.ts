@@ -1,3 +1,4 @@
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcRetryExecution } from '@migaia/rpc-host/features/retry'
 import { EventEmitter } from 'node:events'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -11,7 +12,6 @@ import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
 import { threadFrames } from './frame.ts'
 import { nativeFixture, workerEntry } from './fixture.ts'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
-import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 /** Ordinary lifecycle regressions from archived audit receipts do not restart the interrupted audit. */
 describe('thread preparation and retry settlement', () => {
   it('invokes the configured stop hook without a receiver on the real native unit', async () => {
@@ -150,7 +150,10 @@ describe('thread preparation and retry settlement', () => {
     try {
       /** The larger optional caller budget borrows the real installed Feature's manual clock. */
       await fixture.host.use(
-        linkPolicy({ features: { budget: timeoutFeature({ ms: 200, scheduler }) } })
+        defineFlowPlugin({
+          name: 'rpc-link-policy',
+          features: { budget: timeoutFeature({ ms: 200, scheduler }) }
+        })
       )
       const feature = await fixture.install()
       /** A held request remains physically pending so only its logical deadline may settle it. */

@@ -1,4 +1,4 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { mkdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { expect, vi } from 'vitest'
@@ -9,7 +9,7 @@ import {
   readRpcLaunchFacts,
   withRpcLaunchFacts
 } from '@migaia/rpc-host/sdk'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 
 import { createUnitBudget, type IUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'
@@ -200,7 +200,10 @@ async function installBusinessClient(
   const host = await createRpcHost({
     self,
     plugins: [
-      rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: source.token }) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { auth: authFeature({ credentials: source.token }) }
+      }),
       processPlugin({
         name: 'p',
         features,
