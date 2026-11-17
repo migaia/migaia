@@ -162,7 +162,7 @@ CREATE PUBLICATION migaia_storage_publication
 
 使用托管向量集合时，在下一次读取前用 `ALTER PUBLICATION ... ADD TABLE ...` 加入新建的向量物理表。也可把 storage 放在专属 schema，例如 `storage`，在该 schema 创建后用 `CREATE PUBLICATION migaia_storage_publication FOR TABLES IN SCHEMA storage WITH (publish = 'insert, update, delete, truncate');` 自动包含之后创建的表。专属 schema 只放需要发布的 storage 表；schema publication 也会发布该 schema 的其他合格表。
 
-**准入与迁移：** 旧版本仅接受 `FOR ALL TABLES`；现在统一通过 `pg_publication_tables` 接受显式表、schema 与全部表三种 publication，只要覆盖 feed 的实际表和四种操作。原有启用全部操作的 `FOR ALL TABLES` 部署无需修改。缺表或关闭操作现在以 `UNSUPPORTED_CAPABILITY` 拒绝，并在错误文本中指出表或操作；修正部署后重新检测。旧版本可能接受但不完整发布操作的配置，现在必须补齐四种操作。
+**publication 准入：** 通过 `pg_publication_tables` 检查，显式表、schema 与全部表（`FOR ALL TABLES`）三种 publication 都接受，只要覆盖 feed 用到的实际表和 insert、update、delete、truncate 四种操作。缺表或关闭了某种操作时以 `UNSUPPORTED_CAPABILITY` 拒绝，错误文本指出缺的表或操作；修正部署后重新检测。
 
 [PG16 逻辑解码文档](https://www.postgresql.org/docs/16/logicaldecoding-explanation.html)说明逻辑 slot 对应一个数据库的变更流；[publication 文档](https://www.postgresql.org/docs/16/logical-replication-publication.html)定义发布表与操作范围。逻辑解码仍读取整个数据库的 WAL，publication 只筛选 pgoutput 的输出表。缩小 publication 能减少无关变更的输出和网络量，不会把无关表的变更发给消费者，但不减少 WAL 解码本身的工作，也不能隔离同库 DDL 或保证消除解码错误。
 

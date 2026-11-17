@@ -99,14 +99,14 @@ With `Resource` the fetcher only loads data: generations tell old requests from 
 
 Think of a `Resource` as "an async variable that re-requests by itself": the fetcher is its formula, the reactive values the fetcher reads are the formula's inputs, and `state` is its current value.
 
-| Concept | In one sentence |
-| --- | --- |
-| Fetcher | `({ signal }) => value or Promise`; reactive values read before the first `await` become dependencies |
-| `state` | One of five states: `idle`, `pending`, `success` (with `data`), `error`, `cancelled` |
-| Generation | A number per request; only the newest generation's result can be written to `state` |
-| Lifetime (`ttl`) | How long a success stays fresh; defaults to `Infinity`, so only dependency changes or manual refreshes request again |
-| `cancel()` / `dispose()` | Stop this request and keep the resource usable / stop the request and release the whole resource |
-| Snapshot | The caller can transfer or store the data and remaining lifetime exported by `dehydrate()`, then restore them through `initialSnapshot` |
+| Concept                  | In one sentence                                                                                                                         |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Fetcher                  | `({ signal }) => value or Promise`; reactive values read before the first `await` become dependencies                                   |
+| `state`                  | One of five states: `idle`, `pending`, `success` (with `data`), `error`, `cancelled`                                                    |
+| Generation               | A number per request; only the newest generation's result can be written to `state`                                                     |
+| Lifetime (`ttl`)         | How long a success stays fresh; defaults to `Infinity`, so only dependency changes or manual refreshes request again                    |
+| `cancel()` / `dispose()` | Stop this request and keep the resource usable / stop the request and release the whole resource                                        |
+| Snapshot                 | The caller can transfer or store the data and remaining lifetime exported by `dehydrate()`, then restore them through `initialSnapshot` |
 
 A few terms:
 
@@ -116,15 +116,15 @@ A few terms:
 
 ## Typical scenarios
 
-| Scenario | How to combine | Details |
-| --- | --- | --- |
-| Load from inputs and show only the newest result | fetcher reads reactive values + `effect` reads `state` | [USEGUIDE](./USEGUIDE.en.md#show-only-the-result-for-the-latest-input) |
-| Several filters change together | the fetcher reads several signals | [USEGUIDE](./USEGUIDE.en.md#change-several-filters-send-one-request) |
-| Several components read the same data | share the `promise` or `state` of one `Resource` | [USEGUIDE](./USEGUIDE.en.md#several-readers-one-request) |
-| Leaving a page, cancelling an action | `dispose()` / `cancel()` + hand `signal` to the underlying request | [USEGUIDE](./USEGUIDE.en.md#stop-the-running-request-when-the-user-leaves) |
-| Refresh without blanking the content | `staleWhileRevalidate: true` | [USEGUIDE](./USEGUIDE.en.md#keep-showing-old-data-while-refreshing) |
-| Retry only temporary failures | a `retry` function + `retryDelay` | [USEGUIDE](./USEGUIDE.en.md#retry-only-temporary-failures) |
-| Server rendering | `dehydrate()` + `initialSnapshot` | [USEGUIDE](./USEGUIDE.en.md#do-not-request-server-loaded-data-again) |
+| Scenario                                         | How to combine                                                     | Details                                                                    |
+| ------------------------------------------------ | ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Load from inputs and show only the newest result | fetcher reads reactive values + `effect` reads `state`             | [USEGUIDE](./USEGUIDE.en.md#show-only-the-result-for-the-latest-input)     |
+| Several filters change together                  | the fetcher reads several signals                                  | [USEGUIDE](./USEGUIDE.en.md#change-several-filters-send-one-request)       |
+| Several components read the same data            | share the `promise` or `state` of one `Resource`                   | [USEGUIDE](./USEGUIDE.en.md#several-readers-one-request)                   |
+| Leaving a page, cancelling an action             | `dispose()` / `cancel()` + hand `signal` to the underlying request | [USEGUIDE](./USEGUIDE.en.md#stop-the-running-request-when-the-user-leaves) |
+| Refresh without blanking the content             | `staleWhileRevalidate: true`                                       | [USEGUIDE](./USEGUIDE.en.md#keep-showing-old-data-while-refreshing)        |
+| Retry only temporary failures                    | a `retry` function + `retryDelay`                                  | [USEGUIDE](./USEGUIDE.en.md#retry-only-temporary-failures)                 |
+| Server rendering                                 | `dehydrate()` + `initialSnapshot`                                  | [USEGUIDE](./USEGUIDE.en.md#do-not-request-server-loaded-data-again)       |
 
 ## Installation
 
@@ -136,14 +136,14 @@ The package has only the root entry `@migaia/resource`: `Resource`, `ResourceSta
 
 ## Common APIs
 
-| API | What it does |
-| --- | --- |
-| `new Resource(fetcher, runtime, options?)` | Creates an async data source; by default the first request starts in the constructor |
-| `resource.state` / `resource.read()` | Read the current state / read the Suspense way (success returns the value, loading throws the Promise, failure throws the error) |
-| `resource.promise` | The Promise of the current request or of the fresh cache; every reader shares the same one |
-| `refetch()` / `invalidate()` | Force a new request / expire the cache, then request |
-| `cancel()` / `dispose()` | Stop the current request and keep the resource usable / stop the request and release the resource |
-| `dehydrate()` / `hydrate()` | Export and restore a success with its remaining lifetime |
+| API                                        | What it does                                                                                                                     |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `new Resource(fetcher, runtime, options?)` | Creates an async data source; by default the first request starts in the constructor                                             |
+| `resource.state` / `resource.read()`       | Read the current state / read the Suspense way (success returns the value, loading throws the Promise, failure throws the error) |
+| `resource.promise`                         | The Promise of the current request or of the fresh cache; every reader shares the same one                                       |
+| `refetch()` / `invalidate()`               | Force a new request / expire the cache, then request                                                                             |
+| `cancel()` / `dispose()`                   | Stop the current request and keep the resource usable / stop the request and release the resource                                |
+| `dehydrate()` / `hydrate()`                | Export and restore a success with its remaining lifetime                                                                         |
 
 ## Contract details
 
@@ -172,9 +172,9 @@ One request reuses one pending Promise across every Suspense wait. After a thena
 
 `peekState()` reads the state union without recording a dependency, starting a request or checking the lifetime; unlike `peek()`, it returns the state object instead of returning the value or throwing. `reset()` cancels the current request and clears the dependencies and the cache, bringing the same instance back to a reusable `idle`; the previously shared Promise rejects at once with a native `AbortError` (`REQUEST_ABORTED`). The `IResourceFetchContext` given to the fetcher carries a readonly `signal`, a monotonically increasing `generation` and an opaque `token`: retries of one request share them, and a replacement or reset request receives a new set. Ownership of loaded values and render-version leases belong to adapters, not to the `Resource` dependency graph. See the USEGUIDE for a complete example.
 
-### State type migration
+### State types
 
-`ResourceStatus.fetching` became `ResourceFetchStatus.fetching`; the former `IResourceStatus` / `IResourceFetchStatus` types are replaced by the key unions `ResourceStatus` / `ResourceFetchStatus` that share their constants' names. The runtime status strings and the data and transport semantics of background refresh are unchanged.
+`ResourceStatus` lists the five states of `state`; whether a background refresh is running is reported by `ResourceFetchStatus` (for example `ResourceFetchStatus.fetching`). Both are a constant object plus a key union of the same name: use constants such as `ResourceStatus.success` for values and write `ResourceStatus` as the type.
 
 ### When not to use it
 

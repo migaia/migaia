@@ -114,31 +114,30 @@ pnpm add --workspace @migaia/log-host @migaia/log-plugin-durable
 - Explicit `dispose()` rejects on cleanup failure and reuses its Promise on repeated calls. `await using` cleanup reports failures and completes so it does not replace a primary business error. See each backend's guide for closing caller-supplied native clients.
 - Host errors use `source: 'storage.host'`. Shared argument and capability errors come from `storage.contract`. Inspect `source`, `code` and `cause` together rather than matching message text.
 
-## Moving backend authoring imports
+## Backend authoring entries
 
-Subpaths are consolidated: the former `/authoring/*` and `/vector/mmr` entries are merged into `/sdk`; `/journal` becomes `/plugins/journal`; `/entity/<name>` becomes `/entity/features/<name>`; the memory backend moves from the root entry to `/plugins/memory`. The old paths are removed with no aliases.
+Applications that only call `backend()` need no authoring tools. When you implement a backend, runtime tools come from `@migaia/storage-host/sdk`; types, capability tokens, definitions and pure validators come from `@migaia/storage-contract`.
 
-Applications that only call `backend()` do not need authoring tools. Backend implementations now import runtime tools from these entries; types, capability tokens, definitions and pure validators remain in contract.
+| Use                                          | Entry                                                        |
+| -------------------------------------------- | ------------------------------------------------------------ |
+| Query creation and condition execution       | `@migaia/storage-host/sdk`                                   |
+| Concurrency policy and transaction execution | `@migaia/storage-host/sdk`                                   |
+| Key encoding, input snapshots and resources  | `@migaia/storage-host/sdk`                                   |
+| Capability publication and value conversion  | `@migaia/storage-host/sdk`                                   |
+| SQL, SPARQL and channel tools                | `@migaia/storage-host/sdk`, and the respective channel entry |
+| Journal plugin                               | `@migaia/storage-host/plugins/journal`                       |
+| Memory backend                               | `@migaia/storage-host/plugins/memory`                        |
+| Entity Features                              | `@migaia/storage-host/entity/features/<name>`                |
 
-Paths beginning `/sdk` below are prefixed with `@migaia/storage-host`.
+See [storage-contract](../storage-contract/README.en.md#entries-and-dependency-direction) for full paths and dependencies.
 
-| Former contract runtime use                  | Current entry                            |
-| -------------------------------------------- | ---------------------------------------- |
-| Query creation and condition execution       | `@migaia/storage-host/sdk`               |
-| Concurrency policy and transaction execution | `/sdk`                                   |
-| Key encoding, input snapshots and resources  | `/sdk`                                   |
-| Capability publication and value conversion  | `/sdk`                                   |
-| SQL, SPARQL and channel tools                | `/sdk`, and the respective channel entry |
-
-See [storage-contract](../storage-contract/README.en.md#entries-and-dependency-direction) for full paths and dependencies. The old contract root no longer exports these runtime tools.
-
-Entity plugins: `defineEntityPlugin` replaces `defineEntity` without an alias. Declare a named `xxxEntityPlugin` with a record of opaque native `/entity/features/*` values, install it through storage-host plugins or `host.use`, then obtain repositories from `host.extensions[xxxEntityPlugin.name](store)`. Feature installation runs once per entity; repositories reuse installed factory outputs and expire with entity/host disposal. Plugin IDs can differ from the persisted entity namespace. Missing roles and duplicate roles reject at install. See [entity setup](./USEGUIDE.en.md#use-an-entity-repository).
+Declare entity plugins with `defineEntityPlugin`; instances are usually named `xxxEntityPlugin`. Pick the Features you need from `/entity/features/*` in its `features` record, install it through the `createStorageHost` plugins or `host.use`, then obtain repositories from `host.extensions[xxxEntityPlugin.name](store)`. Feature installation runs once per entity; repositories reuse installed factory outputs and expire with entity or host disposal. Plugin IDs can differ from the persisted entity namespace. Missing and duplicate roles reject at install. See [entity setup](./USEGUIDE.en.md#use-an-entity-repository).
 
 ## Assemble optional capabilities explicitly
 
-The base host does not import journal runtime, notification controllers or change iterators. Previously the host's journal option loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
+The base host does not import the journal runtime, notification controllers or change iterators. Applications select these capabilities, so code that only reads and writes does not bundle them.
 
-Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/plugins/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
+Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/plugins/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`.
 
 Observation events are subscribed only through `storageProbe(handlers)` from `@migaia/storage-host/plugins/probe`; the host has no `hooks` option and no `host.hooks`. A probe in the `createStorageHost` plugins receives events from the first install event of that batch. After installation, `host.extensions.observe(name, handler)` adds a listener and returns its unsubscribe function; on a view of a non-default organization it receives only that organization's events. A host has at most one probe. Listener failures go to `report` and never change storage results.
 
@@ -167,10 +166,10 @@ Without the feed Feature, memory reports `capabilities.changeFeed: false` and wa
 
 Backend authors import the controller factory from `/sdk` and pass it explicitly to `core.createChangeController(options, createBackendChangeController)`. Basic physical resources can use `createBackendLifecycleController` from that entry. Change iterators come from the same `/sdk` entry.
 
-### Strict index query migration
+### Strict index queries
 
-Previously, `.index(...).requirePushdown()` allowed a full scan when no client steps remained. Terminal reads now reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan.
+`.index(...).requirePushdown()` demands native index execution. Terminal reads reject with `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or when native preparation contention leaves only a scan.
 
-Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries retain their scan fallback.
+Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries keep their scan fallback.
 
-IndexedDB borrowed views resolve the same private capabilities as their native store. Legacy records keep readiness running until migration completes with the matching schema fingerprint. Queries continue to scan and report fallback while readiness is not complete.
+IndexedDB borrowed views resolve the same private capabilities as their native store. While records in an older format remain, index readiness stays running and queries keep scanning and report the fallback, until conversion completes with the matching schema fingerprint.

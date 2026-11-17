@@ -138,7 +138,7 @@ This package connects state changes to storage: it reads archives, reconciles lo
 | `@migaia/store-persist/indexed` | persistCollection, IPersistableCollection, IPersistCollectionOptions.                                                                 |
 | `@migaia/store-persist/keyed`   | persistKeyed, clearFamily, IPersistKeyedOptions, IPersistKeyedHandle.                                                                 |
 
-reactive, storage-contract, utils, and lifecycle are runtime dependencies. store-light, store-indexed, and store-keyed are optional peers: install the model you use. Install storage-plugin-browser only when using its backend or codec. Directly install packages your code imports rather than relying on transitive visibility. Obtain memoryStorageHost, localStorageHost, or indexedDbHost from storage-plugin-browser's precise backend subentries; this package does not depend on concrete storage-plugin-browser runtime values.
+reactive, storage-contract, utils, and lifecycle are runtime dependencies. store-light, store-indexed, and store-keyed are optional peers: install the model you use. Install storage-plugin-browser only when using its backend or codec. Directly install packages your code imports rather than relying on transitive visibility. Backend stores come from storage-host: use `memoryBackendPlugin()` from `@migaia/storage-host/plugins/memory` for memory, or a `*BackendPlugin` from a storage-plugin-browser subentry for browsers, install it with `createStorageHost`, then take the store with `host.backend(name)`. This package has no runtime dependency on a concrete backend package.
 
 ### Shared options and synchronous callbacks
 

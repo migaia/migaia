@@ -94,13 +94,13 @@ With `createStore`, the summary is a getter that recomputes when the fields it r
 
 `createStore` sorts every property of the object by how it is written:
 
-| You write | It becomes | In one sentence |
-| --- | --- | --- |
-| A plain value `count: 0` | Reactive value | Reading records a dependency, writing notifies |
-| A getter `get doubled()` | Derived value | Computed only when read, recomputed only when what it reads changes; read-only |
-| A method `increment()` | Action | Writes in one call are published together when it returns; reads inside it do not subscribe the caller |
-| `raw(value)` | Field kept as is | Even a function is stored as data, readable and writable |
-| A custom field (FieldBuilder) | Extension field | Created by an extension, such as a WASM-backed field |
+| You write                     | It becomes       | In one sentence                                                                                        |
+| ----------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------ |
+| A plain value `count: 0`      | Reactive value   | Reading records a dependency, writing notifies                                                         |
+| A getter `get doubled()`      | Derived value    | Computed only when read, recomputed only when what it reads changes; read-only                         |
+| A method `increment()`        | Action           | Writes in one call are published together when it returns; reads inside it do not subscribe the caller |
+| `raw(value)`                  | Field kept as is | Even a function is stored as data, readable and writable                                               |
+| A custom field (FieldBuilder) | Extension field  | Created by an extension, such as a WASM-backed field                                                   |
 
 A few terms:
 
@@ -110,14 +110,14 @@ A few terms:
 
 ## Typical scenarios
 
-| Scenario | How to combine | Details |
-| --- | --- | --- |
-| Forms, carts, settings panels | `createStore` + getters + methods | [USEGUIDE](./USEGUIDE.en.md#plain-object-in-reactive-state-out) |
-| Save to local storage and restore after an upgrade | `$plain()` + `$hydrate(partial, { unknown })` | [USEGUIDE](./USEGUIDE.en.md#save-only-what-can-be-restored) |
-| Sign-out, page teardown | `$dispose()`, with outside resources released through `$own()` | [USEGUIDE](./USEGUIDE.en.md#reading-a-released-store-fails-loudly) |
-| Store callbacks or outside instances | `raw()` | [USEGUIDE](./USEGUIDE.en.md#keep-a-callback-as-a-replaceable-field) |
-| Connections, decoders and other values released after loading | `createStoreResource` + `retainResource()` | [USEGUIDE](./USEGUIDE.en.md#release-an-async-value-when-nobody-uses-it) |
-| Allow field changes only inside methods | `mutationPolicy` | [USEGUIDE](./USEGUIDE.en.md#7-mutation-guards-imutationguard--imutationpolicy) |
+| Scenario                                                      | How to combine                                                 | Details                                                                        |
+| ------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Forms, carts, settings panels                                 | `createStore` + getters + methods                              | [USEGUIDE](./USEGUIDE.en.md#plain-object-in-reactive-state-out)                |
+| Save to local storage and restore after an upgrade            | `$plain()` + `$hydrate(partial, { unknown })`                  | [USEGUIDE](./USEGUIDE.en.md#save-only-what-can-be-restored)                    |
+| Sign-out, page teardown                                       | `$dispose()`, with outside resources released through `$own()` | [USEGUIDE](./USEGUIDE.en.md#reading-a-released-store-fails-loudly)             |
+| Store callbacks or outside instances                          | `raw()`                                                        | [USEGUIDE](./USEGUIDE.en.md#keep-a-callback-as-a-replaceable-field)            |
+| Connections, decoders and other values released after loading | `createStoreResource` + `retainResource()`                     | [USEGUIDE](./USEGUIDE.en.md#release-an-async-value-when-nobody-uses-it)        |
+| Allow field changes only inside methods                       | `mutationPolicy`                                               | [USEGUIDE](./USEGUIDE.en.md#7-mutation-guards-imutationguard--imutationpolicy) |
 
 ## Installation
 
@@ -129,14 +129,14 @@ The package has only the root entry `@migaia/store-light`. Use `@migaia/store-in
 
 ## Common APIs
 
-| API | What it does |
-| --- | --- |
-| `createStore(shape, options?)` | Creates a store from a plain object; the definition cannot contain async fields |
-| `createAsyncStore(shape, options?)` | For definitions with asynchronously initialized fields; the returned Promise completes once every field is ready |
-| `store.$subscribe(fn)` / `store.$batch(recipe)` | Subscribe to any field change / merge several writes into one notification |
-| `store.$plain()` / `store.$hydrate(partial, options?)` | Take the persistable fields / write saved fields back |
-| `store.$dispose()` | Releases the store; later access throws `STORE_DISPOSED` |
-| `createStoreResource(factory, options?)` | Creates an async value released by holder count |
+| API                                                    | What it does                                                                                                     |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `createStore(shape, options?)`                         | Creates a store from a plain object; the definition cannot contain async fields                                  |
+| `createAsyncStore(shape, options?)`                    | For definitions with asynchronously initialized fields; the returned Promise completes once every field is ready |
+| `store.$subscribe(fn)` / `store.$batch(recipe)`        | Subscribe to any field change / merge several writes into one notification                                       |
+| `store.$plain()` / `store.$hydrate(partial, options?)` | Take the persistable fields / write saved fields back                                                            |
+| `store.$dispose()`                                     | Releases the store; later access throws `STORE_DISPOSED`                                                         |
+| `createStoreResource(factory, options?)`               | Creates an async value released by holder count                                                                  |
 
 ## Contract details
 
@@ -153,6 +153,6 @@ Every signature, boundary behaviour and error message is in [USEGUIDE.en.md](./U
 7. **StoreResource owns its values.** With a `dispose` option, values must be objects or functions; without one, a value's own `$dispose` method is called. The countdown after the last holder leaves is `keepAliveMs` (default 1000; `0` releases synchronously); during React rendering, capture/commit leases protect the version on screen.
 8. **Error identity.** Errors produced by this package carry `source === STORE_LIGHT_SOURCE` (`store.light`) and a `code` from `StoreLightErrorCode`; ownership errors from reactive and request failures and cancellations from resource keep their original identity.
 
-Requests, data, cancellation and the shared Promise are handled by one instance of `@migaia/resource`; StoreResource only adds value ownership, render captures, version leases and exactly-once release on top. Migration notes (removal of `StoreResourceDataKind`, `StoreResourceKind` and `retain()`) are at the end of the USEGUIDE.
+Requests, data, cancellation and the shared Promise are handled by one instance of `@migaia/resource`; StoreResource only adds value ownership, render captures, version leases and exactly-once release on top.
 
 **When not to use it**: for lists and collections with frequent inserts and removals, entities addressed by id, or data that needs index queries, use store-indexed, store-keyed and the related packages.

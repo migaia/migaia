@@ -275,7 +275,7 @@ false
 
 本包只有根入口，导出两类、两工厂和错误身份工具，不提供 Store、Worker、消息协议或对象序列化实现。它依赖 `@migaia/reactive`、`@migaia/lifecycle`、`@migaia/utils`；运行时无 DOM、Node 或 Worker 绑定。调用方先创建 `IRuntime`，再创建共享包装实例。
 
-`sharedInt32` 等价于调用 `new SharedInt32Signal`，`sharedInt32Array` 等价于调用 `new SharedInt32Array`。类也公开，供类型标注或 `instanceof` 使用。`SharedWaitMode` / `ISharedWaitMode` 已移除，没有兼容别名；旧导入需要迁移，`watch()` 不再接受模式选择参数。
+`sharedInt32` 等价于调用 `new SharedInt32Signal`，`sharedInt32Array` 等价于调用 `new SharedInt32Array`。类也公开，供类型标注或 `instanceof` 使用。`watch()` 没有等待模式参数。
 
 共享的是 `SharedArrayBuffer`，每个 Runtime 各自创建包装对象。同一 JS 对象只能归属一个 Runtime；归属由 reactive 的所有权系统维护，不能把一个对象登记到另一个 Runtime。跨线程传 `.buffer`，不传包装对象；接收方使用相同长度和 buffer 附着。附着不会重新初始化数据，释放一个包装对象也不释放其他包装对象。
 

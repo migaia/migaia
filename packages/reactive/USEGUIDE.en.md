@@ -6,14 +6,14 @@ For what the package is for, its highlights and its mental model, see the [READM
 
 ## Find by scenario
 
-| Your problem | Read this section |
-| --- | --- |
-| Derived values must be updated by hand at every change | [Keep derived values in sync automatically](#keep-derived-values-in-sync-automatically) |
-| Old subscriptions are still active after switching rooms or pages | [Clean up the old subscription before switching](#clean-up-the-old-subscription-before-switching) |
-| Changing two values flashes a half-updated result | [Several writes, one update](#several-writes-one-update) |
-| A closed panel keeps recomputing | [Skip work nobody reads](#skip-work-nobody-reads) |
-| Two effects trigger each other and the tab freezes | [Effects feeding each other do not freeze the page](#effects-feeding-each-other-do-not-freeze-the-page) |
-| Requests share data in server rendering | [One Runtime per server request](#one-runtime-per-server-request) |
+| Your problem                                                      | Read this section                                                                                       |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Derived values must be updated by hand at every change            | [Keep derived values in sync automatically](#keep-derived-values-in-sync-automatically)                 |
+| Old subscriptions are still active after switching rooms or pages | [Clean up the old subscription before switching](#clean-up-the-old-subscription-before-switching)       |
+| Changing two values flashes a half-updated result                 | [Several writes, one update](#several-writes-one-update)                                                |
+| A closed panel keeps recomputing                                  | [Skip work nobody reads](#skip-work-nobody-reads)                                                       |
+| Two effects trigger each other and the tab freezes                | [Effects feeding each other do not freeze the page](#effects-feeding-each-other-do-not-freeze-the-page) |
+| Requests share data in server rendering                           | [One Runtime per server request](#one-runtime-per-server-request)                                       |
 
 ## Keep derived values in sync automatically
 
@@ -207,8 +207,18 @@ const celsius = runtime.signal(0, { debugName: 'celsius' })
 const fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })
 
 // Two effects write the value the other reads, and the conversion is off by 1, so they never agree and keep triggering each other
-runtime.effect(() => { fahrenheit.value = celsius.value * 1.8 + 33 }, { debugName: 'c-to-f' })
-runtime.effect(() => { celsius.value = (fahrenheit.value - 32) / 1.8 }, { debugName: 'f-to-c' })
+runtime.effect(
+  () => {
+    fahrenheit.value = celsius.value * 1.8 + 33
+  },
+  { debugName: 'c-to-f' }
+)
+runtime.effect(
+  () => {
+    celsius.value = (fahrenheit.value - 32) / 1.8
+  },
+  { debugName: 'f-to-c' }
+)
 
 await new Promise((resolve) => setTimeout(resolve, 10))
 console.log('the page stays responsive, celsius =', Math.round(celsius.peek()))
@@ -650,7 +660,7 @@ import {
 
 Neither factory can rebind a graph node that is already registered (built-in nodes included): it throws `GRAPH_NODE_REGISTERED` and never replaces a set that still has live edges. `invalidateObservable(runtime, node)` removes only the node's downstream edges while keeping upstream edges and caches, for switching Atom routing; to really release a node, still call its `dispose`.
 
-Migration: `@migaia/reactive/internals` has been removed. The old `internalsOf` / `registerSubs` / `registerVersion` / `registerDeps` and similar functions cannot import the whole tracker under a new name; move each use to the matching binding capability of `/extension` described above. `tracker` / `scheduler` / `clock` and writable sets always stay inside the kernel.
+Extensions use only the binding capabilities of `/extension` described above, by role; they cannot reach the whole tracker. `tracker` / `scheduler` / `clock` and writable sets always stay inside the kernel.
 
 ---
 
@@ -664,26 +674,26 @@ import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive'
 
 The stable error code table has **18 codes**, declared only in `src/error-code.ts`, and `source` is always `'reactive'`. (Background: the five codes `SCOPE_CLOSED` / `SCOPE_REENTRANT_DISPOSE` / `SCOPE_SYNC_VIOLATION` / `GENERATION_DISPOSED` / `SCOPE_DISPOSAL_FAILED` that used to belong here moved out with the lifecycle primitives and now belong to `@migaia/lifecycle`.)
 
-| `ReactiveErrorCode` key | Code | When it happens |
-| --- | --- | --- |
-| `callbackFailed` | `CALLBACK_FAILED` | An unclassified action / batch / untracked / tracked derivation callback failed. Native errors get the code in place where possible; primitives (including undefined) and immutable native errors are kept on `cause`; existing semantic identity is unchanged; a thrown non-Error object keeps its control identity so a Resource / Suspense owner can admit it once |
-| `nodeDisposed` | `NODE_DISPOSED` | A read or write method was called on a disposed `Signal` / `Computed` / custom Source |
-| `circularDependency` | `CIRCULAR_DEPENDENCY` | Evaluating a `Computed` read (directly or indirectly) the result it is currently evaluating |
-| `crossRuntime` | `CROSS_RUNTIME` | A node of one `Runtime` was read, subscribed or checked at the tracking / ownership boundary of another `Runtime` |
-| `notRuntimeOwned` | `NOT_RUNTIME_OWNED` | The object was not created by `createRuntime()` or carries no internal ownership registration |
-| `ownershipConflict` | `OWNERSHIP_CONFLICT` | The same node object was registered to different `Runtime`s |
-| `copyConflict` | `COPY_CONFLICT` | Several runtime copies of this library were detected, or `assertSingleRuntimeCopy()` found more than one copy |
-| `brandCorrupted` | `BRAND_CORRUPTED` | A cross-copy diagnostic brand was found in an unexpected shape |
-| `versionExhausted` | `VERSION_EXHAUSTED` | A new version was requested after the monotonic version clock reached its limit (default `Number.MAX_SAFE_INTEGER`) |
-| `flushLoop` | `FLUSH_LOOP` | One observer ran more than `maxFlushPasses` times (default 100) within one flush |
-| `observerFailed` | `OBSERVER_FAILED` | Several observers' `tick()` failed in one flush, or several observable lifecycle hooks failed; used as the `AggregateError` wrapper |
-| `actionFlushFailed` | `ACTION_FLUSH_FAILED` | An action inside `runBatched()` and its closing flush both failed; a plain writable error gets the aggregate on `cause`, and when `cause` cannot be read the three original values go straight into `AggregateError.errors` |
-| `schedulerFailed` | `SCHEDULER_FAILED` | Reserved: diagnostic channel code for unhandled errors caught from an async scheduling strategy callback or `reportError()` (no built-in throw or report point by default) |
-| `captureInvalid` | `CAPTURE_INVALID` | At `commitCapture()` the token from `capture()` was already invalid or consumed, belonged to another tracker, or its observer was disposed |
-| `bindingDuplicate` | `BINDING_DUPLICATE` | `observe()` was called again on the same `IObserverBinding` while it was already observed |
-| `graphNodeRegistered` | `GRAPH_NODE_REGISTERED` | A source / observer binding tried to replace the sets of an existing graph node; create a new node instead |
-| `internalsRegistered` | `INTERNALS_REGISTERED` | The internal surface of the same `Runtime` object was registered twice (`registerInternals()`) |
-| `invalidOption` | `INVALID_OPTION` | An option passed while constructing a `Runtime` / `Scheduler` / `VersionClock` did not meet its requirements |
+| `ReactiveErrorCode` key | Code                    | When it happens                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `callbackFailed`        | `CALLBACK_FAILED`       | An unclassified action / batch / untracked / tracked derivation callback failed. Native errors get the code in place where possible; primitives (including undefined) and immutable native errors are kept on `cause`; existing semantic identity is unchanged; a thrown non-Error object keeps its control identity so a Resource / Suspense owner can admit it once |
+| `nodeDisposed`          | `NODE_DISPOSED`         | A read or write method was called on a disposed `Signal` / `Computed` / custom Source                                                                                                                                                                                                                                                                                 |
+| `circularDependency`    | `CIRCULAR_DEPENDENCY`   | Evaluating a `Computed` read (directly or indirectly) the result it is currently evaluating                                                                                                                                                                                                                                                                           |
+| `crossRuntime`          | `CROSS_RUNTIME`         | A node of one `Runtime` was read, subscribed or checked at the tracking / ownership boundary of another `Runtime`                                                                                                                                                                                                                                                     |
+| `notRuntimeOwned`       | `NOT_RUNTIME_OWNED`     | The object was not created by `createRuntime()` or carries no internal ownership registration                                                                                                                                                                                                                                                                         |
+| `ownershipConflict`     | `OWNERSHIP_CONFLICT`    | The same node object was registered to different `Runtime`s                                                                                                                                                                                                                                                                                                           |
+| `copyConflict`          | `COPY_CONFLICT`         | Several runtime copies of this library were detected, or `assertSingleRuntimeCopy()` found more than one copy                                                                                                                                                                                                                                                         |
+| `brandCorrupted`        | `BRAND_CORRUPTED`       | A cross-copy diagnostic brand was found in an unexpected shape                                                                                                                                                                                                                                                                                                        |
+| `versionExhausted`      | `VERSION_EXHAUSTED`     | A new version was requested after the monotonic version clock reached its limit (default `Number.MAX_SAFE_INTEGER`)                                                                                                                                                                                                                                                   |
+| `flushLoop`             | `FLUSH_LOOP`            | One observer ran more than `maxFlushPasses` times (default 100) within one flush                                                                                                                                                                                                                                                                                      |
+| `observerFailed`        | `OBSERVER_FAILED`       | Several observers' `tick()` failed in one flush, or several observable lifecycle hooks failed; used as the `AggregateError` wrapper                                                                                                                                                                                                                                   |
+| `actionFlushFailed`     | `ACTION_FLUSH_FAILED`   | An action inside `runBatched()` and its closing flush both failed; a plain writable error gets the aggregate on `cause`, and when `cause` cannot be read the three original values go straight into `AggregateError.errors`                                                                                                                                           |
+| `schedulerFailed`       | `SCHEDULER_FAILED`      | Reserved: diagnostic channel code for unhandled errors caught from an async scheduling strategy callback or `reportError()` (no built-in throw or report point by default)                                                                                                                                                                                            |
+| `captureInvalid`        | `CAPTURE_INVALID`       | At `commitCapture()` the token from `capture()` was already invalid or consumed, belonged to another tracker, or its observer was disposed                                                                                                                                                                                                                            |
+| `bindingDuplicate`      | `BINDING_DUPLICATE`     | `observe()` was called again on the same `IObserverBinding` while it was already observed                                                                                                                                                                                                                                                                             |
+| `graphNodeRegistered`   | `GRAPH_NODE_REGISTERED` | A source / observer binding tried to replace the sets of an existing graph node; create a new node instead                                                                                                                                                                                                                                                            |
+| `internalsRegistered`   | `INTERNALS_REGISTERED`  | The internal surface of the same `Runtime` object was registered twice (`registerInternals()`)                                                                                                                                                                                                                                                                        |
+| `invalidOption`         | `INVALID_OPTION`        | An option passed while constructing a `Runtime` / `Scheduler` / `VersionClock` did not meet its requirements                                                                                                                                                                                                                                                          |
 
 Callers should always check `error.code === ReactiveErrorCode.xxx` instead of hard-coding the code strings. The JSDoc in `src/error-code.ts` explains the reason for each code.
 
@@ -740,12 +750,12 @@ type IRuntimeTraceEvent =
 
 Nodes appear as reduced `IRuntimeNodeDescriptor`s (`{ id, kind, debugName? }`), not as raw node objects.
 
-| Constant | Values | Purpose |
-| --- | --- | --- |
-| `ReactiveTraceType` | `{ observableChange, dependency, observerRun, action }` | Top-level discriminant of trace events |
-| `ReactiveTracePhase` | `{ start, end, error, connect, disconnect }` | Phase of dependency / observerRun / action events |
-| `ReactiveErrorPhase` | `{ asyncFlush, causeRead, dependencyDisconnect, lifecycleHook, ssrResource, subscriptionListener, traceListener }` | Values of `context.phase` received by `reportError` / `onError`; `causeRead` means reading the `cause` of an application error failed while closing a batch |
-| `ReactiveTraceReason` | `{ set, notify, retrack, invalidate, dispose }` | Reason of observableChange / dependency events |
+| Constant              | Values                                                                                                             | Purpose                                                                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ReactiveTraceType`   | `{ observableChange, dependency, observerRun, action }`                                                            | Top-level discriminant of trace events                                                                                                                      |
+| `ReactiveTracePhase`  | `{ start, end, error, connect, disconnect }`                                                                       | Phase of dependency / observerRun / action events                                                                                                           |
+| `ReactiveErrorPhase`  | `{ asyncFlush, causeRead, dependencyDisconnect, lifecycleHook, ssrResource, subscriptionListener, traceListener }` | Values of `context.phase` received by `reportError` / `onError`; `causeRead` means reading the `cause` of an application error failed while closing a batch |
+| `ReactiveTraceReason` | `{ set, notify, retrack, invalidate, dispose }`                                                                    | Reason of observableChange / dependency events                                                                                                              |
 
 ---
 
@@ -843,7 +853,7 @@ const runtime = createRuntime({
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
 
-Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When migrating, upgrade every reactive copy in one process together: the old `@morning-watch/store` namespace and the new version cannot see each other, so mixed copies neither count each other nor recognize each other's ownership marks.
+Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When one process holds several reactive copies, they count each other and recognize each other's ownership marks through these keys.
 
 `@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must create nothing at import time. It creates the shared default Runtime on its first call and returns exactly the same object as the root entry's `defaultRuntime`; importing the root `defaultRuntime` still creates it at import time. `ReactiveErrorPhase` can also be imported from the extension entry and is the same object as the root export.
 

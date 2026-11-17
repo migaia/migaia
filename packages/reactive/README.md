@@ -82,14 +82,14 @@ listeners.add(() => console.log(total))
 
 可以把一个 `Runtime` 想成一个独立的电子表格：`Signal` 是输入单元格，`Computed` 是带公式的单元格，`Effect` 是“某个单元格变了就打印或发请求”这类动作。
 
-| 概念 | 一句话 |
-| --- | --- |
-| `Runtime` | 一套独立的依赖图、版本时钟和调度器；节点必须属于同一个 `Runtime` 才能互相依赖 |
-| `Signal` | 可写的值，读 `.value` 会登记依赖，写 `.value` 会通知下游 |
-| `Computed` | 惰性计算、带缓存的派生值，只在被读取时按需重算 |
-| `Effect` | 读取依赖并执行副作用；创建时立即运行一次，依赖变化后被安排重跑 |
-| `batch()` / `flush()` | 把多次写入合并成一次副作用刷新 / 立即同步冲刷待运行的副作用 |
-| trace | 只读诊断事件：值变化、依赖连接和断开、副作用执行，不影响业务状态 |
+| 概念                  | 一句话                                                                        |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `Runtime`             | 一套独立的依赖图、版本时钟和调度器；节点必须属于同一个 `Runtime` 才能互相依赖 |
+| `Signal`              | 可写的值，读 `.value` 会登记依赖，写 `.value` 会通知下游                      |
+| `Computed`            | 惰性计算、带缓存的派生值，只在被读取时按需重算                                |
+| `Effect`              | 读取依赖并执行副作用；创建时立即运行一次，依赖变化后被安排重跑                |
+| `batch()` / `flush()` | 把多次写入合并成一次副作用刷新 / 立即同步冲刷待运行的副作用                   |
+| trace                 | 只读诊断事件：值变化、依赖连接和断开、副作用执行，不影响业务状态              |
 
 几个说法：
 
@@ -99,14 +99,14 @@ listeners.add(() => console.log(total))
 
 ## 典型场景
 
-| 场景 | 怎么组合 | 详细说明 |
-| --- | --- | --- |
-| 派生值随输入自动更新 | `runtime.computed` + `runtime.effect` | [USEGUIDE](./USEGUIDE.md#派生值自动更新) |
-| 切换房间、页面时清理旧订阅 | `effect` 返回清理函数 | [USEGUIDE](./USEGUIDE.md#切换订阅时先清理旧的) |
-| 同时修改多个值 | 默认微任务合并，或 `runtime.batch` | [USEGUIDE](./USEGUIDE.md#多次写入只更新一次) |
-| 关闭的面板不再重算 | `computed` 自动挂起，`keepAlive` 可关闭 | [USEGUIDE](./USEGUIDE.md#没人读取的派生值不计算) |
-| 防止副作用死循环 | `maxFlushPasses` + `onError` | [USEGUIDE](./USEGUIDE.md#副作用互相触发时不会卡死) |
-| 服务端渲染、测试隔离 | 每个请求或用例一个 `createRuntime()` | [USEGUIDE](./USEGUIDE.md#服务端每个请求一个-runtime) |
+| 场景                       | 怎么组合                                | 详细说明                                             |
+| -------------------------- | --------------------------------------- | ---------------------------------------------------- |
+| 派生值随输入自动更新       | `runtime.computed` + `runtime.effect`   | [USEGUIDE](./USEGUIDE.md#派生值自动更新)             |
+| 切换房间、页面时清理旧订阅 | `effect` 返回清理函数                   | [USEGUIDE](./USEGUIDE.md#切换订阅时先清理旧的)       |
+| 同时修改多个值             | 默认微任务合并，或 `runtime.batch`      | [USEGUIDE](./USEGUIDE.md#多次写入只更新一次)         |
+| 关闭的面板不再重算         | `computed` 自动挂起，`keepAlive` 可关闭 | [USEGUIDE](./USEGUIDE.md#没人读取的派生值不计算)     |
+| 防止副作用死循环           | `maxFlushPasses` + `onError`            | [USEGUIDE](./USEGUIDE.md#副作用互相触发时不会卡死)   |
+| 服务端渲染、测试隔离       | 每个请求或用例一个 `createRuntime()`    | [USEGUIDE](./USEGUIDE.md#服务端每个请求一个-runtime) |
 
 ## 安装
 
@@ -114,21 +114,21 @@ listeners.add(() => console.log(total))
 pnpm add @migaia/reactive
 ```
 
-| 入口 | 内容 |
-| --- | --- |
-| `@migaia/reactive` | `createRuntime`、`defaultRuntime`、节点类型 `IReactiveSignal` / `IReactiveComputed` / `IReactiveEffect`、诊断常量与错误码 |
-| `@migaia/reactive/extension` | 给 store、集合、资源和 UI 框架适配层用的扩展能力：所有权登记、自定义数据源、observer binding、只读的版本查询 |
+| 入口                         | 内容                                                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `@migaia/reactive`           | `createRuntime`、`defaultRuntime`、节点类型 `IReactiveSignal` / `IReactiveComputed` / `IReactiveEffect`、诊断常量与错误码 |
+| `@migaia/reactive/extension` | 给 store、集合、资源和 UI 框架适配层用的扩展能力：所有权登记、自定义数据源、observer binding、只读的版本查询              |
 
 ## 常用 API
 
-| API | 做什么 |
-| --- | --- |
-| `createRuntime(options?)` | 创建一个隔离的 Runtime；选项可设置调度方式、`maxFlushPasses`、`onError`、`onTrace` |
-| `runtime.signal(value)` / `runtime.computed(fn)` / `runtime.effect(fn)` | 创建可写值、派生值和副作用；都有 `dispose()` |
-| `runtime.batch(fn)` / `runtime.flush()` | 把多次写入合并成一次刷新 / 立即同步冲刷 |
-| `runtime.untracked(fn)` | 在不登记依赖的情况下读取 |
-| `runtime.subscribeTrace(listener)` | 订阅只读诊断事件 |
-| `createObserverBinding`（`/extension`） | 写 UI 框架适配层：渲染期间采集依赖，提交后再订阅 |
+| API                                                                     | 做什么                                                                             |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `createRuntime(options?)`                                               | 创建一个隔离的 Runtime；选项可设置调度方式、`maxFlushPasses`、`onError`、`onTrace` |
+| `runtime.signal(value)` / `runtime.computed(fn)` / `runtime.effect(fn)` | 创建可写值、派生值和副作用；都有 `dispose()`                                       |
+| `runtime.batch(fn)` / `runtime.flush()`                                 | 把多次写入合并成一次刷新 / 立即同步冲刷                                            |
+| `runtime.untracked(fn)`                                                 | 在不登记依赖的情况下读取                                                           |
+| `runtime.subscribeTrace(listener)`                                      | 订阅只读诊断事件                                                                   |
+| `createObserverBinding`（`/extension`）                                 | 写 UI 框架适配层：渲染期间采集依赖，提交后再订阅                                   |
 
 ## 契约细节
 
@@ -183,7 +183,7 @@ count.dispose()
 
 扩展入口的 `claimOwnership`、`ownerOf`、`assertOwnedBy` 对普通对象和函数对象使用同一归属契约：已登记的函数可以查到原 Runtime，跨 Runtime 校验抛 `CROSS_RUNTIME`，另一模块副本的品牌抛 `COPY_CONFLICT`。
 
-跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 两个全局 Symbol key。升级时请让同一进程中的 reactive 副本保持同一版本：旧的 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数，也不会识别对方的归属标记。
+跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 两个全局 Symbol key。同一进程里有多份 reactive 副本时，它们通过这两个 key 互相计数、识别对方的归属标记。
 
 `@migaia/reactive/extension` 提供 `getDefaultRuntime()`，给需要在导入时保持不创建任何东西的适配层使用。它在第一次调用时创建共享的默认 Runtime，返回的对象与根入口的 `defaultRuntime` 完全相同；导入根入口的 `defaultRuntime` 仍在导入时创建。`ReactiveErrorPhase` 也可以从扩展入口导入，与根入口导出的是同一个对象。
 

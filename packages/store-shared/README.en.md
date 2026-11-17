@@ -116,7 +116,7 @@ These examples import createRuntime directly, so the consuming project must dire
 
 The package has one root entry. It exports two classes, two factories, and error identity helpers; it does not provide a Store, Worker, message protocol, or object serializer. Its dependencies are `@migaia/reactive`, `@migaia/lifecycle`, and `@migaia/utils`. It has no DOM, Node, or Worker binding. Create an `IRuntime` before creating a shared wrapper.
 
-`sharedInt32` delegates to `new SharedInt32Signal`; `sharedInt32Array` delegates to `new SharedInt32Array`. Both classes remain public for type annotations and `instanceof` checks. `SharedWaitMode` and `ISharedWaitMode` were removed without compatibility aliases. Migrate old imports; `watch()` has no wait-mode argument.
+`sharedInt32` delegates to `new SharedInt32Signal`; `sharedInt32Array` delegates to `new SharedInt32Array`. Both classes are public for type annotations and `instanceof` checks. `watch()` has no wait-mode argument.
 
 Share the `SharedArrayBuffer`, and create a separate wrapper in each Runtime. The reactive ownership system gives each JS object one Runtime owner; an existing object cannot be registered with another Runtime. Send `.buffer` across a thread boundary and attach with the same array length. Attachment preserves existing data. Disposing one wrapper does not dispose another wrapper.
 

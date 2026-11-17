@@ -316,7 +316,7 @@ Topics require non-empty strings and portable payloads. A topic named spawned re
 
 Each current subscription receives at most one delivery. Non-ready subscribers miss publications, with no replay, persistence or business-completion acknowledgement. Synchronous listener throws and async rejections are reported on their own side while later listeners continue. Delivery-send rejection is reported by the parent and handler failure by the child, without those delivery failures rejecting the publisher.
 
-### Errors and migration
+### Error codes
 
 Tray-owned boundary codes use TRAY_SOURCE, `tray`. Branch on source/code rather than message. Annotatable native errors preserve type, stack and identity. Frozen or unsafe-to-annotate values remain reachable through a coded wrapper's cause, and complete foreign identities remain with their owner. Graph startup, node and release failures continue to belong to capability.
 
@@ -354,6 +354,6 @@ Tray-owned boundary codes use TRAY_SOURCE, `tray`. Branch on source/code rather 
 | gateReadFailed / TRAY_GATE_READ_FAILED            | Readiness property or state/error getter failure.                                                                              |
 | hostMutationBypass / HOST_MUTATION_BYPASS         | Concrete Host mutation outside the managed facade.                                                                             |
 
-Four former public managed-type helpers are no longer exported: IHostBaselinePlugins, IPluginWithSynchronousShared, ICanResolveReadyDefinitions and IResolveReadyTrayPlugins. Use ITrayResolvedHost / ITrayHostDynamic or inferred Runtime types externally. Runtime shutdown accepts only mode; its unused quiescenceMs field was removed, with that budget configured on managed Host instead. Loader/Adapter method getters are read once, and validation/execution use that same function.
+For external type annotations use ITrayResolvedHost / ITrayHostDynamic or the inferred Runtime types. Runtime shutdown accepts only mode; the quiescence budget is configured on the managed Host. Loader/Adapter method getters are read once, and validation/execution use that same function.
 
 The package provides fmt, lint, typecheck, typecheck:test, test and build. Preserve cause/errors and physicalCompletion when recording cleanup failures. This command list does not claim execution here, nor establish other hosts, native isolation or performance from local examples.

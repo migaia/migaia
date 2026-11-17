@@ -249,6 +249,6 @@ Cookie 的 `redo: true` 复用同一原事务/WAL 协议；普通和 redo 写入
 
 `schema` 处理领域表示，`codec` 处理保存格式。读取依次执行 `codec.decode`、版本迁移（存储表示）、`schema.decode`、`validate`。结构化输出在文本后端以 `UNSUPPORTED_CAPABILITY` 拒绝，不会悄悄改成 JSON。
 
-### 严格索引查询迁移
+### 严格索引查询
 
-旧版 `.index(...).requirePushdown()` 在没有客户端步骤时允许全表扫描。现在显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；未迁移的旧格式记录使 readiness 保持 running；查询继续全表扫描并发出回退诊断，直到迁移状态完成且与当前定义一致。
+`.index(...).requirePushdown()` 要求查询必须走原生索引。显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；存在旧格式记录时 readiness 保持 running，查询继续全表扫描并发出回退诊断，直到记录转换完成且与当前定义一致。

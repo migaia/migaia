@@ -15,7 +15,7 @@
 
 ## 运行准备
 
-每个示例独立保存为 .ts，在 ESM 项目用 Node 24 运行。它们使用真实 memoryStorageHost，不需要浏览器 localStorage 或 IndexedDB；内存后端的内容只在该实例存活期间保留。按所需模型安装，下面覆盖全部六例：
+每个示例独立保存为 .ts，在 ESM 项目用 Node 24 运行。它们使用 storage-host 的真实内存后端，不需要浏览器 localStorage 或 IndexedDB；内存后端的内容只在该实例存活期间保留。按所需模型安装，下面覆盖全部六例：
 
 ```bash
 pnpm add @migaia/store-persist @migaia/storage-plugin-browser @migaia/store-light @migaia/store-indexed @migaia/store-keyed @migaia/reactive
@@ -382,7 +382,7 @@ atoms.dispose()
 | `@migaia/store-persist/indexed` | persistCollection、IPersistableCollection、IPersistCollectionOptions。                                        |
 | `@migaia/store-persist/keyed`   | persistKeyed、clearFamily、IPersistKeyedOptions、IPersistKeyedHandle。                                        |
 
-reactive、storage-contract、utils、lifecycle 是运行时依赖。store-light、store-indexed、store-keyed 是可选 peer，只安装所用模型；storage-plugin-browser 仅在使用其后端或 codec 时安装。代码直接导入的包应直接安装，不能依赖传递依赖恰好可见。memoryStorageHost、localStorageHost、indexedDbHost 从 storage-plugin-browser 的精确后端子入口取得；本包不在运行时依赖具体 storage-plugin-browser 值。
+reactive、storage-contract、utils、lifecycle 是运行时依赖。store-light、store-indexed、store-keyed 是可选 peer，只安装所用模型；storage-plugin-browser 仅在使用其后端或 codec 时安装。代码直接导入的包应直接安装，不能依赖传递依赖恰好可见。后端 store 来自 storage-host：内存后端用 `@migaia/storage-host/plugins/memory` 的 `memoryBackendPlugin()`，浏览器后端用 storage-plugin-browser 各子入口的 `*BackendPlugin`，装进 `createStorageHost` 后用 `host.backend(name)` 取得。本包不在运行时依赖具体后端包。
 
 ### 共同配置与同步回调
 

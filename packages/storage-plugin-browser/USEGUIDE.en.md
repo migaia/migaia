@@ -298,13 +298,13 @@ Raw `store.use(records).query().page()` and `.after()` additionally require `ind
 
 Omitted raw pagination rejects with `@migaia/storage-plugin-browser / INDEXED_DB_FEATURE_NOT_INSTALLED` and names the missing factory before opening a reader. Entity pagination has its own `entityKeysetFeature()` declaration and does not require this raw-query Feature.
 
-### Strict index query migration
+### Strict index queries
 
-Previously, `.index(...).requirePushdown()` allowed a full scan when no client steps remained. Terminal reads now reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan.
+`.index(...).requirePushdown()` demands native index execution. Terminal reads reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan.
 
-Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries retain their scan fallback.
+Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries keep their scan fallback.
 
-IndexedDB borrowed views resolve the same private capabilities as their native store. Legacy records keep readiness running until migration completes with the matching schema fingerprint. Queries continue to scan and report fallback while readiness is not complete.
+IndexedDB borrowed views resolve the same private capabilities as their native store. While records in an older format remain, index readiness stays running and queries keep scanning and report the fallback, until conversion completes with the matching schema fingerprint.
 
 When no migration metadata exists, a backfill that starts from the canonical beginning and finishes both scan phases may become complete only if it observes no legacy records and skips no invalid entity records. Current-format records can then use the native cursor without `entityMigrationFeature()`.
 

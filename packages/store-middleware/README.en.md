@@ -121,7 +121,7 @@ This package adds mutation permission, action/state/error events, and removable 
 
 The root exports MutationPolicy/createMutationPolicy, event and command vocabularies, the Host/binding/logger/DevTools adapter, and errors. Clone strategies are available only from `@migaia/store-middleware/tolerant-clone`. Ordinary dependencies are middleware-pipeline, plugin-host, reactive, store-light, and utils. Explicitly install store-light/reactive when importing them directly in an example.
 
-The old middlewarePlugin/IStoreMiddleware/IMiddlewareContext adapters were removed; use `IStoreMiddlewarePlugin`, install(core), and core.usePipeline. tolerantClone no longer exists at either entry. ClonePolicy, immutableSnapshotClone, opaqueReferenceClone, diagnosticClone, and IClonePolicyMode belong to the narrow entry. Import IMutationGuard/IMutationPolicy directly from store-light; this package has no aliases. The former store-devtools StoreDevtoolsCommand/IStoreDevtoolsCommand imports move to ReduxDevToolsCommand/IReduxDevToolsCommand here without changing protocol strings.
+Middleware plugins implement `IStoreMiddlewarePlugin` and attach in `install(core)` through `core.usePipeline`. Import ClonePolicy, immutableSnapshotClone, opaqueReferenceClone, diagnosticClone and IClonePolicyMode from the narrow entry. Import IMutationGuard/IMutationPolicy directly from store-light. The Redux DevTools command constants are this package's ReduxDevToolsCommand/IReduxDevToolsCommand.
 
 ### MutationPolicy: synchronous write permission
 

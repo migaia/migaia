@@ -677,7 +677,7 @@ tray.publish(topic, payload?) 同步向当前订阅者分发；子端 deps.tray.
 
 每个当前订阅最多投递一次；目标未 ready 会错过消息，没有 replay、持久性或业务完成确认。同步 listener throw 与异步 reject 在其侧报告，后续监听器继续；投递发送拒绝由父端报告，处理失败由子端报告，不以这些投递错误拒绝发布者。
 
-### 错误与迁移
+### 错误码
 
 所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。
 
@@ -715,6 +715,6 @@ tray.publish(topic, payload?) 同步向当前订阅者分发；子端 deps.tray.
 | gateReadFailed / TRAY_GATE_READ_FAILED            | readiness 属性或 state/error getter 失败。                            |
 | hostMutationBypass / HOST_MUTATION_BYPASS         | 绕开托管 facade 的 concrete Host 变更。                               |
 
-旧四个托管类型辅助导出 IHostBaselinePlugins、IPluginWithSynchronousShared、ICanResolveReadyDefinitions、IResolveReadyTrayPlugins 已取消公开导出；外部标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导。Runtime shutdown 只接收 mode，不再接收未使用的 quiescenceMs；对应预算在 managed Host 配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。
+外部类型标注使用 ITrayResolvedHost / ITrayHostDynamic 或 Runtime 推导出的类型。Runtime shutdown 只接收 mode；静默等待预算在 managed Host 上配置。Loader / Adapter 方法只读取一次，校验与执行复用同一函数。
 
 包提供 fmt、lint、typecheck、typecheck:test、test、build；清理失败需沿 cause / errors 与 physicalCompletion 记录。此命令清单不声明本页已运行门禁，也不把本地案例当成其他运行时、原生隔离或性能证据。

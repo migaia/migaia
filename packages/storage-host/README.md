@@ -114,31 +114,30 @@ pnpm add --workspace @migaia/log-host @migaia/log-plugin-durable
 - 显式 `dispose()` 的失败会拒绝，重复调用复用同一个 Promise。`await using` 清理会报告失败并完成，以免覆盖业务代码的主错误。调用方提供的原生客户端是否需要单独关闭，见相应后端说明。
 - 宿主错误的 `source` 为 `storage.host`；共享参数和能力错误来自 `storage.contract`。排查时同时读取 `source`、`code` 与 `cause`，不要匹配错误文案。
 
-## 后端作者入口迁移
+## 后端作者入口
 
-子路径已经收敛：原来的 `/authoring/*` 和 `/vector/mmr` 合并为 `/sdk`；`/journal` 改为 `/plugins/journal`；`/entity/<名称>` 改为 `/entity/features/<名称>`；memory 后端从根入口移到 `/plugins/memory`。旧路径直接删除，不保留别名。
+只调用 `backend()` 的应用不需要作者工具。自己实现后端时，运行时工具都从 `@migaia/storage-host/sdk` 导入；类型、能力 token、定义和纯校验函数从 `@migaia/storage-contract` 导入。
 
-应用只调用 `backend()` 时无需导入作者工具。实现后端时，运行时工具从以下入口获取；类型、能力 token、定义和纯校验继续从 contract 获取。
+| 用途                       | 入口                                          |
+| -------------------------- | --------------------------------------------- |
+| 查询创建与条件执行         | `@migaia/storage-host/sdk`                    |
+| 并发策略与事务执行         | `@migaia/storage-host/sdk`                    |
+| 键编码、输入快照、资源管理 | `@migaia/storage-host/sdk`                    |
+| 能力发布与数据转换         | `@migaia/storage-host/sdk`                    |
+| SQL、SPARQL 与数据通道工具 | `@migaia/storage-host/sdk`、相应通道入口      |
+| 日志插件                   | `@migaia/storage-host/plugins/journal`        |
+| 内存后端                   | `@migaia/storage-host/plugins/memory`         |
+| 实体 Feature               | `@migaia/storage-host/entity/features/<名称>` |
 
-表中的 `/sdk` 均以 `@migaia/storage-host` 开头。
+完整路径和依赖说明见 [storage-contract](../storage-contract/README.md#入口与依赖方向)。
 
-| 原 contract 运行时用途     | 当前入口                   |
-| -------------------------- | -------------------------- |
-| 查询创建与条件执行         | `@migaia/storage-host/sdk` |
-| 并发策略与事务执行         | `/sdk`                     |
-| 键编码、输入快照、资源管理 | `/sdk`                     |
-| 能力发布与数据转换         | `/sdk`                     |
-| SQL、SPARQL 与数据通道工具 | `/sdk`、相应通道入口       |
-
-完整路径和依赖说明见 [storage-contract](../storage-contract/README.md#入口与依赖方向)。旧 contract 根入口不保留这些运行时导出。
-
-实体插件：`defineEntityPlugin` 无别名替代 `defineEntity`。以 `xxxEntityPlugin` 命名实例，在 record 中选择不透明原生 `/entity/features/*`，经 storage host plugins 或 `host.use` 安装，再通过 `host.extensions[xxxEntityPlugin.name](store)` 获取仓储。每实体只安装一次 Feature，仓储复用已安装工厂并随实体/宿主失效；插件 ID 可不同于持久化实体命名空间。缺失或重复角色在安装时拒绝。详见[实体仓储](./USEGUIDE.md#使用实体仓储)。
+实体插件用 `defineEntityPlugin` 声明，实例习惯以 `xxxEntityPlugin` 命名。在它的 `features` 里选择 `/entity/features/*` 中需要的 Feature，经 `createStorageHost` 的 `plugins` 或 `host.use` 安装，再用 `host.extensions[xxxEntityPlugin.name](store)` 取得仓储。每个实体的 Feature 只安装一次，仓储复用已安装的工厂，并随实体或宿主释放而失效；插件 ID 可以和持久化的实体命名空间不同。缺少或重复的角色在安装时拒绝。详见[实体仓储](./USEGUIDE.md#使用实体仓储)。
 
 ## 显式装配可选能力
 
-基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前宿主的 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。
+基础宿主不导入日志运行时、通知控制器或变更迭代器。这些能力由业务显式选择，只做基础读写的应用不会打包用不到的代码。
 
-日志配置写在从 `@migaia/storage-host/plugins/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
+日志配置写在从 `@migaia/storage-host/plugins/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。
 
 观察事件只通过 `@migaia/storage-host/plugins/probe` 的 `storageProbe(handlers)` 订阅，宿主没有 `hooks` 选项，也没有 `host.hooks`。probe 放进 `createStorageHost` 的 plugins 时，从这一批的第一个安装事件起就能收到；安装后用 `host.extensions.observe(name, handler)` 追加监听，返回值是退订函数。在非默认组织的视图上调用时只收到该组织的事件。一个宿主只装一个 probe；监听器失败交给 `report`，不改变存储结果。
 
@@ -167,6 +166,8 @@ await host.dispose()
 
 后端作者从 `/sdk` 导入通知工厂，并显式传给 `core.createChangeController(options, createBackendChangeController)`。基础物理资源可使用同入口的 `createBackendLifecycleController`。变更迭代器也从同一个 `/sdk` 入口导入。
 
-### 严格索引查询迁移
+### 严格索引查询
 
-旧版 `.index(...).requirePushdown()` 在没有客户端步骤时允许全表扫描。现在显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；未迁移的旧格式记录使 readiness 保持 running；查询继续全表扫描并发出回退诊断，直到迁移状态完成且与当前定义一致。
+`.index(...).requirePushdown()` 要求查询必须走原生索引。如果显式索引来源规划为 `fullScan`，或者原生索引准备遇到竞争、只能扫描，终端读取会以 `@migaia/storage-contract / QUERY_NOT_PUSHABLE` 拒绝。需要原生索引时，同时装配 `entityIndexesFeature()` 和后端的索引 Feature；可以接受全表扫描时去掉 `requirePushdown()`。普通查询仍保留扫描回退。
+
+IndexedDB 的借用视图与原生 store 共用能力身份。存在旧格式记录时，索引 readiness 保持 running，查询继续全表扫描并发出回退诊断，直到记录转换完成且与当前定义一致。

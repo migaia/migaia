@@ -94,13 +94,13 @@ cart.add('键盘', 300)
 
 `createStore` 把对象的每个属性按写法归类：
 
-| 你写的 | 变成 | 一句话 |
-| --- | --- | --- |
-| 普通值 `count: 0` | 响应式值 | 读取时登记依赖，写入时通知 |
-| getter `get doubled()` | 派生值 | 只在被读取时计算，读到的字段变了才重算；只读 |
-| 方法 `increment()` | Action | 一次调用里的写入在返回时一起发布；方法里读字段不会让调用方订阅它们 |
-| `raw(value)` | 原样字段 | 函数也当作数据保存，可读可写 |
-| 自定义字段（FieldBuilder） | 扩展字段 | 交给扩展创建，例如 WASM 支撑的字段 |
+| 你写的                     | 变成     | 一句话                                                             |
+| -------------------------- | -------- | ------------------------------------------------------------------ |
+| 普通值 `count: 0`          | 响应式值 | 读取时登记依赖，写入时通知                                         |
+| getter `get doubled()`     | 派生值   | 只在被读取时计算，读到的字段变了才重算；只读                       |
+| 方法 `increment()`         | Action   | 一次调用里的写入在返回时一起发布；方法里读字段不会让调用方订阅它们 |
+| `raw(value)`               | 原样字段 | 函数也当作数据保存，可读可写                                       |
+| 自定义字段（FieldBuilder） | 扩展字段 | 交给扩展创建，例如 WASM 支撑的字段                                 |
 
 几个说法：
 
@@ -110,14 +110,14 @@ cart.add('键盘', 300)
 
 ## 典型场景
 
-| 场景 | 怎么组合 | 详细说明 |
-| --- | --- | --- |
-| 表单、购物车、设置面板 | `createStore` + getter + 方法 | [USEGUIDE](./USEGUIDE.md#写普通对象就得到响应式状态) |
-| 保存到本地存储、升级后恢复 | `$plain()` + `$hydrate(partial, { unknown })` | [USEGUIDE](./USEGUIDE.md#只保存能恢复的字段) |
-| 退出登录、页面销毁 | `$dispose()`，外部资源用 `$own()` 一起释放 | [USEGUIDE](./USEGUIDE.md#读取已释放的-store-会明确报错) |
-| 存回调、外部实例 | `raw()` | [USEGUIDE](./USEGUIDE.md#把回调保存成可替换的字段) |
-| 连接、解码器等加载后要释放的值 | `createStoreResource` + `retainResource()` | [USEGUIDE](./USEGUIDE.md#没人使用之后自动释放异步值) |
-| 只允许在方法里改字段 | `mutationPolicy` | [USEGUIDE](./USEGUIDE.md#7-写入守卫imutationguard--imutationpolicy) |
+| 场景                           | 怎么组合                                      | 详细说明                                                            |
+| ------------------------------ | --------------------------------------------- | ------------------------------------------------------------------- |
+| 表单、购物车、设置面板         | `createStore` + getter + 方法                 | [USEGUIDE](./USEGUIDE.md#写普通对象就得到响应式状态)                |
+| 保存到本地存储、升级后恢复     | `$plain()` + `$hydrate(partial, { unknown })` | [USEGUIDE](./USEGUIDE.md#只保存能恢复的字段)                        |
+| 退出登录、页面销毁             | `$dispose()`，外部资源用 `$own()` 一起释放    | [USEGUIDE](./USEGUIDE.md#读取已释放的-store-会明确报错)             |
+| 存回调、外部实例               | `raw()`                                       | [USEGUIDE](./USEGUIDE.md#把回调保存成可替换的字段)                  |
+| 连接、解码器等加载后要释放的值 | `createStoreResource` + `retainResource()`    | [USEGUIDE](./USEGUIDE.md#没人使用之后自动释放异步值)                |
+| 只允许在方法里改字段           | `mutationPolicy`                              | [USEGUIDE](./USEGUIDE.md#7-写入守卫imutationguard--imutationpolicy) |
 
 ## 安装
 
@@ -129,14 +129,14 @@ pnpm add @migaia/store-light
 
 ## 常用 API
 
-| API | 做什么 |
-| --- | --- |
-| `createStore(shape, options?)` | 用普通对象创建 store；定义里不能有异步字段 |
-| `createAsyncStore(shape, options?)` | 定义里有异步初始化的字段时使用，返回的 Promise 完成时字段都已就绪 |
-| `store.$subscribe(fn)` / `store.$batch(recipe)` | 订阅任意字段变化 / 把多次写入合并成一次通知 |
-| `store.$plain()` / `store.$hydrate(partial, options?)` | 取可持久化的字段 / 写回保存的字段 |
-| `store.$dispose()` | 释放 store；之后的访问抛 `STORE_DISPOSED` |
-| `createStoreResource(factory, options?)` | 创建按持有者释放的异步值 |
+| API                                                    | 做什么                                                            |
+| ------------------------------------------------------ | ----------------------------------------------------------------- |
+| `createStore(shape, options?)`                         | 用普通对象创建 store；定义里不能有异步字段                        |
+| `createAsyncStore(shape, options?)`                    | 定义里有异步初始化的字段时使用，返回的 Promise 完成时字段都已就绪 |
+| `store.$subscribe(fn)` / `store.$batch(recipe)`        | 订阅任意字段变化 / 把多次写入合并成一次通知                       |
+| `store.$plain()` / `store.$hydrate(partial, options?)` | 取可持久化的字段 / 写回保存的字段                                 |
+| `store.$dispose()`                                     | 释放 store；之后的访问抛 `STORE_DISPOSED`                         |
+| `createStoreResource(factory, options?)`               | 创建按持有者释放的异步值                                          |
 
 ## 契约细节
 
@@ -153,6 +153,6 @@ pnpm add @migaia/store-light
 7. **StoreResource 的值由它持有。** 配了 `dispose` 时值必须是对象或函数；没配而值自带 `$dispose` 时会调用它。没有持有者之后的回收倒计时是 `keepAliveMs`（默认 1000，`0` 表示同步回收）；React 渲染期间由 capture/commit 租约保护正在显示的版本。
 8. **错误身份。** 本包产生的错误带 `source === STORE_LIGHT_SOURCE`（`store.light`）和 `StoreLightErrorCode` 里的 `code`；来自 reactive 的所有权错误、来自 resource 的请求失败和取消保留原来的身份。
 
-请求、数据、取消和共享 Promise 由 `@migaia/resource` 的一个实例负责，StoreResource 只在其上加值的所有权、渲染 capture、版本租约和恰好一次的释放。迁移说明（`StoreResourceDataKind`、`StoreResourceKind`、`retain()` 的移除）见 USEGUIDE 末尾。
+请求、数据、取消和共享 Promise 由 `@migaia/resource` 的一个实例负责，StoreResource 只在其上加值的所有权、渲染 capture、版本租约和恰好一次的释放。
 
 **不适合的场景**：列表或频繁增删的集合、需要按 id 寻址的实体、需要索引查询的数据，分别用 store-indexed、store-keyed 等包。

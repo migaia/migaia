@@ -374,7 +374,7 @@ A value chunk fails with TypeError / CODEC_CONTRACT because SSR needs wire text 
 
 Codec script id and codec attributes escape &, double/single quotes, <, and > as HTML attributes, in addition to id admission. Reading uses data-codec, default json, and data-wire, default text. An unregistered writer type fails with CODEC_CONTRACT; decoded output still passes assertSSRState. Writer and reader registries must be compatible. registry.encode alone does not provide the SSR helper's embedding policy.
 
-SsrWireType is { json: 'json', text: 'text', bytes: 'bytes' }, and ISsrWireType is its value union. Json is a codec-type comparison, while text/bytes identify chunk kinds. Internal wait outcomes SsrWorkOutcome/ISsrWorkOutcome were removed from the root without a compatibility alias. awaitResources still returns its failure array directly.
+SsrWireType is { json: 'json', text: 'text', bytes: 'bytes' }, and ISsrWireType is its value union. Json is a codec-type comparison, while text/bytes identify chunk kinds. awaitResources returns its failure array directly.
 
 ### Error identity and factories
 

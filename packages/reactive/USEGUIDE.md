@@ -6,14 +6,14 @@
 
 ## 按场景查找
 
-| 你遇到的问题 | 看这一节 |
-| --- | --- |
-| 派生值要在每个修改点手动更新 | [派生值自动更新](#派生值自动更新) |
-| 切换房间、页面后旧订阅还在 | [切换订阅时先清理旧的](#切换订阅时先清理旧的) |
-| 同时改两个值，页面闪过一半新一半旧的结果 | [多次写入只更新一次](#多次写入只更新一次) |
-| 关着的面板也在重算 | [没人读取的派生值不计算](#没人读取的派生值不计算) |
-| 两个副作用互相触发，标签页卡死 | [副作用互相触发时不会卡死](#副作用互相触发时不会卡死) |
-| 服务端渲染时请求之间串数据 | [服务端每个请求一个 Runtime](#服务端每个请求一个-runtime) |
+| 你遇到的问题                             | 看这一节                                                  |
+| ---------------------------------------- | --------------------------------------------------------- |
+| 派生值要在每个修改点手动更新             | [派生值自动更新](#派生值自动更新)                         |
+| 切换房间、页面后旧订阅还在               | [切换订阅时先清理旧的](#切换订阅时先清理旧的)             |
+| 同时改两个值，页面闪过一半新一半旧的结果 | [多次写入只更新一次](#多次写入只更新一次)                 |
+| 关着的面板也在重算                       | [没人读取的派生值不计算](#没人读取的派生值不计算)         |
+| 两个副作用互相触发，标签页卡死           | [副作用互相触发时不会卡死](#副作用互相触发时不会卡死)     |
+| 服务端渲染时请求之间串数据               | [服务端每个请求一个 Runtime](#服务端每个请求一个-runtime) |
 
 ## 派生值自动更新
 
@@ -207,8 +207,18 @@ const celsius = runtime.signal(0, { debugName: 'celsius' })
 const fahrenheit = runtime.signal(32, { debugName: 'fahrenheit' })
 
 // 两个副作用互相写对方读取的值，换算里又多加了 1，两个值永远对不上，于是互相触发
-runtime.effect(() => { fahrenheit.value = celsius.value * 1.8 + 33 }, { debugName: 'c-to-f' })
-runtime.effect(() => { celsius.value = (fahrenheit.value - 32) / 1.8 }, { debugName: 'f-to-c' })
+runtime.effect(
+  () => {
+    fahrenheit.value = celsius.value * 1.8 + 33
+  },
+  { debugName: 'c-to-f' }
+)
+runtime.effect(
+  () => {
+    celsius.value = (fahrenheit.value - 32) / 1.8
+  },
+  { debugName: 'f-to-c' }
+)
 
 await new Promise((resolve) => setTimeout(resolve, 10))
 console.log('页面仍可响应，celsius =', Math.round(celsius.peek()))
@@ -651,7 +661,7 @@ import {
 
 这两个factory不能重绑已登记图节点（包括内置节点）：抛 `GRAPH_NODE_REGISTERED`，不会替换仍有活跃边的集合。`invalidateObservable(runtime, node)` 只摘节点下游、保留上游与缓存，供Atom routing切换；真正释放节点仍调用其dispose。
 
-迁移：`@migaia/reactive/internals` 已删除。旧 `internalsOf/registerSubs/registerVersion/registerDeps` 等不能通过换名导入整个tracker；按上述角色迁移到 `/extension` 的绑定能力。`tracker/scheduler/clock` 和可写集合始终仅在kernel内部。
+扩展只能通过上述角色使用 `/extension` 的绑定能力，不能取得整个 tracker。`tracker/scheduler/clock` 和可写集合始终只在 kernel 内部。
 
 ---
 
@@ -665,26 +675,26 @@ import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive'
 
 稳定错误码表，**18 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）
 
-| `ReactiveErrorCode` 键 | 码值                    | 触发条件                                                                                                                                       |
-| ---------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `callbackFailed` | `CALLBACK_FAILED` | 未分类 action/batch/untracked/tracked derivation callback 失败；native 尽量原位附码，primitive（含 undefined）/不可变 native 原错保留 cause，已有 semantic identity 不变；非 Error 对象 throw 保留控制身份，供 Resource/Suspense owner 单次准入 |
-| `nodeDisposed`         | `NODE_DISPOSED`         | 在已 dispose 的 `Signal`/`Computed`/自定义 Source 上调用读取或写入方法                                                                         |
-| `circularDependency`   | `CIRCULAR_DEPENDENCY`   | 求值 `Computed` 时检测到它（直接或间接）读取了自己正在求值的结果                                                                               |
-| `crossRuntime`         | `CROSS_RUNTIME`         | 一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验                                                            |
-| `notRuntimeOwned`      | `NOT_RUNTIME_OWNED`     | 传入的对象不是由 `createRuntime()` 创建、或不携带内部所有权登记                                                                                |
-| `ownershipConflict`    | `OWNERSHIP_CONFLICT`    | 同一个对象或函数引用被重复登记到不同的 `Runtime`                                                                                                     |
-| `copyConflict`         | `COPY_CONFLICT`         | 检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一                                                                |
-| `brandCorrupted`       | `BRAND_CORRUPTED`       | 跨副本诊断品牌被发现处于非预期形状                                                                                                             |
-| `versionExhausted`     | `VERSION_EXHAUSTED`     | 单调版本时钟达到配置上限（默认 `Number.MAX_SAFE_INTEGER`）后再次申请新版本号                                                                   |
-| `flushLoop`            | `FLUSH_LOOP`            | 一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）                                                                                          |
-| `observerFailed`       | `OBSERVER_FAILED`       | 一次冲刷中多个 observer 的 `tick()` 失败、或多个 observable 生命周期钩子失败，作为 `AggregateError` 外壳                                       |
-| `actionFlushFailed`    | `ACTION_FLUSH_FAILED`   | `runBatched()` 内业务动作与收尾 flush 同时失败；普通可写错误在 `cause` 附加聚合结果，不可读 `cause` 的三个原值直接置于 `AggregateError.errors` |
-| `schedulerFailed`      | `SCHEDULER_FAILED`      | 预留：异步调度策略回调或 `reportError()` 捕获到未处理错误的诊断通道码（默认无内置抛出/上报点）                                                 |
-| `captureInvalid`       | `CAPTURE_INVALID`       | `capture()` 产生的 token 在 `commitCapture()` 时已失效、已被消费、属于另一个 tracker，或对应 observer 已 dispose                               |
-| `bindingDuplicate`     | `BINDING_DUPLICATE`     | 同一个 `IObserverBinding` 被重复调用 `observe()`（已处于 observed 状态）                                                                       |
-| `graphNodeRegistered`  | `GRAPH_NODE_REGISTERED` | source/observer binding尝试替换已有graph node的集合，须创建新节点                                                                              |
-| `internalsRegistered`  | `INTERNALS_REGISTERED`  | 同一个 `Runtime` 对象被重复注册内部面（`registerInternals()`）                                                                                 |
-| `invalidOption`        | `INVALID_OPTION`        | 构造 `Runtime`/`Scheduler`/`VersionClock` 时传入的选项不满足取值要求                                                                           |
+| `ReactiveErrorCode` 键 | 码值                    | 触发条件                                                                                                                                                                                                                                        |
+| ---------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `callbackFailed`       | `CALLBACK_FAILED`       | 未分类 action/batch/untracked/tracked derivation callback 失败；native 尽量原位附码，primitive（含 undefined）/不可变 native 原错保留 cause，已有 semantic identity 不变；非 Error 对象 throw 保留控制身份，供 Resource/Suspense owner 单次准入 |
+| `nodeDisposed`         | `NODE_DISPOSED`         | 在已 dispose 的 `Signal`/`Computed`/自定义 Source 上调用读取或写入方法                                                                                                                                                                          |
+| `circularDependency`   | `CIRCULAR_DEPENDENCY`   | 求值 `Computed` 时检测到它（直接或间接）读取了自己正在求值的结果                                                                                                                                                                                |
+| `crossRuntime`         | `CROSS_RUNTIME`         | 一个属于某 `Runtime` 的节点或已登记函数对象在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验                                                                                                                                             |
+| `notRuntimeOwned`      | `NOT_RUNTIME_OWNED`     | 传入的对象不是由 `createRuntime()` 创建、或不携带内部所有权登记                                                                                                                                                                                 |
+| `ownershipConflict`    | `OWNERSHIP_CONFLICT`    | 同一个对象或函数引用被重复登记到不同的 `Runtime`                                                                                                                                                                                                |
+| `copyConflict`         | `COPY_CONFLICT`         | 检测到本库存在多份运行时副本、查询到另一副本已登记的对象或函数，或 `assertSingleRuntimeCopy()` 校验到副本数大于一                                                                                                                               |
+| `brandCorrupted`       | `BRAND_CORRUPTED`       | 跨副本诊断品牌被发现处于非预期形状                                                                                                                                                                                                              |
+| `versionExhausted`     | `VERSION_EXHAUSTED`     | 单调版本时钟达到配置上限（默认 `Number.MAX_SAFE_INTEGER`）后再次申请新版本号                                                                                                                                                                    |
+| `flushLoop`            | `FLUSH_LOOP`            | 一次冲刷内同一个 observer 的执行次数超过 `maxFlushPasses`（默认 100）                                                                                                                                                                           |
+| `observerFailed`       | `OBSERVER_FAILED`       | 一次冲刷中多个 observer 的 `tick()` 失败、或多个 observable 生命周期钩子失败，作为 `AggregateError` 外壳                                                                                                                                        |
+| `actionFlushFailed`    | `ACTION_FLUSH_FAILED`   | `runBatched()` 内业务动作与收尾 flush 同时失败；普通可写错误在 `cause` 附加聚合结果，不可读 `cause` 的三个原值直接置于 `AggregateError.errors`                                                                                                  |
+| `schedulerFailed`      | `SCHEDULER_FAILED`      | 预留：异步调度策略回调或 `reportError()` 捕获到未处理错误的诊断通道码（默认无内置抛出/上报点）                                                                                                                                                  |
+| `captureInvalid`       | `CAPTURE_INVALID`       | `capture()` 产生的 token 在 `commitCapture()` 时已失效、已被消费、属于另一个 tracker，或对应 observer 已 dispose                                                                                                                                |
+| `bindingDuplicate`     | `BINDING_DUPLICATE`     | 同一个 `IObserverBinding` 被重复调用 `observe()`（已处于 observed 状态）                                                                                                                                                                        |
+| `graphNodeRegistered`  | `GRAPH_NODE_REGISTERED` | source/observer binding尝试替换已有graph node的集合，须创建新节点                                                                                                                                                                               |
+| `internalsRegistered`  | `INTERNALS_REGISTERED`  | 同一个 `Runtime` 对象被重复注册内部面（`registerInternals()`）                                                                                                                                                                                  |
+| `invalidOption`        | `INVALID_OPTION`        | 构造 `Runtime`/`Scheduler`/`VersionClock` 时传入的选项不满足取值要求                                                                                                                                                                            |
 
 调用方应始终以 `error.code === ReactiveErrorCode.xxx` 判别，不要硬编码码值字符串。逐条设计动机见源码 `src/error-code.ts` 的 JSDoc。
 
@@ -844,7 +854,7 @@ const runtime = createRuntime({
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
 
-跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。
+跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。同一进程里有多份 reactive 副本时，它们通过这两个 key 互相计数、识别对方的归属标记。
 
 `@migaia/reactive/extension` 提供 `getDefaultRuntime()`，给需要在导入时保持不创建任何东西的适配层使用。它在第一次调用时创建共享的默认 Runtime，返回的对象与根入口的 `defaultRuntime` 完全相同；导入根入口的 `defaultRuntime` 仍在导入时创建。`ReactiveErrorPhase` 也可以从扩展入口导入，与根入口导出的是同一个对象。
 

@@ -378,7 +378,7 @@ false
 
 根入口导出 MutationPolicy/createMutationPolicy、事件与命令词表、Host/binding/logger/DevTools adapter 和错误；克隆策略只从 `@migaia/store-middleware/tolerant-clone` 导入。普通依赖为 middleware-pipeline、plugin-host、reactive、store-light、utils。示例直接导入 store-light/reactive 时要显式安装对应包。
 
-旧 middlewarePlugin/IStoreMiddleware/IMiddlewareContext 已移除，改用 `IStoreMiddlewarePlugin` 的 install(core) 与 core.usePipeline。旧 tolerantClone 名在两入口都已删除；ClonePolicy、immutableSnapshotClone、opaqueReferenceClone、diagnosticClone 以及 IClonePolicyMode 都归窄入口。IMutationGuard/IMutationPolicy 直接从 store-light 导入，没有本包别名。原 store-devtools 的 StoreDevtoolsCommand/IStoreDevtoolsCommand 迁移到本包 ReduxDevToolsCommand/IReduxDevToolsCommand，协议字符串不变。
+中间件插件实现 `IStoreMiddlewarePlugin`，在 `install(core)` 中通过 `core.usePipeline` 接入。ClonePolicy、immutableSnapshotClone、opaqueReferenceClone、diagnosticClone 以及 IClonePolicyMode 从窄入口导入。IMutationGuard/IMutationPolicy 直接从 store-light 导入。Redux DevTools 命令常量是本包的 ReduxDevToolsCommand/IReduxDevToolsCommand。
 
 ### MutationPolicy：同步写入许可
 

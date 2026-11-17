@@ -99,14 +99,14 @@ void loadProfile('1')
 
 可以把一个 `Resource` 想成“一个会自己重新请求的异步变量”：请求函数是它的公式，请求函数读到的响应式值是公式的输入，`state` 是它当前的值。
 
-| 概念 | 一句话 |
-| --- | --- |
-| 请求函数（fetcher） | `({ signal }) => 值或 Promise`；第一个 `await` 之前读到的响应式值成为依赖 |
-| `state` | 五种状态之一：`idle`、`pending`、`success`（带 `data`）、`error`、`cancelled` |
-| 世代（generation） | 每次请求一个编号；只有最新一代的结果能写入 `state` |
-| 有效期（`ttl`） | 成功的数据多久后过期；默认 `Infinity`，只在依赖变化或手动刷新时重新请求 |
-| `cancel()` / `dispose()` | 停掉这一次请求、资源还能用 / 停掉请求并释放整个资源 |
-| 快照 | 调用方可传输或保存 `dehydrate()` 导出的数据和剩余有效期，再用 `initialSnapshot` 恢复 |
+| 概念                     | 一句话                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| 请求函数（fetcher）      | `({ signal }) => 值或 Promise`；第一个 `await` 之前读到的响应式值成为依赖            |
+| `state`                  | 五种状态之一：`idle`、`pending`、`success`（带 `data`）、`error`、`cancelled`        |
+| 世代（generation）       | 每次请求一个编号；只有最新一代的结果能写入 `state`                                   |
+| 有效期（`ttl`）          | 成功的数据多久后过期；默认 `Infinity`，只在依赖变化或手动刷新时重新请求              |
+| `cancel()` / `dispose()` | 停掉这一次请求、资源还能用 / 停掉请求并释放整个资源                                  |
+| 快照                     | 调用方可传输或保存 `dehydrate()` 导出的数据和剩余有效期，再用 `initialSnapshot` 恢复 |
 
 几个说法：
 
@@ -116,15 +116,15 @@ void loadProfile('1')
 
 ## 典型场景
 
-| 场景 | 怎么组合 | 详细说明 |
-| --- | --- | --- |
-| 根据输入加载，只显示最新结果 | 请求函数读响应式值 + `effect` 读 `state` | [USEGUIDE](./USEGUIDE.md#只显示最新输入的结果) |
-| 几个筛选条件一起变 | 请求函数同时读多个 signal | [USEGUIDE](./USEGUIDE.md#同时改几个条件只发一次请求) |
-| 多个组件读同一份数据 | 共享同一个 `Resource` 的 `promise` 或 `state` | [USEGUIDE](./USEGUIDE.md#多处同时读取只请求一次) |
-| 离开页面、取消操作 | `dispose()` / `cancel()` + 把 `signal` 交给底层请求 | [USEGUIDE](./USEGUIDE.md#离开页面时停掉还在进行的请求) |
-| 刷新时不清空内容 | `staleWhileRevalidate: true` | [USEGUIDE](./USEGUIDE.md#刷新时继续显示旧数据) |
-| 只重试临时故障 | `retry` 判断函数 + `retryDelay` | [USEGUIDE](./USEGUIDE.md#只重试临时故障) |
-| 服务端渲染 | `dehydrate()` + `initialSnapshot` | [USEGUIDE](./USEGUIDE.md#服务端已取到的数据浏览器不再请求) |
+| 场景                         | 怎么组合                                            | 详细说明                                                   |
+| ---------------------------- | --------------------------------------------------- | ---------------------------------------------------------- |
+| 根据输入加载，只显示最新结果 | 请求函数读响应式值 + `effect` 读 `state`            | [USEGUIDE](./USEGUIDE.md#只显示最新输入的结果)             |
+| 几个筛选条件一起变           | 请求函数同时读多个 signal                           | [USEGUIDE](./USEGUIDE.md#同时改几个条件只发一次请求)       |
+| 多个组件读同一份数据         | 共享同一个 `Resource` 的 `promise` 或 `state`       | [USEGUIDE](./USEGUIDE.md#多处同时读取只请求一次)           |
+| 离开页面、取消操作           | `dispose()` / `cancel()` + 把 `signal` 交给底层请求 | [USEGUIDE](./USEGUIDE.md#离开页面时停掉还在进行的请求)     |
+| 刷新时不清空内容             | `staleWhileRevalidate: true`                        | [USEGUIDE](./USEGUIDE.md#刷新时继续显示旧数据)             |
+| 只重试临时故障               | `retry` 判断函数 + `retryDelay`                     | [USEGUIDE](./USEGUIDE.md#只重试临时故障)                   |
+| 服务端渲染                   | `dehydrate()` + `initialSnapshot`                   | [USEGUIDE](./USEGUIDE.md#服务端已取到的数据浏览器不再请求) |
 
 ## 安装
 
@@ -136,14 +136,14 @@ pnpm add @migaia/resource @migaia/reactive
 
 ## 常用 API
 
-| API | 做什么 |
-| --- | --- |
-| `new Resource(fetcher, runtime, options?)` | 创建异步数据源；默认在构造时发起第一次请求 |
-| `resource.state` / `resource.read()` | 读当前状态 / 按 Suspense 的方式读取（成功返回值、加载中抛 Promise、失败抛错误） |
-| `resource.promise` | 当前请求或有效缓存对应的 Promise，多个读取方共享同一个 |
-| `refetch()` / `invalidate()` | 强制发起新请求 / 先让缓存过期再请求 |
-| `cancel()` / `dispose()` | 停掉当前请求、资源还能用 / 停掉请求并释放资源 |
-| `dehydrate()` / `hydrate()` | 导出、恢复成功数据和剩余有效期 |
+| API                                        | 做什么                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------- |
+| `new Resource(fetcher, runtime, options?)` | 创建异步数据源；默认在构造时发起第一次请求                                      |
+| `resource.state` / `resource.read()`       | 读当前状态 / 按 Suspense 的方式读取（成功返回值、加载中抛 Promise、失败抛错误） |
+| `resource.promise`                         | 当前请求或有效缓存对应的 Promise，多个读取方共享同一个                          |
+| `refetch()` / `invalidate()`               | 强制发起新请求 / 先让缓存过期再请求                                             |
+| `cancel()` / `dispose()`                   | 停掉当前请求、资源还能用 / 停掉请求并释放资源                                   |
+| `dehydrate()` / `hydrate()`                | 导出、恢复成功数据和剩余有效期                                                  |
 
 ## 契约细节
 
@@ -172,9 +172,9 @@ pnpm add @migaia/resource @migaia/reactive
 
 `peekState()` 读取状态联合，不登记依赖、不发起请求、不检查有效期；和 `peek()` 不同，它返回状态对象而不是取值或抛出。`reset()` 取消当前请求、清除依赖和缓存，让同一个实例回到可复用的 `idle`；之前共享的 Promise 立即以原生 `AbortError`（`REQUEST_ABORTED`）失败。请求函数收到的 `IResourceFetchContext` 带只读的 `signal`、单调递增的 `generation` 和不透明的 `token`：同一次请求的多次重试共享它们，替换或重置后的新请求拿到新的一组。加载值的所有权和渲染版本租约由适配层负责，不属于 `Resource` 的依赖图。完整示例见 USEGUIDE。
 
-### 状态类型迁移
+### 状态类型
 
-`ResourceStatus.fetching` 已改为 `ResourceFetchStatus.fetching`；旧的 `IResourceStatus` / `IResourceFetchStatus` 类型改用与常量同名的 `ResourceStatus` / `ResourceFetchStatus` 键联合。运行时的状态字符串和后台刷新的数据、传输语义没有变化。
+`ResourceStatus` 列出 `state` 的五种状态；后台刷新是否在进行由 `ResourceFetchStatus` 表示（例如 `ResourceFetchStatus.fetching`）。两者都是“常量对象 + 同名键联合类型”：值用 `ResourceStatus.success` 这样的常量，类型直接写 `ResourceStatus`。
 
 ### 不适合的场景
 

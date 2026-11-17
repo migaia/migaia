@@ -451,7 +451,7 @@ A custom combiner's returned value becomes the propagated failure. The caller mu
 
 The root exports `MiddlewarePipelineNext`, `ICreatePipelineOptions`, `IMiddlewarePipeline`, `IMiddlewarePipelineStage`, `IMiddlewarePipelineDone`, `IMiddlewarePipelineRunResult`, `IMiddlewarePipelineLiftSource`, the four stage types, context/control types, violation types and signal types. Applications reach executors through `createPipeline`, run and lift.
 
-`IMiddlewarePipelineSyncMode` is only an internal conditional-type helper for Done/RunResult. It was withdrawn from the root with no compatibility alias. Use public `IMiddlewarePipelineDone` and `IMiddlewarePipelineRunResult` instead.
+To type the terminal callback and the run result, use the public `IMiddlewarePipelineDone` and `IMiddlewarePipelineRunResult`.
 
 ```bash
 pnpm run fmt

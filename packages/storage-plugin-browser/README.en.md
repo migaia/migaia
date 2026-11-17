@@ -299,10 +299,10 @@ Portable JSON rejects unsupported objects and cycles. For `Map` and `Set`, adapt
 
 The schema handles domain representation; the codec handles the saved format. Reads call `codec.decode`, migrate the saved representation, call `schema.decode`, and validate the domain value. A text-only backend rejects structured output with `UNSUPPORTED_CAPABILITY` rather than silently converting it to JSON.
 
-### Strict index query migration
+### Strict index queries
 
-Previously, `.index(...).requirePushdown()` allowed a full scan when no client steps remained. Terminal reads now reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan.
+`.index(...).requirePushdown()` demands native index execution. Terminal reads reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan.
 
-Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries retain their scan fallback.
+Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries keep their scan fallback.
 
-IndexedDB borrowed views resolve the same private capabilities as their native store. Legacy records keep readiness running until migration completes with the matching schema fingerprint. Queries continue to scan and report fallback while readiness is not complete.
+IndexedDB borrowed views resolve the same private capabilities as their native store. While records in an older format remain, index readiness stays running and queries keep scanning and report the fallback, until conversion completes with the matching schema fingerprint.

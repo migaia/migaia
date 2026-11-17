@@ -118,7 +118,7 @@ Use these collections for tables or message lists where observers read only some
 
 ### Construction, options, and input admission
 
-Class constructors are the only creation entry points, with `(initial, runtime?, options?)`. The former thin factories were removed. Migrate old `(initial, options, runtime)` calls by swapping the last two arguments; no factory aliases or compatibility wrappers remain.
+Class constructors are the only creation entry points, with `(initial, runtime?, options?)`.
 
 | Class and type parameters                             | initial                                                 | Defaults and boundaries                                                                                     |
 | ----------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |

@@ -348,7 +348,7 @@ canonical（固定的原名）方法始终存在；别名与原名指向同一�
 
 `subscribeUntil` 接受原生 `AbortSignal`，也接受具有布尔 `aborted`、可选 `reason`、可调用 `addEventListener` 与 `removeEventListener` 的兼容对象；事件类型固定为 `'abort'`。非法信号为 `INVALID_SIGNAL`。已取消信号默认不创建登记；只有 canonical channel 显式设置 `throwOnAborted: true` 时抛 `ABORTED`。
 
-对象订阅者只需实现 `IEventSubscriber.handle(event)`。旧草案的抽象 `EventSubscriber`、静态 `EVENT_NAME`（也不是 `EVENTNAME`）与 `onCall()` 不属于当前公开契约：事件来源由传入的通道决定，多事件名称由 Hub 的订阅 key 决定，不重复保存在 class 中。
+对象订阅者只需实现 `IEventSubscriber.handle(event)`：事件来源由传入的通道决定，多事件名称由 Hub 的订阅 key 决定，不重复保存在 class 中。
 
 ## 等待异步监听器
 

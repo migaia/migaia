@@ -93,14 +93,14 @@ toggle('t1')
 
 可以把定义想成“变量声明”，把 store 想成“一块内存”：同一个声明在每块内存里各有一份值。
 
-| 概念 | 一句话 |
-| --- | --- |
-| 定义（`atomDef` / `derivedDef` / `writableDef`） | 冻结的描述对象，说明状态的初值或计算方式；不保存值，可以放在模块顶层 |
-| store（`createAtomStore`） | 为定义保存值的作用域；第一次读取某个定义时才为它建一个响应式节点 |
-| 读取 | `get` 登记依赖，`peek` 不登记，`preview` 供 React 并发渲染做推测读取 |
-| optics（`focusDef` / `splitDef` / `selectDef` / `opticDef`） | 从一个定义派生出指向字段、列表项或投影的新定义 |
-| family（`familyDef` / `derivedFamilyDef`） | 按 key 产出定义；同一个 key 得到同一个定义 |
-| `override` | 在一个 store 里把对某个定义的读取转到另一个定义 |
+| 概念                                                         | 一句话                                                               |
+| ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| 定义（`atomDef` / `derivedDef` / `writableDef`）             | 冻结的描述对象，说明状态的初值或计算方式；不保存值，可以放在模块顶层 |
+| store（`createAtomStore`）                                   | 为定义保存值的作用域；第一次读取某个定义时才为它建一个响应式节点     |
+| 读取                                                         | `get` 登记依赖，`peek` 不登记，`preview` 供 React 并发渲染做推测读取 |
+| optics（`focusDef` / `splitDef` / `selectDef` / `opticDef`） | 从一个定义派生出指向字段、列表项或投影的新定义                       |
+| family（`familyDef` / `derivedFamilyDef`）                   | 按 key 产出定义；同一个 key 得到同一个定义                           |
+| `override`                                                   | 在一个 store 里把对某个定义的读取转到另一个定义                      |
 
 几个说法：
 
@@ -110,13 +110,13 @@ toggle('t1')
 
 ## 典型场景
 
-| 场景 | 怎么组合 | 详细说明 |
-| --- | --- | --- |
-| 服务端渲染、测试隔离 | 模块级定义 + 每个请求或用例一个 `createAtomStore` | [USEGUIDE](./USEGUIDE.md#一份定义每个请求或测试各有一份值) |
-| 大对象的字段级订阅 | `focusDef`，只读投影用 `selectDef` | [USEGUIDE](./USEGUIDE.md#只订阅大对象里的一个字段) |
-| 长列表只更新变化的一行 | `splitDef` + `of(key)` | [USEGUIDE](./USEGUIDE.md#改一行不让整个列表重新渲染) |
-| 每个对话、频道一份状态 | `familyDef` / `derivedFamilyDef` | [USEGUIDE](./USEGUIDE.md#每个对话一份状态不用手写-map) |
-| 测试替换依赖 | `store.override()` | [USEGUIDE](./USEGUIDE.md#测试时替换一个依赖不用改被测代码) |
+| 场景                   | 怎么组合                                          | 详细说明                                                   |
+| ---------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| 服务端渲染、测试隔离   | 模块级定义 + 每个请求或用例一个 `createAtomStore` | [USEGUIDE](./USEGUIDE.md#一份定义每个请求或测试各有一份值) |
+| 大对象的字段级订阅     | `focusDef`，只读投影用 `selectDef`                | [USEGUIDE](./USEGUIDE.md#只订阅大对象里的一个字段)         |
+| 长列表只更新变化的一行 | `splitDef` + `of(key)`                            | [USEGUIDE](./USEGUIDE.md#改一行不让整个列表重新渲染)       |
+| 每个对话、频道一份状态 | `familyDef` / `derivedFamilyDef`                  | [USEGUIDE](./USEGUIDE.md#每个对话一份状态不用手写-map)     |
+| 测试替换依赖           | `store.override()`                                | [USEGUIDE](./USEGUIDE.md#测试时替换一个依赖不用改被测代码) |
 
 ## 安装
 
@@ -124,25 +124,25 @@ toggle('t1')
 pnpm add @migaia/store-keyed @migaia/reactive
 ```
 
-| 入口 | 内容 |
-| --- | --- |
-| `@migaia/store-keyed` | 定义构造器、`createAtomStore` / `defaultAtomStore`、`selectDef` / `opticDef` / `focusDef` / `splitDef`、family、错误工具 |
-| `@migaia/store-keyed/atom/store` | store 的窄入口，和根入口的对应导出相同 |
-| `@migaia/store-keyed/atom/definition` | 定义的窄入口，另外导出 `assertNotThenable` |
-| `@migaia/store-keyed/optics` | 手写自定义 optics 用的纯函数：路径读写、按 key 查找、不可变插入删除、`KeyedSplitCache` |
-| `@migaia/store-keyed/reactive/atom` | 实例式 atom 的协议类型和跨 Runtime 校验（`atomGetter` / `atomSetter`） |
+| 入口                                  | 内容                                                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `@migaia/store-keyed`                 | 定义构造器、`createAtomStore` / `defaultAtomStore`、`selectDef` / `opticDef` / `focusDef` / `splitDef`、family、错误工具 |
+| `@migaia/store-keyed/atom/store`      | store 的窄入口，和根入口的对应导出相同                                                                                   |
+| `@migaia/store-keyed/atom/definition` | 定义的窄入口，另外导出 `assertNotThenable`                                                                               |
+| `@migaia/store-keyed/optics`          | 手写自定义 optics 用的纯函数：路径读写、按 key 查找、不可变插入删除、`KeyedSplitCache`                                   |
+| `@migaia/store-keyed/reactive/atom`   | 实例式 atom 的协议类型和跨 Runtime 校验（`atomGetter` / `atomSetter`）                                                   |
 
 ## 常用 API
 
-| API | 做什么 |
-| --- | --- |
-| `atomDef(init)` / `derivedDef(read)` / `writableDef(read, write)` | 定义源状态、只读派生和可写派生 |
-| `createAtomStore(runtime)` | 创建一个独立保存值的 store |
-| `store.get` / `store.set` / `store.sub` | 读取（登记依赖）、写入、订阅 |
-| `store.setMany(entries)` | 一次批量写入多个源定义，全部成功才写入，订阅者只通知一轮 |
-| `focusDef(def, ...path)` / `splitDef(def, keyOf)` | 字段级定义 / 列表按 key 拆分 |
-| `familyDef(initial, options?)` | 按 key 产出定义 |
-| `store.override(def, replacement)` / `store.dispose()` | 替换定义 / 释放整个 store |
+| API                                                               | 做什么                                                   |
+| ----------------------------------------------------------------- | -------------------------------------------------------- |
+| `atomDef(init)` / `derivedDef(read)` / `writableDef(read, write)` | 定义源状态、只读派生和可写派生                           |
+| `createAtomStore(runtime)`                                        | 创建一个独立保存值的 store                               |
+| `store.get` / `store.set` / `store.sub`                           | 读取（登记依赖）、写入、订阅                             |
+| `store.setMany(entries)`                                          | 一次批量写入多个源定义，全部成功才写入，订阅者只通知一轮 |
+| `focusDef(def, ...path)` / `splitDef(def, keyOf)`                 | 字段级定义 / 列表按 key 拆分                             |
+| `familyDef(initial, options?)`                                    | 按 key 产出定义                                          |
+| `store.override(def, replacement)` / `store.dispose()`            | 替换定义 / 释放整个 store                                |
 
 ## 契约细节
 
@@ -159,6 +159,6 @@ pnpm add @migaia/store-keyed @migaia/reactive
 9. **key 比较用 SameValueZero**，和 `Map` / `Set` 一致：`-0` 与 `+0` 是同一个 key，`NaN` 等于自身。
 10. **错误身份。** 本包产生的错误带 `source === STORE_KEYED_SOURCE`（`store.keyed`）和 `StoreKeyedErrorCode` 里的 `code`；其他包已有身份的错误保持原样。按 `source` / `code` 判断，不要比较 message。
 
-**破坏性迁移**：十个高级 optics 原语只从 `@migaia/store-keyed/optics` 导出，`assertNotThenable` 只从 `@migaia/store-keyed/atom/definition` 导出，根入口不保留兼容别名。
+**导入位置**：十个高级 optics 原语从 `@migaia/store-keyed/optics` 导入，`assertNotThenable` 从 `@migaia/store-keyed/atom/definition` 导入，根入口不导出它们。
 
 **不适合的场景**：整个应用只有一份全局状态、永远不需要多个作用域时，直接用 `runtime.signal()` / `runtime.computed()` 更简单；需要 Provider 和 Hook 时用 `@migaia/store-react`。

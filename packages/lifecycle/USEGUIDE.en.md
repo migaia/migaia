@@ -6,14 +6,14 @@ The [README](./README.en.md) explains what the package is for, what sets it apar
 
 ## Find your scenario
 
-| Your problem | Read |
-| --- | --- |
-| Deploys cut off in-flight requests | [Graceful service shutdown](#graceful-service-shutdown) |
-| A search box or detail page shows stale results | [Use only the latest request's result](#use-only-the-latest-requests-result) |
-| Subscriptions and timers keep running after a page closes | [Clean up together when a page closes](#clean-up-together-when-a-page-closes) |
+| Your problem                                                    | Read                                                                                                      |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Deploys cut off in-flight requests                              | [Graceful service shutdown](#graceful-service-shutdown)                                                   |
+| A search box or detail page shows stale results                 | [Use only the latest request's result](#use-only-the-latest-requests-result)                              |
+| Subscriptions and timers keep running after a page closes       | [Clean up together when a page closes](#clean-up-together-when-a-page-closes)                             |
 | Initialisation fails halfway and leaves resources nobody closes | [Reclaim what was created when initialisation fails](#reclaim-what-was-created-when-initialisation-fails) |
-| Two saves arrive out of order and old content overwrites new | [Save in submission order](#save-in-submission-order) |
-| One cleanup fails and the rest never run | [One cleanup fails, the rest still run](#one-cleanup-fails-the-rest-still-run) |
+| Two saves arrive out of order and old content overwrites new    | [Save in submission order](#save-in-submission-order)                                                     |
+| One cleanup fails and the rest never run                        | [One cleanup fails, the rest still run](#one-cleanup-fails-the-rest-still-run)                            |
 
 ## Graceful service shutdown
 
@@ -30,7 +30,11 @@ app.own('db-pool', { force: () => console.log('database pool closed') })
 app.own('http', {
   force: async () => {
     const finished = await boundedWait(inFlight.drain(), performance.now() + 300)
-    console.log(finished ? 'all in-flight requests finished' : `${inFlight.size} request(s) still running, closing anyway`)
+    console.log(
+      finished
+        ? 'all in-flight requests finished'
+        : `${inFlight.size} request(s) still running, closing anyway`
+    )
   }
 })
 
@@ -58,7 +62,10 @@ import { createGenerationController } from '@migaia/lifecycle/generation'
 // A fake search API: shorter keywords match more and answer more slowly.
 const search = (keyword: string, signal: AbortSignal) =>
   new Promise<string[]>((resolve, reject) => {
-    const timer = setTimeout(() => resolve([`results for ${keyword}`]), keyword.length === 1 ? 300 : 100)
+    const timer = setTimeout(
+      () => resolve([`results for ${keyword}`]),
+      keyword.length === 1 ? 300 : 100
+    )
     signal.addEventListener('abort', () => {
       clearTimeout(timer)
       reject(signal.reason)
@@ -532,10 +539,12 @@ import { mergeCleanupResults } from '@migaia/lifecycle/disposal'
 
 const first = new Error('flush')
 const late = new Error('socket close')
-const result = await mergeCleanupResults([{
-  cleanupErrors: [first],
-  physicalCompletion: Promise.resolve({ cleanupErrors: [late] })
-}])
+const result = await mergeCleanupResults([
+  {
+    cleanupErrors: [first],
+    physicalCompletion: Promise.resolve({ cleanupErrors: [late] })
+  }
+])
 // result.cleanupErrors === [first, late]; both error objects are unchanged.
 ```
 
@@ -557,9 +566,10 @@ type ICleanupResult<TError = unknown> = Readonly<{
   physicalCompletion?: Promise<ICleanupResult<TError>>
 }>
 
-type ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{
-  physicalCompletion: Promise<ICleanupResult<ICollectedError>>
-}>
+type ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> &
+  Readonly<{
+    physicalCompletion: Promise<ICleanupResult<ICollectedError>>
+  }>
 ```
 
 For containers whose `dispose()` must start every disposer synchronously but whose cleanup may finish asynchronously. The ledger is the single source of truth for what is pending, the raw errors and when everything has ended. The caller still decides the order, clears its own registry and turns raw errors into its own throw/report/aggregate contract.
@@ -882,10 +892,7 @@ import {
 import type { IAbortSignal } from '@migaia/utils/promise'
 
 // Scheduler composition helpers exported only from the leaf entry:
-import {
-  resolveScheduler,
-  resolveSchedulerOption
-} from '@migaia/lifecycle/scheduler'
+import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 
 // The scheduler contract and implementations come from utils:
 import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
@@ -948,7 +955,7 @@ Behaviour to be aware of:
 - `abort()` and `abort(undefined)` use the host's default reason, usually a native `DOMException` named `AbortError`, not `undefined`.
 - An explicit reason other than `undefined` keeps its `===` identity. When an `undefined` reason from a structural parent signal is forwarded to a native child, it is normalised to the host `AbortError` as well.
 - Repeated `abort()` calls are idempotent and do not overwrite the first reason.
-- An external listener that throws goes through the host EventTarget's error channel; `try/catch` around `controller.abort()` cannot catch it, and lifecycle does not provide an `ABORT_LISTENER_FAILED` error.
+- An external listener that throws goes through the host EventTarget's error channel; `try/catch` around `controller.abort()` cannot catch it, and lifecycle defines no error code for it.
 - Parent and cancellation callbacks that lifecycle registers itself go through a package-private observed subscription. It handles a signal that is already aborted, an abort during registration, a re-check after registration and idempotent removal, and sends its own callback/read/cleanup failures to the matching operation's collect or report boundary. It does not proxy, enumerate or catch other listeners on the same signal.
 
 If you need listener errors to be thrown back to whoever called `abort`, use a callback coordinator that your own code owns; do not wrap or monkey-patch the native `AbortSignal`.
@@ -1004,15 +1011,15 @@ No arguments. `close()` is synchronous and idempotent and only acts when `open` 
 
 The root entry `@migaia/lifecycle` provides the maintained public building blocks. Consumers that care about what a bundle keeps can use these stable subpaths:
 
-| Subpath | Main exports |
-| --- | --- |
-| `@migaia/lifecycle/abort` | `createAbortController`, `observeAbortSubscription`, `IAbortController`, `IObservedAbortSubscription`, `IObservedAbortFailureSink` (the structural `IAbortSignal` type comes from `@migaia/utils`) |
-| `@migaia/lifecycle/scheduler` | `snapshotScheduler`, `resolveScheduler`, `resolveSchedulerOption` |
-| `@migaia/lifecycle/quiescence` | quiescence, lease and pending trackers |
-| `@migaia/lifecycle/scope` | `createLifecycleScope` |
-| `@migaia/lifecycle/generation` | `createGenerationController` |
-| `@migaia/lifecycle/disposal` | release transactions and the sync-started disposal ledger |
-| `@migaia/lifecycle/errors` | thenable/error helpers and error identity |
+| Subpath                        | Main exports                                                                                                                                                                                       |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@migaia/lifecycle/abort`      | `createAbortController`, `observeAbortSubscription`, `IAbortController`, `IObservedAbortSubscription`, `IObservedAbortFailureSink` (the structural `IAbortSignal` type comes from `@migaia/utils`) |
+| `@migaia/lifecycle/scheduler`  | `snapshotScheduler`, `resolveScheduler`, `resolveSchedulerOption`                                                                                                                                  |
+| `@migaia/lifecycle/quiescence` | quiescence, lease and pending trackers                                                                                                                                                             |
+| `@migaia/lifecycle/scope`      | `createLifecycleScope`                                                                                                                                                                             |
+| `@migaia/lifecycle/generation` | `createGenerationController`                                                                                                                                                                       |
+| `@migaia/lifecycle/disposal`   | release transactions and the sync-started disposal ledger                                                                                                                                          |
+| `@migaia/lifecycle/errors`     | thenable/error helpers and error identity                                                                                                                                                          |
 
 ```ts
 import { createAbortController } from '@migaia/lifecycle/abort'
@@ -1136,21 +1143,17 @@ const collected = collector.finalize('teardown failed') // ICollectedError[] und
 ## State constants
 
 ```ts
-import {
-  LifecycleState,
-  LifecycleErrorPolicy,
-  DisposeTransactionKind
-} from '@migaia/lifecycle'
+import { LifecycleState, LifecycleErrorPolicy, DisposeTransactionKind } from '@migaia/lifecycle'
 import { ThenableProbeKind } from '@migaia/utils/function'
 ```
 
 Plain constant objects (`as const`) to compare against or `switch` on instead of bare string literals.
 
-| Constant | Values | Meaning |
-| --- | --- | --- |
-| `LifecycleState` | `{ open: 'open', closing: 'closing', terminal: 'terminal' }` | Whether a container is still open |
-| `LifecycleErrorPolicy` | `{ throw: 'throw', collect: 'collect', report: 'report', firstError: 'firstError' }` | How release errors surface; `firstError` exists for callers that need first-error-wins behaviour and is not a general default |
-| `DisposeTransactionKind` | `{ order: 'order', plan: 'plan' }` | The mode of `createDisposeTransaction` |
+| Constant                 | Values                                                                               | Meaning                                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `LifecycleState`         | `{ open: 'open', closing: 'closing', terminal: 'terminal' }`                         | Whether a container is still open                                                                                             |
+| `LifecycleErrorPolicy`   | `{ throw: 'throw', collect: 'collect', report: 'report', firstError: 'firstError' }` | How release errors surface; `firstError` exists for callers that need first-error-wins behaviour and is not a general default |
+| `DisposeTransactionKind` | `{ order: 'order', plan: 'plan' }`                                                   | The mode of `createDisposeTransaction`                                                                                        |
 
 ---
 
@@ -1168,30 +1171,30 @@ if (error.code === LifecycleErrorCode.scopeClosed) {
 }
 ```
 
-| `LifecycleErrorCode` key | Code | When it happens |
-| --- | --- | --- |
-| `delayFailed` | `DELAY_FAILED` | A relative delay could not be registered, scheduled or cleaned up; the original error stays traceable. Cancellation itself returns `false` rather than an error |
-| `scopeClosed` | `SCOPE_CLOSED` | `own()` after `close()` (async or sync scope), or `retain()` on a closed registry |
-| `scopeTerminal` | `SCOPE_TERMINAL` | Any registration or activation after the container reached `terminal` |
-| `scopeReentrantDispose` | `SCOPE_REENTRANT_DISPOSE` | A disposer calls `dispose()` of its own scope |
-| `scopeReentrantOwn` | `SCOPE_REENTRANT_OWN` | A disposer calls `own()` of its own scope |
-| `scopeSyncViolation` | `SCOPE_SYNC_VIOLATION` | A `SyncLifecycleScope` receives a descriptor without `syncSafe: true`, an async scope instance as a resource, or a callback that returns a thenable |
-| `scopeDisposalFailed` | `SCOPE_DISPOSAL_FAILED` | Release failed under the `throw` policy: attached to a single unclassified failure, or carried by the `AggregateError` that combines several |
-| `unitStartFailed` | `UNIT_START_FAILED` | Used by the internal unit loader, which is no longer exported |
-| `generationSuperseded` | `GENERATION_SUPERSEDED` | A result reached `adopt()` after a newer generation replaced it (a diagnostic, not a failure) |
-| `generationCancellationFailed` | `GENERATION_CANCELLATION_FAILED` | Timer, parent listener or signal cleanup failed while cancelling a generation |
-| `generationDisposed` | `GENERATION_DISPOSED` | `begin()` on a `GenerationController` that was disposed |
-| `generationTimedOut` | `GENERATION_TIMED_OUT` | The current generation's `timeoutMs` expired; `signal.reason` is a coded Error |
-| `quiescenceSealed` | `QUIESCENCE_SEALED` | `retain()` after `seal()` |
-| `quiescenceUnsealedWait` | `QUIESCENCE_UNSEALED_WAIT` | The strict `whenZero(key)` without `seal(key)` first (thrown synchronously, not a rejected Promise) |
-| `provisionalSettled` | `PROVISIONAL_SETTLED` | Committing twice, committing after rollback, or rolling back after a successful commit; a repeated rollback reuses the first Promise |
-| `provisionalParentClosed` | `PROVISIONAL_PARENT_CLOSED` | The parent passed to `commitTo()` is `closing`/`terminal` and refuses resources |
-| `queueAdmissionTimeout` | `QUEUE_ADMISSION_TIMEOUT` | A mutation waited in the queue longer than `queueAdmissionTimeoutMs` |
-| `queueSelfDependency` | `QUEUE_SELF_DEPENDENCY` | An owner whose task is still running submits another task to the same queue, which would deadlock if awaited |
-| `releaseForceFailed` | `RELEASE_FORCE_FAILED` | A descriptor's `force` threw or rejected (the contract requires `force` to succeed unconditionally) |
-| `deadlineExceeded` | `DEADLINE_EXCEEDED` | The shared absolute deadline already passed when a resource was about to start a graceful phase, or a synchronous `graceful` returned after its budget (still counted as success; `force` does not run). Both are only reported; the normal fallback path does not use this code |
-| `envUnsupported` | `ENV_UNSUPPORTED` | The host lacks the `AbortController` support lifecycle needs; missing scheduler support is reported by utils `ENV_UNSUPPORTED` |
-| `invalidOption` | `INVALID_OPTION` | A scheduler received an invalid time or delay, or a descriptor field has the wrong type |
+| `LifecycleErrorCode` key       | Code                             | When it happens                                                                                                                                                                                                                                                                  |
+| ------------------------------ | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `delayFailed`                  | `DELAY_FAILED`                   | A relative delay could not be registered, scheduled or cleaned up; the original error stays traceable. Cancellation itself returns `false` rather than an error                                                                                                                  |
+| `scopeClosed`                  | `SCOPE_CLOSED`                   | `own()` after `close()` (async or sync scope), or `retain()` on a closed registry                                                                                                                                                                                                |
+| `scopeTerminal`                | `SCOPE_TERMINAL`                 | Any registration or activation after the container reached `terminal`                                                                                                                                                                                                            |
+| `scopeReentrantDispose`        | `SCOPE_REENTRANT_DISPOSE`        | A disposer calls `dispose()` of its own scope                                                                                                                                                                                                                                    |
+| `scopeReentrantOwn`            | `SCOPE_REENTRANT_OWN`            | A disposer calls `own()` of its own scope                                                                                                                                                                                                                                        |
+| `scopeSyncViolation`           | `SCOPE_SYNC_VIOLATION`           | A `SyncLifecycleScope` receives a descriptor without `syncSafe: true`, an async scope instance as a resource, or a callback that returns a thenable                                                                                                                              |
+| `scopeDisposalFailed`          | `SCOPE_DISPOSAL_FAILED`          | Release failed under the `throw` policy: attached to a single unclassified failure, or carried by the `AggregateError` that combines several                                                                                                                                     |
+| `unitStartFailed`              | `UNIT_START_FAILED`              | Used by the package's internal unit loader                                                                                                                                                                                                                                       |
+| `generationSuperseded`         | `GENERATION_SUPERSEDED`          | A result reached `adopt()` after a newer generation replaced it (a diagnostic, not a failure)                                                                                                                                                                                    |
+| `generationCancellationFailed` | `GENERATION_CANCELLATION_FAILED` | Timer, parent listener or signal cleanup failed while cancelling a generation                                                                                                                                                                                                    |
+| `generationDisposed`           | `GENERATION_DISPOSED`            | `begin()` on a `GenerationController` that was disposed                                                                                                                                                                                                                          |
+| `generationTimedOut`           | `GENERATION_TIMED_OUT`           | The current generation's `timeoutMs` expired; `signal.reason` is a coded Error                                                                                                                                                                                                   |
+| `quiescenceSealed`             | `QUIESCENCE_SEALED`              | `retain()` after `seal()`                                                                                                                                                                                                                                                        |
+| `quiescenceUnsealedWait`       | `QUIESCENCE_UNSEALED_WAIT`       | The strict `whenZero(key)` without `seal(key)` first (thrown synchronously, not a rejected Promise)                                                                                                                                                                              |
+| `provisionalSettled`           | `PROVISIONAL_SETTLED`            | Committing twice, committing after rollback, or rolling back after a successful commit; a repeated rollback reuses the first Promise                                                                                                                                             |
+| `provisionalParentClosed`      | `PROVISIONAL_PARENT_CLOSED`      | The parent passed to `commitTo()` is `closing`/`terminal` and refuses resources                                                                                                                                                                                                  |
+| `queueAdmissionTimeout`        | `QUEUE_ADMISSION_TIMEOUT`        | A mutation waited in the queue longer than `queueAdmissionTimeoutMs`                                                                                                                                                                                                             |
+| `queueSelfDependency`          | `QUEUE_SELF_DEPENDENCY`          | An owner whose task is still running submits another task to the same queue, which would deadlock if awaited                                                                                                                                                                     |
+| `releaseForceFailed`           | `RELEASE_FORCE_FAILED`           | A descriptor's `force` threw or rejected (the contract requires `force` to succeed unconditionally)                                                                                                                                                                              |
+| `deadlineExceeded`             | `DEADLINE_EXCEEDED`              | The shared absolute deadline already passed when a resource was about to start a graceful phase, or a synchronous `graceful` returned after its budget (still counted as success; `force` does not run). Both are only reported; the normal fallback path does not use this code |
+| `envUnsupported`               | `ENV_UNSUPPORTED`                | The host lacks the `AbortController` support lifecycle needs; missing scheduler support is reported by utils `ENV_UNSUPPORTED`                                                                                                                                                   |
+| `invalidOption`                | `INVALID_OPTION`                 | A scheduler received an invalid time or delay, or a descriptor field has the wrong type                                                                                                                                                                                          |
 
 The JSDoc in `src/error-code.ts` explains the reasoning behind each code. Always compare with `error.code === LifecycleErrorCode.xxx` instead of hard-coding the string.
 
@@ -1428,9 +1431,7 @@ Options (`errorPolicy`, `report`, `deadlineAt`, `scheduler`, `onAdmissionDiagnos
 
 `context.signal` in a release callback is created on first read (already aborted, with a `SCOPE_CLOSED` reason). A provisional scope without `parentSignal` also creates its `signal` on first read. Release callbacks that never read the signal cost no AbortController.
 
-### Helpers that are no longer public
-
-`createLifecycleUnit` and its option/result types are no longer exported; applications use `createGenerationController` for stale work and keep loading state in their own code. `createStringQuiescenceTracker` was replaced by `createStringLeaseRegistry`, which has real consumers. `validateSchedulerTime` and `validateSchedulerDelay` are internal and exposed neither at the root nor from a leaf; the error factories such as `tagLifecycleError` and `createLifecycleRangeError` were removed, and the package now builds native errors and attaches identity with `attachErrorIdentity` from `@migaia/utils/error`. `/scheduler` exposes the snapshot/resolve admission helpers. Error constructors and scheduler arithmetic helpers are internal with no compatibility aliases; application errors use their own package's identity.
+### Failures nobody else receives
 
 The generation controller's `report?: (error: unknown) => void` receives failures nobody else can receive: a stale resource's release error when `adopt()` is called without `onReleaseError`, and timer or parent-listener cleanup errors from an asynchronous timeout. Throws and rejections from the reporter itself go to the shared host error queue from utils; without a reporter these diagnostics are not emitted.
 

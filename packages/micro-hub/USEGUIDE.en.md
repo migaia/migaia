@@ -18,13 +18,13 @@
 
 ## 1. Hub
 
-| API | Description |
-| --- | --- |
-| `createMicroHub({ plugins, report? })` | Creates the single hub of the page. It checks every plugin's dependencies first and installs the plugins only when all of them are met. Throws `HUB_ALREADY_CREATED` when a hub already exists. |
-| `getMicroHub()` | Returns the hub; throws `HUB_NOT_CREATED` when none has been created. |
-| `hub.connect(name)` | Connects an app. The name must be non-empty and must not contain `.`; throws `APP_ALREADY_CONNECTED` while an app with the same name is still connected. |
-| `hub.apps` | Names of the connected apps, in connection order. |
-| `hub.dispose()` | `hub.dispose()` disconnects every app and returns `Promise<void>` for app unloading and hub cleanup; later disposal calls on that hub reuse its disposal Promise. `createMicroHub` can be called again afterwards. |
+| API                                    | Description                                                                                                                                                                                                        |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `createMicroHub({ plugins, report? })` | Creates the single hub of the page. It checks every plugin's dependencies first and installs the plugins only when all of them are met. Throws `HUB_ALREADY_CREATED` when a hub already exists.                    |
+| `getMicroHub()`                        | Returns the hub; throws `HUB_NOT_CREATED` when none has been created.                                                                                                                                              |
+| `hub.connect(name)`                    | Connects an app. The name must be non-empty and must not contain `.`; throws `APP_ALREADY_CONNECTED` while an app with the same name is still connected.                                                           |
+| `hub.apps`                             | Names of the connected apps, in connection order.                                                                                                                                                                  |
+| `hub.dispose()`                        | `hub.dispose()` disconnects every app and returns `Promise<void>` for app unloading and hub cleanup; later disposal calls on that hub reuse its disposal Promise. `createMicroHub` can be called again afterwards. |
 
 `report(error)` receives errors that must not interrupt the current operation: exceptions from listeners and subscription callbacks, and cleanup failures. When omitted, the hub uses `globalThis.reportError`, or `console.error` when that is missing. If `report` itself throws, both errors go to the default reporter.
 
@@ -32,16 +32,16 @@
 
 `defineContract(name, spec)` only validates and freezes; it has no side effects. The hub registers a contract the first time an app calls `use()` or `own()` with it.
 
-| Field | Description |
-| --- | --- |
-| `version` | Positive integer major version. The first registration of a name decides the version; a different version later throws `CONTRACT_VERSION_MISMATCH`. |
-| `state` | Initial field values, or `keyed<T>()`. Initial values are copied with `structuredClone` and frozen at the top level, so they must be structured-cloneable. |
-| `computed` | `(state) => value`. Depends only on the fields it actually reads. |
-| `commands` | `(state, ...args) => patch`. Must be synchronous; the patch contains only the fields to change. |
-| `writers` | Apps other than the owner that may call commands. By default only the owner can write. |
-| `events` | `event<T>()`. Only the owner can emit. |
-| `requests` | `request<In, Out>()`. The owner registers exactly one handler. |
-| `resources` | `resource<T>()`. The owner provides a fetcher. |
+| Field       | Description                                                                                                                                                |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`   | Positive integer major version. The first registration of a name decides the version; a different version later throws `CONTRACT_VERSION_MISMATCH`.        |
+| `state`     | Initial field values, or `keyed<T>()`. Initial values are copied with `structuredClone` and frozen at the top level, so they must be structured-cloneable. |
+| `computed`  | `(state) => value`. Depends only on the fields it actually reads.                                                                                          |
+| `commands`  | `(state, ...args) => patch`. Must be synchronous; the patch contains only the fields to change.                                                            |
+| `writers`   | Apps other than the owner that may call commands. By default only the owner can write.                                                                     |
+| `events`    | `event<T>()`. Only the owner can emit.                                                                                                                     |
+| `requests`  | `request<In, Out>()`. The owner registers exactly one handler.                                                                                             |
+| `resources` | `resource<T>()`. The owner provides a fetcher.                                                                                                             |
 
 Invalid names, versions that are not positive integers, and section members of the wrong kind throw `INVALID_OPTION` (`TypeError`).
 
@@ -49,22 +49,22 @@ Invalid names, versions that are not positive integers, and section members of t
 
 The shell and child apps receive exactly the same `IMicroApp`:
 
-| Member | Description |
-| --- | --- |
-| `name` / `connected` | The app name; `connected` becomes false after `disconnect()`. |
-| `use(contract)` | Returns the contract view. Repeated calls by the same app for the same contract return the same object. |
-| `own(contract, options?)` | Claims ownership and returns the view plus the owner-only members. Throws `CONTRACT_OWNED` when the contract already has an owner. |
-| `disconnect()` | The app's `disconnect()` synchronously releases its subscriptions, handlers and ownership, then returns `Promise<void>` for unloading its plugin from plugin-host; later disconnection calls on that app reuse this unloading Promise. |
+| Member                    | Description                                                                                                                                                                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name` / `connected`      | The app name; `connected` becomes false after `disconnect()`.                                                                                                                                                                          |
+| `use(contract)`           | Returns the contract view. Repeated calls by the same app for the same contract return the same object.                                                                                                                                |
+| `own(contract, options?)` | Claims ownership and returns the view plus the owner-only members. Throws `CONTRACT_OWNED` when the contract already has an owner.                                                                                                     |
+| `disconnect()`            | The app's `disconnect()` synchronously releases its subscriptions, handlers and ownership, then returns `Promise<void>` for unloading its plugin from plugin-host; later disconnection calls on that app reuse this unloading Promise. |
 
 After disconnecting, calling any member of the handle or a view throws `APP_DISCONNECTED`. Owner-only members:
 
-| Member | Description |
-| --- | --- |
-| `events.<name>.emit(payload)` | Delivers synchronously to every listener. |
-| `handle(name, handler)` | Registers a request handler; registering twice throws `HANDLER_DUPLICATED`. Returns an unregister function. |
-| `provide(name, fetcher)` | Registers the fetcher of a shared asynchronous value. Returns an unregister function. |
-| `persistence` | The store-persist `IPersistHandle` when persistence was requested, otherwise `undefined`. |
-| `release()` | Gives up ownership so another app can claim it. The state is kept. |
+| Member                        | Description                                                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `events.<name>.emit(payload)` | Delivers synchronously to every listener.                                                                   |
+| `handle(name, handler)`       | Registers a request handler; registering twice throws `HANDLER_DUPLICATED`. Returns an unregister function. |
+| `provide(name, fetcher)`      | Registers the fetcher of a shared asynchronous value. Returns an unregister function.                       |
+| `persistence`                 | The store-persist `IPersistHandle` when persistence was requested, otherwise `undefined`.                   |
+| `release()`                   | Gives up ownership so another app can claim it. The state is kept.                                          |
 
 ## 4. State
 
@@ -96,7 +96,7 @@ On a view, `state.<field>` is an `IReadable<T>`; a `keyed` field is `{ at(id): I
 
 ## 6. Persistence
 
-`persist({ store, debounceMs?, keyPrefix? })` requires `state()`. `store` is any `IKeyValueStore`, for example `localStorageHost({ namespace })` from `@migaia/storage-plugin-browser/local-storage` or `indexedDbHost({ dbName })` from `@migaia/storage-plugin-browser/indexed-db`. Despite the `Host` in their names, these two factories return only a store and do not create a storage-plugin-browser host. micro-hub does not use storage-plugin-browser's `./plugins/*`, which can only be installed into a storage host. The hub borrows the store and never releases it.
+`persist({ store, debounceMs?, keyPrefix? })` requires `state()`. `store` is any key-value store. In a browser you usually create a storage host with one backend plugin, for example `localStorageBackendPlugin({ namespace })` from `@migaia/storage-plugin-browser/local-storage`, and pass `storage.backend('local')`. The hub borrows the store and never releases it; the app disposes the storage host itself when it shuts down.
 
 `own(contract, { persist: ['items'], persistKey? })` writes the selected plain fields to `<keyPrefix><persistKey ?? contract name>` and reads them back when the owner starts. Writes made while reading back are not overwritten by the saved data (the store-persist hydrate merge rule). When the owner changes within the same hub, fields that were already restored or written keep their in-memory values and are not overwritten by the old saved data; a new hub still restores the saved data. The saved version is the contract `version`; after a major version upgrade the old data is discarded and the fields start from the contract's initial values. `owned.persistence.ready` resolves after the first successful read-back. Persistence stops when the owner disconnects or calls `release()`. Keyed fields cannot be persisted.
 
@@ -113,11 +113,11 @@ Asynchronous writes to the same storage key within one hub keep their order acro
 
 ## 8. Web Components
 
-| API | Description |
-| --- | --- |
-| `MICRO_APP_CONTEXT` | The Context Protocol context key (a string). |
-| `provideMicroApp(element, app)` | Makes `element` answer `context-request` events from its descendants, including inside shadow DOM. It also answers helper requests that were waiting, and dispatches `context-provider` so an external ContextRoot replays its subscription requests. Returns a stop function. |
-| `consumeMicroApp(element, callback)` | Dispatches a `context-request` (`bubbles`, `composed`); waits when there is no provider yet. Returns a cancel function. |
+| API                                  | Description                                                                                                                                                                                                                                                                    |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MICRO_APP_CONTEXT`                  | The Context Protocol context key (a string).                                                                                                                                                                                                                                   |
+| `provideMicroApp(element, app)`      | Makes `element` answer `context-request` events from its descendants, including inside shadow DOM. It also answers helper requests that were waiting, and dispatches `context-provider` so an external ContextRoot replays its subscription requests. Returns a stop function. |
+| `consumeMicroApp(element, callback)` | Dispatches a `context-request` (`bubbles`, `composed`); waits when there is no provider yet. Returns a cancel function.                                                                                                                                                        |
 
 When a Lit consumer may connect before the provider, connect a `ContextRoot` on a common ancestor first and set `@consume({ context: MICRO_APP_CONTEXT, subscribe: true })`. ContextRoot records unanswered subscription requests and, when it receives the provider's `context-provider`, re-dispatches them from the original consumers. This package reuses that protocol and does not create a ContextRoot of its own.
 
@@ -131,11 +131,11 @@ When a Lit consumer may connect before the provider, connect a `ContextRoot` on 
 
 The three constant objects exported from the root entry are frozen literals; their values are part of the public contract.
 
-| Constant | Values | Use |
-| --- | --- | --- |
-| `MicroResourceStatus` | `idle`, `pending`, `success`, `error`, `cancelled` | The `status` of `resources.<name>.state.get()`. `idle` means the owner has not called `provide` yet; `cancelled` means the request was replaced by a newer one or the owner released it. Compare with `status === MicroResourceStatus.success`. |
-| `MicroCapability` | `events`, `state`, `persist`, `resource` | The capability kind names. Each plugin declares one kind, and `PLUGIN_MISSING` messages name them. Use them when writing a custom plugin or when explaining which capability is missing. |
-| `MicroHubErrorText` | The message, or message factory, of every error code | Every message this package throws comes from here, for example `MicroHubErrorText.appDisconnected('cart')`. Branch on `code`; refer to this object only when a test or a log needs the exact wording. |
+| Constant              | Values                                               | Use                                                                                                                                                                                                                                             |
+| --------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MicroResourceStatus` | `idle`, `pending`, `success`, `error`, `cancelled`   | The `status` of `resources.<name>.state.get()`. `idle` means the owner has not called `provide` yet; `cancelled` means the request was replaced by a newer one or the owner released it. Compare with `status === MicroResourceStatus.success`. |
+| `MicroCapability`     | `events`, `state`, `persist`, `resource`             | The capability kind names. Each plugin declares one kind, and `PLUGIN_MISSING` messages name them. Use them when writing a custom plugin or when explaining which capability is missing.                                                        |
+| `MicroHubErrorText`   | The message, or message factory, of every error code | Every message this package throws comes from here, for example `MicroHubErrorText.appDisconnected('cart')`. Branch on `code`; refer to this object only when a test or a log needs the exact wording.                                           |
 
 ```ts
 import { MicroResourceStatus } from '@migaia/micro-hub'
@@ -146,20 +146,20 @@ if (status === MicroResourceStatus.success) render(data)
 
 ## Error codes
 
-| Code | Type | Thrown when | What the caller should do |
-| --- | --- | --- | --- |
-| `HUB_ALREADY_CREATED` | Error | `createMicroHub` is called while a hub exists | Child apps use `getMicroHub()` |
-| `HUB_NOT_CREATED` | Error | No hub exists, or it has been disposed | Create the hub in the shell first |
-| `APP_ALREADY_CONNECTED` | Error | An app with the same name is still connected | Disconnect the old instance first |
-| `APP_DISCONNECTED` | Error | A handle is used after disconnecting | Connect again |
-| `PLUGIN_MISSING` | Error | A capability needed by a contract or a plugin is not installed | Add it to `plugins` |
-| `CONTRACT_VERSION_MISMATCH` | Error | A contract name is used with a different major version | Align the deployed versions |
-| `CONTRACT_OWNED` | Error | The contract already has an owner | Wait for the owner to disconnect or call `release()` |
-| `WRITE_DENIED` | Error | The caller is neither the owner nor in `writers` | Add it to `writers`, or use a request instead |
-| `EMIT_DENIED` | Error | An owner-only member (emit, handle, provide) is called after `release()` | Claim ownership again |
-| `COMMAND_ASYNC` | TypeError | A command returns a thenable | Finish the async work before calling the command |
-| `HANDLER_DUPLICATED` | Error | `handle` / `provide` is registered twice | Remove the duplicate registration |
-| `OWNER_ABSENT` | Error | No handler exists when the request is made | Pass `waitForOwner`, or retry later |
-| `OWNER_TIMEOUT` | Error | Waiting for a handler timed out | Report the failure, or retry later |
-| `OWNER_GONE` | Error | The owner left while a request was in progress | Reconcile, then retry |
-| `INVALID_OPTION` | TypeError | A name, version, member or patch field is invalid | Fix the call |
+| Code                        | Type      | Thrown when                                                              | What the caller should do                            |
+| --------------------------- | --------- | ------------------------------------------------------------------------ | ---------------------------------------------------- |
+| `HUB_ALREADY_CREATED`       | Error     | `createMicroHub` is called while a hub exists                            | Child apps use `getMicroHub()`                       |
+| `HUB_NOT_CREATED`           | Error     | No hub exists, or it has been disposed                                   | Create the hub in the shell first                    |
+| `APP_ALREADY_CONNECTED`     | Error     | An app with the same name is still connected                             | Disconnect the old instance first                    |
+| `APP_DISCONNECTED`          | Error     | A handle is used after disconnecting                                     | Connect again                                        |
+| `PLUGIN_MISSING`            | Error     | A capability needed by a contract or a plugin is not installed           | Add it to `plugins`                                  |
+| `CONTRACT_VERSION_MISMATCH` | Error     | A contract name is used with a different major version                   | Align the deployed versions                          |
+| `CONTRACT_OWNED`            | Error     | The contract already has an owner                                        | Wait for the owner to disconnect or call `release()` |
+| `WRITE_DENIED`              | Error     | The caller is neither the owner nor in `writers`                         | Add it to `writers`, or use a request instead        |
+| `EMIT_DENIED`               | Error     | An owner-only member (emit, handle, provide) is called after `release()` | Claim ownership again                                |
+| `COMMAND_ASYNC`             | TypeError | A command returns a thenable                                             | Finish the async work before calling the command     |
+| `HANDLER_DUPLICATED`        | Error     | `handle` / `provide` is registered twice                                 | Remove the duplicate registration                    |
+| `OWNER_ABSENT`              | Error     | No handler exists when the request is made                               | Pass `waitForOwner`, or retry later                  |
+| `OWNER_TIMEOUT`             | Error     | Waiting for a handler timed out                                          | Report the failure, or retry later                   |
+| `OWNER_GONE`                | Error     | The owner left while a request was in progress                           | Reconcile, then retry                                |
+| `INVALID_OPTION`            | TypeError | A name, version, member or patch field is invalid                        | Fix the call                                         |

@@ -246,11 +246,11 @@ Business failures reject the operation's Promise. Observer and reporting-callbac
 
 Explicit `host.dispose()` waits for work already started, preserves cleanup failures and reuses its Promise. `await using host = ...` also releases resources, but reports cleanup failures instead of replacing an outer primary error. Finish reading data and consuming iterators before shutdown; do not continue using saved handles afterwards.
 
-For backend implementations, see the [README migration table](./README.en.md#moving-backend-authoring-imports) and [contract entry table](../storage-contract/README.en.md#entries-and-dependency-direction).
+For backend implementations, see the [README backend authoring entries](./README.en.md#backend-authoring-entries) and [contract entry table](../storage-contract/README.en.md#entries-and-dependency-direction).
 
 ## Assemble optional capabilities explicitly
 
-The base host does not import journal runtime, notification controllers or change iterators. Previously the host's journal option loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
+The base host does not import the journal runtime, notification controllers or change iterators. Applications select these capabilities, so code that only reads and writes does not bundle them.
 
 Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/plugins/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
 
@@ -283,13 +283,13 @@ Without the feed Feature, memory reports `capabilities.changeFeed: false` and wa
 
 Backend authors import the controller factory from `/sdk` and pass it explicitly to `core.createChangeController(options, createBackendChangeController)`. Basic physical resources can use `createBackendLifecycleController` from that entry. Change iterators come from the same `/sdk` entry.
 
-### Strict index query migration
+### Strict index queries
 
-Previously, `.index(...).requirePushdown()` allowed a full scan when no client steps remained. Terminal reads now reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan.
+`.index(...).requirePushdown()` demands native index execution. Terminal reads reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan.
 
-Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries retain their scan fallback.
+Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries keep their scan fallback.
 
-IndexedDB borrowed views resolve the same private capabilities as their native store. Legacy records keep readiness running until migration completes with the matching schema fingerprint. Queries continue to scan and report fallback while readiness is not complete.
+IndexedDB borrowed views resolve the same private capabilities as their native store. While records in an older format remain, index readiness stays running and queries keep scanning and report the fallback, until conversion completes with the matching schema fingerprint.
 
 When no migration metadata exists, a backfill that starts from the canonical beginning and finishes both scan phases may become complete only if it observes no legacy records and skips no invalid entity records. Current-format records can then use the native cursor without `entityMigrationFeature()`.
 

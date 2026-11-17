@@ -348,7 +348,7 @@ All return a synchronous, idempotent `IUnsubscribe`, without styled `off`, `disp
 
 `subscribeUntil` accepts native `AbortSignal` or a compatible object with boolean `aborted`, optional `reason`, and callable `addEventListener` and `removeEventListener` methods. The event type is `'abort'`. Invalid signals produce `INVALID_SIGNAL`. Already-aborted signals create no registration by default; a canonical channel explicitly configured with `throwOnAborted: true` throws `ABORTED`.
 
-Object subscribers need only `IEventSubscriber.handle(event)`. The old draft's abstract `EventSubscriber`, static `EVENT_NAME` (nor `EVENTNAME`) and `onCall()` are outside the current API. The supplied channel determines the source. Hub subscription keys determine event names; subscriber classes do not repeat that information.
+Object subscribers need only `IEventSubscriber.handle(event)`. The supplied channel determines the source. Hub subscription keys determine event names; subscriber classes do not repeat that information.
 
 ## Waiting for asynchronous listeners
 

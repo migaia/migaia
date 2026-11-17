@@ -6,16 +6,16 @@ What the package is for, its highlights and its mental model are in the [README]
 
 ## Find by scenario
 
-| Your problem | Read this section |
-| --- | --- |
-| A slow old request answers last and overwrites the new result | [Show only the result for the latest input](#show-only-the-result-for-the-latest-input) |
-| Several filters change together and several requests go out | [Change several filters, send one request](#change-several-filters-send-one-request) |
-| Several components request the same data at once | [Several readers, one request](#several-readers-one-request) |
-| A request keeps running after the user leaves | [Stop the running request when the user leaves](#stop-the-running-request-when-the-user-leaves) |
-| The page shows "failed" after the user cancels | [Show cancelled instead of an error](#show-cancelled-instead-of-an-error) |
-| A refresh blanks the content before showing it again | [Keep showing old data while refreshing](#keep-showing-old-data-while-refreshing) |
-| A 404 is retried too, and the original error is lost afterwards | [Retry only temporary failures](#retry-only-temporary-failures) |
-| Data loaded on the server is requested again in the browser | [Do not request server-loaded data again](#do-not-request-server-loaded-data-again) |
+| Your problem                                                    | Read this section                                                                               |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| A slow old request answers last and overwrites the new result   | [Show only the result for the latest input](#show-only-the-result-for-the-latest-input)         |
+| Several filters change together and several requests go out     | [Change several filters, send one request](#change-several-filters-send-one-request)            |
+| Several components request the same data at once                | [Several readers, one request](#several-readers-one-request)                                    |
+| A request keeps running after the user leaves                   | [Stop the running request when the user leaves](#stop-the-running-request-when-the-user-leaves) |
+| The page shows "failed" after the user cancels                  | [Show cancelled instead of an error](#show-cancelled-instead-of-an-error)                       |
+| A refresh blanks the content before showing it again            | [Keep showing old data while refreshing](#keep-showing-old-data-while-refreshing)               |
+| A 404 is retried too, and the original error is lost afterwards | [Retry only temporary failures](#retry-only-temporary-failures)                                 |
+| Data loaded on the server is requested again in the browser     | [Do not request server-loaded data again](#do-not-request-server-loaded-data-again)             |
 
 ## Show only the result for the latest input
 
@@ -356,7 +356,9 @@ try {
   await order.promise
 } catch (error) {
   const failure = error as HttpError & { code?: string }
-  console.log(`final failure: ${failure.message}, still an HttpError: ${failure instanceof HttpError}`)
+  console.log(
+    `final failure: ${failure.message}, still an HttpError: ${failure instanceof HttpError}`
+  )
   console.log(`code: ${failure.code}`)
 }
 order.dispose()
@@ -700,22 +702,22 @@ import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@mi
 
 The stable error-code table has **14 codes**, declared only in `src/error-code.ts`. The package's own errors use the `source` `'resource'`; errors that already carry a full foreign identity keep their original package identity. `RESOURCE_SOURCE` exports this stable source: when classifying errors across packages, compare against it and `ResourceErrorCode` instead of copying string literals.
 
-| `ResourceErrorCode` key | Code | When |
-| --- | --- | --- |
-| `resourceDisposed` | `RESOURCE_DISPOSED` | Any read or operation on a `Resource` after `dispose()` |
-| `requestAborted` | `REQUEST_ABORTED` | The native AbortError of a stopped request; for a Resource-initiated abort it is the same object as `signal.reason`, and a lifecycle replacement reason stays on `cause` |
-| `requestCancelled` | `REQUEST_CANCELLED` | The `DOMException` carried by the `cancelled` state after an explicit `cancel()` of a pending request |
-| `cancellationCleanupFailed` | `CANCELLATION_CLEANUP_FAILED` | Cancellation converged the state, but timer/listener cleanup during cancellation failed |
-| `noActivePromise` | `NO_ACTIVE_PROMISE` | Reading `promise`, or calling `read()`/`peek()` in `pending`/`idle`, when there is no running or cached Promise to return |
-| `invalidSnapshot` | `INVALID_SNAPSHOT` | A snapshot that is not v2, a negative or non-finite duration (`remainingTtlMs` may be `null`), an overflowing rebuilt timestamp, or a failing getter |
-| `invalidOption` | `INVALID_OPTION` | An option passed to the constructor or a call (`ttl`, `retry`, `retryDelay`, `scheduler`, ...) does not meet its requirements |
-| `suspenseProbeFailed` | `SUSPENSE_PROBE_FAILED` | The `fetcher` threw a value for Suspense, but reading its `.then` threw, so it cannot be classified as a thenable |
-| `fetchFailed` | `FETCH_FAILED` | An unclassified fetch failure once retries are exhausted; native errors keep their identity where possible, frozen errors and non-Error values stay on `cause`, existing foreign identities are not rewritten |
-| `setupInvalid` | `RESOURCE_SETUP_INVALID` | `createResource()` got a setup that is not a function, or setup returned something other than a fetcher function; registered setup cleanups have already run |
-| `setupClosed` | `RESOURCE_SETUP_CLOSED` | `onDispose()` was called after setup returned (for example from an escaped context in an async callback); the cleanup is rejected |
-| `setupFailed` | `RESOURCE_SETUP_FAILED` | The setup callback threw; registered setup cleanups have already run. The thrown error carries this code itself; a non-error value is wrapped and kept on `cause` |
-| `mutateFailed` | `MUTATE_FAILED` | The `mutate()` updater threw; state is unchanged. The thrown error carries this code itself; a non-error value is wrapped and kept on `cause` |
-| `disposeCleanupFailed` | `DISPOSE_CLEANUP_FAILED` | A registered cleanup threw during `dispose()`; the other cleanups still ran; the first cleanup error carries this code and later ones are on its `.errors` |
+| `ResourceErrorCode` key     | Code                          | When                                                                                                                                                                                                          |
+| --------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resourceDisposed`          | `RESOURCE_DISPOSED`           | Any read or operation on a `Resource` after `dispose()`                                                                                                                                                       |
+| `requestAborted`            | `REQUEST_ABORTED`             | The native AbortError of a stopped request; for a Resource-initiated abort it is the same object as `signal.reason`, and a lifecycle replacement reason stays on `cause`                                      |
+| `requestCancelled`          | `REQUEST_CANCELLED`           | The `DOMException` carried by the `cancelled` state after an explicit `cancel()` of a pending request                                                                                                         |
+| `cancellationCleanupFailed` | `CANCELLATION_CLEANUP_FAILED` | Cancellation converged the state, but timer/listener cleanup during cancellation failed                                                                                                                       |
+| `noActivePromise`           | `NO_ACTIVE_PROMISE`           | Reading `promise`, or calling `read()`/`peek()` in `pending`/`idle`, when there is no running or cached Promise to return                                                                                     |
+| `invalidSnapshot`           | `INVALID_SNAPSHOT`            | A snapshot that is not v2, a negative or non-finite duration (`remainingTtlMs` may be `null`), an overflowing rebuilt timestamp, or a failing getter                                                          |
+| `invalidOption`             | `INVALID_OPTION`              | An option passed to the constructor or a call (`ttl`, `retry`, `retryDelay`, `scheduler`, ...) does not meet its requirements                                                                                 |
+| `suspenseProbeFailed`       | `SUSPENSE_PROBE_FAILED`       | The `fetcher` threw a value for Suspense, but reading its `.then` threw, so it cannot be classified as a thenable                                                                                             |
+| `fetchFailed`               | `FETCH_FAILED`                | An unclassified fetch failure once retries are exhausted; native errors keep their identity where possible, frozen errors and non-Error values stay on `cause`, existing foreign identities are not rewritten |
+| `setupInvalid`              | `RESOURCE_SETUP_INVALID`      | `createResource()` got a setup that is not a function, or setup returned something other than a fetcher function; registered setup cleanups have already run                                                  |
+| `setupClosed`               | `RESOURCE_SETUP_CLOSED`       | `onDispose()` was called after setup returned (for example from an escaped context in an async callback); the cleanup is rejected                                                                             |
+| `setupFailed`               | `RESOURCE_SETUP_FAILED`       | The setup callback threw; registered setup cleanups have already run. The thrown error carries this code itself; a non-error value is wrapped and kept on `cause`                                             |
+| `mutateFailed`              | `MUTATE_FAILED`               | The `mutate()` updater threw; state is unchanged. The thrown error carries this code itself; a non-error value is wrapped and kept on `cause`                                                                 |
+| `disposeCleanupFailed`      | `DISPOSE_CLEANUP_FAILED`      | A registered cleanup threw during `dispose()`; the other cleanups still ran; the first cleanup error carries this code and later ones are on its `.errors`                                                    |
 
 Values thrown or stored for `requestAborted`/`requestCancelled` are always native `DOMException`s (`name === 'AbortError'`). Callers usually check `error.name === 'AbortError'` and handle them quietly rather than as real failures; `code` is only an attached field and does not change the type. Branch on `error.code === ResourceErrorCode.xxx` and never hard-code the code strings.
 
@@ -798,7 +800,7 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 
 One request reuses one pending Promise across every Suspense wait. After a thenable thrown by the fetcher settles, the work continues through a 0 ms task on the injected scheduler; Suspense waits do not count as retries and have no upper limit. Even when the fetcher keeps throwing thenables that settle at once, cancellation tasks can still run, and `cancel()`/`dispose()` stop further calls.
 
-State type migration: `ResourceStatus.fetching` became `ResourceFetchStatus.fetching`; the former `IResourceStatus` / `IResourceFetchStatus` types are replaced by the key unions `ResourceStatus` / `ResourceFetchStatus` that share their constants' names. The runtime status strings and the data and transport semantics of background refresh are unchanged.
+`ResourceStatus` lists the five states of `state`; whether a background refresh is running is reported by `ResourceFetchStatus` (for example `ResourceFetchStatus.fetching`). Both are a constant object plus a key union of the same name: use constants such as `ResourceStatus.success` for values and write `ResourceStatus` as the type.
 
 ### Adapters: read-only inspection and reset
 

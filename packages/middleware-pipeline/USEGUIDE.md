@@ -451,7 +451,7 @@ stage、done、`assertActive` 的原生 Error 尽量保留对象、类型和 sta
 
 根入口公开 `MiddlewarePipelineNext`、`ICreatePipelineOptions`、`IMiddlewarePipeline`、`IMiddlewarePipelineStage`、`IMiddlewarePipelineDone`、`IMiddlewarePipelineRunResult`、`IMiddlewarePipelineLiftSource`，以及四种 stage 类型、context/control 类型、违约与信号类型。消费者通过工厂、run 和 lift 使用执行器。
 
-`IMiddlewarePipelineSyncMode` 只是包内用于 Done/RunResult 条件类型的中间项，已从根入口撤回，没有兼容别名。业务代码使用公开的 `IMiddlewarePipelineDone`、`IMiddlewarePipelineRunResult`。
+标注终点回调和运行结果的类型时，使用公开的 `IMiddlewarePipelineDone`、`IMiddlewarePipelineRunResult`。
 
 ```bash
 pnpm run fmt

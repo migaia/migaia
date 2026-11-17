@@ -248,7 +248,7 @@ owned 释放优先 $dispose()，否则 dispose()，无对应函数则无操作�
 
 remove、replace 和 register 返回的注销函数触发的是单项清理：异步失败会报告，但不纳入之后整体 disposeAsync 的等待账本。应用若要等待某个已移除对象的真实异步释放，应由该对象 owner 保留自己的完成协议，不能把 Registry 完成当成所有历史清理的屏障。
 
-### 错误与迁移
+### 错误码
 
 | StoreReactErrorCode 属性 | code                     | 场景                                                     |
 | ------------------------ | ------------------------ | -------------------------------------------------------- |
@@ -275,7 +275,7 @@ STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；
 | `[store] ready barrier rejected`                                                  | 检查 cause，用外层 Error Boundary      |
 | `[store] provider registry disposal failed`                                       | 展开 AggregateError.errors 或单个原错  |
 
-feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。React/react-dom 最低版本已迁移到 19；无操作 prepareForRender 与 retain 的无效第二参数已删除，保留一个 disposeOnRelease 参数。
+feature 断言信息含 apiName 与 path；wasm 开启却无 ready 的信息提示传入 ensureWasm 或等价初始化。不要把 fallback 当作错误 UI，也不要把状态三态当成错误码。需要 React/react-dom 19 及以上；`retain` 只接收一个 disposeOnRelease 参数。
 
 ### 排查与开发命令
 

@@ -155,7 +155,7 @@ With `style: 'on-emit'`, `channel.on(listener)` registers a listener and returns
 
 Import `subscribeOnce`, `subscribeUntil` and `subscribeSubscriber` from `@migaia/event-subscriber/subscriber`. They work only through `channel.subscribe(listener, options?)` without reading style configuration, so they also accept styled channels that retain this method. A styled channel adds naming aliases. Each helper returns a plain `IUnsubscribe`: a synchronous, idempotent cancellation function with no `off`, `dispose`, `unlisten` or chain methods.
 
-An object subscriber only implements `handle(event)` from `IEventSubscriber<T, R>`. The channel supplied to `subscribeSubscriber(channel, subscriber)` determines the event source; a Hub's `subscribe(key, listener)` key determines the event name. The old draft's abstract `EventSubscriber` class, static `EVENT_NAME` and `onCall()` are outside the current public contract; event names are not repeated on subscriber classes.
+An object subscriber only implements `handle(event)` from `IEventSubscriber<T, R>`. The channel supplied to `subscribeSubscriber(channel, subscriber)` determines the event source; a Hub's `subscribe(key, listener)` key determines the event name. Subscriber classes do not need to repeat the event name.
 
 The Hub fixes its internal channels to the default policies and accepts no channel policy configuration. It does not aggregate listener results; use a channel with a result type when results matter.
 

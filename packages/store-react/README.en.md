@@ -248,7 +248,7 @@ One synchronous failure can retain its native Error with REGISTRY_DISPOSAL_FAILE
 
 remove, replace, and register's returned disposer perform separate per-entry cleanup. Async rejection is reported but does not enter a later whole-owner disposeAsync wait ledger. To await a removed object's actual asynchronous release, retain its owner's completion protocol rather than treating Registry completion as a barrier for every historical cleanup.
 
-### Errors and migration
+### Error codes
 
 | StoreReactErrorCode property | code                     | Situation                                                                      |
 | ---------------------------- | ------------------------ | ------------------------------------------------------------------------------ |
@@ -275,7 +275,7 @@ STORE_REACT_SOURCE is `'store.react'`. Errors created here carry source/code; fo
 | `[store] ready barrier rejected`                                                  | Inspect cause and use an outer Error Boundary                   |
 | `[store] provider registry disposal failed`                                       | Inspect AggregateError.errors or the individual original error  |
 
-Feature assertions include apiName and path in the message. Enabling wasm without ready suggests ensureWasm or equivalent initialization. fallback is not error UI, and readiness states are not error codes. The minimum React/react-dom version moved to 19. The no-op prepareForRender method and ineffective second retain argument were removed; retain takes only disposeOnRelease.
+Feature assertions include apiName and path in the message. Enabling wasm without ready suggests ensureWasm or equivalent initialization. fallback is not error UI, and readiness states are not error codes. React/react-dom 19 or later is required; `retain` takes a single disposeOnRelease argument.
 
 ### Troubleshooting and development commands
 

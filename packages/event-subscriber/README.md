@@ -155,7 +155,7 @@ value 模式保持 payload 身份，不提供 `abort()`、`setTaskId()` 或 `tas
 
 从 `@migaia/event-subscriber/subscriber` 导入的 `subscribeOnce`、`subscribeUntil`、`subscribeSubscriber` 只通过 `channel.subscribe(listener, options?)` 工作，不读取 style 配置，因此可以接收仍保留该方法的 styled channel（增加命名别名的通道）。它们的返回值固定为普通 `IUnsubscribe`，即同步、幂等的取消函数，不带 `off`、`dispose`、`unlisten` 或订阅链方法。
 
-对象订阅者只需实现 `IEventSubscriber<T, R>` 的 `handle(event)`，事件来源由 `subscribeSubscriber(channel, subscriber)` 中的 channel 决定；多事件名称由 Hub 的 `subscribe(key, listener)` 中的 key 决定。旧草案中的抽象类 `EventSubscriber`、静态 `EVENT_NAME` 与 `onCall()` 不属于当前公开契约，不把事件名重复存进 class。
+对象订阅者只需实现 `IEventSubscriber<T, R>` 的 `handle(event)`，事件来源由 `subscribeSubscriber(channel, subscriber)` 中的 channel 决定；多事件名称由 Hub 的 `subscribe(key, listener)` 中的 key 决定。事件名不需要重复存进 class。
 
 Hub 的内部策略固定为上述默认值，不接受单通道策略配置。它不聚合监听器结果；需要返回值时使用带结果类型的 channel。
 

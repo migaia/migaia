@@ -226,7 +226,7 @@ createSSRStateScriptWith(state, options) 和 readSSRStateFromDocumentWith(option
 
 多 codec 标签的 id 及 codec 属性按 HTML 属性规则转义 &、双引号、单引号、<、>。这不替代 id 的准入规则。读者取 data-codec（默认 json）与 data-wire（默认 text）决定还原方式；未注册写入类型以 CODEC_CONTRACT 拒绝，解码后的结果仍经过 assertSSRState。写入和读取必须有兼容 registry，registry.encode 本身不代替 SSR helper 的嵌入策略。
 
-SsrWireType 是 { json: 'json', text: 'text', bytes: 'bytes' }，ISsrWireType 为值联合。json 比较 codec type，text/bytes 比较 chunk kind，不能把这三个词混为同一层。内部等待标签 SsrWorkOutcome/ISsrWorkOutcome 已从根入口收回，不增加 wrapper 或兼容 alias；awaitResources 仍直接返回失败数组。
+SsrWireType 是 { json: 'json', text: 'text', bytes: 'bytes' }，ISsrWireType 为值联合。json 比较 codec type，text/bytes 比较 chunk kind，不能把这三个词混为同一层。awaitResources 直接返回失败数组。
 
 ### 错误身份与工厂
 

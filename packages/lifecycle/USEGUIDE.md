@@ -6,14 +6,14 @@
 
 ## 按场景查找
 
-| 你遇到的问题 | 看这一节 |
-| --- | --- |
-| 发布时进行中的请求被砍断 | [服务优雅停机](#服务优雅停机) |
-| 搜索框、详情页显示的是旧结果 | [只采用最新一次请求的结果](#只采用最新一次请求的结果) |
-| 离开页面后订阅、计时器还在运行 | [离开页面时一起清理](#离开页面时一起清理) |
+| 你遇到的问题                       | 看这一节                                                          |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| 发布时进行中的请求被砍断           | [服务优雅停机](#服务优雅停机)                                     |
+| 搜索框、详情页显示的是旧结果       | [只采用最新一次请求的结果](#只采用最新一次请求的结果)             |
+| 离开页面后订阅、计时器还在运行     | [离开页面时一起清理](#离开页面时一起清理)                         |
 | 初始化到一半失败，留下没人关的资源 | [初始化失败时回收已经创建的资源](#初始化失败时回收已经创建的资源) |
-| 两次保存乱序，旧内容覆盖了新内容 | [按提交顺序保存](#按提交顺序保存) |
-| 一个清理失败，后面的都没执行 | [一项清理失败，其余照常释放](#一项清理失败其余照常释放) |
+| 两次保存乱序，旧内容覆盖了新内容   | [按提交顺序保存](#按提交顺序保存)                                 |
+| 一个清理失败，后面的都没执行       | [一项清理失败，其余照常释放](#一项清理失败其余照常释放)           |
 
 ## 服务优雅停机
 
@@ -262,7 +262,6 @@ dispose() 失败: 缓存文件被占用 (SCOPE_DISPOSAL_FAILED)
 不想让关闭流程抛错时，用 `createLifecycleScope({ errorPolicy: 'collect' })`，`dispose()` 会把失败作为数组返回；或者用 `{ errorPolicy: 'report', report }`，把每个失败交给日志函数。
 
 ---
-
 
 ## 目录
 
@@ -537,10 +536,12 @@ import { mergeCleanupResults } from '@migaia/lifecycle/disposal'
 
 const first = new Error('flush')
 const late = new Error('socket close')
-const result = await mergeCleanupResults([{
-  cleanupErrors: [first],
-  physicalCompletion: Promise.resolve({ cleanupErrors: [late] })
-}])
+const result = await mergeCleanupResults([
+  {
+    cleanupErrors: [first],
+    physicalCompletion: Promise.resolve({ cleanupErrors: [late] })
+  }
+])
 // result.cleanupErrors === [first, late]，两个 error 身份不变。
 ```
 
@@ -564,9 +565,10 @@ type ICleanupResult<TError = unknown> = Readonly<{
   physicalCompletion?: Promise<ICleanupResult<TError>>
 }>
 
-type ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{
-  physicalCompletion: Promise<ICleanupResult<ICollectedError>>
-}>
+type ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> &
+  Readonly<{
+    physicalCompletion: Promise<ICleanupResult<ICollectedError>>
+  }>
 ```
 
 用于“同步启动全部 disposer，但异步统一等待”的领域容器。Ledger 是 pending、raw error 与 terminal 的唯一事实源；调用方仍负责生成顺序计划、清空领域 registry，以及把 raw errors 投影成自己的 throw/report/aggregate 契约。
@@ -898,14 +900,11 @@ import {
 import type { IAbortSignal } from '@migaia/utils/promise'
 
 // 仅 leaf entry 导出的 scheduler 组合工具：
-import {
-  resolveScheduler,
-  resolveSchedulerOption
-} from '@migaia/lifecycle/scheduler'
+import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 
 // 调度器契约与实现来自 utils：
-import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler';
-import { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing';
+import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
+import { createManualScheduler, type IManualScheduler } from '@migaia/utils/testing'
 ```
 
 调度器契约 `IScheduler`/`IScheduledTask` 与默认实现 `systemScheduler`（`performance.now()` 单调时钟）由 `@migaia/utils/scheduler` 导出；`createManualScheduler`/`IManualScheduler` 由 `@migaia/utils/testing` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.field: 'delayMs'`）拒绝；直接调用 utils `systemScheduler.schedule()` 时同样输入得到的是 utils `INVALID_ARGUMENT`。
@@ -964,7 +963,7 @@ controller.abort('reason')
 - `abort()` 与 `abort(undefined)` 使用宿主默认 reason，通常是原生 `DOMException`（name 为 `AbortError`），而不是 `undefined`。
 - non-`undefined` explicit reason保持 `===` identity；把 structural parent signal 的 `undefined` reason转发给native child时，同样规范化为宿主 `AbortError`。
 - 重复 `abort()` 幂等，不覆盖第一次固化的 reason。
-- 外部 listener throw走宿主 EventTarget error channel；`try/catch controller.abort()` 不能同步捕获它，lifecycle也不再提供 `ABORT_LISTENER_FAILED`。
+- 外部 listener throw走宿主 EventTarget error channel；`try/catch controller.abort()` 不能同步捕获它，lifecycle 也不为它定义错误码。
 - Lifecycle 自己登记的 parent/cancellation callback 经过 package-private observed-subscription：处理 already-aborted、registration-time abort、post-registration recheck和幂等remove，并把自身 callback/read/cleanup failure交给对应 operation的collect/report边界。它不代理、枚举或捕获同一 signal 上的外部 listener。
 
 如果业务需要旧式“listener错误由调用 abort 的栈聚合抛出”，应使用业务自己拥有的回调编排器；不要包裹或 monkey-patch native `AbortSignal`。
@@ -1022,15 +1021,15 @@ await terminal.whenTerminal()
 
 根入口 `@migaia/lifecycle` 提供维护中的公开原语；对 bundle retained graph敏感的消费者可使用以下稳定 subpath：
 
-| Subpath                        | 主要导出                                                    |
-| ------------------------------ | ----------------------------------------------------------- |
+| Subpath                        | 主要导出                                                                                                                                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@migaia/lifecycle/abort`      | `createAbortController`、`observeAbortSubscription`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink`（结构化 signal 类型 `IAbortSignal` 由 `@migaia/utils` 提供） |
-| `@migaia/lifecycle/scheduler`  | `snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption` |
-| `@migaia/lifecycle/quiescence` | quiescence/lease/pending trackers                           |
-| `@migaia/lifecycle/scope`      | `createLifecycleScope`                                      |
-| `@migaia/lifecycle/generation` | `createGenerationController`                                |
-| `@migaia/lifecycle/disposal`   | release transaction与sync-start ledger                      |
-| `@migaia/lifecycle/errors`     | thenable/error helpers与error identity                      |
+| `@migaia/lifecycle/scheduler`  | `snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`                                                                                                                               |
+| `@migaia/lifecycle/quiescence` | quiescence/lease/pending trackers                                                                                                                                                               |
+| `@migaia/lifecycle/scope`      | `createLifecycleScope`                                                                                                                                                                          |
+| `@migaia/lifecycle/generation` | `createGenerationController`                                                                                                                                                                    |
+| `@migaia/lifecycle/disposal`   | release transaction与sync-start ledger                                                                                                                                                          |
+| `@migaia/lifecycle/errors`     | thenable/error helpers与error identity                                                                                                                                                          |
 
 ```ts
 import { createAbortController } from '@migaia/lifecycle/abort'
@@ -1158,21 +1157,17 @@ const collected = collector.finalize('teardown failed') // 'collect' 策略下�
 ## 状态常量模块
 
 ```ts
-import {
-  LifecycleState,
-  LifecycleErrorPolicy,
-  DisposeTransactionKind
-} from '@migaia/lifecycle'
+import { LifecycleState, LifecycleErrorPolicy, DisposeTransactionKind } from '@migaia/lifecycle'
 import { ThenableProbeKind } from '@migaia/utils/function'
 ```
 
 均为纯常量对象（`as const`），无调用参数，用于替代裸字符串字面量做比较/`switch`。
 
-| 常量                     | 取值                                                                                          | 语义                                                                                            |
-| ------------------------ | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `LifecycleState`         | `{ open: 'open', closing: 'closing', terminal: 'terminal' }`                                  | 容器存活轴                                                                                      |
-| `LifecycleErrorPolicy`   | `{ throw: 'throw', collect: 'collect', report: 'report', firstError: 'firstError' }`          | 释放错误策略；`firstError` 只服务需要“第一个错误为准”的调用方，不是通用默认值 |
-| `DisposeTransactionKind` | `{ order: 'order', plan: 'plan' }`                                                            | `createDisposeTransaction` 的模式                                                               |
+| 常量                     | 取值                                                                                 | 语义                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `LifecycleState`         | `{ open: 'open', closing: 'closing', terminal: 'terminal' }`                         | 容器存活轴                                                                    |
+| `LifecycleErrorPolicy`   | `{ throw: 'throw', collect: 'collect', report: 'report', firstError: 'firstError' }` | 释放错误策略；`firstError` 只服务需要“第一个错误为准”的调用方，不是通用默认值 |
+| `DisposeTransactionKind` | `{ order: 'order', plan: 'plan' }`                                                   | `createDisposeTransaction` 的模式                                             |
 
 ---
 
@@ -1192,30 +1187,30 @@ if (error.code === LifecycleErrorCode.scopeClosed) {
 }
 ```
 
-| `LifecycleErrorCode` 键        | 码值                             | 触发条件                                                                                                              |
-| ------------------------------ | -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `delayFailed` | `DELAY_FAILED` | 相对延时无法注册、调度或清理；原错误保持可追溯，取消本身返回 false 而非错误 |
-| `scopeClosed`                  | `SCOPE_CLOSED`                   | `close()` 之后调用 `own()`（异步/同步 scope）或某个 registry 的 `retain()`                                            |
-| `scopeTerminal`                | `SCOPE_TERMINAL`                 | 容器已到达 `terminal` 之后，任何登记/激活操作                                                                         |
-| `scopeReentrantDispose`        | `SCOPE_REENTRANT_DISPOSE`        | disposer 内部重入本 scope 的 `dispose()`                                                                              |
-| `scopeReentrantOwn`            | `SCOPE_REENTRANT_OWN`            | disposer 内部调用本 scope 的 `own()`                                                                                  |
-| `scopeSyncViolation`           | `SCOPE_SYNC_VIOLATION`           | `SyncLifecycleScope` 收到 `syncSafe !== true` 的 descriptor、收到一个异步 scope 实例作为资源、或某回调返回了 thenable |
-| `scopeDisposalFailed`          | `SCOPE_DISPOSAL_FAILED`          | `throw` 策略下释放失败：单个未分类失败会被附上此码，多个失败合成的 `AggregateError` 也带此码                                                    |
-| `unitStartFailed`              | `UNIT_START_FAILED`              | 由已不再导出的内部单元加载器使用                                                |
-| `generationSuperseded`         | `GENERATION_SUPERSEDED`          | 一次异步操作的结果在 `adopt()` 提交点已被更晚的 generation 取代（非失败信号，仅诊断）                                 |
-| `generationCancellationFailed` | `GENERATION_CANCELLATION_FAILED` | generation 取消期间的 timer、parent listener 或 signal cleanup 失败                                                   |
-| `generationDisposed`           | `GENERATION_DISPOSED`            | 在已 `dispose()` 的 `GenerationController` 上调用 `begin()`                                                           |
-| `generationTimedOut` | `GENERATION_TIMED_OUT` | 当前 generation 的 timeoutMs 预算到期；signal.reason 为带码 Error |
-| `quiescenceSealed`             | `QUIESCENCE_SEALED`              | `seal()` 之后又调用 `retain()`                                                                                        |
-| `quiescenceUnsealedWait`       | `QUIESCENCE_UNSEALED_WAIT`       | 未先 `seal(key)` 就调用严格 `whenZero(key)`（同步抛出，非 rejected Promise）                                          |
-| `provisionalSettled`           | `PROVISIONAL_SETTLED`            | 重复 commit、rollback 后 commit、成功 commit 后 rollback；重复 rollback 复用原 Promise                                                  |
-| `provisionalParentClosed`      | `PROVISIONAL_PARENT_CLOSED`      | `commitTo()` 的目标 parent 已 `closing`/`terminal`，拒绝接收资源                                                      |
-| `queueAdmissionTimeout`        | `QUEUE_ADMISSION_TIMEOUT`        | mutation 在队列中等待超过配置的 `queueAdmissionTimeoutMs`                                                             |
-| `queueSelfDependency`          | `QUEUE_SELF_DEPENDENCY`          | 同一 `owner` 在自己尚未完成时又向同一队列提交新任务且被等待，会死锁                                                   |
-| `releaseForceFailed`           | `RELEASE_FORCE_FAILED`           | descriptor 的 `force` 抛出/reject（契约要求 `force` 必须无条件成功）                                                  |
+| `LifecycleErrorCode` 键        | 码值                             | 触发条件                                                                                                                                                                       |
+| ------------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `delayFailed`                  | `DELAY_FAILED`                   | 相对延时无法注册、调度或清理；原错误保持可追溯，取消本身返回 false 而非错误                                                                                                    |
+| `scopeClosed`                  | `SCOPE_CLOSED`                   | `close()` 之后调用 `own()`（异步/同步 scope）或某个 registry 的 `retain()`                                                                                                     |
+| `scopeTerminal`                | `SCOPE_TERMINAL`                 | 容器已到达 `terminal` 之后，任何登记/激活操作                                                                                                                                  |
+| `scopeReentrantDispose`        | `SCOPE_REENTRANT_DISPOSE`        | disposer 内部重入本 scope 的 `dispose()`                                                                                                                                       |
+| `scopeReentrantOwn`            | `SCOPE_REENTRANT_OWN`            | disposer 内部调用本 scope 的 `own()`                                                                                                                                           |
+| `scopeSyncViolation`           | `SCOPE_SYNC_VIOLATION`           | `SyncLifecycleScope` 收到 `syncSafe !== true` 的 descriptor、收到一个异步 scope 实例作为资源、或某回调返回了 thenable                                                          |
+| `scopeDisposalFailed`          | `SCOPE_DISPOSAL_FAILED`          | `throw` 策略下释放失败：单个未分类失败会被附上此码，多个失败合成的 `AggregateError` 也带此码                                                                                   |
+| `unitStartFailed`              | `UNIT_START_FAILED`              | 由包内部的单元加载器使用                                                                                                                                                       |
+| `generationSuperseded`         | `GENERATION_SUPERSEDED`          | 一次异步操作的结果在 `adopt()` 提交点已被更晚的 generation 取代（非失败信号，仅诊断）                                                                                          |
+| `generationCancellationFailed` | `GENERATION_CANCELLATION_FAILED` | generation 取消期间的 timer、parent listener 或 signal cleanup 失败                                                                                                            |
+| `generationDisposed`           | `GENERATION_DISPOSED`            | 在已 `dispose()` 的 `GenerationController` 上调用 `begin()`                                                                                                                    |
+| `generationTimedOut`           | `GENERATION_TIMED_OUT`           | 当前 generation 的 timeoutMs 预算到期；signal.reason 为带码 Error                                                                                                              |
+| `quiescenceSealed`             | `QUIESCENCE_SEALED`              | `seal()` 之后又调用 `retain()`                                                                                                                                                 |
+| `quiescenceUnsealedWait`       | `QUIESCENCE_UNSEALED_WAIT`       | 未先 `seal(key)` 就调用严格 `whenZero(key)`（同步抛出，非 rejected Promise）                                                                                                   |
+| `provisionalSettled`           | `PROVISIONAL_SETTLED`            | 重复 commit、rollback 后 commit、成功 commit 后 rollback；重复 rollback 复用原 Promise                                                                                         |
+| `provisionalParentClosed`      | `PROVISIONAL_PARENT_CLOSED`      | `commitTo()` 的目标 parent 已 `closing`/`terminal`，拒绝接收资源                                                                                                               |
+| `queueAdmissionTimeout`        | `QUEUE_ADMISSION_TIMEOUT`        | mutation 在队列中等待超过配置的 `queueAdmissionTimeoutMs`                                                                                                                      |
+| `queueSelfDependency`          | `QUEUE_SELF_DEPENDENCY`          | 同一 `owner` 在自己尚未完成时又向同一队列提交新任务且被等待，会死锁                                                                                                            |
+| `releaseForceFailed`           | `RELEASE_FORCE_FAILED`           | descriptor 的 `force` 抛出/reject（契约要求 `force` 必须无条件成功）                                                                                                           |
 | `deadlineExceeded`             | `DEADLINE_EXCEEDED`              | 共享绝对 deadline 已过去，但仍有资源被要求进入新的 graceful 阶段；或同步 `graceful` 超过预算才返回（仍算成功，不跑 `force`）。两者都只经 `report` 上报，正常降级路径不用这个码 |
-| `envUnsupported`               | `ENV_UNSUPPORTED`                | lifecycle 需要的宿主 `AbortController` 能力缺失；调度器宿主能力缺失由 utils `ENV_UNSUPPORTED` 报告                    |
-| `invalidOption`                | `INVALID_OPTION`                 | scheduler 收到非法时间/延迟参数，或 descriptor 字段类型非法                                                           |
+| `envUnsupported`               | `ENV_UNSUPPORTED`                | lifecycle 需要的宿主 `AbortController` 能力缺失；调度器宿主能力缺失由 utils `ENV_UNSUPPORTED` 报告                                                                             |
+| `invalidOption`                | `INVALID_OPTION`                 | scheduler 收到非法时间/延迟参数，或 descriptor 字段类型非法                                                                                                                    |
 
 逐条设计动机见源码 `src/error-code.ts` 的 JSDoc；调用方应始终以 `error.code === LifecycleErrorCode.xxx` 判别，不要硬编码码值字符串。
 
@@ -1304,7 +1299,7 @@ async function applyBatch(mutations: Array<() => Promise<void>>) {
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'
-import { createManualScheduler } from '@migaia/utils/testing';
+import { createManualScheduler } from '@migaia/utils/testing'
 
 const scheduler = createManualScheduler()
 const items: IDisposeItem[] = [
@@ -1429,7 +1424,7 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 
 ```ts
 import { abortableDelay, createAbortController } from '@migaia/lifecycle'
-import { createManualScheduler } from '@migaia/utils/testing';
+import { createManualScheduler } from '@migaia/utils/testing'
 
 const scheduler = createManualScheduler()
 const controller = createAbortController()
@@ -1460,9 +1455,7 @@ options（`errorPolicy`、`report`、`deadlineAt`、`scheduler`、`onAdmissionDi
 
 释放回调收到的 `context.signal` 在第一次读取时才创建（已经处于 aborted 状态，reason 为 `SCOPE_CLOSED`）；provisional scope 没有传 `parentSignal` 时，它的 `signal` 也是第一次读取时才创建。不读取 signal 的释放回调不会产生 AbortController。
 
-### 已收回内部的辅助 API
-
-`createLifecycleUnit` 及其 option/result types 不再从 package 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay` 只供包内部使用，root 与 leaf 均不再暴露；`tagLifecycleError`、`createLifecycleRangeError` 等错误工厂已删除，包内统一用原生错误加 `@migaia/utils/error` 的 `attachErrorIdentity`。`/scheduler` 公开 snapshot/resolve 准入工具。错误构造器与 scheduler 算术 helper 均已收回内部，不提供兼容 alias；业务错误使用所属包的身份。
+### 无人接收的失败
 
 Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 交 utils 共享宿主异常队列；省略时这些诊断不外发。
 

@@ -138,7 +138,7 @@ pnpm add @migaia/store-indexed @migaia/store-keyed @migaia/reactive
 | `@migaia/store-persist/indexed` | persistCollection、IPersistableCollection、IPersistCollectionOptions。                                        |
 | `@migaia/store-persist/keyed`   | persistKeyed、clearFamily、IPersistKeyedOptions、IPersistKeyedHandle。                                        |
 
-reactive、storage-contract、utils、lifecycle 是运行时依赖。store-light、store-indexed、store-keyed 是可选 peer，只安装所用模型；storage-plugin-browser 仅在使用其后端或 codec 时安装。代码直接导入的包应直接安装，不能依赖传递依赖恰好可见。memoryStorageHost、localStorageHost、indexedDbHost 从 storage-plugin-browser 的精确后端子入口取得；本包不在运行时依赖具体 storage-plugin-browser 值。
+reactive、storage-contract、utils、lifecycle 是运行时依赖。store-light、store-indexed、store-keyed 是可选 peer，只安装所用模型；storage-plugin-browser 仅在使用其后端或 codec 时安装。代码直接导入的包应直接安装，不能依赖传递依赖恰好可见。后端 store 来自 storage-host：内存后端用 `@migaia/storage-host/plugins/memory` 的 `memoryBackendPlugin()`，浏览器后端用 storage-plugin-browser 各子入口的 `*BackendPlugin`，装进 `createStorageHost` 后用 `host.backend(name)` 取得。本包不在运行时依赖具体后端包。
 
 ### 共同配置与同步回调
 

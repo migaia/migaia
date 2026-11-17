@@ -6,15 +6,15 @@
 
 ## 按场景查找
 
-| 你遇到的问题 | 看这一节 |
-| --- | --- |
-| 慢的旧请求后返回，把新结果覆盖掉 | [只显示最新输入的结果](#只显示最新输入的结果) |
-| 几个筛选条件一起变，发出多次请求 | [同时改几个条件只发一次请求](#同时改几个条件只发一次请求) |
-| 多个组件同时请求同一份数据 | [多处同时读取只请求一次](#多处同时读取只请求一次) |
-| 离开页面后请求还在跑 | [离开页面时停掉还在进行的请求](#离开页面时停掉还在进行的请求) |
-| 用户取消后界面显示“失败” | [取消后显示已取消而不是错误](#取消后显示已取消而不是错误) |
-| 刷新时内容先清空再出现 | [刷新时继续显示旧数据](#刷新时继续显示旧数据) |
-| 404 也在重试，重试后认不出原始错误 | [只重试临时故障](#只重试临时故障) |
+| 你遇到的问题                       | 看这一节                                                              |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| 慢的旧请求后返回，把新结果覆盖掉   | [只显示最新输入的结果](#只显示最新输入的结果)                         |
+| 几个筛选条件一起变，发出多次请求   | [同时改几个条件只发一次请求](#同时改几个条件只发一次请求)             |
+| 多个组件同时请求同一份数据         | [多处同时读取只请求一次](#多处同时读取只请求一次)                     |
+| 离开页面后请求还在跑               | [离开页面时停掉还在进行的请求](#离开页面时停掉还在进行的请求)         |
+| 用户取消后界面显示“失败”           | [取消后显示已取消而不是错误](#取消后显示已取消而不是错误)             |
+| 刷新时内容先清空再出现             | [刷新时继续显示旧数据](#刷新时继续显示旧数据)                         |
+| 404 也在重试，重试后认不出原始错误 | [只重试临时故障](#只重试临时故障)                                     |
 | 服务端取过的数据，浏览器又请求一遍 | [服务端已取到的数据浏览器不再请求](#服务端已取到的数据浏览器不再请求) |
 
 ## 只显示最新输入的结果
@@ -756,22 +756,22 @@ import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@mi
 稳定错误码表，**14 个码**，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。
 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。
 
-| `ResourceErrorCode` 键      | 码值                          | 触发条件                                                                                                                                        |
-| --------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `resourceDisposed`          | `RESOURCE_DISPOSED`           | 在已 `dispose()` 的 `Resource` 上调用任意读取/操作方法                                                                                          |
-| `requestAborted` | `REQUEST_ABORTED` | 请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause |
-| `requestCancelled`          | `REQUEST_CANCELLED`           | 调用方显式 `cancel()` 导致当前 pending 请求被取消，`state` 落入 `cancelled` 所携带的 `DOMException`                                             |
-| `cancellationCleanupFailed` | `CANCELLATION_CLEANUP_FAILED` | 请求取消已完成状态收敛，但取消期间的 timer/listener cleanup 失败                                                                                |
-| `noActivePromise`           | `NO_ACTIVE_PROMISE`           | 读取 `promise`，或在 `pending`/`idle` 状态下调用 `read()`/`peek()` 时，没有正在进行或已缓存的 Promise 可返回                                   |
-| `invalidSnapshot` | `INVALID_SNAPSHOT` | 非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败 |
-| `invalidOption`             | `INVALID_OPTION`              | 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求                                                             |
-| `suspenseProbeFailed`       | `SUSPENSE_PROBE_FAILED`       | `fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable                                                  |
-| `fetchFailed` | `FETCH_FAILED` | 重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写 |
-| `setupInvalid` | `RESOURCE_SETUP_INVALID` | `createResource()` 的 setup 不是函数，或 setup 返回的不是 fetcher 函数；已登记的 setup 清理已执行 |
-| `setupClosed` | `RESOURCE_SETUP_CLOSED` | setup 返回后才调用 `onDispose()`（例如在异步回调里使用了逃逸的 context）；该清理被拒绝 |
-| `setupFailed` | `RESOURCE_SETUP_FAILED` | setup 回调本身抛错；已登记的 setup 清理已执行。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上 |
-| `mutateFailed` | `MUTATE_FAILED` | `mutate()` 的 updater 抛错；状态不变。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上 |
-| `disposeCleanupFailed` | `DISPOSE_CLEANUP_FAILED` | `dispose()` 时某个已登记清理抛错；其余清理照常执行；第一个清理错误本身带上这个码，后续错误挂在它的 `.errors` 上 |
+| `ResourceErrorCode` 键      | 码值                          | 触发条件                                                                                                               |
+| --------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `resourceDisposed`          | `RESOURCE_DISPOSED`           | 在已 `dispose()` 的 `Resource` 上调用任意读取/操作方法                                                                 |
+| `requestAborted`            | `REQUEST_ABORTED`             | 请求停止时的原生 AbortError；Resource 主动取消时与 signal.reason 同一，lifecycle replacement reason 保留在 cause       |
+| `requestCancelled`          | `REQUEST_CANCELLED`           | 调用方显式 `cancel()` 导致当前 pending 请求被取消，`state` 落入 `cancelled` 所携带的 `DOMException`                    |
+| `cancellationCleanupFailed` | `CANCELLATION_CLEANUP_FAILED` | 请求取消已完成状态收敛，但取消期间的 timer/listener cleanup 失败                                                       |
+| `noActivePromise`           | `NO_ACTIVE_PROMISE`           | 读取 `promise`，或在 `pending`/`idle` 状态下调用 `read()`/`peek()` 时，没有正在进行或已缓存的 Promise 可返回           |
+| `invalidSnapshot`           | `INVALID_SNAPSHOT`            | 非 v2 快照、负/非有限时长（remaining 可为 null）、本地重建时间戳溢出或 getter 失败                                     |
+| `invalidOption`             | `INVALID_OPTION`              | 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求                                    |
+| `suspenseProbeFailed`       | `SUSPENSE_PROBE_FAILED`       | `fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable                         |
+| `fetchFailed`               | `FETCH_FAILED`                | 重试耗尽后的未分类 fetch 失败；原生错误尽量保留身份，冻结错误/非 Error 值保留在 cause，已有外部身份不改写              |
+| `setupInvalid`              | `RESOURCE_SETUP_INVALID`      | `createResource()` 的 setup 不是函数，或 setup 返回的不是 fetcher 函数；已登记的 setup 清理已执行                      |
+| `setupClosed`               | `RESOURCE_SETUP_CLOSED`       | setup 返回后才调用 `onDispose()`（例如在异步回调里使用了逃逸的 context）；该清理被拒绝                                 |
+| `setupFailed`               | `RESOURCE_SETUP_FAILED`       | setup 回调本身抛错；已登记的 setup 清理已执行。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上 |
+| `mutateFailed`              | `MUTATE_FAILED`               | `mutate()` 的 updater 抛错；状态不变。抛出的错误本身带上这个码；抛出的不是错误对象时才包装，原值在 `cause` 上          |
+| `disposeCleanupFailed`      | `DISPOSE_CLEANUP_FAILED`      | `dispose()` 时某个已登记清理抛错；其余清理照常执行；第一个清理错误本身带上这个码，后续错误挂在它的 `.errors` 上        |
 
 `requestAborted`/`requestCancelled` 抛出/落入状态的值始终是原生 `DOMException`（`name === 'AbortError'`），调用方通常按 `error.name === 'AbortError'` 判定并静默处理，而不是当作真实失败；`code` 只作为附加字段挂上，不改变类型。调用方应始终以 `error.code === ResourceErrorCode.xxx` 判别，不要硬编码码值字符串。
 
@@ -854,7 +854,7 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 
 同一请求在所有 Suspense 等待阶段复用同一个 pending Promise。fetcher 抛出的 thenable 完成后，经注入 scheduler 的 0ms 任务继续执行；Suspense 不计入 retry 次数，也不设计数上限。即使 fetcher 连续抛立即完成的 thenable，取消任务仍可执行，cancel/dispose 会停止后续调用。
 
-状态类型迁移：`ResourceStatus.fetching` 改为 `ResourceFetchStatus.fetching`；旧 `IResourceStatus` / `IResourceFetchStatus` 类型改用与常量同名的 `ResourceStatus` / `ResourceFetchStatus` key union。运行时的状态字符串与 SWR 数据/传输语义保持不变。
+`ResourceStatus` 列出 `state` 的五种状态；后台刷新是否在进行由 `ResourceFetchStatus` 表示（例如 `ResourceFetchStatus.fetching`）。两者都是“常量对象 + 同名键联合类型”：值用 `ResourceStatus.success` 这样的常量，类型直接写 `ResourceStatus`。
 
 ### 适配层：只读检查与重置
 

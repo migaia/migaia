@@ -6,12 +6,12 @@ What the package is for, its highlights and its mental model are in the [README]
 
 ## Find by scenario
 
-| Your problem | Read this section |
-| --- | --- |
-| State leaks between server requests or between tests | [One definition, a separate value per request or test](#one-definition-a-separate-value-per-request-or-test) |
-| One field of a large object changes and components reading other fields re-render | [Subscribe to one field of a large object](#subscribe-to-one-field-of-a-large-object) |
-| Changing one list item re-renders the whole list | [Update one row without re-rendering the whole list](#update-one-row-without-re-rendering-the-whole-list) |
-| A Map of state by chat id keeps growing | [One state per chat id, without a hand-written Map](#one-state-per-chat-id-without-a-hand-written-map) |
+| Your problem                                                                           | Read this section                                                                                                                         |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| State leaks between server requests or between tests                                   | [One definition, a separate value per request or test](#one-definition-a-separate-value-per-request-or-test)                              |
+| One field of a large object changes and components reading other fields re-render      | [Subscribe to one field of a large object](#subscribe-to-one-field-of-a-large-object)                                                     |
+| Changing one list item re-renders the whole list                                       | [Update one row without re-rendering the whole list](#update-one-row-without-re-rendering-the-whole-list)                                 |
+| A Map of state by chat id keeps growing                                                | [One state per chat id, without a hand-written Map](#one-state-per-chat-id-without-a-hand-written-map)                                    |
 | A test must replace a dependency such as the time without changing the code under test | [Swap one dependency in a test without touching the code under test](#swap-one-dependency-in-a-test-without-touching-the-code-under-test) |
 
 ## One definition, a separate value per request or test
@@ -133,7 +133,12 @@ for (const id of ['t1', 't2']) {
 
 store.set(todos.of('t2'), (todo) => ({ ...todo, done: true })) // tick the second item
 await Promise.resolve()
-console.log(`list: ${store.peek(todosDef).map((todo) => `${todo.id}=${todo.done}`).join(', ')}`)
+console.log(
+  `list: ${store
+    .peek(todosDef)
+    .map((todo) => `${todo.id}=${todo.done}`)
+    .join(', ')}`
+)
 store.dispose()
 ```
 
@@ -167,7 +172,9 @@ const lengthByChat = derivedFamilyDef((chatId: string) => (get) => get(draftByCh
 const store = createAtomStore(createRuntime())
 store.set(draftByChat('product'), 'ship tomorrow')
 console.log(`same id, same definition: ${draftByChat('product') === draftByChat('product')}`)
-console.log(`product draft: ${store.get(draftByChat('product'))}, ${store.get(lengthByChat('product'))} characters`)
+console.log(
+  `product draft: ${store.get(draftByChat('product'))}, ${store.get(lengthByChat('product'))} characters`
+)
 console.log(`engineering draft: ${store.get(draftByChat('engineering'))}`)
 
 draftByChat.forget('engineering') // the chat was deleted; stop caching its definition
@@ -203,15 +210,24 @@ import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'
 // Code under test: the price is discounted depending on the current hour
 const priceDef = atomDef(100, 'price')
 const nowDef = derivedDef(() => new Date().getHours(), 'now')
-const finalPriceDef = derivedDef((get) => (get(nowDef) >= 22 ? get(priceDef) * 0.5 : get(priceDef)), 'finalPrice')
+const finalPriceDef = derivedDef(
+  (get) => (get(nowDef) >= 22 ? get(priceDef) * 0.5 : get(priceDef)),
+  'finalPrice'
+)
 
 // The test replaces "the current hour" with a fixed value; the definitions the code uses stay the same
 const store = createAtomStore(createRuntime())
-const undo = store.override(nowDef, derivedDef(() => 23))
+const undo = store.override(
+  nowDef,
+  derivedDef(() => 23)
+)
 console.log(`price at 23:00: ${store.get(finalPriceDef)}`)
 
 undo()
-store.override(nowDef, derivedDef(() => 9))
+store.override(
+  nowDef,
+  derivedDef(() => 9)
+)
 console.log(`price at 09:00: ${store.get(finalPriceDef)}`)
 store.dispose()
 ```
@@ -226,7 +242,6 @@ price at 09:00: 100
 With the hour fixed at 23 the price is 50; after undoing and fixing it at 9 the price is 100.
 
 An override must keep the write contract: read-only definitions can be replaced by any definition of the same value type, writable ones only by definitions that are written the same way, otherwise a `TypeError` is thrown.
-
 
 ---
 
@@ -273,15 +288,15 @@ The main entry publishes definitions/store, definition optics, families and erro
 
 Source: `src/atom/definition.ts`, `src/atom/kind-constants.ts`. Every constructor returns an `Object.freeze`d plain object branded internally with `Symbol.for('morning-watch.store.atom-definition')` (`Symbol.for` uses the global registry, so two copies of the package in the same realm, for example the app bundle and a devtools bundle, still recognize each other's definitions; transfer across workers or realms is outside this brand protocol).
 
-| Constructor | Signature | Parameters | Sync/async | `kind` | Notes |
-| --- | --- | --- | --- | --- | --- |
-| `atomDef` | `<T>(init: T, debugLabel?: string) => IPrimitiveDefinition<T>` | `init: T`; `debugLabel?: string` | Sync | `'primitive'` | Source definition holding only an initial value. Every `AtomStore` runs `cloneInitial` on `init` when it first instantiates it (see [section 9](#9-lifecycle-and-release-details)), so the same `atomDef({ list: [] })` never shares one object reference across stores. |
-| `atomDefFactory` | `<T>(create: () => T, debugLabel?: string) => IPrimitiveFactoryDefinition<T>` | `create: () => T`; `debugLabel?: string` | Sync | `'primitive-factory'` | Source definition with a factory instead of a static initial value; `create()` runs once per store at first instantiation. `previewSafe` is always `false`, so `store.preview()` throws on it unless you use `previewSafeAtomDefFactory` below. |
-| `previewSafeAtomDefFactory` | same as above | same as above | Sync | `'primitive-factory'` | The only difference from `atomDefFactory` is `previewSafe: true`. Wrap only pure, side-effect-free `create` functions: React's speculative preview may be discarded after `create()` has really run. |
-| `derivedDef` | `<T>(read: IAtomRead<T>, debugLabel?: string, equals?: (a: T, b: T) => boolean) => IDerivedDefinition<T>` | `read: IAtomRead<T>`; `debugLabel?: string`; `equals?: (a: T, b: T) => boolean` | Sync | `'derived'` | Read-only derivation; the `get` in `read(get)` can only read other definitions in the same store. `equals` defaults to the underlying Computed comparison (`Object.is`); a custom `equals` avoids extra downstream notifications when values are equal but references differ. |
-| `writableDef` | `<T, Args, Result>(read, write: IAtomWriter<Args, Result>, debugLabel?, equals?) => IWritableDerivedDefinition<T, Args, Result>` | `read: IAtomRead<T>`; `write: IAtomWriter<Args, Result>`; `debugLabel?: string`; `equals?: (a: T, b: T) => boolean` | Sync | `'writable-derived'` | Writable derivation; the `get`/`set` given to `write(get, set, ...args)` are the `IAtomGet`/`IAtomSet` of the same store, so write logic can read and write other definitions (typically: one `set` updating two related fields). |
-| `isAtomDefinition` | `(value: unknown) => value is IAtomDefinition<unknown>` | `value: unknown` | Sync | — | Type guard checking the internal brand symbol; every `AtomStore` entry method validates its argument with it, and invalid values throw `TypeError('[store] not an atom definition')`. |
-| `assertNotThenable` | `(value: unknown, context: string) => void` | `value: unknown`; `context: string` | Sync | — | Guard rejecting thenables; `atomDef`/`atomDefFactory` use it on initial values and factory results. `context` appears in the error message to mark the call site. A thenable (or a `.then` read that throws) throws `TypeError` with `code: 'INVALID_OPTION'`, keeping the original exception, if any, on `cause`. |
+| Constructor                 | Signature                                                                                                                        | Parameters                                                                                                          | Sync/async | `kind`                | Notes                                                                                                                                                                                                                                                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `atomDef`                   | `<T>(init: T, debugLabel?: string) => IPrimitiveDefinition<T>`                                                                   | `init: T`; `debugLabel?: string`                                                                                    | Sync       | `'primitive'`         | Source definition holding only an initial value. Every `AtomStore` runs `cloneInitial` on `init` when it first instantiates it (see [section 9](#9-lifecycle-and-release-details)), so the same `atomDef({ list: [] })` never shares one object reference across stores.                                           |
+| `atomDefFactory`            | `<T>(create: () => T, debugLabel?: string) => IPrimitiveFactoryDefinition<T>`                                                    | `create: () => T`; `debugLabel?: string`                                                                            | Sync       | `'primitive-factory'` | Source definition with a factory instead of a static initial value; `create()` runs once per store at first instantiation. `previewSafe` is always `false`, so `store.preview()` throws on it unless you use `previewSafeAtomDefFactory` below.                                                                    |
+| `previewSafeAtomDefFactory` | same as above                                                                                                                    | same as above                                                                                                       | Sync       | `'primitive-factory'` | The only difference from `atomDefFactory` is `previewSafe: true`. Wrap only pure, side-effect-free `create` functions: React's speculative preview may be discarded after `create()` has really run.                                                                                                               |
+| `derivedDef`                | `<T>(read: IAtomRead<T>, debugLabel?: string, equals?: (a: T, b: T) => boolean) => IDerivedDefinition<T>`                        | `read: IAtomRead<T>`; `debugLabel?: string`; `equals?: (a: T, b: T) => boolean`                                     | Sync       | `'derived'`           | Read-only derivation; the `get` in `read(get)` can only read other definitions in the same store. `equals` defaults to the underlying Computed comparison (`Object.is`); a custom `equals` avoids extra downstream notifications when values are equal but references differ.                                      |
+| `writableDef`               | `<T, Args, Result>(read, write: IAtomWriter<Args, Result>, debugLabel?, equals?) => IWritableDerivedDefinition<T, Args, Result>` | `read: IAtomRead<T>`; `write: IAtomWriter<Args, Result>`; `debugLabel?: string`; `equals?: (a: T, b: T) => boolean` | Sync       | `'writable-derived'`  | Writable derivation; the `get`/`set` given to `write(get, set, ...args)` are the `IAtomGet`/`IAtomSet` of the same store, so write logic can read and write other definitions (typically: one `set` updating two related fields).                                                                                  |
+| `isAtomDefinition`          | `(value: unknown) => value is IAtomDefinition<unknown>`                                                                          | `value: unknown`                                                                                                    | Sync       | —                     | Type guard checking the internal brand symbol; every `AtomStore` entry method validates its argument with it, and invalid values throw `TypeError('[store] not an atom definition')`.                                                                                                                              |
+| `assertNotThenable`         | `(value: unknown, context: string) => void`                                                                                      | `value: unknown`; `context: string`                                                                                 | Sync       | —                     | Guard rejecting thenables; `atomDef`/`atomDefFactory` use it on initial values and factory results. `context` appears in the error message to mark the call site. A thenable (or a `.then` read that throws) throws `TypeError` with `code: 'INVALID_OPTION'`, keeping the original exception, if any, on `cause`. |
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 const AtomKind = {
@@ -322,18 +337,18 @@ import { createAtomStore, defaultAtomStore } from '@migaia/store-keyed'
 const store = createAtomStore(createRuntime())
 ```
 
-| Constructor | Signature | Parameters | Sync/async | Notes |
-| --- | --- | --- | --- | --- |
-| `createAtomStore` | `(runtime: IRuntime) => IAtomStore` | `runtime: IRuntime` | Sync | Every call produces a brand-new scope that never interferes with others. |
-| `defaultAtomStore` | `(runtime: IRuntime) => IAtomStore` | `runtime: IRuntime` | Sync | The **default** (not the only) store for each `IRuntime`, cached in a `WeakMap<IRuntime, IAtomStore>`; a disposed old store is dropped and recreated. Meant for older instance-style APIs used without a Provider, so they share state on the same Runtime; Provider scenarios should each use their own `createAtomStore`. |
+| Constructor        | Signature                           | Parameters          | Sync/async | Notes                                                                                                                                                                                                                                                                                                                       |
+| ------------------ | ----------------------------------- | ------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createAtomStore`  | `(runtime: IRuntime) => IAtomStore` | `runtime: IRuntime` | Sync       | Every call produces a brand-new scope that never interferes with others.                                                                                                                                                                                                                                                    |
+| `defaultAtomStore` | `(runtime: IRuntime) => IAtomStore` | `runtime: IRuntime` | Sync       | The **default** (not the only) store for each `IRuntime`, cached in a `WeakMap<IRuntime, IAtomStore>`; a disposed old store is dropped and recreated. Meant for older instance-style APIs used without a Provider, so they share state on the same Runtime; Provider scenarios should each use their own `createAtomStore`. |
 
 ### 3.1 Reading
 
-| Method | Signature | Parameters | Sync/async | Semantics |
-| --- | --- | --- | --- | --- |
-| `store.get(def)` | `<T>(definition: IAtomDefinition<T>) => T` | `definition: IAtomDefinition<T>` | Sync | Records a dependency edge inside the current Computed/Effect tracking window; outside a tracking context it is an ordinary read and does not throw. When the definition has no instance yet, one is created first according to its kind (a Signal or a Computed). |
-| `store.peek(def)` | same as above | same as above | Sync | Untracked read that never records an edge. For "read once without becoming a dependency" (the `getSnapshot` of a React adapter is the typical case). |
-| `store.preview(def)` | same as above | same as above | Sync | **Speculative** read for React concurrent rendering. When the definition already has a real instance in this store, it returns that instance's current value (`peek()` semantics); otherwise it computes a temporary value valid only for the current runtime version, creates no persistent instance, and drops the cached value after the Runtime's idle cleanup (a microtask by default) if it was never committed as a real instance. A `primitive-factory` must be marked `previewSafe` to run here, otherwise it throws; a cycle of self-dependency throws `[store] circular atom preview detected`. |
+| Method               | Signature                                  | Parameters                       | Sync/async | Semantics                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------- | ------------------------------------------ | -------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `store.get(def)`     | `<T>(definition: IAtomDefinition<T>) => T` | `definition: IAtomDefinition<T>` | Sync       | Records a dependency edge inside the current Computed/Effect tracking window; outside a tracking context it is an ordinary read and does not throw. When the definition has no instance yet, one is created first according to its kind (a Signal or a Computed).                                                                                                                                                                                                                                                                                                                                          |
+| `store.peek(def)`    | same as above                              | same as above                    | Sync       | Untracked read that never records an edge. For "read once without becoming a dependency" (the `getSnapshot` of a React adapter is the typical case).                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `store.preview(def)` | same as above                              | same as above                    | Sync       | **Speculative** read for React concurrent rendering. When the definition already has a real instance in this store, it returns that instance's current value (`peek()` semantics); otherwise it computes a temporary value valid only for the current runtime version, creates no persistent instance, and drops the cached value after the Runtime's idle cleanup (a microtask by default) if it was never committed as a real instance. A `primitive-factory` must be marked `previewSafe` to run here, otherwise it throws; a cycle of self-dependency throws `[store] circular atom preview detected`. |
 
 ### 3.2 Writing
 
@@ -398,20 +413,20 @@ Behaviour details:
 
 ### 3.5 Observing and releasing
 
-| Method | Signature | Parameters | Sync/async | Semantics |
-| --- | --- | --- | --- | --- |
-| `store.isObserved(def)` | `<T>(definition: IAtomDefinition<T>) => boolean` | `definition: IAtomDefinition<T>` | Sync | Whether the definition has an instance in this store with active subscribers; returns `false` when the definition was never `get`/`sub`bed, and the query itself creates no instance. |
-| `store.release(def)` | `<T>(definition: IAtomDefinition<T>) => boolean` | `definition: IAtomDefinition<T>` | Sync | Removes only the instance of this one definition (cutting its edges and disposing the underlying node) without affecting other definitions in the store; returns whether anything was released. It tries both "the target after override resolution" and "the original definition passed in", covering instances created before an override took effect. |
-| `store.size` | `number` (getter) | — (read-only getter, no parameters) | Sync | Number of definitions currently instantiated, usable as an observable assertion point for release behaviour. |
-| `store.dispose()` | `() => void` | none | Sync | Releases the whole scope; see [section 9](#9-lifecycle-and-release-details). Idempotent; repeated calls are no-ops. |
-| `store.runtime` | `IRuntime` (read-only) | — (read-only property, no parameters) | Sync | The runtime passed at creation, for adapters to cross-check. |
-| `store.disposed` | `boolean` (getter) | — (read-only getter, no parameters) | Sync | Whether the store has been disposed. |
+| Method                  | Signature                                        | Parameters                            | Sync/async | Semantics                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------- | ------------------------------------------------ | ------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `store.isObserved(def)` | `<T>(definition: IAtomDefinition<T>) => boolean` | `definition: IAtomDefinition<T>`      | Sync       | Whether the definition has an instance in this store with active subscribers; returns `false` when the definition was never `get`/`sub`bed, and the query itself creates no instance.                                                                                                                                                                    |
+| `store.release(def)`    | `<T>(definition: IAtomDefinition<T>) => boolean` | `definition: IAtomDefinition<T>`      | Sync       | Removes only the instance of this one definition (cutting its edges and disposing the underlying node) without affecting other definitions in the store; returns whether anything was released. It tries both "the target after override resolution" and "the original definition passed in", covering instances created before an override took effect. |
+| `store.size`            | `number` (getter)                                | — (read-only getter, no parameters)   | Sync       | Number of definitions currently instantiated, usable as an observable assertion point for release behaviour.                                                                                                                                                                                                                                             |
+| `store.dispose()`       | `() => void`                                     | none                                  | Sync       | Releases the whole scope; see [section 9](#9-lifecycle-and-release-details). Idempotent; repeated calls are no-ops.                                                                                                                                                                                                                                      |
+| `store.runtime`         | `IRuntime` (read-only)                           | — (read-only property, no parameters) | Sync       | The runtime passed at creation, for adapters to cross-check.                                                                                                                                                                                                                                                                                             |
+| `store.disposed`        | `boolean` (getter)                               | — (read-only getter, no parameters)   | Sync       | Whether the store has been disposed.                                                                                                                                                                                                                                                                                                                     |
 
 ---
 
 ## 4. Definition optics reference
 
-Source: `src/atom/def-optics.ts`. This is the definition-level counterpart of the instance-level `selectAtom`/`focusAtom`/`splitAtom` (which take "live" atom objects): everything produced here is a pure definition token that becomes state only through an `AtomStore`.
+Everything produced here is a pure definition token that becomes state only through an `AtomStore`.
 
 ### 4.1 selectDef — read-only projection
 
@@ -476,13 +491,13 @@ function splitDef<T, Key = number>(
 ): ISplitDefinition<T, Key>
 ```
 
-| Member | Parameters | Sync/async | Notes |
-| --- | --- | --- | --- |
-| `of(key)` | `key: Key` | Sync | Returns the writable item definition for the key; tokens are cached in an internal `Map`, so the same key always gives the same object reference, across stores too (this is the definition layer, not instances). Reads locate the index in the current source array with `keyOf`; if it is missing they throw `Error('[store] split def item was removed')`. Writes likewise throw `Error('[store] cannot write a removed split def item')`. |
-| `items` | — (a `derivedDef` property, not a call) | — | A `derivedDef` whose value is the frozen array of `of(key)` definitions for the current source items; compared with a custom `equals` (`shallowArrayEquals`: same length and `Object.is` item by item), so updates other than reorder/insert/delete do not rerun its downstream, and item identities stay stable while the order is unchanged. |
-| `insert(store, item, index?)` | `store: IAtomStore`; `item: T`; `index?: number` | Sync | Equivalent to `store.set(source, (previous) => spliceInsert(previous, item, index))`; `index` defaults to `+Infinity` (append) and is clamped to `[0, length]`. |
-| `remove(store, key)` | `store: IAtomStore`; `key: Key` | Sync | Filters out every source element whose `keyOf` matches by SameValueZero and returns whether anything was removed. |
-| `prune(store)` | `store: IAtomStore` | Sync | **Only clears `splitDef`'s own key → definition token cache**, without releasing nodes already instantiated in the `AtomStore`; release those with `store.release(itemDef)` or `store.dispose()`. Returns the number of keys cleared. |
+| Member                        | Parameters                                       | Sync/async | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------- | ------------------------------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `of(key)`                     | `key: Key`                                       | Sync       | Returns the writable item definition for the key; tokens are cached in an internal `Map`, so the same key always gives the same object reference, across stores too (this is the definition layer, not instances). Reads locate the index in the current source array with `keyOf`; if it is missing they throw `Error('[store] split def item was removed')`. Writes likewise throw `Error('[store] cannot write a removed split def item')`. |
+| `items`                       | — (a `derivedDef` property, not a call)          | —          | A `derivedDef` whose value is the frozen array of `of(key)` definitions for the current source items; compared with a custom `equals` (`shallowArrayEquals`: same length and `Object.is` item by item), so updates other than reorder/insert/delete do not rerun its downstream, and item identities stay stable while the order is unchanged.                                                                                                 |
+| `insert(store, item, index?)` | `store: IAtomStore`; `item: T`; `index?: number` | Sync       | Equivalent to `store.set(source, (previous) => spliceInsert(previous, item, index))`; `index` defaults to `+Infinity` (append) and is clamped to `[0, length]`.                                                                                                                                                                                                                                                                                |
+| `remove(store, key)`          | `store: IAtomStore`; `key: Key`                  | Sync       | Filters out every source element whose `keyOf` matches by SameValueZero and returns whether anything was removed.                                                                                                                                                                                                                                                                                                                              |
+| `prune(store)`                | `store: IAtomStore`                              | Sync       | **Only clears `splitDef`'s own key → definition token cache**, without releasing nodes already instantiated in the `AtomStore`; release those with `store.release(itemDef)` or `store.dispose()`. Returns the number of keys cleared.                                                                                                                                                                                                          |
 
 A duplicate key in the source array (`keyOf` producing the same value twice) throws `Error('[store] splitDef keys must be unique')` when `items` is evaluated.
 
@@ -685,29 +700,29 @@ const StoreKeyedErrorCode = {
 type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]
 ```
 
-| Thrown by | Error type | code | message | When |
-| --- | --- | --- | --- | --- |
-| Every `AtomStore` method entry | `Error` | `ATOM_STORE_DISPOSED` | `cannot use a disposed atom store` | `get`/`peek`/`preview`/`set`/`sub`/`override`/`isObserved`/`release` called after `dispose()`. |
-| Every `AtomStore` method entry | `TypeError` | `INVALID_OPTION` | `not an atom definition` | The argument is not a valid definition object produced by `atomDef`/`derivedDef`/... |
-| `store.set()` | `TypeError` | `OVERRIDE_CONTRACT` | `atom override resolved to a read-only definition` | The target (possibly after override resolution) is `derived` and has no write semantics. |
-| `store.override()` | `TypeError` | `OVERRIDE_CONTRACT` | `atom override must preserve the original write contract` | Breaks one of the three replacement rules in [section 3.4](#34-override). |
-| `store.override()` / resolution paths such as `store.get()` | `Error` | `CYCLIC_OVERRIDE` | `cyclic atom override` | The override chain forms a cycle. |
-| `store.preview()` | `Error` | `PREVIEW_UNSAFE` | `atom factory is not marked preview-safe` | `preview()` meets a `primitive-factory` with `previewSafe: false`. |
-| `store.preview()` | `Error` | `CIRCULAR_PREVIEW` | `circular atom preview detected` | Speculative reads depend on each other in a cycle. |
-| `focusDef` (construction) | `Error` | `INVALID_OPTION` | `focusDef requires at least one path segment` | No key given. |
-| `focusDef`/`readOpticPath`/`writeOpticPath` (read/write) | `TypeError` | `INVALID_OPTION` | `<label> cannot read path segment <key>` / `<label> cannot write path segment <key>` | `null` or a non-object value midway along the path. |
-| `splitDef(...).of(key)` read | `Error` | `INVALID_OPTION` | `split def item was removed` | The key is no longer in the source array when reading. |
-| `splitDef(...).of(key)` write | `Error` | `INVALID_OPTION` | `cannot write a removed split def item` | The key is no longer in the source array when writing. |
-| `splitDef(...).items` evaluation / `computeUniqueKeys` | `Error` | `INVALID_OPTION` | `splitDef keys must be unique` | `keyOf` produced the same key for different elements. |
-| `familyDef` / `derivedFamilyDef` | `RangeError` | `INVALID_OPTION` | `family maxSize must be a positive integer` | `maxSize` is not a positive integer. |
-| `familyDef` / `derivedFamilyDef` | `RangeError` | `INVALID_OPTION` | `family debugLabel must be a string` | `debugLabel` is not a string. |
-| `familyDef` / `derivedFamilyDef` | `Error` | `ENV_UNSUPPORTED` | `family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox` | The host lacks these two globals. |
-| `atomDef`/`atomDefFactory`/`assertNotThenable` | `TypeError` | `INVALID_OPTION` | `<context> returned a thenable — async initial values are not supported here; compose with @migaia/resource instead (...)` | The initial value or factory result is a thenable. |
-| `atomDef({...})` initial-value clone (host without `structuredClone`) | `Error` | `ENV_UNSUPPORTED` | `primitive initial values require structuredClone support` | The host lacks `structuredClone`. |
-| `atomDef({...})` initial-value clone failure (`structuredClone` throws) | `Error` | `INVALID_OPTION` | `primitive initial value cannot be cloned independently` | The value cannot be structured-cloned; the original exception is on `cause`. |
-| `atomGetter(runtime)` / `atomSetter(runtime)` | `Error` | `CROSS_RUNTIME` | `cross-runtime atom access is not allowed` | The instance-style atom's `runtime` differs from the runtime the caller is bound to. |
-| `AtomStore.dispose()` (several failures) | `AggregateError` | `DISPOSAL_FAILED` | `atom store disposal failed` | More than one instance or entry threw during release; each cause stays in `errors[]`. |
-| Internal ownership registration of `AtomStore` (from `@migaia/reactive`) | `Error` | — | `this node is already owned by another Runtime` | The same store object was claimed by two Runtimes; normal use never triggers it, and it means a store was wrongly reused across Runtimes. |
+| Thrown by                                                                | Error type       | code                  | message                                                                                                                    | When                                                                                                                                      |
+| ------------------------------------------------------------------------ | ---------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Every `AtomStore` method entry                                           | `Error`          | `ATOM_STORE_DISPOSED` | `cannot use a disposed atom store`                                                                                         | `get`/`peek`/`preview`/`set`/`sub`/`override`/`isObserved`/`release` called after `dispose()`.                                            |
+| Every `AtomStore` method entry                                           | `TypeError`      | `INVALID_OPTION`      | `not an atom definition`                                                                                                   | The argument is not a valid definition object produced by `atomDef`/`derivedDef`/...                                                      |
+| `store.set()`                                                            | `TypeError`      | `OVERRIDE_CONTRACT`   | `atom override resolved to a read-only definition`                                                                         | The target (possibly after override resolution) is `derived` and has no write semantics.                                                  |
+| `store.override()`                                                       | `TypeError`      | `OVERRIDE_CONTRACT`   | `atom override must preserve the original write contract`                                                                  | Breaks one of the three replacement rules in [section 3.4](#34-override).                                                                 |
+| `store.override()` / resolution paths such as `store.get()`              | `Error`          | `CYCLIC_OVERRIDE`     | `cyclic atom override`                                                                                                     | The override chain forms a cycle.                                                                                                         |
+| `store.preview()`                                                        | `Error`          | `PREVIEW_UNSAFE`      | `atom factory is not marked preview-safe`                                                                                  | `preview()` meets a `primitive-factory` with `previewSafe: false`.                                                                        |
+| `store.preview()`                                                        | `Error`          | `CIRCULAR_PREVIEW`    | `circular atom preview detected`                                                                                           | Speculative reads depend on each other in a cycle.                                                                                        |
+| `focusDef` (construction)                                                | `Error`          | `INVALID_OPTION`      | `focusDef requires at least one path segment`                                                                              | No key given.                                                                                                                             |
+| `focusDef`/`readOpticPath`/`writeOpticPath` (read/write)                 | `TypeError`      | `INVALID_OPTION`      | `<label> cannot read path segment <key>` / `<label> cannot write path segment <key>`                                       | `null` or a non-object value midway along the path.                                                                                       |
+| `splitDef(...).of(key)` read                                             | `Error`          | `INVALID_OPTION`      | `split def item was removed`                                                                                               | The key is no longer in the source array when reading.                                                                                    |
+| `splitDef(...).of(key)` write                                            | `Error`          | `INVALID_OPTION`      | `cannot write a removed split def item`                                                                                    | The key is no longer in the source array when writing.                                                                                    |
+| `splitDef(...).items` evaluation / `computeUniqueKeys`                   | `Error`          | `INVALID_OPTION`      | `splitDef keys must be unique`                                                                                             | `keyOf` produced the same key for different elements.                                                                                     |
+| `familyDef` / `derivedFamilyDef`                                         | `RangeError`     | `INVALID_OPTION`      | `family maxSize must be a positive integer`                                                                                | `maxSize` is not a positive integer.                                                                                                      |
+| `familyDef` / `derivedFamilyDef`                                         | `RangeError`     | `INVALID_OPTION`      | `family debugLabel must be a string`                                                                                       | `debugLabel` is not a string.                                                                                                             |
+| `familyDef` / `derivedFamilyDef`                                         | `Error`          | `ENV_UNSUPPORTED`     | `family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox`               | The host lacks these two globals.                                                                                                         |
+| `atomDef`/`atomDefFactory`/`assertNotThenable`                           | `TypeError`      | `INVALID_OPTION`      | `<context> returned a thenable — async initial values are not supported here; compose with @migaia/resource instead (...)` | The initial value or factory result is a thenable.                                                                                        |
+| `atomDef({...})` initial-value clone (host without `structuredClone`)    | `Error`          | `ENV_UNSUPPORTED`     | `primitive initial values require structuredClone support`                                                                 | The host lacks `structuredClone`.                                                                                                         |
+| `atomDef({...})` initial-value clone failure (`structuredClone` throws)  | `Error`          | `INVALID_OPTION`      | `primitive initial value cannot be cloned independently`                                                                   | The value cannot be structured-cloned; the original exception is on `cause`.                                                              |
+| `atomGetter(runtime)` / `atomSetter(runtime)`                            | `Error`          | `CROSS_RUNTIME`       | `cross-runtime atom access is not allowed`                                                                                 | The instance-style atom's `runtime` differs from the runtime the caller is bound to.                                                      |
+| `AtomStore.dispose()` (several failures)                                 | `AggregateError` | `DISPOSAL_FAILED`     | `atom store disposal failed`                                                                                               | More than one instance or entry threw during release; each cause stays in `errors[]`.                                                     |
+| Internal ownership registration of `AtomStore` (from `@migaia/reactive`) | `Error`          | —                     | `this node is already owned by another Runtime`                                                                            | The same store object was claimed by two Runtimes; normal use never triggers it, and it means a store was wrongly reused across Runtimes. |
 
 ---
 
@@ -722,15 +737,15 @@ import { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'
 
 This file defines only the **protocol shape** of "instance-style" atoms and the cross-Runtime checks; this package ships no concrete implementation. It lives here because higher-level packages (async, family, react) only need to know these types, not the instantiation strategy in `atom/store.ts`.
 
-| Export | Notes |
-| --- | --- |
-| `IReadableAtom<T>` | `IDisposable & { runtime, atomDefinition?, value, observed, read(), peek() }`. `atomDefinition` is an optional bridge field for Provider-level React adapters to find the pure definition behind an instance-style atom. |
-| `IWritableAtom<T, Args, Result>` | `IReadableAtom<T> & { write(...args): Result }`. |
-| `IAtomGetter` / `IAtomSetter` | `<T>(atom) => T` / `<T, Args, Result>(atom, ...args) => Result`, for instance-style `read`/`write` callbacks. |
-| `IAtomRead<T>` / `IAtomWrite<Args, Result>` | `(get: IAtomGetter) => T` / `(get, set, ...args) => Result`, the function types of instance-style read/write callbacks. |
-| `IAtomUpdate<T>` | `T \| ((previous: T) => T)`, the common update argument of instance-style `write`. |
-| `atomGetter(runtime)` | Returns a getter bound to that runtime; before reading it checks `atom.runtime === runtime` and throws `Error('[store] cross-runtime atom access is not allowed')` otherwise. |
-| `atomSetter(runtime)` | Same, with the same cross-Runtime check before writing. |
+| Export                                      | Notes                                                                                                                                                                                                                    |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `IReadableAtom<T>`                          | `IDisposable & { runtime, atomDefinition?, value, observed, read(), peek() }`. `atomDefinition` is an optional bridge field for Provider-level React adapters to find the pure definition behind an instance-style atom. |
+| `IWritableAtom<T, Args, Result>`            | `IReadableAtom<T> & { write(...args): Result }`.                                                                                                                                                                         |
+| `IAtomGetter` / `IAtomSetter`               | `<T>(atom) => T` / `<T, Args, Result>(atom, ...args) => Result`, for instance-style `read`/`write` callbacks.                                                                                                            |
+| `IAtomRead<T>` / `IAtomWrite<Args, Result>` | `(get: IAtomGetter) => T` / `(get, set, ...args) => Result`, the function types of instance-style read/write callbacks.                                                                                                  |
+| `IAtomUpdate<T>`                            | `T \| ((previous: T) => T)`, the common update argument of instance-style `write`.                                                                                                                                       |
+| `atomGetter(runtime)`                       | Returns a getter bound to that runtime; before reading it checks `atom.runtime === runtime` and throws `Error('[store] cross-runtime atom access is not allowed')` otherwise.                                            |
+| `atomSetter(runtime)`                       | Same, with the same cross-Runtime check before writing.                                                                                                                                                                  |
 
 ---
 
@@ -815,9 +830,7 @@ const sessionDef = atomDef<ISessionState>({
 const userNameDef = focusDef(sessionDef, 'user', 'name')
 const todosDef = focusDef(sessionDef, 'todos')
 const todosSplit = splitDef(todosDef, (todo) => todo.id)
-const doneCountDef = derivedDef(
-  (get) => get(todosDef).filter((todo) => todo.done).length
-)
+const doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)
 
 // Each session's runtime state is cached as a token by familyDef per sessionId,
 // but it still becomes a value only through some AtomStore
@@ -889,7 +902,7 @@ A disposed store is in its end state, and every read or write entry first throws
 Yes: the old token is still a valid definition, and `AtomStore` state already instantiated with it is unaffected. But after `forget`, looking up the same key creates a **new** token, and the old and new tokens are unrelated; if some code still holds the old token and keeps reading and writing with it, the logical key splits permanently into two states. After `forget`, make sure every caller switches to the new lookup result instead of mixing them.
 
 **Q: How do I create state grouped by key?**
-Combine the public `familyDef`/`derivedFamilyDef` with `createAtomStore`. The unpublished instance-style family source and its tests have been deleted, and the `FAMILY_DISPOSED`/`EVICTION_FAILED` error codes that belonged only to that implementation were removed.
+Combine the public `familyDef`/`derivedFamilyDef` with `createAtomStore`.
 
 ---
 
@@ -917,4 +930,4 @@ Cleanup of speculative values goes through the owning Runtime's idle channel (`s
 
 Every split key lookup, uniqueness check, cache and deletion uses SameValueZero, as Map/Set do, so `-0` and `+0` are the same key and `NaN` equals itself. `shallowArrayEquals` still compares ordinary values item by item with `Object.is`. Store disposal clears the uncommitted preview cache, so even when a caller keeps a disposed store, that cache no longer holds speculative values. The family's canonical Map uses strong keys and weak values and is not a WeakMap; `forget` does not release existing store instances.
 
-Breaking migration: the ten advanced optics imports move from the root to `/optics`, and the `assertNotThenable` import moves from the root to `/atom/definition`. `IAtomUpdate` is declared once in definition and re-exported as a type by reactive/atom; both supported type import paths remain, as do the two distinct reader contracts. External usage is unknown; the root entry keeps no compatibility alias.
+Import the ten advanced optics primitives from `/optics` and `assertNotThenable` from `/atom/definition`. `IAtomUpdate` is declared once in definition and re-exported as a type by reactive/atom; both import paths work.

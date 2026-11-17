@@ -93,14 +93,14 @@ With store-keyed, definitions hold no value and every request or test uses its o
 
 Think of a definition as a variable declaration and a store as a block of memory: the same declaration has its own value in every block.
 
-| Concept | In one sentence |
-| --- | --- |
-| Definition (`atomDef` / `derivedDef` / `writableDef`) | A frozen description of the initial value or the computation; holds no value and can stay at module level |
-| Store (`createAtomStore`) | The scope that keeps values for definitions; it creates a reactive node for a definition the first time it is read |
-| Reading | `get` records a dependency, `peek` does not, `preview` serves speculative reads during React concurrent rendering |
-| Optics (`focusDef` / `splitDef` / `selectDef` / `opticDef`) | New definitions derived from one definition, pointing at a field, a list item or a projection |
-| Family (`familyDef` / `derivedFamilyDef`) | Produces definitions by key; the same key gives the same definition |
-| `override` | Inside one store, routes reads of one definition to another |
+| Concept                                                     | In one sentence                                                                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Definition (`atomDef` / `derivedDef` / `writableDef`)       | A frozen description of the initial value or the computation; holds no value and can stay at module level          |
+| Store (`createAtomStore`)                                   | The scope that keeps values for definitions; it creates a reactive node for a definition the first time it is read |
+| Reading                                                     | `get` records a dependency, `peek` does not, `preview` serves speculative reads during React concurrent rendering  |
+| Optics (`focusDef` / `splitDef` / `selectDef` / `opticDef`) | New definitions derived from one definition, pointing at a field, a list item or a projection                      |
+| Family (`familyDef` / `derivedFamilyDef`)                   | Produces definitions by key; the same key gives the same definition                                                |
+| `override`                                                  | Inside one store, routes reads of one definition to another                                                        |
 
 A few terms:
 
@@ -110,13 +110,13 @@ A few terms:
 
 ## Typical scenarios
 
-| Scenario | How to combine | Details |
-| --- | --- | --- |
-| Server rendering, test isolation | Module-level definitions + one `createAtomStore` per request or test | [USEGUIDE](./USEGUIDE.en.md#one-definition-a-separate-value-per-request-or-test) |
-| Field-level subscriptions on a large object | `focusDef`, or `selectDef` for read-only projections | [USEGUIDE](./USEGUIDE.en.md#subscribe-to-one-field-of-a-large-object) |
-| Update only the changed row of a long list | `splitDef` + `of(key)` | [USEGUIDE](./USEGUIDE.en.md#update-one-row-without-re-rendering-the-whole-list) |
-| One state per chat or channel | `familyDef` / `derivedFamilyDef` | [USEGUIDE](./USEGUIDE.en.md#one-state-per-chat-id-without-a-hand-written-map) |
-| Replace a dependency in tests | `store.override()` | [USEGUIDE](./USEGUIDE.en.md#swap-one-dependency-in-a-test-without-touching-the-code-under-test) |
+| Scenario                                    | How to combine                                                       | Details                                                                                         |
+| ------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Server rendering, test isolation            | Module-level definitions + one `createAtomStore` per request or test | [USEGUIDE](./USEGUIDE.en.md#one-definition-a-separate-value-per-request-or-test)                |
+| Field-level subscriptions on a large object | `focusDef`, or `selectDef` for read-only projections                 | [USEGUIDE](./USEGUIDE.en.md#subscribe-to-one-field-of-a-large-object)                           |
+| Update only the changed row of a long list  | `splitDef` + `of(key)`                                               | [USEGUIDE](./USEGUIDE.en.md#update-one-row-without-re-rendering-the-whole-list)                 |
+| One state per chat or channel               | `familyDef` / `derivedFamilyDef`                                     | [USEGUIDE](./USEGUIDE.en.md#one-state-per-chat-id-without-a-hand-written-map)                   |
+| Replace a dependency in tests               | `store.override()`                                                   | [USEGUIDE](./USEGUIDE.en.md#swap-one-dependency-in-a-test-without-touching-the-code-under-test) |
 
 ## Installation
 
@@ -124,25 +124,25 @@ A few terms:
 pnpm add @migaia/store-keyed @migaia/reactive
 ```
 
-| Entry | Contents |
-| --- | --- |
-| `@migaia/store-keyed` | Definition constructors, `createAtomStore` / `defaultAtomStore`, `selectDef` / `opticDef` / `focusDef` / `splitDef`, families, error tools |
-| `@migaia/store-keyed/atom/store` | Narrow store entry, identical to the corresponding root exports |
-| `@migaia/store-keyed/atom/definition` | Narrow definition entry, which also exports `assertNotThenable` |
-| `@migaia/store-keyed/optics` | Pure functions for hand-written optics: path reads and writes, lookup by key, immutable insert and delete, `KeyedSplitCache` |
-| `@migaia/store-keyed/reactive/atom` | Protocol types for instance-style atoms and cross-Runtime checks (`atomGetter` / `atomSetter`) |
+| Entry                                 | Contents                                                                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@migaia/store-keyed`                 | Definition constructors, `createAtomStore` / `defaultAtomStore`, `selectDef` / `opticDef` / `focusDef` / `splitDef`, families, error tools |
+| `@migaia/store-keyed/atom/store`      | Narrow store entry, identical to the corresponding root exports                                                                            |
+| `@migaia/store-keyed/atom/definition` | Narrow definition entry, which also exports `assertNotThenable`                                                                            |
+| `@migaia/store-keyed/optics`          | Pure functions for hand-written optics: path reads and writes, lookup by key, immutable insert and delete, `KeyedSplitCache`               |
+| `@migaia/store-keyed/reactive/atom`   | Protocol types for instance-style atoms and cross-Runtime checks (`atomGetter` / `atomSetter`)                                             |
 
 ## Common APIs
 
-| API | What it does |
-| --- | --- |
-| `atomDef(init)` / `derivedDef(read)` / `writableDef(read, write)` | Define source state, read-only derived values and writable derived values |
-| `createAtomStore(runtime)` | Creates a store that keeps its own values |
-| `store.get` / `store.set` / `store.sub` | Read (recording a dependency), write, subscribe |
-| `store.setMany(entries)` | Writes several source definitions in one batch; nothing is written unless every entry succeeds, and subscribers are notified once |
-| `focusDef(def, ...path)` / `splitDef(def, keyOf)` | A field-level definition / a list split by key |
-| `familyDef(initial, options?)` | Produces definitions by key |
-| `store.override(def, replacement)` / `store.dispose()` | Replace a definition / release the whole store |
+| API                                                               | What it does                                                                                                                      |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `atomDef(init)` / `derivedDef(read)` / `writableDef(read, write)` | Define source state, read-only derived values and writable derived values                                                         |
+| `createAtomStore(runtime)`                                        | Creates a store that keeps its own values                                                                                         |
+| `store.get` / `store.set` / `store.sub`                           | Read (recording a dependency), write, subscribe                                                                                   |
+| `store.setMany(entries)`                                          | Writes several source definitions in one batch; nothing is written unless every entry succeeds, and subscribers are notified once |
+| `focusDef(def, ...path)` / `splitDef(def, keyOf)`                 | A field-level definition / a list split by key                                                                                    |
+| `familyDef(initial, options?)`                                    | Produces definitions by key                                                                                                       |
+| `store.override(def, replacement)` / `store.dispose()`            | Replace a definition / release the whole store                                                                                    |
 
 ## Contract details
 
@@ -159,6 +159,6 @@ Every signature, boundary behaviour and error code is in [USEGUIDE.en.md](./USEG
 9. **Keys are compared with SameValueZero**, as in `Map` / `Set`: `-0` and `+0` are the same key, and `NaN` equals itself.
 10. **Error identity.** Errors produced by this package carry `source === STORE_KEYED_SOURCE` (`store.keyed`) and a `code` from `StoreKeyedErrorCode`; errors from other packages that already have an identity keep it. Branch on `source` / `code`, never on the message.
 
-**Breaking migration**: the ten advanced optics primitives are exported only from `@migaia/store-keyed/optics`, and `assertNotThenable` only from `@migaia/store-keyed/atom/definition`; the root entry keeps no compatibility alias.
+**Import locations**: import the ten advanced optics primitives from `@migaia/store-keyed/optics` and `assertNotThenable` from `@migaia/store-keyed/atom/definition`; the root entry does not export them.
 
 **When not to use it**: when the whole application has one global state and never needs several scopes, `runtime.signal()` / `runtime.computed()` are simpler; for Providers and Hooks, use `@migaia/store-react`.

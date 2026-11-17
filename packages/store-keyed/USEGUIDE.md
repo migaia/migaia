@@ -6,13 +6,13 @@
 
 ## 按场景查找
 
-| 你遇到的问题 | 看这一节 |
-| --- | --- |
-| 服务端请求之间、测试用例之间状态串了 | [一份定义每个请求或测试各有一份值](#一份定义每个请求或测试各有一份值) |
-| 大对象里一个字段变了，只读别的字段的组件也重新渲染 | [只订阅大对象里的一个字段](#只订阅大对象里的一个字段) |
-| 改一条列表项，整个列表都重新渲染 | [改一行不让整个列表重新渲染](#改一行不让整个列表重新渲染) |
-| 按对话 id 保存状态的 Map 越来越大 | [每个对话一份状态不用手写 Map](#每个对话一份状态不用手写-map) |
-| 测试要替换时间之类的依赖，又不想改被测代码 | [测试时替换一个依赖不用改被测代码](#测试时替换一个依赖不用改被测代码) |
+| 你遇到的问题                                       | 看这一节                                                              |
+| -------------------------------------------------- | --------------------------------------------------------------------- |
+| 服务端请求之间、测试用例之间状态串了               | [一份定义每个请求或测试各有一份值](#一份定义每个请求或测试各有一份值) |
+| 大对象里一个字段变了，只读别的字段的组件也重新渲染 | [只订阅大对象里的一个字段](#只订阅大对象里的一个字段)                 |
+| 改一条列表项，整个列表都重新渲染                   | [改一行不让整个列表重新渲染](#改一行不让整个列表重新渲染)             |
+| 按对话 id 保存状态的 Map 越来越大                  | [每个对话一份状态不用手写 Map](#每个对话一份状态不用手写-map)         |
+| 测试要替换时间之类的依赖，又不想改被测代码         | [测试时替换一个依赖不用改被测代码](#测试时替换一个依赖不用改被测代码) |
 
 ## 一份定义每个请求或测试各有一份值
 
@@ -133,7 +133,12 @@ for (const id of ['t1', 't2']) {
 
 store.set(todos.of('t2'), (todo) => ({ ...todo, done: true })) // 勾选第二项
 await Promise.resolve()
-console.log(`列表：${store.peek(todosDef).map((todo) => `${todo.id}=${todo.done}`).join(', ')}`)
+console.log(
+  `列表：${store
+    .peek(todosDef)
+    .map((todo) => `${todo.id}=${todo.done}`)
+    .join(', ')}`
+)
 store.dispose()
 ```
 
@@ -167,7 +172,9 @@ const lengthByChat = derivedFamilyDef((chatId: string) => (get) => get(draftByCh
 const store = createAtomStore(createRuntime())
 store.set(draftByChat('产品群'), '明天发版')
 console.log(`同一个 id 是同一个定义：${draftByChat('产品群') === draftByChat('产品群')}`)
-console.log(`产品群草稿：${store.get(draftByChat('产品群'))}，${store.get(lengthByChat('产品群'))} 个字`)
+console.log(
+  `产品群草稿：${store.get(draftByChat('产品群'))}，${store.get(lengthByChat('产品群'))} 个字`
+)
 console.log(`技术群草稿：${store.get(draftByChat('技术群'))}`)
 
 draftByChat.forget('技术群') // 对话被删除，不再缓存它的定义
@@ -203,15 +210,24 @@ import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'
 // 被测代码：价格按当前时间决定是否打折
 const priceDef = atomDef(100, 'price')
 const nowDef = derivedDef(() => new Date().getHours(), 'now')
-const finalPriceDef = derivedDef((get) => (get(nowDef) >= 22 ? get(priceDef) * 0.5 : get(priceDef)), 'finalPrice')
+const finalPriceDef = derivedDef(
+  (get) => (get(nowDef) >= 22 ? get(priceDef) * 0.5 : get(priceDef)),
+  'finalPrice'
+)
 
 // 测试里把“当前时间”换成固定值，被测代码引用的定义不用改
 const store = createAtomStore(createRuntime())
-const undo = store.override(nowDef, derivedDef(() => 23))
+const undo = store.override(
+  nowDef,
+  derivedDef(() => 23)
+)
 console.log(`23 点的价格：${store.get(finalPriceDef)}`)
 
 undo()
-store.override(nowDef, derivedDef(() => 9))
+store.override(
+  nowDef,
+  derivedDef(() => 9)
+)
 console.log(`9 点的价格：${store.get(finalPriceDef)}`)
 store.dispose()
 ```
@@ -274,7 +290,7 @@ reactive/atom.ts       —— "实例式" atom 协议类型，只有类型和跨
 
 | 构造器                      | 签名                                                                                                                             | 参数类型                                                                                                            | 同步/异步 | `kind`                | 说明                                                                                                                                                                                                                                   |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `atomDef`                   | `<T>(init: T, debugLabel?: string) => IPrimitiveDefinition<T>`                                                                   | `init: T`；`debugLabel?: string`                                                                                    | 同步      | `'primitive'`         | 源定义，只存初值。每个 `AtomStore` 首次实例化时都会对 `init` 跑一次 `cloneInitial`（见 [第 9 节](#9-生命周期与资源释放细节)），因此同一个 `atomDef({ list: [] })` 在多个 store 下互不共享同一个对象引用。                                   |
+| `atomDef`                   | `<T>(init: T, debugLabel?: string) => IPrimitiveDefinition<T>`                                                                   | `init: T`；`debugLabel?: string`                                                                                    | 同步      | `'primitive'`         | 源定义，只存初值。每个 `AtomStore` 首次实例化时都会对 `init` 跑一次 `cloneInitial`（见 [第 9 节](#9-生命周期与资源释放细节)），因此同一个 `atomDef({ list: [] })` 在多个 store 下互不共享同一个对象引用。                              |
 | `atomDefFactory`            | `<T>(create: () => T, debugLabel?: string) => IPrimitiveFactoryDefinition<T>`                                                    | `create: () => T`；`debugLabel?: string`                                                                            | 同步      | `'primitive-factory'` | 源定义，用工厂函数代替静态初值；`create()` 在每个 store 首次实例化时调用一次。`previewSafe` 固定为 `false`——`store.preview()` 遇到它会直接抛错，除非改用下面的 `previewSafeAtomDefFactory`。                                           |
 | `previewSafeAtomDefFactory` | 同上                                                                                                                             | 同上                                                                                                                | 同步      | `'primitive-factory'` | 与 `atomDefFactory` 唯一区别是 `previewSafe: true`。只应包装纯函数、无副作用的 `create`——React 的 speculative preview 可能被放弃，`create()` 却已经真实执行过了。                                                                      |
 | `derivedDef`                | `<T>(read: IAtomRead<T>, debugLabel?: string, equals?: (a: T, b: T) => boolean) => IDerivedDefinition<T>`                        | `read: IAtomRead<T>`；`debugLabel?: string`；`equals?: (a: T, b: T) => boolean`                                     | 同步      | `'derived'`           | 只读派生，`read(get)` 里的 `get` 只能读同一个 store 内的其它定义。`equals` 默认走底层 Computed 的默认比较（`Object.is`），传自定义 `equals` 可以避免"值语义相等但引用不同"时的多余下游通知。                                           |
@@ -402,7 +418,7 @@ store.override(writableDerivedDef, replacementWritableDerivedDef)
 | `store.isObserved(def)` | `<T>(definition: IAtomDefinition<T>) => boolean` | `definition: IAtomDefinition<T>` | 同步      | 该定义在本 store 内是否已建实例且有活跃订阅者；定义从未被 `get`/`sub` 过时返回 `false`，不会因为查询本身而建实例。                                                                                                           |
 | `store.release(def)`    | `<T>(definition: IAtomDefinition<T>) => boolean` | `definition: IAtomDefinition<T>` | 同步      | 只摘掉这一个定义对应的实例（断开依赖边、dispose 底层节点），不牵连同一 store 里的其它定义；返回是否确实释放了什么。会同时尝试"override 解析后的目标"与"传入的原始定义"两个 key，兼容"实例是在 override 生效前建的"这种情况。 |
 | `store.size`            | `number`（getter）                               | —（只读 getter，无参数）         | 同步      | 当前已实例化的定义数量，可用作释放行为的可观测断言点。                                                                                                                                                                       |
-| `store.dispose()`       | `() => void`                                     | 无                               | 同步      | 释放整个作用域，见 [第 9 节](#9-生命周期与资源释放细节)。幂等，重复调用是无操作。                                                                                                                                                 |
+| `store.dispose()`       | `() => void`                                     | 无                               | 同步      | 释放整个作用域，见 [第 9 节](#9-生命周期与资源释放细节)。幂等，重复调用是无操作。                                                                                                                                            |
 | `store.runtime`         | `IRuntime`（只读）                               | —（只读属性，无参数）            | 同步      | 创建时传入的 runtime，供适配层交叉校验。                                                                                                                                                                                     |
 | `store.disposed`        | `boolean`（getter）                              | —（只读 getter，无参数）         | 同步      | 是否已经 dispose。                                                                                                                                                                                                           |
 
@@ -410,7 +426,7 @@ store.override(writableDerivedDef, replacementWritableDerivedDef)
 
 ## 4. Definition Optics 完整参考
 
-源文件：`src/atom/def-optics.ts`，与实例层的 `selectAtom`/`focusAtom`/`splitAtom`（吃"活的" atom 对象）是同一思路在 definition 层的对应物——这里产出的都是纯 def token，需要经某个 `AtomStore` 才能落地成状态。
+这里产出的都是纯 definition token，需要经某个 `AtomStore` 才能落地成状态。
 
 ### 4.1 selectDef —— 只读投影
 
@@ -480,7 +496,7 @@ function splitDef<T, Key = number>(
 | `of(key)`                     | `key: Key`                                       | 同步      | 返回该 key 对应的可写 item 定义；token 用内部 `Map` 缓存，同一个 key 永远拿到同一个对象引用，跨 store 也一样（因为这是 definition 层，不是实例）。读取时按 `keyOf` 在当前源数组里定位下标；找不到抛 `Error('[store] split def item was removed')`。写入同理，找不到抛 `Error('[store] cannot write a removed split def item')`。 |
 | `items`                       | —（`derivedDef` 属性，非函数调用）               | —         | 一个 `derivedDef`，值是"当前源数组每一项对应的 `of(key)` 定义"组成的冻结数组；用自定义 `equals`（`shallowArrayEquals`：长度相同且逐项 `Object.is`）比较——重排/新增/删除之外的更新不会让这个数组本身触发下游重跑，数组顺序不变时各项 identity 也保持稳定。                                                                        |
 | `insert(store, item, index?)` | `store: IAtomStore`；`item: T`；`index?: number` | 同步      | 等价于 `store.set(source, (previous) => spliceInsert(previous, item, index))`；`index` 默认 `+Infinity`（追加到末尾），越界会被夹到 `[0, length]` 区间。                                                                                                                                                                         |
-| `remove(store, key)`          | `store: IAtomStore`；`key: Key`                  | 同步      | 按 `keyOf` 过滤掉源数组里全部 SameValueZero 匹配元素，返回是否确实删除了。                                                                                                                                                                                                                                                                  |
+| `remove(store, key)`          | `store: IAtomStore`；`key: Key`                  | 同步      | 按 `keyOf` 过滤掉源数组里全部 SameValueZero 匹配元素，返回是否确实删除了。                                                                                                                                                                                                                                                       |
 | `prune(store)`                | `store: IAtomStore`                              | 同步      | **只清理 `splitDef` 自己的 key → 定义 token 缓存**，不释放 `AtomStore` 里已经实例化的对应节点——那部分要么自己 `store.release(itemDef)`，要么整体 `store.dispose()`。返回本次清理掉的 key 数量。                                                                                                                                  |
 
 源数组里出现重复 key（`keyOf` 算出同一个值）会在 `items` 求值时抛 `Error('[store] splitDef keys must be unique')`。
@@ -689,7 +705,7 @@ type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyed
 | `AtomStore` 各方法入口                                    | `Error`          | `ATOM_STORE_DISPOSED` | `cannot use a disposed atom store`                                                                                         | store 已 `dispose()` 后调用 `get`/`peek`/`preview`/`set`/`sub`/`override`/`isObserved`/`release`。                                    |
 | `AtomStore` 各方法入口                                    | `TypeError`      | `INVALID_OPTION`      | `not an atom definition`                                                                                                   | 传入的不是 `atomDef`/`derivedDef`/... 产出的合法定义对象。                                                                            |
 | `store.set()`                                             | `TypeError`      | `OVERRIDE_CONTRACT`   | `atom override resolved to a read-only definition`                                                                         | 目标（可能经 override 解析后）是 `derived`，没有写语义。                                                                              |
-| `store.override()`                                        | `TypeError`      | `OVERRIDE_CONTRACT`   | `atom override must preserve the original write contract`                                                                  | 违反 [第 3.4 节](#34-override覆盖) 的三条替换规则。                                                                                        |
+| `store.override()`                                        | `TypeError`      | `OVERRIDE_CONTRACT`   | `atom override must preserve the original write contract`                                                                  | 违反 [第 3.4 节](#34-override覆盖) 的三条替换规则。                                                                                   |
 | `store.override()` / `store.get()` 等解析路径             | `Error`          | `CYCLIC_OVERRIDE`     | `cyclic atom override`                                                                                                     | override 链形成环。                                                                                                                   |
 | `store.preview()`                                         | `Error`          | `PREVIEW_UNSAFE`      | `atom factory is not marked preview-safe`                                                                                  | `preview()` 遇到 `previewSafe: false` 的 `primitive-factory`。                                                                        |
 | `store.preview()`                                         | `Error`          | `CIRCULAR_PREVIEW`    | `circular atom preview detected`                                                                                           | 推测读之间出现循环依赖。                                                                                                              |
@@ -705,7 +721,7 @@ type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyed
 | `atomDef({...})` 初值克隆（宿主不支持 `structuredClone`） | `Error`          | `ENV_UNSUPPORTED`     | `primitive initial values require structuredClone support`                                                                 | 宿主缺少 `structuredClone`。                                                                                                          |
 | `atomDef({...})` 初值克隆失败（`structuredClone` 抛错）   | `Error`          | `INVALID_OPTION`      | `primitive initial value cannot be cloned independently`                                                                   | 值本身不可结构化克隆，原异常在 `cause`。                                                                                              |
 | `atomGetter(runtime)` / `atomSetter(runtime)`             | `Error`          | `CROSS_RUNTIME`       | `cross-runtime atom access is not allowed`                                                                                 | 实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。                                                                              |
-| `AtomStore.dispose()`（多项失败）                         | `AggregateError` | `DISPOSAL_FAILED`     | `atom store disposal failed`                                               | 释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。                                                                          |
+| `AtomStore.dispose()`（多项失败）                         | `AggregateError` | `DISPOSAL_FAILED`     | `atom store disposal failed`                                                                                               | 释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。                                                                          |
 | `AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）   | `Error`          | —                     | `this node is already owned by another Runtime`                                                                            | 同一个 store 对象被 `claimOwnership` 到两个不同的 Runtime——正常使用路径下不会触发，出现即说明把同一个 store 错误地跨 Runtime 复用了。 |
 
 ---
@@ -814,9 +830,7 @@ const sessionDef = atomDef<ISessionState>({
 const userNameDef = focusDef(sessionDef, 'user', 'name')
 const todosDef = focusDef(sessionDef, 'todos')
 const todosSplit = splitDef(todosDef, (todo) => todo.id)
-const doneCountDef = derivedDef(
-  (get) => get(todosDef).filter((todo) => todo.done).length
-)
+const doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)
 
 // 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,
 // 但真正落地成值仍要经某个 AtomStore
@@ -888,7 +902,7 @@ store.dispose() // 释放这个作用域建出的全部实例
 能，旧 token 依旧是一个合法的定义，已经用它实例化过的 `AtomStore` 状态不受影响。但 `forget` 之后同一个 key 再查会创建一个**新** token，新旧 token 互不相通——如果代码里还有地方持有旧 token 并继续用它读写，会和"新 token 那一份状态"永久分裂成两份。`forget` 之后应该确保调用方统一切换到新的查找结果，不要混用。
 
 **Q：如何创建按 key 分组的状态？**
-使用 `familyDef`/`derivedFamilyDef` 与 `createAtomStore` 的公开组合。未发布的实例式 family 源码及其测试已删除；仅属于该实现的 `FAMILY_DISPOSED`/`EVICTION_FAILED` 错误码成员也已移除。
+使用 `familyDef`/`derivedFamilyDef` 与 `createAtomStore` 的公开组合。
 
 ---
 
@@ -916,4 +930,4 @@ pnpm --filter @migaia/store-keyed test:e2e
 
 所有 split 键查找、唯一性、缓存和删除采用 SameValueZero，与 Map/Set 一致；因此 `-0` 与 `+0` 是同一键，`NaN` 与自身相等。`shallowArrayEquals` 仍使用逐项 `Object.is` 比较一般值。Store dispose 会清除未提交 preview 缓存；即使调用方保留已 dispose 的 Store，也不再由该缓存持有 speculative 值。Family 的 canonical Map 使用强键和弱值，不是 WeakMap；forget 不释放已有 Store 实例。
 
-破坏性迁移：十个高级 optics 原语的导入从根入口改到 `/optics`，`assertNotThenable` 的导入从根入口改到 `/atom/definition`。`IAtomUpdate` 只在 definition 里声明一次，由 reactive/atom 以类型再导出；两个受支持的类型导入路径和两种不同的读取契约都保留。外部使用情况未知，根入口不保留兼容别名。
+十个高级 optics 原语从 `/optics` 导入，`assertNotThenable` 从 `/atom/definition` 导入。`IAtomUpdate` 只在 definition 里声明一次，由 reactive/atom 以类型再导出，两个导入路径都可用。

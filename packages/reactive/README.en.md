@@ -82,14 +82,14 @@ With a Runtime, a `computed` declares its rule once and registers dependencies a
 
 Think of a `Runtime` as an independent spreadsheet: a `Signal` is an input cell, a `Computed` is a cell with a formula, and an `Effect` is an action such as "print or send a request when a cell changes".
 
-| Concept | In one sentence |
-| --- | --- |
-| `Runtime` | An independent dependency graph, version clock and scheduler; nodes can depend on each other only within one `Runtime` |
-| `Signal` | A writable value; reading `.value` registers a dependency and writing `.value` notifies dependents |
-| `Computed` | A lazy, cached derived value that recomputes only when read |
-| `Effect` | Reads its dependencies and performs a side effect; runs once on creation and is scheduled to rerun when a dependency changes |
-| `batch()` / `flush()` | Merge several writes into one effect flush / run pending effects synchronously right now |
-| trace | Read-only diagnostic events: value changes, dependency connections and disconnections, effect runs; it never affects application state |
+| Concept               | In one sentence                                                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `Runtime`             | An independent dependency graph, version clock and scheduler; nodes can depend on each other only within one `Runtime`                 |
+| `Signal`              | A writable value; reading `.value` registers a dependency and writing `.value` notifies dependents                                     |
+| `Computed`            | A lazy, cached derived value that recomputes only when read                                                                            |
+| `Effect`              | Reads its dependencies and performs a side effect; runs once on creation and is scheduled to rerun when a dependency changes           |
+| `batch()` / `flush()` | Merge several writes into one effect flush / run pending effects synchronously right now                                               |
+| trace                 | Read-only diagnostic events: value changes, dependency connections and disconnections, effect runs; it never affects application state |
 
 A few terms:
 
@@ -99,14 +99,14 @@ A few terms:
 
 ## Typical scenarios
 
-| Scenario | How to combine | Details |
-| --- | --- | --- |
-| Derived values follow their inputs | `runtime.computed` + `runtime.effect` | [Usage guide](./USEGUIDE.en.md#keep-derived-values-in-sync-automatically) |
-| Clean up old subscriptions when switching rooms or pages | an `effect` that returns a cleanup function | [Usage guide](./USEGUIDE.en.md#clean-up-the-old-subscription-before-switching) |
-| Change several values at once | default microtask merging, or `runtime.batch` | [Usage guide](./USEGUIDE.en.md#several-writes-one-update) |
-| Stop recomputing for a closed panel | automatic `computed` suspension, which `keepAlive` turns off | [Usage guide](./USEGUIDE.en.md#skip-work-nobody-reads) |
-| Guard against effect loops | `maxFlushPasses` + `onError` | [Usage guide](./USEGUIDE.en.md#effects-feeding-each-other-do-not-freeze-the-page) |
-| Isolate server rendering and tests | one `createRuntime()` per request or test | [Usage guide](./USEGUIDE.en.md#one-runtime-per-server-request) |
+| Scenario                                                 | How to combine                                               | Details                                                                           |
+| -------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Derived values follow their inputs                       | `runtime.computed` + `runtime.effect`                        | [Usage guide](./USEGUIDE.en.md#keep-derived-values-in-sync-automatically)         |
+| Clean up old subscriptions when switching rooms or pages | an `effect` that returns a cleanup function                  | [Usage guide](./USEGUIDE.en.md#clean-up-the-old-subscription-before-switching)    |
+| Change several values at once                            | default microtask merging, or `runtime.batch`                | [Usage guide](./USEGUIDE.en.md#several-writes-one-update)                         |
+| Stop recomputing for a closed panel                      | automatic `computed` suspension, which `keepAlive` turns off | [Usage guide](./USEGUIDE.en.md#skip-work-nobody-reads)                            |
+| Guard against effect loops                               | `maxFlushPasses` + `onError`                                 | [Usage guide](./USEGUIDE.en.md#effects-feeding-each-other-do-not-freeze-the-page) |
+| Isolate server rendering and tests                       | one `createRuntime()` per request or test                    | [Usage guide](./USEGUIDE.en.md#one-runtime-per-server-request)                    |
 
 ## Installation
 
@@ -114,21 +114,21 @@ A few terms:
 pnpm add @migaia/reactive
 ```
 
-| Entry | Contents |
-| --- | --- |
-| `@migaia/reactive` | `createRuntime`, `defaultRuntime`, the node types `IReactiveSignal` / `IReactiveComputed` / `IReactiveEffect`, diagnostic constants and error codes |
+| Entry                        | Contents                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@migaia/reactive`           | `createRuntime`, `defaultRuntime`, the node types `IReactiveSignal` / `IReactiveComputed` / `IReactiveEffect`, diagnostic constants and error codes                                  |
 | `@migaia/reactive/extension` | Extension capabilities for store, collection, resource and UI framework adapter authors: ownership registration, custom data sources, observer binding and read-only version queries |
 
 ## Common APIs
 
-| API | What it does |
-| --- | --- |
-| `createRuntime(options?)` | Creates an isolated Runtime; options set the scheduling, `maxFlushPasses`, `onError` and `onTrace` |
-| `runtime.signal(value)` / `runtime.computed(fn)` / `runtime.effect(fn)` | Create writable values, derived values and effects; each has `dispose()` |
-| `runtime.batch(fn)` / `runtime.flush()` | Merge several writes into one flush / flush synchronously right now |
-| `runtime.untracked(fn)` | Read without registering dependencies |
-| `runtime.subscribeTrace(listener)` | Subscribe to read-only diagnostic events |
-| `createObserverBinding` (`/extension`) | Write a UI framework adapter: capture dependencies during render, subscribe after commit |
+| API                                                                     | What it does                                                                                       |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `createRuntime(options?)`                                               | Creates an isolated Runtime; options set the scheduling, `maxFlushPasses`, `onError` and `onTrace` |
+| `runtime.signal(value)` / `runtime.computed(fn)` / `runtime.effect(fn)` | Create writable values, derived values and effects; each has `dispose()`                           |
+| `runtime.batch(fn)` / `runtime.flush()`                                 | Merge several writes into one flush / flush synchronously right now                                |
+| `runtime.untracked(fn)`                                                 | Read without registering dependencies                                                              |
+| `runtime.subscribeTrace(listener)`                                      | Subscribe to read-only diagnostic events                                                           |
+| `createObserverBinding` (`/extension`)                                  | Write a UI framework adapter: capture dependencies during render, subscribe after commit           |
 
 ## Contract details
 
@@ -183,7 +183,7 @@ The general "release a group of resources together" container (formerly `Scope` 
 
 The extension entry's `claimOwnership`, `ownerOf` and `assertOwnedBy` apply one ownership contract to plain objects and function objects: a registered function reports its original Runtime, a cross-Runtime check throws `CROSS_RUNTIME`, and a brand from another module copy throws `COPY_CONFLICT`.
 
-Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When upgrading, keep every reactive copy in one process on the same version: the old `@morning-watch/store` namespace and the new version cannot see each other, so mixed copies neither count each other nor recognize each other's ownership marks.
+Cross-copy diagnostics use two global Symbol keys, `@migaia/reactive.runtime-copies` and `@migaia/reactive.ownership-copy`. When one process holds several reactive copies, they count each other and recognize each other's ownership marks through these keys.
 
 `@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must create nothing at import time. It creates the shared default Runtime on its first call and returns exactly the same object as the root entry's `defaultRuntime`; importing the root `defaultRuntime` still creates it at import time. `ReactiveErrorPhase` can also be imported from the extension entry and is the same object as the root export.
 

@@ -235,9 +235,9 @@ STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有�
 | `[store] WASM cleanup failed`                                                                     | 聚合清理失败                            |
 | `[store] WASM instance trapped earlier and is permanently unusable`                               | 已毒化的 arena                          |
 
-### 迁移、排查与开发命令
+### 排查与开发命令
 
-旧 array(number(),n,g) 改为 array(n,g)，删除未使用 item 参数，编码仍固定 f64，没有兼容入口。WasmFieldMode/IWasmFieldMode 已收回，统一复用 store-light 的 StoreFieldMode.sync；类型只表达同步分支时用 typeof StoreFieldMode.sync，不能把含 async 的完整 IStoreFieldMode 联合当作等价旧别名。
+数值数组写作 `array(n, g)`，元素固定按 f64 编码。字段模式复用 store-light 的 `StoreFieldMode.sync`；只表达同步分支的类型写 `typeof StoreFieldMode.sync`，完整的 `IStoreFieldMode` 联合还包含 async。
 
 未就绪时先修初始化顺序；字符串容量按 UTF-8 字节检查；想逐 index 通知用 granularity=1；view 副本改动不会提交，写入必须 setAt/setRange。固定记录不支持任意嵌套类型。构造器只声明布局，不把分配副作用放进 React render；请求/应用 owner 初始化、创建并负责释放。
 

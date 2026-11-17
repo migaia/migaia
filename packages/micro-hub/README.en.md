@@ -75,10 +75,16 @@ import { createMicroHub } from '@migaia/micro-hub'
 import { events } from '@migaia/micro-hub/events'
 import { state } from '@migaia/micro-hub/state'
 import { persist } from '@migaia/micro-hub/persist'
-import { localStorageHost } from '@migaia/storage-plugin-browser/local-storage'
+import { createStorageHost } from '@migaia/storage-host'
+import { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'
+
+// The persistence store is one storage-host backend; the hub borrows it and the app closes storage
+const storage = await createStorageHost({
+  plugins: [localStorageBackendPlugin({ namespace: 'shop' })]
+})
 
 createMicroHub({
-  plugins: [events(), state(), persist({ store: localStorageHost({ namespace: 'shop' }) })]
+  plugins: [events(), state(), persist({ store: storage.backend('local') })]
 })
 ```
 
@@ -100,7 +106,7 @@ owned.handle('checkout', async ({ coupon }) => {
 // Consumer: the product app
 const product = getMicroHub().connect('product')
 const view = product.use(cart)
-view.commands.add({ id: 'sku-1', price: 42 })          // product is in writers, so it may write
+view.commands.add({ id: 'sku-1', price: 42 }) // product is in writers, so it may write
 view.computed.total.subscribe(() => render(view.computed.total.get()))
 view.events.checkedOut.on(({ orderId }) => toast(orderId))
 const { orderId } = await view.requests.checkout({}, { waitForOwner: 3000 })
@@ -134,11 +140,11 @@ When a child app is mounted as a custom element, it can get its app handle witho
 ```ts
 import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'
 
-provideMicroApp(document.querySelector('#checkout-slot')!, app)   // shell
+provideMicroApp(document.querySelector('#checkout-slot')!, app) // shell
 
 class CheckoutElement extends HTMLElement {
   connectedCallback() {
-    consumeMicroApp(this, (app) => this.render(app.use(cart)))   // child app
+    consumeMicroApp(this, (app) => this.render(app.use(cart))) // child app
   }
 }
 ```
@@ -147,12 +153,12 @@ When `consumeMicroApp` is mounted before the provider, the request waits and is 
 
 ## Plugins
 
-| Plugin | Subpath | Requires | Provides |
-| --- | --- | --- | --- |
-| `events(options?)` | `@migaia/micro-hub/events` | — | The contract's `events` and `requests` |
-| `state()` | `@migaia/micro-hub/state` | — | `state`, `computed`, `commands`, `select`, `keyed()` |
-| `persist({ store })` | `@migaia/micro-hub/persist` | `state` | `own(contract, { persist })` |
-| `resources()` | `@migaia/micro-hub/resource` | Optional peer `@migaia/resource` | The contract's `resources` |
+| Plugin               | Subpath                      | Requires                         | Provides                                             |
+| -------------------- | ---------------------------- | -------------------------------- | ---------------------------------------------------- |
+| `events(options?)`   | `@migaia/micro-hub/events`   | —                                | The contract's `events` and `requests`               |
+| `state()`            | `@migaia/micro-hub/state`    | —                                | `state`, `computed`, `commands`, `select`, `keyed()` |
+| `persist({ store })` | `@migaia/micro-hub/persist`  | `state`                          | `own(contract, { persist })`                         |
+| `resources()`        | `@migaia/micro-hub/resource` | Optional peer `@migaia/resource` | The contract's `resources`                           |
 
 When a contract uses a plugin that is not installed, `use()` / `own()` throws `PLUGIN_MISSING`. When a plugin's own dependency is not installed, `createMicroHub()` throws `PLUGIN_MISSING` and no hub is created.
 
@@ -166,10 +172,10 @@ Errors thrown by listeners and subscription callbacks do not stop other listener
 
 ## Related packages
 
-| Package | Relationship |
-| --- | --- |
-| [`@migaia/store-keyed`](../store-keyed/README.en.md) | One atom per field and per entity id |
-| [`@migaia/event-subscriber`](../event-subscriber/README.en.md) | Event channels and request handler selection |
-| [`@migaia/plugin-host`](../plugin-host/README.en.md) | Installing and unloading capability plugins and each app |
-| [`@migaia/store-persist`](../store-persist/README.en.md) | Persistence debouncing, versions and hydrate races |
-| [`@migaia/rpc-plugin-browser`](../rpc-plugin-browser/README.en.md) | Cross-realm communication such as iframes and Workers |
+| Package                                                            | Relationship                                             |
+| ------------------------------------------------------------------ | -------------------------------------------------------- |
+| [`@migaia/store-keyed`](../store-keyed/README.en.md)               | One atom per field and per entity id                     |
+| [`@migaia/event-subscriber`](../event-subscriber/README.en.md)     | Event channels and request handler selection             |
+| [`@migaia/plugin-host`](../plugin-host/README.en.md)               | Installing and unloading capability plugins and each app |
+| [`@migaia/store-persist`](../store-persist/README.en.md)           | Persistence debouncing, versions and hydrate races       |
+| [`@migaia/rpc-plugin-browser`](../rpc-plugin-browser/README.en.md) | Cross-realm communication such as iframes and Workers    |

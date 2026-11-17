@@ -135,6 +135,6 @@ Memory, SQLite and PostgreSQL can supply hot storage. IndexedDB cannot perform c
 
 Segments commit separately; later failures do not roll back earlier segments. Explicit Sweep removes unreferenced cold objects. Get does not restore by default. Sweep neither archives nor deletes records by age. Error source is storage.backend.archive. See the [usage guide](./USEGUIDE.en.md) for rules, cancellation and failure progress.
 
-## Migrating nested extension calls
+## Extension function names
 
-Earlier drafts used `host.extensions.archive.run()`, `.get()` and `.sweep()`. Replace them with `host.extensions.archiveRun()`, `archiveGet()` and `archiveSweep()`. A `name: 'history'` configuration uses `historyRun`, `historyGet` and `historySweep`. Organization views expose the same flat functions through `host.org(id).extensions`. Arguments and results retain each operation's contract. There is no old nested object or compatibility alias; the host still owns resource cleanup.
+The archive plugin publishes three flat functions on the host: `host.extensions.archiveRun()`, `archiveGet()` and `archiveSweep()`. The prefix is the plugin `name`: with `name: 'history'` they are `historyRun`, `historyGet` and `historySweep`. Organization views call the same functions through `host.org(id).extensions`. The host releases the resources.

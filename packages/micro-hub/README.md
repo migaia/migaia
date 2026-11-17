@@ -75,10 +75,16 @@ import { createMicroHub } from '@migaia/micro-hub'
 import { events } from '@migaia/micro-hub/events'
 import { state } from '@migaia/micro-hub/state'
 import { persist } from '@migaia/micro-hub/persist'
-import { localStorageHost } from '@migaia/storage-plugin-browser/local-storage'
+import { createStorageHost } from '@migaia/storage-host'
+import { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'
+
+// 持久化用的 store 来自 storage-host 的一个后端；hub 只借用它，关闭 storage 由应用负责
+const storage = await createStorageHost({
+  plugins: [localStorageBackendPlugin({ namespace: 'shop' })]
+})
 
 createMicroHub({
-  plugins: [events(), state(), persist({ store: localStorageHost({ namespace: 'shop' }) })]
+  plugins: [events(), state(), persist({ store: storage.backend('local') })]
 })
 ```
 
@@ -100,7 +106,7 @@ owned.handle('checkout', async ({ coupon }) => {
 // 使用方：商品应用
 const product = getMicroHub().connect('product')
 const view = product.use(cart)
-view.commands.add({ id: 'sku-1', price: 42 })          // product 在 writers 里，可以写
+view.commands.add({ id: 'sku-1', price: 42 }) // product 在 writers 里，可以写
 view.computed.total.subscribe(() => render(view.computed.total.get()))
 view.events.checkedOut.on(({ orderId }) => toast(orderId))
 const { orderId } = await view.requests.checkout({}, { waitForOwner: 3000 })
@@ -134,11 +140,11 @@ const total = readable(view.computed.total.get(), (set) =>
 ```ts
 import { consumeMicroApp, provideMicroApp } from '@migaia/micro-hub/web-component'
 
-provideMicroApp(document.querySelector('#checkout-slot')!, app)   // 主应用
+provideMicroApp(document.querySelector('#checkout-slot')!, app) // 主应用
 
 class CheckoutElement extends HTMLElement {
   connectedCallback() {
-    consumeMicroApp(this, (app) => this.render(app.use(cart)))   // 子应用
+    consumeMicroApp(this, (app) => this.render(app.use(cart))) // 子应用
   }
 }
 ```
@@ -147,12 +153,12 @@ class CheckoutElement extends HTMLElement {
 
 ## 插件
 
-| 插件 | 子入口 | 依赖 | 提供 |
-| --- | --- | --- | --- |
-| `events(options?)` | `@migaia/micro-hub/events` | — | 契约的 `events`、`requests` |
-| `state()` | `@migaia/micro-hub/state` | — | `state`、`computed`、`commands`、`select`、`keyed()` |
-| `persist({ store })` | `@migaia/micro-hub/persist` | `state` | `own(contract, { persist })` |
-| `resources()` | `@migaia/micro-hub/resource` | 可选 peer `@migaia/resource` | 契约的 `resources` |
+| 插件                 | 子入口                       | 依赖                         | 提供                                                 |
+| -------------------- | ---------------------------- | ---------------------------- | ---------------------------------------------------- |
+| `events(options?)`   | `@migaia/micro-hub/events`   | —                            | 契约的 `events`、`requests`                          |
+| `state()`            | `@migaia/micro-hub/state`    | —                            | `state`、`computed`、`commands`、`select`、`keyed()` |
+| `persist({ store })` | `@migaia/micro-hub/persist`  | `state`                      | `own(contract, { persist })`                         |
+| `resources()`        | `@migaia/micro-hub/resource` | 可选 peer `@migaia/resource` | 契约的 `resources`                                   |
 
 契约用到了没装的插件时，`use()` / `own()` 报 `PLUGIN_MISSING`；插件依赖没装时，`createMicroHub()` 报 `PLUGIN_MISSING`，hub 不会被创建。
 
@@ -166,10 +172,10 @@ listener 和订阅回调抛出的错误不会打断其它 listener，也不会�
 
 ## 相关包
 
-| 包 | 关系 |
-| --- | --- |
-| [`@migaia/store-keyed`](../store-keyed/README.md) | 每个字段和实体 id 的 atom |
-| [`@migaia/event-subscriber`](../event-subscriber/README.md) | 事件通道与请求 handler 选择 |
-| [`@migaia/plugin-host`](../plugin-host/README.md) | 能力插件与每个应用的安装、卸载 |
-| [`@migaia/store-persist`](../store-persist/README.md) | 持久化防抖、版本与 hydrate 竞态 |
+| 包                                                              | 关系                            |
+| --------------------------------------------------------------- | ------------------------------- |
+| [`@migaia/store-keyed`](../store-keyed/README.md)               | 每个字段和实体 id 的 atom       |
+| [`@migaia/event-subscriber`](../event-subscriber/README.md)     | 事件通道与请求 handler 选择     |
+| [`@migaia/plugin-host`](../plugin-host/README.md)               | 能力插件与每个应用的安装、卸载  |
+| [`@migaia/store-persist`](../store-persist/README.md)           | 持久化防抖、版本与 hydrate 竞态 |
 | [`@migaia/rpc-plugin-browser`](../rpc-plugin-browser/README.md) | iframe / Worker 等跨 realm 通信 |

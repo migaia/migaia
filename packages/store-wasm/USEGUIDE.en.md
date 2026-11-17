@@ -462,9 +462,9 @@ All four public factories require code:IStoreWasmErrorCode and message:string. `
 | `[store] WASM cleanup failed`                                                                     | Aggregate cleanup failure                                      |
 | `[store] WASM instance trapped earlier and is permanently unusable`                               | Poisoned arena                                                 |
 
-### Migration, troubleshooting, and development commands
+### Troubleshooting and development commands
 
-Replace the old array(number(),n,g) with array(n,g). The unused item argument was removed, encoding remains f64, and no compatibility entry remains. WasmFieldMode/IWasmFieldMode were withdrawn in favor of store-light StoreFieldMode.sync. Use typeof StoreFieldMode.sync for a sync-only type; the full IStoreFieldMode union includes async and is not an equivalent alias.
+Numeric arrays are written `array(n, g)`, with elements always encoded as f64. Field modes reuse store-light's `StoreFieldMode.sync`; write `typeof StoreFieldMode.sync` for a sync-only type, because the full `IStoreFieldMode` union also includes async.
 
 Fix initialization order after NOT_INITIALIZED. Size strings by UTF-8 bytes. Choose granularity=1 for separate index notifications. view returns a copy, so writes must use setAt/setRange. Fixed records do not support arbitrary nested field types. Builders describe layout; keep allocation outside React render under an application/request owner that initializes, constructs, and releases it.
 
