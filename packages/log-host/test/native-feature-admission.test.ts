@@ -43,6 +43,17 @@ it('rejects ordinary native features in a log plugin record', () => {
   expect(() => createLogHost({ plugins: [mixed] })).toThrowError(invalidOption)
 })
 
+it('rejects a native feature whose output borrows the implementation field name', () => {
+  /** A non-log feature that happens to expose an `implementation` with no log phase. */
+  const lookalike = defineFeature(() => ({ implementation: { phase: 'transform' } }))
+  /** Installation must reject it instead of treating it as a log policy. */
+  const plugin = defineLogPlugin({
+    name: 'lookalike',
+    features: { lookalike }
+  } as unknown as Parameters<typeof defineLogPlugin>[0])
+  expect(() => createLogHost({ plugins: [plugin] })).toThrowError(invalidOption)
+})
+
 /** Counts the resource-owning callbacks of an output that installation must reject first. */
 class RejectedOutput {
   /** Application installer calls; zero proves admission ran before any output resource opened. */
