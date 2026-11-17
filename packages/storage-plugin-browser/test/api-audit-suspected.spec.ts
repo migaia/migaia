@@ -61,7 +61,7 @@ describe('storage-plugin-browser confirmed audit suspicions', () => {
       )
       /** Install once on the real fixture host and retain exact extension inference. */
       const entity1EntityPluginHost = await storeHost.use(entity1EntityPlugin)
-      await entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store).put({
+      await entity1EntityPluginHost.extensions[entity1EntityPlugin.name](store).put({
         id: 'row',
         value: 'saved'
       })
@@ -99,7 +99,7 @@ describe('storage-plugin-browser confirmed audit suspicions', () => {
       /** Install once on the real fixture host and retain exact extension inference. */
       const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
+      const repo = repoEntityPluginHost.extensions[repoEntityPlugin.name](store)
       await expect(
         repo.query().index('byValue', { lower: 'saved', upper: 'saved' }).all()
       ).rejects.toMatchObject({
@@ -180,7 +180,7 @@ describe('storage-plugin-browser confirmed audit suspicions', () => {
       /** Install once on the real fixture host and retain exact extension inference. */
       const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
+      const repo = repoEntityPluginHost.extensions[repoEntityPlugin.name](store)
       await repo.put({ id: 'first', value: 'a' })
       await repo.put({ id: 'second', value: 'b' })
       await repo.migrate()

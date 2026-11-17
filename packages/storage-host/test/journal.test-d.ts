@@ -18,7 +18,7 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 /** Only actual admitted backend ids can select a private resource; org views grant no host close. */
 export async function compileStorageLogStore(): Promise<void> {
   await using host = await createStorageHost({
-    plugins: [storageJournalPlugin(), memoryBackendPlugin({ id: 'data' })]
+    plugins: [storageJournalPlugin(), memoryBackendPlugin({ name: 'data' })]
   })
   await using log = await storageLogStore(host, 'data', { prefix: 'history' })
   const view = host.org(createOrgId())

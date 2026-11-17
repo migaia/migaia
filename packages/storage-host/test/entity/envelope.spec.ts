@@ -9,13 +9,15 @@ import { describe, expect, it } from 'vitest'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 import {
   createStorageHost,
-  definePlugin,
-  defineFeature,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
+  type IStorageBackendPluginDefiner
 } from '../../src/index.ts'
 import { defineEntityPlugin } from '../../src/entity.ts'
 import { composeFlatKey } from '../../src/entity/key.ts'
+import { defineStorageFeature, defineBackendPlugin } from '../../src/sdk.ts'
+import { type IStorageBase } from '@migaia/storage-contract'
 
 /**
  * A frozen raw provider proves envelope hooks do not depend on a change controller or provider
@@ -25,10 +27,13 @@ function rawPlugin(shared?: IKeyValueStore, marked = false, synchronous = false)
   /** The original resource is acquired only in the actual install hook. */
   let store!: IKeyValueStore
   /** Open kind identity carries the raw native shape without a capability installer. */
-  const kind = defineStorageBackendKind()('raw-entity')
+  type IKindBackend = IStorageBackendType<IStorageBase, undefined>
+  /** Backend-plugin definer typed for this test backend. */
+  const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
+  /** Feature definer typed for this test backend. */
+  const defineKindFeature: IStorageFeatureDefiner<IKindBackend> = defineStorageFeature
   /** Named descriptors retain native store inference through the authoring boundary. */
   const descriptor = (core: IStoragePluginCore) => ({
-    kind,
     featureExpose: () => ({ getClient: () => undefined }),
     install() {
       if (shared !== undefined) {
@@ -91,7 +96,7 @@ function rawPlugin(shared?: IKeyValueStore, marked = false, synchronous = false)
     }
   })
   if (marked) {
-    const marker = defineFeature(kind, () => ({
+    const marker = defineKindFeature(() => ({
       capabilities: [],
       api: { store: {}, transaction: {} },
       chain: {
@@ -104,13 +109,11 @@ function rawPlugin(shared?: IKeyValueStore, marked = false, synchronous = false)
     }))
     const factory = (core: IStoragePluginCore) => descriptor(core)
     return {
-      plugin: definePlugin<'raw', typeof factory, { marker: typeof marker }>('raw', factory, {
-        marker
-      }),
+      plugin: defineKindBackend({ name: 'raw', features: { marker }, open: factory }),
       getStore: () => store
     }
   }
-  return { plugin: definePlugin('raw', descriptor), getStore: () => store }
+  return { plugin: defineKindBackend({ name: 'raw', open: descriptor }), getStore: () => store }
 }
 
 describe('entity envelopes through the shared plan owner', () => {
@@ -138,7 +141,7 @@ describe('entity envelopes through the shared plan owner', () => {
       )
       /** This actual storage host owns the entity installation for this test scope. */
       const entity1EntityPluginHost = await entityHost(entity1EntityPlugin)
-      const plain = entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store)
+      const plain = entity1EntityPluginHost.extensions[entity1EntityPlugin.name](store)
       await plain.put({ id: 'existing', email: 'one' })
       const before = await store.keys()
       let validations = 0
@@ -168,7 +171,7 @@ describe('entity envelopes through the shared plan owner', () => {
       )
       /** This actual storage host owns the entity installation for this test scope. */
       const entity2EntityPluginHost = await entityHost(entity2EntityPlugin)
-      const unique = entity2EntityPluginHost.extensions[entity2EntityPlugin.id](store)
+      const unique = entity2EntityPluginHost.extensions[entity2EntityPlugin.name](store)
       await expect(unique.put({ id: 'new', email: 'one' })).rejects.toMatchObject({
         source: 'storage.contract',
         code: 'UNSUPPORTED_CAPABILITY'
@@ -202,7 +205,7 @@ describe('entity envelopes through the shared plan owner', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity3EntityPluginHost = await entityHost(entity3EntityPlugin)
-    const repo = entity3EntityPluginHost.extensions[entity3EntityPlugin.id](firstRaw.getStore())
+    const repo = entity3EntityPluginHost.extensions[entity3EntityPlugin.name](firstRaw.getStore())
     expect(repo.query()).toHaveProperty('mark')
     await using second = await createStorageHost({
       plugins: [rawPlugin(firstRaw.getStore()).plugin]
@@ -257,7 +260,7 @@ describe('entity envelopes through the shared plan owner', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
-    const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](store)
+    const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.name](store)
     await repo.put({ id: 'a' })
     expect(await repo.get('a')).toEqual({ id: 'a' })
     expect(seen).toEqual(['first', 'second'])
@@ -320,7 +323,7 @@ describe('entity envelopes through the shared plan owner', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity5EntityPluginHost = await entityHost(entity5EntityPlugin)
-    const repo = entity5EntityPluginHost.extensions[entity5EntityPlugin.id](store)
+    const repo = entity5EntityPluginHost.extensions[entity5EntityPlugin.name](store)
     expect(await repo.get('a')).toEqual({ id: 'a', count: 2 })
     expect(order).toEqual(['check', 'checked', 'step', 'stepped', 'migrated'])
     await repo.put({ id: 'b', count: 3 })
@@ -354,7 +357,7 @@ describe('entity envelopes through the shared plan owner', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity6EntityPluginHost = await entityHost(entity6EntityPlugin)
-    const repo = entity6EntityPluginHost.extensions[entity6EntityPlugin.id](store)
+    const repo = entity6EntityPluginHost.extensions[entity6EntityPlugin.name](store)
     await store.set(
       composeFlatKey('invalid', 'old'),
       JSON.stringify({ __v: 2, data: { id: 'old' } })
@@ -396,7 +399,7 @@ describe('entity envelopes through the shared plan owner', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity7EntityPluginHost = await entityHost(entity7EntityPlugin)
-    const invalidWrite = entity7EntityPluginHost.extensions[entity7EntityPlugin.id](store)
+    const invalidWrite = entity7EntityPluginHost.extensions[entity7EntityPlugin.name](store)
     await expect(invalidWrite.put({ id: 'a' })).rejects.toMatchObject({
       source: 'storage.host',
       code: 'SERIALIZE_FAILED',
@@ -435,7 +438,7 @@ describe('entity envelopes through the shared plan owner', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity8EntityPluginHost = await entityHost(entity8EntityPlugin)
-    const repo = entity8EntityPluginHost.extensions[entity8EntityPlugin.id](store)
+    const repo = entity8EntityPluginHost.extensions[entity8EntityPlugin.name](store)
     await store.set(
       composeFlatKey('broken', 'a'),
       JSON.stringify({ version: 1, state: { id: 'a' } })

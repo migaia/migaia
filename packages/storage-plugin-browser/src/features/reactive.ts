@@ -1,41 +1,33 @@
 import { snapshotBrowserConfig } from '../utils/config-snapshot.ts'
-import { indexedDbFeatureMissing } from '../backends/indexed-db-base-access.ts'
-import { IndexedDbFeature } from '../constants.ts'
+import { BROWSER_REACTIVE_POLL_INTERVAL_MS } from '../constants.ts'
 import {
-  defineFeature,
-  StorageError as HostStorageError,
-  StorageErrorText as HostStorageErrorText,
-  type IStorageBackendKind,
+  type IStorageBackendType,
   type IStorageFeature,
+  type IStorageFeatureDefiner,
   type IStorageFeatureExpose,
   type IStorageFeatureOutput,
-  type IStorageFeatureTarget
+  type IStorageFeatureTarget,
+  type IStorageReactiveProfileExpose
 } from '@migaia/storage-host'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import {
-  StorageHostErrorCode as HostStorageErrorCode,
-  StorageBrowserErrorCode
-} from '@migaia/storage-contract/error-code'
-import { memoryBackendKind } from '@migaia/storage-host/plugins/memory'
-import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
+  createStorageOperationReporter,
+  defineStorageFeature,
+  reportCleanupError,
+  StorageReactiveVisibility
+} from '@migaia/storage-host/sdk'
 import type {
   IOperationContext,
   IQueryResultOf,
   IQueryShape,
   IStorageResource
 } from '@migaia/storage-contract'
-import {
-  cookieBackendKind,
-  indexedDbBackendKind,
-  localStorageBackendKind,
-  sessionStorageBackendKind
-} from '../host/builtin-kinds.ts'
 import { createStorageReactiveService, type IStorageReactiveAdapter } from '../host/reactive.ts'
 import type {
   ILiveQuery,
   ILiveQueryOptions,
   IStorageReactiveFeatureMetadata
 } from '../host/types.ts'
-import { StorageReactiveVisibility } from '../host/state-constants.ts'
 import { StorageErrorText } from '../error-text.ts'
 import { StorageError } from '../types/errors.ts'
 
@@ -78,53 +70,18 @@ export type IReactiveFeatureOutput = IStorageFeatureOutput<
   { readonly store: {}; readonly transaction: {} }
 >
 
-/** Original native reconciliation interval shared by the four browser profiles. */
-const browserPollIntervalMs = 1000
+/** What the reactive Feature reads from any backend; a backend may state its own profile. */
+type IReactiveFeatureExpose = IStorageFeatureExpose<IStorageBackendType> &
+  Partial<IStorageReactiveProfileExpose>
 
-/** Preserve the native observation domains by opaque kind identity, never a backend label. */
-const nativeConsistency = (
-  kind: IStorageBackendKind,
-  hasController: boolean
-): IStorageReactiveFeatureMetadata => {
-  if (kind === memoryBackendKind) {
-    if (!hasController)
-      throw new HostStorageError(
-        HostStorageErrorCode.changeControllerNotAssembled,
-        {},
-        HostStorageErrorText.changeControllerNotAssembled
-      )
-    return { mode: 'push', visibility: StorageReactiveVisibility.instance }
-  }
-  if (kind === localStorageBackendKind)
-    return {
-      mode: 'hybrid',
-      visibility: StorageReactiveVisibility.documentEventual,
-      pollIntervalMs: browserPollIntervalMs
-    }
-  if (kind === sessionStorageBackendKind)
-    return {
-      mode: 'hybrid',
-      visibility: StorageReactiveVisibility.topLevelContextEventual,
-      pollIntervalMs: browserPollIntervalMs
-    }
-  if (kind === cookieBackendKind)
-    return {
-      mode: 'hybrid',
-      visibility: StorageReactiveVisibility.originJsVisibleEventual,
-      pollIntervalMs: browserPollIntervalMs
-    }
-  if (kind === indexedDbBackendKind)
-    return {
-      mode: 'hybrid',
-      visibility: StorageReactiveVisibility.originEventual,
-      pollIntervalMs: browserPollIntervalMs
-    }
+/** A backend that states no profile is observed by its controller, else by polling this instance. */
+function defaultReactiveProfile(hasController: boolean): IStorageReactiveFeatureMetadata {
   return hasController
     ? { mode: 'push', visibility: StorageReactiveVisibility.instance }
     : {
         mode: 'polling',
         visibility: StorageReactiveVisibility.instance,
-        pollIntervalMs: browserPollIntervalMs
+        pollIntervalMs: BROWSER_REACTIVE_POLL_INTERVAL_MS
       }
 }
 
@@ -167,11 +124,11 @@ const validateLiveOptions = <T>(options: IChainLiveQueryOptions<T>): void => {
 /** One Feature installation owns its service, selected adapter and stable abort listener. */
 type IReactiveFeatureContext = {
   /** Original registration controls when store, client and lifecycle access is allowed. */
-  readonly featureExpose: IStorageFeatureExpose<IStorageBackendKind>
+  readonly featureExpose: IReactiveFeatureExpose
   /** Original scheduler drives Resource requests without a new scheduling owner. */
-  readonly scheduler: ReturnType<IStorageFeatureExpose<IStorageBackendKind>['getScheduler']>
+  readonly scheduler: ReturnType<IReactiveFeatureExpose['getScheduler']>
   /** Original registration signal starts the same service cleanup before LIFO disposal. */
-  readonly signal: ReturnType<IStorageFeatureExpose<IStorageBackendKind>['getLifecycle']>['signal']
+  readonly signal: ReturnType<IReactiveFeatureExpose['getLifecycle']>['signal']
   /** Service owns adapters and their Resource query lifetimes for this one Feature. */
   readonly service: ReturnType<typeof createStorageReactiveService>
   /** Original operation reporter handles asynchronous cleanup failures. */
@@ -182,15 +139,15 @@ type IReactiveFeatureContext = {
   adapter: IStorageReactiveAdapter | undefined
 }
 /** Own one original reactive service per installed Feature and attach its source on first live. */
-export const reactiveFeature = <const T extends IStorageFeatureTarget>(
-  target: T
-): IStorageFeature<T, IReactiveFeatureOutput> =>
-  defineFeature(target, ({ featureExpose }) => createReactiveFeature(featureExpose))
+export const reactiveFeature = <
+  T extends IStorageFeatureTarget = IStorageBackendType
+>(): IStorageFeature<T, IReactiveFeatureOutput> =>
+  (defineStorageFeature as IStorageFeatureDefiner<T>)(({ featureExpose }) =>
+    createReactiveFeature(featureExpose as IReactiveFeatureExpose)
+  )
 
 /** Attach the Feature's service to its original lifecycle before publishing terminal methods. */
-function createReactiveFeature(
-  featureExpose: IStorageFeatureExpose<IStorageBackendKind>
-): IReactiveFeatureOutput {
+function createReactiveFeature(featureExpose: IReactiveFeatureExpose): IReactiveFeatureOutput {
   /** Constructor admission selects these original ports before any source can subscribe. */
   const scheduler = featureExpose.getScheduler()
   const signal = featureExpose.getLifecycle().signal
@@ -255,13 +212,13 @@ function createReactiveLiveQuery<TQuery extends IQueryShape>(
   if (context.adapter === undefined) {
     try {
       const controller = context.featureExpose.getChangeController()
-      if (context.featureExpose.getKind() === indexedDbBackendKind && controller === undefined)
-        indexedDbFeatureMissing.fail(IndexedDbFeature.notifications)
       context.adapter = context.service.registerAdapter({
         backendId,
         store,
         controller,
-        consistency: nativeConsistency(context.featureExpose.getKind(), controller !== undefined),
+        consistency:
+          context.featureExpose.reactiveProfile?.(controller !== undefined) ??
+          defaultReactiveProfile(controller !== undefined),
         report: (error) => reportCleanupError(context.reporter, error)
       })
       context.adapter.startSource()

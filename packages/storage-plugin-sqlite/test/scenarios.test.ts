@@ -3,24 +3,32 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { it, expect, onTestFinished, vi } from 'vitest'
-import { createStorageHost, createOrgId, defineFeature, definePlugin } from '@migaia/storage-host'
+import { createStorageHost, createOrgId, type IStorageFeatureDefiner } from '@migaia/storage-host'
 import { deferred, sleep } from '@migaia/utils/promise'
 import {
   lockKey,
   readTransactionOperationContext,
-  runTransactionOperation
+  runTransactionOperation,
+  definePlugin,
+  defineStorageFeature
 } from '@migaia/storage-host/sdk'
 import { sql, type IOperationContext, type IStorageChange } from '@migaia/storage-contract'
-import { sqliteBackendPlugin, sqliteBackendKind, type ISqliteDriver } from '../src/index.ts'
+import { sqliteBackendPlugin, type ISqliteDriver, type ISqliteBackend } from '../src/index.ts'
 import { nodeSqliteDriver } from '../src/node.ts'
 import { sqliteMaintenanceFeature } from '../src/features/maintenance.ts'
+
+/** Feature definer typed for the imported backend. */
+const defineSqliteFeature: IStorageFeatureDefiner<ISqliteBackend> = defineStorageFeature
 /** Maintenance runs through the real selected Feature and the original connection's SQL tag. */
 it('backs up and vacuums the actual database while rejecting an occupied connection', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-maintenance-'))
   const connection = nodeSqliteDriver(join(directory, 'source.sqlite'))
   const host = await createStorageHost({
     plugins: [
-      sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })
+      sqliteBackendPlugin({
+        driver: connection,
+        features: { maintenance: sqliteMaintenanceFeature() }
+      })
     ] as const
   })
   onTestFinished(async () => {
@@ -89,7 +97,7 @@ it('publishes canonical changed keys once in fixed channel order only after comm
       }
     }
   }
-  const notifications = defineFeature(sqliteBackendKind, ({ featureExpose }) => ({
+  const notifications = defineSqliteFeature(({ featureExpose }) => ({
     capabilities: [],
     chain: {},
     api: {
@@ -102,7 +110,7 @@ it('publishes canonical changed keys once in fixed channel order only after comm
     }
   }))
   const host = await createStorageHost({
-    plugins: [sqliteBackendPlugin({ driver }, { notifications })] as const
+    plugins: [sqliteBackendPlugin({ driver, features: { notifications } })] as const
   })
   onTestFinished(async () => {
     await host.dispose()
@@ -147,19 +155,22 @@ it('keeps asynchronous pipeline preparation inside the original root deadline', 
   const connection = nodeSqliteDriver(':memory:')
   let pipelineCalls = 0
   let settled = false
-  const slow = definePlugin('slow', (core) => ({
-    install() {
-      core.useAsyncPipeline(async (request, next) => {
-        if (request.operation === 'set') {
-          pipelineCalls++
-          await sleep(60)
-          settled = true
-        }
-        await next(request)
-      })
-      return {}
-    }
-  }))
+  const slow = definePlugin({
+    name: 'slow',
+    setup: (core) => ({
+      install() {
+        core.useAsyncPipeline(async (request, next) => {
+          if (request.operation === 'set') {
+            pipelineCalls++
+            await sleep(60)
+            settled = true
+          }
+          await next(request)
+        })
+        return {}
+      }
+    })
+  })
   const host = await createStorageHost({
     plugins: [sqliteBackendPlugin({ driver: connection }), slow] as const
   })
@@ -187,25 +198,28 @@ it('keeps after-next reads and native error catches around the real terminal', a
   let readCommitted!: () => Promise<string | null>
   let afterNext: string | null | undefined
   let caught: unknown
-  const around = definePlugin('around', (core) => ({
-    install() {
-      core.useAsyncPipeline(async (request, next) => {
-        if (request.operation !== 'set') {
-          await next(request)
-          return
-        }
-        try {
-          await next(request)
-          if ((request.input as { key?: unknown }).key === 'wrapped')
-            afterNext = await readCommitted()
-        } catch (error) {
-          caught = error
-          throw error
-        }
-      })
-      return {}
-    }
-  }))
+  const around = definePlugin({
+    name: 'around',
+    setup: (core) => ({
+      install() {
+        core.useAsyncPipeline(async (request, next) => {
+          if (request.operation !== 'set') {
+            await next(request)
+            return
+          }
+          try {
+            await next(request)
+            if ((request.input as { key?: unknown }).key === 'wrapped')
+              afterNext = await readCommitted()
+          } catch (error) {
+            caught = error
+            throw error
+          }
+        })
+        return {}
+      }
+    })
+  })
   const host = await createStorageHost({
     plugins: [sqliteBackendPlugin({ driver: connection }), around] as const
   })
@@ -227,15 +241,18 @@ it('keeps after-next reads and native error catches around the real terminal', a
 it('shares the original attempt context with cancellable transaction composition', async () => {
   /** The installed middleware sees the same attempt fields passed to the native owner. */
   let attemptContext: IOperationContext | undefined
-  const inspect = definePlugin('inspect-context', (core) => ({
-    install() {
-      core.useAsyncPipeline((request, next) => {
-        if (request.operation === 'transaction') attemptContext = request.ctx
-        return next(request)
-      })
-      return {}
-    }
-  }))
+  const inspect = definePlugin({
+    name: 'inspect-context',
+    setup: (core) => ({
+      install() {
+        core.useAsyncPipeline((request, next) => {
+          if (request.operation === 'transaction') attemptContext = request.ctx
+          return next(request)
+        })
+        return {}
+      }
+    })
+  })
   const connection = nodeSqliteDriver(':memory:')
   const host = await createStorageHost({
     plugins: [sqliteBackendPlugin({ driver: connection }), inspect] as const
@@ -310,7 +327,7 @@ it('uses genuine organization scopes without exposing caller SQL or rerunning Fe
   let factories = 0
   const clients: ISqliteDriver[] = []
   const eventOrganizations: (string | undefined)[] = []
-  const native = defineFeature(sqliteBackendKind, (core) => {
+  const native = defineSqliteFeature((core) => {
     factories++
     return {
       capabilities: [] as const,
@@ -343,10 +360,10 @@ it('uses genuine organization scopes without exposing caller SQL or rerunning Fe
   await using host = await createStorageHost({
     org,
     plugins: [
-      sqliteBackendPlugin(
-        { driver: connection },
-        { native, maintenance: sqliteMaintenanceFeature() }
-      )
+      sqliteBackendPlugin({
+        driver: connection,
+        features: { native, maintenance: sqliteMaintenanceFeature() }
+      })
     ]
   })
   const root = host.backend('sqlite')

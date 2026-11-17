@@ -1,5 +1,4 @@
 import type {
-  IBackendKind,
   IRecordIndexDefinition,
   IRecordIndexProjection,
   IStorageKey
@@ -17,15 +16,15 @@ export type IUniqueIndexOwner = {
 }
 /** Only native backend error construction varies; index ownership validation has one implementation. */
 export type IUniqueIndexErrorFactory = {
-  invalidConfig(backend: IBackendKind): Error
-  uniqueConflict(backend: IBackendKind, key: IStorageKey, indexName: string): Error
+  invalidConfig(backend: string): Error
+  uniqueConflict(backend: string, key: IStorageKey, indexName: string): Error
 }
 
 /** Collect owners with original same-record multi-entry deduplication before any commit writes. */
 export function collectUniqueIndexOwners(
   definitions: readonly IRecordIndexDefinition[],
   records: Iterable<{ readonly key: IStorageKey; readonly projection: IRecordIndexProjection }>,
-  backend: IBackendKind,
+  backend: string,
   errors?: IUniqueIndexErrorFactory
 ): ReadonlyMap<string, IUniqueIndexOwner> {
   /** Declared definitions are the only source of uniqueness metadata. */

@@ -269,7 +269,7 @@ export type IQdrantOrganizationContext = {
 
   ports: ReturnType<IStoragePluginCore['getOrgContext']>
 
-  identity: { backendId: string; backend: typeof QdrantText.backend; orgId: string }
+  identity: { backendId: string; orgId: string }
 
   store: IQdrantStore
 
@@ -301,7 +301,6 @@ function forOrg(
   )
   organizationContext.identity = {
     backendId: organizationContext.backendContext.core.getBackendId(),
-    backend: QdrantText.backend,
     orgId: organizationContext.orgId
   }
   organizationContext.base = {

@@ -3,14 +3,15 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, onTestFinished, vi } from 'vitest'
-import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
 import { kv, ttl, counter, records, sql, type IStorageKey } from '@migaia/storage-contract'
 import {
   sqlFragment,
   lockKey,
   ConcurrencyPolicy,
-  compareStorageKeys
+  compareStorageKeys,
+  definePlugin
 } from '@migaia/storage-host/sdk'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import { sqliteBackendPlugin, type ISqliteValue } from '../src/index.ts'
@@ -403,15 +404,18 @@ describe('native SQLite installation', () => {
     /** Caller ownership survives both failed batch validation and host release. */
     const connection = nodeSqliteDriver(':memory:')
     /** One existing host execution stage observes the actual native endpoints. */
-    const execution = definePlugin('batch-execution', (core) => ({
-      install() {
-        core.usePipeline((context, next) => {
-          operations.push(context.operation)
-          return next(context)
-        })
-        return {}
-      }
-    }))
+    const execution = definePlugin({
+      name: 'batch-execution',
+      setup: (core) => ({
+        install() {
+          core.usePipeline((context, next) => {
+            operations.push(context.operation)
+            return next(context)
+          })
+          return {}
+        }
+      })
+    })
     /** Hooks receive only the canonical operation/count identity, never the batch values. */
     const host = await createStorageHost({
       plugins: [
@@ -555,25 +559,30 @@ describe('native SQLite installation', () => {
     /** This is the original public pipeline entry; its input is shallow-readonly, not deep-frozen. */
     const { store, host } = await installed({ memory: true })
     await host.use(
-      definePlugin('rewrite-batch', (core) => ({
-        install() {
-          core.usePipeline((request, next) => {
-            if (request.operation === 'setMany') {
-              const input = request.input as { entries: Array<{ key: IStorageKey; value: string }> }
-              input.entries[0]!.key = 'redirected:point'
-              input.entries[0]!.value = 'changed'
-            } else if (request.operation === 'getMany' || request.operation === 'removeMany') {
-              const input = request.input as { keys: IStorageKey[] }
-              input.keys[0] = 'redirected:point'
-            } else if (request.operation === 'removeByPrefix') {
-              const input = request.input as { prefix: IStorageKey }
-              input.prefix = 'redirected:'
-            }
-            return next(request)
-          })
-          return {}
-        }
-      }))
+      definePlugin({
+        name: 'rewrite-batch',
+        setup: (core) => ({
+          install() {
+            core.usePipeline((request, next) => {
+              if (request.operation === 'setMany') {
+                const input = request.input as {
+                  entries: Array<{ key: IStorageKey; value: string }>
+                }
+                input.entries[0]!.key = 'redirected:point'
+                input.entries[0]!.value = 'changed'
+              } else if (request.operation === 'getMany' || request.operation === 'removeMany') {
+                const input = request.input as { keys: IStorageKey[] }
+                input.keys[0] = 'redirected:point'
+              } else if (request.operation === 'removeByPrefix') {
+                const input = request.input as { prefix: IStorageKey }
+                input.prefix = 'redirected:'
+              }
+              return next(request)
+            })
+            return {}
+          }
+        })
+      })
     )
     /** Pipeline edits apply to the detached native batch payload. */
     await store.use(kv).setMany([{ key: 'caller', value: 'original' }])
@@ -879,21 +888,24 @@ describe('native SQLite installation', () => {
       const second = other.backend('sqlite')
       let pipelineCalls = 0
       await other.use(
-        definePlugin('redirect', (core) => ({
-          install() {
-            core.usePipeline((request, next) => {
-              if (
-                request.operation === 'set' &&
-                (request.input as { key?: unknown }).key === 'redirect'
-              ) {
-                pipelineCalls++
-                return next({ ...request, input: { key: 'shared', value: 'redirected' } })
-              }
-              return next(request)
-            })
-            return {}
-          }
-        }))
+        definePlugin({
+          name: 'redirect',
+          setup: (core) => ({
+            install() {
+              core.usePipeline((request, next) => {
+                if (
+                  request.operation === 'set' &&
+                  (request.input as { key?: unknown }).key === 'redirect'
+                ) {
+                  pipelineCalls++
+                  return next({ ...request, input: { key: 'shared', value: 'redirected' } })
+                }
+                return next(request)
+              })
+              return {}
+            }
+          })
+        })
       )
       let enter!: () => void
       const entered = new Promise<void>((resolve) => {
@@ -994,17 +1006,20 @@ describe('native SQLite installation', () => {
     const release = deferred<void>()
     const queued = deferred<void>()
     await host.use(
-      definePlugin('queue-marker', (core) => ({
-        install() {
-          core.usePipeline((request, next) => {
-            const result = next(request)
-            if (request.operation === 'set' && (request.input as { key?: unknown }).key === 'A')
-              queued.resolve()
-            return result
-          })
-          return {}
-        }
-      }))
+      definePlugin({
+        name: 'queue-marker',
+        setup: (core) => ({
+          install() {
+            core.usePipeline((request, next) => {
+              const result = next(request)
+              if (request.operation === 'set' && (request.input as { key?: unknown }).key === 'A')
+                queued.resolve()
+              return result
+            })
+            return {}
+          }
+        })
+      })
     )
     const initial = store.transaction(
       async (tx) => {

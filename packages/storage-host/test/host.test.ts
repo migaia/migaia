@@ -6,23 +6,28 @@ import { deferred } from '@migaia/utils/promise'
 import {
   createStorageHost,
   StorageHost,
-  definePlugin,
-  defineFeature,
-  defineStorageBackendKind
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
+  type IStorageBackendPluginDefiner
 } from '../src/index.ts'
-import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.ts'
+import { memoryBackendPlugin } from '../src/plugins/memory.ts'
 import type { IStoragePluginCore } from '../src/index.ts'
 import type { IStorageBase } from '@migaia/storage-contract'
+import { definePlugin, defineStorageFeature, defineBackendPlugin } from '../src/sdk.ts'
+import type { IMemoryBackend } from '../src/plugins/memory.ts'
+
+/** Feature definer typed for the imported backend. */
+const defineMemoryFeature: IStorageFeatureDefiner<IMemoryBackend> = defineStorageFeature
 /** The kind describes the real store and native client without granting either one. */
-const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(
-  'catalog'
-)
+type IKindBackend = IStorageBackendType<ReturnType<typeof catalog>['store'], Map<string, string>>
+/** Backend-plugin definer typed for this test backend. */
+const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
+/** Feature definer typed for this test backend. */
+const defineKindFeature: IStorageFeatureDefiner<IKindBackend> = defineStorageFeature
 /** A named descriptor preserves the exact store returned by its actual provider. */
 function plugin<const N extends string>(name: N, value: string) {
   let state!: ReturnType<typeof catalog>
   const descriptor = (core: IStoragePluginCore) => ({
-    kind,
     featureExpose: () => ({ getClient: () => state.client }),
     capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
     install: () => {
@@ -32,7 +37,7 @@ function plugin<const N extends string>(name: N, value: string) {
       return {}
     }
   })
-  return { plugin: definePlugin(name, descriptor), state: () => state }
+  return { plugin: defineKindBackend({ name: name, open: descriptor }), state: () => state }
 }
 describe('neutral storage installation', () => {
   it('queues an overlapping batch until the running one settles, failed or not', async () => {
@@ -83,44 +88,14 @@ describe('neutral storage installation', () => {
     expect(right.state().cleanup).toHaveBeenCalledTimes(1)
   })
   it('keeps plain native extensions without treating an ordinary plugin as a backend', async () => {
-    const ordinary = definePlugin('utility', () => ({ install: () => ({ ping: () => 42 }) }))
+    const ordinary = definePlugin({
+      name: 'utility',
+      setup: () => ({ install: () => ({ ping: () => 42 }) })
+    })
     await using host = await createStorageHost({ plugins: [ordinary] })
     expect(host.extensions.ping()).toBe(42)
     expect(host.hasBackend('utility')).toBe(false)
     expect(Object.keys(host.api)).toEqual([])
-  })
-  it('rejects a mismatched same-name token before a Feature factory or driver is used', async () => {
-    const otherKind = defineStorageBackendKind<
-      ReturnType<typeof catalog>['store'],
-      Map<string, string>
-    >()('catalog')
-    const factory = vi.fn(() => ({
-      capabilities: [],
-      chain: {},
-      api: { store: {}, transaction: {} }
-    }))
-    const feature = defineFeature(otherKind, factory)
-    const create = vi.fn()
-    const descriptor = (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => new Map<string, string>() }),
-      install: () => {
-        create()
-        core.registerStore(catalog(core).store)
-        return {}
-      }
-    })
-    const definition = Reflect.apply(definePlugin, undefined, [
-      'mismatch',
-      descriptor,
-      { wrong: feature }
-    ])
-    await expect(createStorageHost({ plugins: [definition] })).rejects.toMatchObject({
-      source: 'storage.host',
-      code: StorageHostErrorCode.backendInstallFailed
-    })
-    expect(factory).not.toHaveBeenCalled()
-    expect(create).not.toHaveBeenCalled()
   })
   it('forwards both runners and preserves native Promise identity without stages', async () => {
     const item = plugin('values', 'one')
@@ -132,15 +107,18 @@ describe('neutral storage installation', () => {
   it('uses the original fixed async runner and rejects its sync entry before effects', async () => {
     const item = plugin('values', 'one')
     let stages = 0
-    const intervention = definePlugin('intervention', (core) => ({
-      install: () => {
-        core.useAsyncPipeline(async (input, next) => {
-          stages += 1
-          await next({ ...input, input: 'name' })
-        })
-        return {}
-      }
-    }))
+    const intervention = definePlugin({
+      name: 'intervention',
+      setup: (core) => ({
+        install: () => {
+          core.useAsyncPipeline(async (input, next) => {
+            stages += 1
+            await next({ ...input, input: 'name' })
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({ plugins: [item.plugin, intervention] })
     expect(() => host.backend('values').readSync('text')).toThrowError(
       expect.objectContaining({ code: 'ASYNC_STAGE_IN_SYNC_ENTRY' })
@@ -151,12 +129,15 @@ describe('neutral storage installation', () => {
   })
   it('turns intercepted storage endpoints into the existing aborted error', async () => {
     const item = plugin('values', 'one')
-    const intervention = definePlugin('intervention', (core) => ({
-      install: () => {
-        core.usePipeline(() => undefined)
-        return {}
-      }
-    }))
+    const intervention = definePlugin({
+      name: 'intervention',
+      setup: (core) => ({
+        install: () => {
+          core.usePipeline(() => undefined)
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({ plugins: [item.plugin, intervention] })
     expect(() => host.backend('values').voidSync()).toThrowError(
       expect.objectContaining({ source: 'storage.contract', code: 'ABORTED' })
@@ -167,7 +148,7 @@ describe('neutral storage installation', () => {
     })
   })
   it('binds selected root Feature API to its own lazy native client', async () => {
-    const upper = defineFeature(kind, (_core) => ({
+    const upper = defineKindFeature((_core) => ({
       capabilities: [],
       chain: {},
       api: {
@@ -181,7 +162,6 @@ describe('neutral storage installation', () => {
     }))
     let state!: ReturnType<typeof catalog>
     const descriptor = (core: IStoragePluginCore) => ({
-      kind,
       featureExpose: () => ({ getClient: () => state.client }),
       capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
       install: () => {
@@ -191,7 +171,7 @@ describe('neutral storage installation', () => {
         return {}
       }
     })
-    const definition = definePlugin('feature', descriptor, { upper })
+    const definition = defineKindBackend({ name: 'feature', features: { upper }, open: descriptor })
     const host = await createStorageHost({ plugins: [definition] })
     expect(host.api.feature).toBe(host.backend('feature').api)
     expect(await host.backend('feature').api.uppercase('name')).toBe('ONE')
@@ -202,7 +182,7 @@ describe('neutral storage installation', () => {
   })
   it('projects selected APIs by exact backend id without changing API identity or publication', async () => {
     /** Both instances intentionally publish the same method name from one selected Feature. */
-    const identity = defineFeature(memoryBackendKind, () => ({
+    const identity = defineMemoryFeature(() => ({
       capabilities: [],
       chain: {},
       api: {
@@ -216,14 +196,14 @@ describe('neutral storage installation', () => {
     }))
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(
-          { id: 'left' },
-          {
+        memoryBackendPlugin({
+          name: 'left',
+          features: {
             identity,
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           }
-        )
+        })
       ]
     })
     /** This immutable projection contains only the original committed registration. */
@@ -233,14 +213,14 @@ describe('neutral storage installation', () => {
     expect(await before.left.identity()).toBe(host.backend('left'))
     /** A later publication adds its own API without mutating a saved projection. */
     const expanded = await host.use(
-      memoryBackendPlugin(
-        { id: 'right' },
-        {
+      memoryBackendPlugin({
+        name: 'right',
+        features: {
           identity,
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()
         }
-      )
+      })
     )
     expect(Object.keys(before)).toEqual(['left'])
     expect(Object.keys(expanded.api)).toEqual(['left', 'right'])
@@ -249,21 +229,24 @@ describe('neutral storage installation', () => {
     await expanded.detect()
     expect(await expanded.api.right.identity()).toBe(expanded.backend('right'))
     /** Rollback never exposes an uncommitted id in the host's existing publication snapshot. */
-    const reject = definePlugin('reject', () => ({
-      install: () => {
-        throw new Error('install')
-      }
-    }))
+    const reject = definePlugin({
+      name: 'reject',
+      setup: () => ({
+        install: () => {
+          throw new Error('install')
+        }
+      })
+    })
     await expect(
       expanded.use(
-        memoryBackendPlugin(
-          { id: 'uncommitted' },
-          {
+        memoryBackendPlugin({
+          name: 'uncommitted',
+          features: {
             identity,
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           }
-        ),
+        }),
         reject
       )
     ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
@@ -275,14 +258,17 @@ describe('neutral storage installation', () => {
     /** Reporting is separate from the explicit rejecting cleanup promise. */
     const report = vi.fn()
     /** An ordinary plugin still uses the same native resource ownership as backend plugins. */
-    const resource = definePlugin('resource', (core) => ({
-      install: () => {
-        core.onDispose(() => {
-          throw original
-        })
-        return {}
-      }
-    }))
+    const resource = definePlugin({
+      name: 'resource',
+      setup: (core) => ({
+        install: () => {
+          core.onDispose(() => {
+            throw original
+          })
+          return {}
+        }
+      })
+    })
     /** One host owns one real cleanup and two cached public promise projections. */
     const host = await createStorageHost({ plugins: [resource], report })
     const primary = host.dispose()
@@ -298,67 +284,6 @@ describe('neutral storage installation', () => {
     expect(host.dispose()).toBe(primary)
     expect(report).toHaveBeenCalledExactlyOnceWith(failure)
   })
-  it.each([false, true])(
-    'cleans an admitted mismatched store once when cleanup rejects: %s',
-    async (failCleanup) => {
-      /** Secondary cleanup failure must reach the existing reporter without replacing admission. */
-      const cleanupError = new Error('rollback cleanup failed')
-      /** The backend kind describes the intended store, independently of a wrong returned label. */
-      const expected = defineStorageBackendKind<IStorageBase>()('expected')
-      /** Original receiver and call count prove the actual admitted disposer was registered. */
-      const cleanup = vi.fn(function (this: IStorageBase) {
-        expect(this.backend).toBe('other')
-        return failCleanup ? Promise.reject(cleanupError) : Promise.resolve()
-      })
-      /** The host owns only resources handed over after shape admission. */
-      const report = vi.fn()
-      /** A fresh base shape deliberately has a valid but mismatched backend label. */
-      const descriptor = (core: IStoragePluginCore) => ({
-        kind: expected,
-        featureExpose: () => ({ getClient: () => undefined }),
-        install: () => {
-          core.registerStore({
-            backend: 'other',
-            capabilities: {
-              syncRead: false,
-              binary: false,
-              records: false,
-              transactions: false,
-              iteration: false,
-              secondaryIndexes: false,
-              changeFeed: false,
-              maxValueBytes: undefined,
-              opaqueEntries: false
-            },
-            dispose: cleanup,
-            [Symbol.asyncDispose]: () => Promise.resolve()
-          })
-          return {}
-        }
-      })
-      /** Installation must remain atomic even though the constructed resource is valid. */
-      const failure = await createStorageHost({
-        plugins: [definePlugin('wrong', descriptor)],
-        report
-      }).catch((error) => error)
-      expect(failure).toMatchObject({
-        source: 'storage.host',
-        code: 'BACKEND_INSTALL_FAILED'
-      })
-      /** Walk only the bounded existing cause chain to identify the primary semantic rejection. */
-      let cursor: unknown = failure
-      /** Native install and facade wrappers add a finite number of ownership boundaries. */
-      const codes: string[] = []
-      for (let depth = 0; depth < 8 && cursor instanceof Error; depth += 1) {
-        if ('code' in cursor) codes.push(String(cursor.code))
-        cursor = cursor.cause
-      }
-      expect(codes).toContain('BACKEND_KIND_MISMATCH')
-      expect(cleanup).toHaveBeenCalledTimes(1)
-      if (failCleanup) expect(report).toHaveBeenCalledExactlyOnceWith(cleanupError)
-      else expect(report).not.toHaveBeenCalled()
-    }
-  )
   it('disposes the original receiver when a late store loses its batch', async () => {
     /** Pause the actual install before its ownership handoff. */
     const entered = deferred<void>()
@@ -372,7 +297,10 @@ describe('neutral storage installation', () => {
     /** The test observes expected late rejection diagnostics without changing cleanup. */
     const report = vi.fn()
     /** The kind and returned store agree; only the closing batch invalidates handoff. */
-    const lateKind = defineStorageBackendKind<IStorageBase>()('late')
+    type ILateKindBackend = IStorageBackendType<IStorageBase, undefined>
+    /** Backend-plugin definer typed for the late store. */
+    const defineLateKindBackend: IStorageBackendPluginDefiner<ILateKindBackend> =
+      defineBackendPlugin
     /** One host owns the actual asynchronous install and its cancellation signal. */
     const host = new StorageHost({ report })
     /** Late native handoff keeps the original resource receiver. */
@@ -394,7 +322,6 @@ describe('neutral storage installation', () => {
     }
     /** The backend returns its actual resource after its original install has expired. */
     const descriptor = (core: IStoragePluginCore) => ({
-      kind: lateKind,
       featureExpose: () => ({ getClient: () => undefined }),
       install: async () => {
         entered.resolve()
@@ -404,7 +331,9 @@ describe('neutral storage installation', () => {
       }
     })
     /** Observe the install failure immediately so cancellation cannot create an unhandled rejection. */
-    const installing = host.use(definePlugin('late', descriptor)).catch((error) => error)
+    const installing = host
+      .use(defineLateKindBackend({ name: 'late', open: descriptor }))
+      .catch((error) => error)
     await entered.promise
     /** Closing wins publication authority while the backend's actual work remains pending. */
     const closing = host.dispose()

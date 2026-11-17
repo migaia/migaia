@@ -258,7 +258,7 @@ export type ICacheOrganizationContext = {
 
   ports: ReturnType<IStoragePluginCore['getOrgContext']>
 
-  identity: { backendId: string; backend: string; orgId: string }
+  identity: { backendId: string; orgId: string }
 
   inflight: Map<string, IFlight>
 
@@ -331,7 +331,6 @@ function createProjection(cacheContext: ICacheBackendContext, orgId: string): IP
   )
   organizationContext.identity = {
     backendId: organizationContext.cacheContext.core.getBackendId(),
-    backend: CacheText.backend,
     orgId: organizationContext.orgId
   }
   organizationContext.inflight = new Map<string, IFlight>()

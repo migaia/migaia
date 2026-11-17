@@ -1,9 +1,9 @@
-import type { IBackendKind, IStorageChange } from '@migaia/storage-contract'
+import type { IStorageChange } from '@migaia/storage-contract'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 
 /** Construction-time references and options retained by the backend authoring boundary. */
 export type IBackendChangeSnapshot = {
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly platform: object | undefined
   readonly options: object | undefined
 }
@@ -22,7 +22,7 @@ export type IBackendChangeController = {
 }
 
 export type IBackendChangeControllerOptions = {
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly platform?: object
   readonly options?: object
   /**

@@ -1,5 +1,7 @@
 // Backend and Feature author SDK: one entry for every authoring helper. `sideEffects: false` keeps
 // unused helpers out of application bundles.
+export { defineBackendPlugin, definePlugin, defineStorageFeature } from './contracts.ts'
+export { StorageReactiveVisibility } from './state-constants.ts'
 export * from './authoring/backend.ts'
 export * from './authoring/blob.ts'
 export * from './authoring/capability.ts'

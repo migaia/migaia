@@ -5,7 +5,10 @@ import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs'
 /** Existing dependency owners stay external through their root and every public subpath. */
 const dependencies = ['@migaia/utils', '@migaia/serialize']
 
-/** Separate consumer-run conformance from the normal runtime entry; declarations stay with TypeScript. */
+/**
+ * Separate consumer-run conformance from the normal runtime entry; declarations stay with
+ * TypeScript.
+ */
 export default defineConfig(
   withDistFreshness({
     cacheDir: fileURLToPath(new URL('../../node_modules/.vite/storage-contract', import.meta.url)),

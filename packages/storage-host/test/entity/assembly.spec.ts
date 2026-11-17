@@ -5,8 +5,8 @@ import {
   memoryBackend as sourceMemoryBackend
 } from '../helpers/memory.ts'
 import { defineEntityPlugin as defineSourceEntityPlugin } from '../../src/entity.ts'
-import { defineFeature } from '../../src/contracts.ts'
-import { registerEntityUnit, entityUnitTarget } from '../../src/entity/assembly.ts'
+import { defineFeature } from '@migaia/plugin-host/features'
+import { registerEntityUnit } from '../../src/entity/assembly.ts'
 import { EntityQueryOwner } from '../../src/entity/query-owner.ts'
 import type { EntityRepositoryOwner } from '../../src/entity/repository.ts'
 import { EntityFeatureName } from '../../src/entity/constants.ts'
@@ -192,7 +192,7 @@ async function recordOrderPreservesEntityBehavior(): Promise<void> {
     })
     /** This actual storage host owns the entity installation for this test scope. */
     const entity3EntityPluginHost = await entityHost(entity3EntityPlugin)
-    const repository = entity3EntityPluginHost.extensions[entity3EntityPlugin.id](store)
+    const repository = entity3EntityPluginHost.extensions[entity3EntityPlugin.name](store)
     expect(await repository.migrate()).toMatchObject({ migrated: 1 })
     expect(await repository.query().index('byGroup', 'migrated').all()).toEqual([
       { id: 'a', group: 'migrated' }
@@ -260,7 +260,7 @@ async function nativeInstallationIsReused(): Promise<void> {
   const counter = new CountingQueryUnit(counts)
   /** Metadata is attached to the exact native definition consumed by the entity plugin. */
   const countedQuery = registerEntityUnit(
-    defineFeature(entityUnitTarget, () => counter.install()),
+    defineFeature(() => counter.install()),
     EntityFeatureName.query
   )
   /** A source-only seam keeps source metadata and source host identities together. */
@@ -274,8 +274,8 @@ async function nativeInstallationIsReused(): Promise<void> {
   /** One host installation publishes the reusable factory output. */
   const firstHost = await sourceEntityHost(countedEntityPlugin)
   /** Two requests must create two repository owners without another native install. */
-  const first = firstHost.extensions[countedEntityPlugin.id](store)
-  const second = firstHost.extensions[countedEntityPlugin.id](store)
+  const first = firstHost.extensions[countedEntityPlugin.name](store)
+  const second = firstHost.extensions[countedEntityPlugin.name](store)
   expect(counts).toEqual({ installs: 1, repositories: 2 })
   await first.put({ id: 'a', group: 'original' })
   expect(await second.query().all()).toEqual([{ id: 'a', group: 'original' }])
@@ -283,9 +283,9 @@ async function nativeInstallationIsReused(): Promise<void> {
   /** A separate native host gets its own install and lifetime for the same declaration. */
   const secondHost = await sourceEntityHost(countedEntityPlugin)
   /** The second registration reuses no repository-local state from the first registration. */
-  const isolated = secondHost.extensions[countedEntityPlugin.id](store)
+  const isolated = secondHost.extensions[countedEntityPlugin.name](store)
   expect(counts).toEqual({ installs: 2, repositories: 3 })
-  await firstHost.unUse(countedEntityPlugin.id)
+  await firstHost.unUse(countedEntityPlugin.name)
   expect(await isolated.get('a')).toEqual({ id: 'a', group: 'original' })
   /** Independent registration IDs admit two versions of one persisted entity namespace. */
   const upgradedEntityPlugin = defineSourceEntityPlugin<IRow>()('counted-entity-upgraded', {
@@ -297,11 +297,11 @@ async function nativeInstallationIsReused(): Promise<void> {
   })
   /** The original entity and its alternative version coexist in one actual host. */
   const versionsHost = await sourceEntityHost(countedEntityPlugin, upgradedEntityPlugin)
-  expect(await versionsHost.extensions[countedEntityPlugin.id](store).get('a')).toEqual({
+  expect(await versionsHost.extensions[countedEntityPlugin.name](store).get('a')).toEqual({
     id: 'a',
     group: 'original'
   })
-  expect(await versionsHost.extensions[upgradedEntityPlugin.id](store).get('a')).toEqual({
+  expect(await versionsHost.extensions[upgradedEntityPlugin.name](store).get('a')).toEqual({
     id: 'a',
     group: 'upgraded'
   })
@@ -322,7 +322,7 @@ async function entityRemovalRevokesRetainedWork(): Promise<void> {
   /** The actual public entity host owns the native revocation signal. */
   const host = await entityHost(lifecycleEntityPlugin)
   /** Hold the repository and delayed source handles before the registration is removed. */
-  const repository = host.extensions[lifecycleEntityPlugin.id](store)
+  const repository = host.extensions[lifecycleEntityPlugin.name](store)
   await repository.put({ id: 'a', group: 'one' })
   /** Any backend read after revocation would violate admission before source work. */
   const recordReads = vi.spyOn(store, 'getRecord')
@@ -336,7 +336,7 @@ async function entityRemovalRevokesRetainedWork(): Promise<void> {
     const bound = repository.in(scope)
     /** Transaction queries must observe the same native signal as their bound repository view. */
     const boundQuery = bound.query()
-    await host.unUse(lifecycleEntityPlugin.id)
+    await host.unUse(lifecycleEntityPlugin.name)
     await expect(repository.get('a')).rejects.toMatchObject({ code: 'ABORTED' })
     await expect(query.all()).rejects.toMatchObject({ code: 'ABORTED' })
     await expect(stream.next()).rejects.toMatchObject({ code: 'ABORTED' })
@@ -350,7 +350,7 @@ async function entityRemovalRevokesRetainedWork(): Promise<void> {
   expect(await store.get('entity-lifetime')).toBe('backend-still-open')
   /** Disposing another native host must revoke its retained handles independently. */
   const disposedHost = await entityHost(lifecycleEntityPlugin)
-  const disposedRepository = disposedHost.extensions[lifecycleEntityPlugin.id](store)
+  const disposedRepository = disposedHost.extensions[lifecycleEntityPlugin.name](store)
   const disposedQuery = disposedRepository.query()
   const disposedStream = disposedRepository.stream()
   await disposedHost.dispose()
@@ -380,7 +380,7 @@ describe('explicit entity assembly', () => {
     })
     /** This actual storage host owns the entity installation for this test scope. */
     const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
-    const repository = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](store)
+    const repository = entity4EntityPluginHost.extensions[entity4EntityPlugin.name](store)
     /** An explicit empty record installs no optional role. */
 
     /** Explicit entity plugin configuration is installed before requesting a repository. */
@@ -391,7 +391,7 @@ describe('explicit entity assembly', () => {
     })
     /** This actual storage host owns the entity installation for this test scope. */
     const entity5EntityPluginHost = await entityHost(entity5EntityPlugin)
-    const empty = entity5EntityPluginHost.extensions[entity5EntityPlugin.id](store)
+    const empty = entity5EntityPluginHost.extensions[entity5EntityPlugin.name](store)
     await repository.put({ id: 'a', group: 'one' })
     expect(await repository.get('a')).toEqual({ id: 'a', group: 'one' })
     expect(await empty.get('a')).toEqual({ id: 'a', group: 'one' })
@@ -411,7 +411,7 @@ describe('explicit entity assembly', () => {
     })
     /** This actual storage host owns the entity installation for this test scope. */
     const entity6EntityPluginHost = await entityHost(entity6EntityPlugin)
-    const repository = entity6EntityPluginHost.extensions[entity6EntityPlugin.id](
+    const repository = entity6EntityPluginHost.extensions[entity6EntityPlugin.name](
       await memoryBackend()
     )
     await repository.put({ id: 'a', group: 'one' })
@@ -438,7 +438,7 @@ describe('explicit entity assembly', () => {
     })
     /** This actual storage host owns the entity installation for this test scope. */
     const entity7EntityPluginHost = await entityHost(entity7EntityPlugin)
-    const repository = entity7EntityPluginHost.extensions[entity7EntityPlugin.id](store)
+    const repository = entity7EntityPluginHost.extensions[entity7EntityPlugin.name](store)
     expect(await repository.get('a')).toEqual({ id: 'a', group: 'migrated' })
     expect(() => repository.query()).toThrow(expect.objectContaining(missing('query')))
   })
@@ -454,7 +454,7 @@ describe('explicit entity assembly', () => {
     })
     /** This actual storage host owns the entity installation for this test scope. */
     const entity8EntityPluginHost = await entityHost(entity8EntityPlugin)
-    const original = entity8EntityPluginHost.extensions[entity8EntityPlugin.id](store)
+    const original = entity8EntityPluginHost.extensions[entity8EntityPlugin.name](store)
     for (const id of ['a', 'b', 'c']) await original.put({ id, group: 'one' })
     /** Only migration is selected; two native batches must not resolve another optional owner. */
 
@@ -468,7 +468,7 @@ describe('explicit entity assembly', () => {
     })
     /** This actual storage host owns the entity installation for this test scope. */
     const entity9EntityPluginHost = await entityHost(entity9EntityPlugin)
-    const repository = entity9EntityPluginHost.extensions[entity9EntityPlugin.id](store)
+    const repository = entity9EntityPluginHost.extensions[entity9EntityPlugin.name](store)
     await expect(repository.migrate({ batchSize: 2 })).resolves.toEqual({
       scanned: 3,
       eligible: 3,
@@ -516,7 +516,7 @@ describe('explicit entity assembly', () => {
     })
     /** This actual storage host owns the entity installation for this test scope. */
     const entity11EntityPluginHost = await entityHost(entity11EntityPlugin)
-    const repository = entity11EntityPluginHost.extensions[entity11EntityPlugin.id](store)
+    const repository = entity11EntityPluginHost.extensions[entity11EntityPlugin.name](store)
     await expect(repository.query().all()).rejects.toMatchObject(missing('migration'))
     await expect(repository.list({ onInvalid: 'skip' })).rejects.toMatchObject(missing('migration'))
   })
@@ -530,7 +530,7 @@ describe('explicit entity assembly', () => {
     })
     /** This actual storage host owns the entity installation for this test scope. */
     const entity12EntityPluginHost = await entityHost(entity12EntityPlugin)
-    const repository = entity12EntityPluginHost.extensions[entity12EntityPlugin.id](
+    const repository = entity12EntityPluginHost.extensions[entity12EntityPlugin.name](
       await memoryBackend()
     )
     await repository.put({ id: 'a', group: 'one' })
@@ -551,7 +551,7 @@ describe('explicit entity assembly', () => {
     })
     /** This actual storage host owns the entity installation for this test scope. */
     const entity13EntityPluginHost = await entityHost(entity13EntityPlugin)
-    const repository = entity13EntityPluginHost.extensions[entity13EntityPlugin.id](
+    const repository = entity13EntityPluginHost.extensions[entity13EntityPlugin.name](
       await memoryBackend()
     )
     await repository.put({ id: 'a', group: 'one' })
@@ -610,7 +610,7 @@ async function retainedQueryStreamProtocol(): Promise<void> {
     features: { reads: entityQueryFeature() }
   })
   const host = await entityHost(streamEntityPlugin)
-  const repository = host.extensions[streamEntityPlugin.id](store)
+  const repository = host.extensions[streamEntityPlugin.name](store)
   await repository.put({ id: 'a', group: 'one' })
   await repository.put({ id: 'b', group: 'two' })
   /** Early return and both disposal forms reach the guarded original iterator. */
@@ -625,7 +625,7 @@ async function retainedQueryStreamProtocol(): Promise<void> {
   /** A stream opened before removal rejects every later advance and closes its source once. */
   const retained = repository.query().stream()
   expect(await retained.next()).toMatchObject({ done: false })
-  await host.unUse(streamEntityPlugin.id)
+  await host.unUse(streamEntityPlugin.name)
   await expect(retained.next()).rejects.toMatchObject({ code: 'ABORTED' })
   await expect(retained.next()).rejects.toMatchObject({ code: 'ABORTED' })
   await store.dispose()

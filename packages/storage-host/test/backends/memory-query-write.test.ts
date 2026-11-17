@@ -2,23 +2,27 @@ import { describe, expect, it } from 'vitest'
 import { records, rdf, vector, type IQuad } from '@migaia/storage-contract'
 import { term } from '../../src/authoring/rdf.ts'
 import { ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
-import { createOrgId, createStorageHost, definePlugin } from '../../src/index.ts'
+import { createOrgId, createStorageHost } from '../../src/index.ts'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import { MemoryOperation } from '../../src/backends/memory-constants.ts'
+import { definePlugin } from '../../src/sdk.ts'
 
 /** Native query mutations select and write inside the original transaction attempt. */
 describe('memory native query writes', () => {
   it('patches actual records and retains generic field values through one write pipeline', async () => {
     const operations: string[] = []
-    const observe = definePlugin('query-write-observer', (core) => ({
-      install() {
-        core.usePipeline((input, next) => {
-          operations.push(input.operation)
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observe = definePlugin({
+      name: 'query-write-observer',
+      setup: (core) => ({
+        install() {
+          core.usePipeline((input, next) => {
+            operations.push(input.operation)
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin(), observe] })
     const store = host.backend('memory')
     await store.putRecord({ active: true, retained: 'a', date: new Date(1), map: new Map() }, 'a')
@@ -104,15 +108,18 @@ describe('memory native query writes', () => {
 
   it('deletes only the original bounded vector ranking and keeps other collections and organizations', async () => {
     const operations: string[] = []
-    const observe = definePlugin('vector-write-observer', (core) => ({
-      install() {
-        core.usePipeline((input, next) => {
-          operations.push(input.operation)
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observe = definePlugin({
+      name: 'vector-write-observer',
+      setup: (core) => ({
+        install() {
+          core.usePipeline((input, next) => {
+            operations.push(input.operation)
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin(), observe] })
     const collection = host
       .backend('memory')

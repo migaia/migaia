@@ -1,4 +1,5 @@
-export { sparqlBackendPlugin, sparqlBackendKind } from './plugin.ts'
+export { sparqlBackendPlugin } from './plugin.ts'
+export type { ISparqlBackend } from './plugin.ts'
 export type { ISparqlOptions } from './plugin.ts'
 export type {
   ISparqlStore,

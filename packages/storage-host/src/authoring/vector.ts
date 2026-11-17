@@ -10,7 +10,6 @@ import {
   assertStorageVectorCollection,
   assertStorageVector,
   assertStorageVectorIds,
-  type IBackendKind,
   StorageContractError,
   StorageContractErrorCode,
   StorageContractErrorText
@@ -22,7 +21,7 @@ export { recommendStorageVector } from '../backends/vector-core.ts'
 
 /** Preserve coded contract failures and retain the exact cause of getters and codec failures. */
 /** Only payload projection normalizes a real serialization failure to the vector contract. */
-function projectVectorPayload<T>(value: T, backend: IBackendKind | undefined): T {
+function projectVectorPayload<T>(value: T, backend: string | undefined): T {
   try {
     return asCodecValue(toPortableValue(value)) as T
   } catch (cause) {
@@ -38,7 +37,7 @@ function projectVectorPayload<T>(value: T, backend: IBackendKind | undefined): T
 function assertVectorArrayLength(
   length: number,
   minimum: 0 | 1,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): void {
   if (!Number.isSafeInteger(length) || length < minimum) invalidVector(backend)
 }
@@ -47,7 +46,7 @@ function assertVectorArrayLength(
 export function snapshotStorageVectorCollection(
   name: string,
   options?: IStorageVectorConfiguration,
-  backend?: IBackendKind
+  backend?: string
 ): Readonly<{ name: string; options: Readonly<IStorageVectorConfiguration> | undefined }> {
   assertStorageVectorCollection(name, options, backend)
   return {
@@ -61,7 +60,7 @@ export function snapshotStorageVectorCollection(
 export function snapshotStorageVector(
   input: readonly number[],
   options?: IStorageVectorValidation,
-  backend?: IBackendKind
+  backend?: string
 ): readonly number[] {
   assertStorageVector(input, options, backend)
   return [...input]
@@ -74,7 +73,7 @@ export function snapshotStorageVector(
 export function snapshotStorageVectorUpsert<TPayload>(
   points: readonly IStorageVectorPoint<TPayload>[],
   configuration?: IStorageVectorConfiguration,
-  backend?: IBackendKind
+  backend?: string
 ): readonly IStorageVectorPoint<TPayload>[] {
   /** Omission captures the batch only; a native schema is never inferred from caller values. */
   let config: IStorageVectorConfiguration | undefined
@@ -109,11 +108,11 @@ export function snapshotStorageVectorUpsert<TPayload>(
 /** One snapshot owns active ancestors while preserving repeated sibling nodes. */
 class VectorFilterSnapshot {
   /** The original backend labels every malformed filter without allocating another error owner. */
-  readonly #backend: IBackendKind | undefined
+  readonly #backend: string | undefined
   /** Only active ancestors are retained, so shared acyclic subtrees remain supported. */
   readonly #active = new Set<object>()
   /** Establish one synchronous capture; no caller input survives in the returned filter. */
-  constructor(backend: IBackendKind | undefined) {
+  constructor(backend: string | undefined) {
     this.#backend = backend
   }
   /** Validate the closed AST alternatives and detach values before native filter execution awaits. */
@@ -213,7 +212,7 @@ class VectorFilterSnapshot {
 /** Detach the filter AST before the backend performs native asynchronous work. */
 export function snapshotStorageVectorFilter(
   filter: IVectorFilter,
-  backend?: IBackendKind
+  backend?: string
 ): IVectorFilter {
   return new VectorFilterSnapshot(backend).capture(filter)
 }
@@ -223,7 +222,7 @@ export function snapshotStorageVectorSearch(
   query: readonly number[],
   options: Parameters<IVectorCollection<unknown>['search']>[1],
   configuration?: IStorageVectorConfiguration,
-  backend?: IBackendKind
+  backend?: string
 ): Readonly<{
   query: readonly number[]
   options: Readonly<{
@@ -268,7 +267,7 @@ export function snapshotStorageVectorSearch(
 /** Capture caller IDs because native schema lookup and deferred recommendation reads can await. */
 export function snapshotStorageVectorIds(
   ids: readonly string[],
-  backend?: IBackendKind,
+  backend?: string,
   rejectDuplicates = false
 ): readonly string[] {
   assertStorageVectorIds(ids, backend, rejectDuplicates)
@@ -278,7 +277,7 @@ export function snapshotStorageVectorIds(
 /** Resolve only the declared deletion strategy; engines retain ownership of actual count behavior. */
 export function snapshotStorageDeleteCountMode(
   value: DeleteCountMode | undefined,
-  backend?: IBackendKind
+  backend?: string
 ): DeleteCountMode {
   if (value === undefined) return DeleteCountMode.precount
   if (value !== DeleteCountMode.precount && value !== DeleteCountMode.scroll) invalidVector(backend)

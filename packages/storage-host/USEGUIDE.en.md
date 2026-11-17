@@ -20,10 +20,10 @@ import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 const original = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'session' })]
+  plugins: [memoryBackendPlugin({ name: 'session' })]
 })
 try {
-  const host = await original.use(memoryBackendPlugin({ id: 'drafts' }))
+  const host = await original.use(memoryBackendPlugin({ name: 'drafts' }))
   await host.detect()
   await host.backend('session').set('user', 'ada')
   await host.backend('drafts').set('title', 'First draft')
@@ -88,7 +88,7 @@ const usersEntityPlugin = defineEntityPlugin<{ id: string; name: string }>()('us
 })
 const host = await createStorageHost({ plugins: [memoryBackendPlugin(), usersEntityPlugin] })
 try {
-  const users = host.extensions[usersEntityPlugin.id](host.backend('memory'))
+  const users = host.extensions[usersEntityPlugin.name](host.backend('memory'))
   await users.put({ id: 'u1', name: 'Ada' })
   console.log(await users.get('u1'))
 } finally {
@@ -116,7 +116,7 @@ const ordersEntityPlugin = defineEntityPlugin<IOrder>()('orders', {
 })
 const host = await createStorageHost({ plugins: [memoryBackendPlugin(), ordersEntityPlugin] })
 try {
-  const orders = host.extensions[ordersEntityPlugin.id](host.backend('memory'))
+  const orders = host.extensions[ordersEntityPlugin.name](host.backend('memory'))
   await orders.put({ id: 'o1', state: 'paid', total: 20 })
   console.log(await orders.get('o1'))
   console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())
@@ -125,7 +125,7 @@ try {
 }
 ```
 
-You can also add an entity with `const installed = await host.use(ordersEntityPlugin)` and use `installed.extensions[ordersEntityPlugin.id](store)`. Each repository borrows the backend; it never closes it. Repository, retained query and iterator access expires when the entity is removed or its host is disposed. Use `orders.in(tx)` inside an original transaction and `orders.batch(...)` for one native record transaction. Schemas/codecs retain their runtime conversion and original causes. Choose index/range once; pair a custom comparator with a finite limit. Dispose a stream when stopping early.
+You can also add an entity with `const installed = await host.use(ordersEntityPlugin)` and use `installed.extensions[ordersEntityPlugin.name](store)`. Each repository borrows the backend; it never closes it. Repository, retained query and iterator access expires when the entity is removed or its host is disposed. Use `orders.in(tx)` inside an original transaction and `orders.batch(...)` for one native record transaction. Schemas/codecs retain their runtime conversion and original causes. Choose index/range once; pair a custom comparator with a finite limit. Dispose a stream when stopping early.
 
 ### Persist versioned records
 
@@ -157,10 +157,10 @@ const host = await createStorageHost({
 })
 try {
   const store = host.backend('memory')
-  const original = host.extensions[originalUsersEntityPlugin.id](store)
+  const original = host.extensions[originalUsersEntityPlugin.name](store)
   await original.put({ id: 'ada', name: ' Ada ' })
   await original.put({ id: 'lin', name: ' Lin ' })
-  const users = host.extensions[migratedUsersEntityPlugin.id](store)
+  const users = host.extensions[migratedUsersEntityPlugin.name](store)
   const result = await users.migrate({ batchSize: 1 })
   console.log(result.migrated, (await users.get('ada'))?.name)
 } finally {
@@ -268,9 +268,11 @@ import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-ch
 
 const host = await createStorageHost({
   plugins: [
-    memoryBackendPlugin(undefined, {
-      notifications: memoryNotificationsFeature(),
-      changeFeed: memoryChangeFeedFeature()
+    memoryBackendPlugin({
+      features: {
+        notifications: memoryNotificationsFeature(),
+        changeFeed: memoryChangeFeedFeature()
+      }
     })
   ]
 })

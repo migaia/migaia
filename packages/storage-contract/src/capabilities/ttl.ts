@@ -1,6 +1,5 @@
 import { type IOperationContext } from '../context.ts'
 import { assertLockKey, type ILockKey, type IWriteConcurrencyOptions } from '../concurrency.ts'
-import { type IBackendKind } from '../capabilities.ts'
 import { StorageContractError, StorageContractErrorCode } from '../errors.ts'
 import { StorageContractErrorText } from '../error-text.ts'
 import { STORAGE_TTL_METHODS } from '../capability-constants.ts'
@@ -33,7 +32,7 @@ export type ITransactionTtlApi = {
 /** Validate TTL's lock-domain subset without copying keys inside synchronous native terminals. */
 export function assertStorageTtlTarget(
   target: unknown,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): asserts target is ITtlTarget {
   assertLockKey(target, backend)
   if (target.channel === 'rdf')
@@ -45,7 +44,7 @@ export function assertStorageTtlTarget(
 }
 
 /** Finite nonnegative durations include fractional milliseconds and immediate expiry at zero. */
-export function assertStorageTtlDuration(ms: number, backend: IBackendKind | undefined): void {
+export function assertStorageTtlDuration(ms: number, backend: string | undefined): void {
   if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0)
     throw new StorageContractError(
       StorageContractErrorCode.invalidArgument,

@@ -503,4 +503,4 @@ export type IEntityPlugin<
 > = import('../types.ts').IStorageBackendPluginHandle<{
   readonly [K in TId]: IEntityRepositoryAccess<TDomain, TIndexes>
 }> &
-  Readonly<{ id: TId }>
+  Readonly<{ name: TId }>

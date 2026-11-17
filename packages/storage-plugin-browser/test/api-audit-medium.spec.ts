@@ -50,7 +50,7 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
       /** Install once on the real fixture host and retain exact extension inference. */
       const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
+      const repo = repoEntityPluginHost.extensions[repoEntityPlugin.name](store)
       /**
        * Capture the failure for identity assertions without asserting an implementation wrapper
        * count.
@@ -85,7 +85,7 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const previousEntityPluginHost = await storeHost.use(previousEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const previous = previousEntityPluginHost.extensions[previousEntityPlugin.id](store)
+    const previous = previousEntityPluginHost.extensions[previousEntityPlugin.name](store)
     await previous.put({ id: 'old' })
     /** Explicit native declaration owns this scenario's optional repository capabilities. */
     const currentEntityPlugin = defineEntityPlugin<{ id: string }>()(
@@ -101,7 +101,7 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const currentEntityPluginHost = await storeHost.use(currentEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const current = currentEntityPluginHost.extensions[currentEntityPlugin.id](store)
+    const current = currentEntityPluginHost.extensions[currentEntityPlugin.name](store)
     await current.put({ id: 'current' })
     await expect(current.get('current')).resolves.toEqual({ id: 'current' })
     await expect(current.get('old')).rejects.toMatchObject({
@@ -160,7 +160,7 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
       /** Install once on the real fixture host and retain exact extension inference. */
       const repositoryEntityPluginHost = await storeHost.use(repositoryEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.id](store)
+      const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.name](store)
       await repository.put({ id: 'row' })
       rejectValidation = true
       /** The cause graph must retain the exact original rejection after stage enrichment. */

@@ -99,14 +99,14 @@ pnpm add n3@^1.26.0 oxigraph@^0.4.11
 
 ## 常用 API
 
-| API                                                 | 用途                           |
-| --------------------------------------------------- | ------------------------------ |
-| `sparqlBackendPlugin({ endpoint, id? }, features?)` | 安装一个端点，id 默认 sparql。 |
-| `oxigraphEndpoint(store)` / `httpEndpoint(options)` | 适配本地或远程端点。           |
-| `store.use(rdf)`                                    | `add`、`delete`、`match`。     |
-| `store.use(sparql)`                                 | 原生查询与更新模板。           |
-| `store.transaction(run)` / `store.tx()`             | 乐观事务。                     |
-| `graphStoreFeature()` / `ontologyFeature()`         | 图文档读写。                   |
+| API                                                   | 用途                             |
+| ----------------------------------------------------- | -------------------------------- |
+| `sparqlBackendPlugin({ endpoint, name?, features? })` | 安装一个端点，name 默认 sparql。 |
+| `oxigraphEndpoint(store)` / `httpEndpoint(options)`   | 适配本地或远程端点。             |
+| `store.use(rdf)`                                      | `add`、`delete`、`match`。       |
+| `store.use(sparql)`                                   | 原生查询与更新模板。             |
+| `store.transaction(run)` / `store.tx()`               | 乐观事务。                       |
+| `graphStoreFeature()` / `ontologyFeature()`           | 图文档读写。                     |
 
 ## 契约细节
 

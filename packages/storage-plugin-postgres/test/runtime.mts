@@ -19,10 +19,11 @@ const adapter = process.argv[2]
 async function exercise(driver: IPgDriver): Promise<void> {
   const host = await createStorageHost({
     plugins: [
-      postgresBackendPlugin(
-        { driver, prefix: 'pg_runtime_' + crypto.randomUUID().slice(0, 8) },
-        { vector: pgvectorFeature(), copy: pgCopyFeature() }
-      )
+      postgresBackendPlugin({
+        driver,
+        prefix: 'pg_runtime_' + crypto.randomUUID().slice(0, 8),
+        features: { vector: pgvectorFeature(), copy: pgCopyFeature() }
+      })
     ] as const
   })
   try {

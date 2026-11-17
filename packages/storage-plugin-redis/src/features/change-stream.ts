@@ -1,7 +1,7 @@
 import { RedisOperation } from '../constants.ts'
 import { RedisCommand, RedisText } from '../constants.ts'
 import type { IRedisConnection } from '../driver.ts'
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import {
   asyncDisposeKey,
   throwIfAborted,
@@ -17,7 +17,7 @@ import {
   type ICapabilityImpl,
   type IStorageResource
 } from '@migaia/storage-contract'
-import { redisBackendKind } from '../plugin.ts'
+import { defineRedisFeature } from '../plugin.ts'
 import { readNativeFeaturePort, type IRedisNativeFeaturePort } from '../native-feature.ts'
 import { featureInteger, readStreamRows } from '../feature-input.ts'
 import { decodeRedisChange } from '../changes.ts'
@@ -132,20 +132,17 @@ async function assertRetained(
  */
 export function redisChangeStreamFeature(options: { readonly maxLen: number }) {
   const maxLen = featureInteger(options.maxLen)
-  return defineFeature<typeof redisBackendKind, {}, IRedisChangeStreamOutput>(
-    redisBackendKind,
-    (core) => {
-      core.featureExpose.registerDetect(async () => {
-        readNativeFeaturePort(core.featureExpose.getStore()).enableDurable(maxLen, storeDurableApi)
-      })
-      const api = createRedisDurableApi(() => readNativeFeaturePort(core.featureExpose.getStore()))
-      return {
-        capabilities: [implement(durableChangeFeed, api)] as const,
-        chain: {},
-        api: { store: {}, transaction: {} }
-      }
+  return defineRedisFeature<{}, IRedisChangeStreamOutput>((core) => {
+    core.featureExpose.registerDetect(async () => {
+      readNativeFeaturePort(core.featureExpose.getStore()).enableDurable(maxLen, storeDurableApi)
+    })
+    const api = createRedisDurableApi(() => readNativeFeaturePort(core.featureExpose.getStore()))
+    return {
+      capabilities: [implement(durableChangeFeed, api)] as const,
+      chain: {},
+      api: { store: {}, transaction: {} }
     }
-  )
+  })
 }
 
 /** Durable change-feed API of another organized store, reading that store's own native port. */

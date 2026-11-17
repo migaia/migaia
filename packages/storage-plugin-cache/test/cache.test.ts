@@ -4,13 +4,13 @@ import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-ch
 import { describe, it, expect } from 'vitest'
 import {
   createStorageHost,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendPluginDefiner,
+  type IStorageBackendType
 } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { kv, ttl, type IStorageBase } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/sdk'
+import { lockKey, defineBackendPlugin, definePlugin } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { IdentifyError, walkErrorCauses } from '@migaia/utils/error'
 import { cachePlugin, type ICacheOptions } from '../src/index.ts'
@@ -21,8 +21,8 @@ async function fixture(options: Partial<ICacheOptions> = {}) {
   const host = await createStorageHost({
     plugins: [
       storageProbe(),
-      memoryBackendPlugin({ id: 'fast' }),
-      memoryBackendPlugin({ id: 'slow' })
+      memoryBackendPlugin({ name: 'fast' }),
+      memoryBackendPlugin({ name: 'slow' })
     ]
   })
   const configured = await host.use(
@@ -53,7 +53,7 @@ describe('borrowed multi-tier cache', () => {
     ]
     for (const options of invalid) {
       const host = await createStorageHost({
-        plugins: [storageProbe(), memoryBackendPlugin({ id: 'a' })]
+        plugins: [storageProbe(), memoryBackendPlugin({ name: 'a' })]
       })
       try {
         expect(() => cachePlugin({ tiers: [{ backend: 'a' }], ...options })).toThrowError(
@@ -70,14 +70,20 @@ describe('borrowed multi-tier cache', () => {
       const host = await createStorageHost({
         plugins: [
           storageProbe(),
-          memoryBackendPlugin(
-            { id: 'a' },
-            { notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature() }
-          ),
-          memoryBackendPlugin(
-            { id: 'b' },
-            { notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature() }
-          )
+          memoryBackendPlugin({
+            name: 'a',
+            features: {
+              notifications: memoryNotificationsFeature(),
+              changeFeed: memoryChangeFeedFeature()
+            }
+          }),
+          memoryBackendPlugin({
+            name: 'b',
+            features: {
+              notifications: memoryNotificationsFeature(),
+              changeFeed: memoryChangeFeedFeature()
+            }
+          })
         ]
       })
       try {
@@ -98,7 +104,7 @@ describe('borrowed multi-tier cache', () => {
       try {
         const plugin = cachePlugin({ tiers: [{ backend: 'future' }] })
         const failure = await (
-          sameBatch ? host.use(memoryBackendPlugin({ id: 'future' }), plugin) : host.use(plugin)
+          sameBatch ? host.use(memoryBackendPlugin({ name: 'future' }), plugin) : host.use(plugin)
         ).catch((error) => error)
         expect(walkErrorCauses(failure)).toContainEqual(
           expect.objectContaining({ code: 'BACKEND_NOT_INSTALLED' })
@@ -107,32 +113,37 @@ describe('borrowed multi-tier cache', () => {
         await host.dispose()
       }
     }
-    const emptyKind = defineStorageBackendKind<IStorageBase, undefined>()('empty')
-    const raw = definePlugin('empty', (core: IStoragePluginCore) => ({
-      kind: emptyKind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install() {
-        core.registerStore({
-          backend: 'empty',
-          capabilities: {
-            syncRead: false,
-            binary: false,
-            records: false,
-            transactions: false,
-            iteration: false,
-            secondaryIndexes: false,
-            changeFeed: false,
-            maxValueBytes: undefined,
-            opaqueEntries: false
-          },
-          dispose: async () => {},
-          [Symbol.asyncDispose]: async () => {}
-        })
-        return {}
-      }
-    }))
+    type IEmptyKindBackend = IStorageBackendType<IStorageBase, undefined>
+    /** Backend-plugin definer typed for this test backend. */
+    const defineEmptyKindBackend: IStorageBackendPluginDefiner<IEmptyKindBackend> =
+      defineBackendPlugin
+    const raw = defineEmptyKindBackend({
+      name: 'empty',
+      open: (core: IStoragePluginCore) => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install() {
+          core.registerStore({
+            backend: 'empty',
+            capabilities: {
+              syncRead: false,
+              binary: false,
+              records: false,
+              transactions: false,
+              iteration: false,
+              secondaryIndexes: false,
+              changeFeed: false,
+              maxValueBytes: undefined,
+              opaqueEntries: false
+            },
+            dispose: async () => {},
+            [Symbol.asyncDispose]: async () => {}
+          })
+          return {}
+        }
+      })
+    })
     const host = await createStorageHost({
-      plugins: [storageProbe(), memoryBackendPlugin({ id: 'a' }), raw]
+      plugins: [storageProbe(), memoryBackendPlugin({ name: 'a' }), raw]
     })
     try {
       const failure = await host
@@ -147,7 +158,7 @@ describe('borrowed multi-tier cache', () => {
         message: expect.stringContaining('1')
       })
       const inner = await host.use(
-        cachePlugin({ id: 'inner', propagate: false, tiers: [{ backend: 'a' }] })
+        cachePlugin({ name: 'inner', propagate: false, tiers: [{ backend: 'a' }] })
       )
       for (const options of [
         { tiers: [{ backend: 'inner', ttlMs: 10 }] },
@@ -164,8 +175,8 @@ describe('borrowed multi-tier cache', () => {
         )
       }
       const configured = await host.use(
-        cachePlugin({ id: 'one', prefix: 'one:', propagate: false, tiers: [{ backend: 'a' }] }),
-        cachePlugin({ id: 'two', prefix: 'two:', propagate: false, tiers: [{ backend: 'a' }] })
+        cachePlugin({ name: 'one', prefix: 'one:', propagate: false, tiers: [{ backend: 'a' }] }),
+        cachePlugin({ name: 'two', prefix: 'two:', propagate: false, tiers: [{ backend: 'a' }] })
       )
       await configured.detect()
       await configured.backend('one').set('same', 'first')
@@ -218,7 +229,7 @@ describe('borrowed multi-tier cache', () => {
         reports.push(error)
         reported.resolve()
       },
-      plugins: [storageProbe(), memoryBackendPlugin({ id: 'tier' })]
+      plugins: [storageProbe(), memoryBackendPlugin({ name: 'tier' })]
     })
     const host = await base.use(
       cachePlugin({
@@ -260,7 +271,7 @@ describe('borrowed multi-tier cache', () => {
       now = 1101
       expect(await cache.getOrLoad('stale', async () => 'new')).toBe('new')
       const unbounded = await host.use(
-        cachePlugin({ id: 'no-negative', propagate: false, tiers: [{ backend: 'tier' }] })
+        cachePlugin({ name: 'no-negative', propagate: false, tiers: [{ backend: 'tier' }] })
       )
       await unbounded.detect()
       const noNegative = unbounded.backend('no-negative')
@@ -275,26 +286,29 @@ describe('borrowed multi-tier cache', () => {
     let writes = 0
     const reports: unknown[] = [],
       original = new RangeError('back write failed')
-    const observer = definePlugin('back-errors', (core) => ({
-      install() {
-        core.useAsyncPipeline((input, next) => {
-          if (input.backendId === 'fast' && input.operation === 'set') {
-            writes++
-            throw original
-          }
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observer = definePlugin({
+      name: 'back-errors',
+      setup: (core) => ({
+        install() {
+          core.useAsyncPipeline((input, next) => {
+            if (input.backendId === 'fast' && input.operation === 'set') {
+              writes++
+              throw original
+            }
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     const base = await createStorageHost({
       report: (error) => {
         reports.push(error)
       },
       plugins: [
         storageProbe(),
-        memoryBackendPlugin({ id: 'fast' }),
-        memoryBackendPlugin({ id: 'slow' }),
+        memoryBackendPlugin({ name: 'fast' }),
+        memoryBackendPlugin({ name: 'slow' }),
         observer
       ]
     })
@@ -340,36 +354,39 @@ describe('borrowed multi-tier cache', () => {
     const reports: unknown[] = [],
       original = new RangeError('tier read or write failed')
     let emit!: IStoragePluginCore['emit']
-    const observer = definePlugin('tier-errors', (core) => ({
-      install() {
-        emit = core.emit
-        core.useAsyncPipeline((input, next) => {
-          if (
-            failing &&
-            (input.backendId === 'zero' || input.backendId === 'one') &&
-            input.operation === 'get'
-          )
-            throw original
-          if (
-            failing &&
-            (input.backendId === 'zero' || input.backendId === 'two') &&
-            input.operation === 'set'
-          )
-            throw original
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observer = definePlugin({
+      name: 'tier-errors',
+      setup: (core) => ({
+        install() {
+          emit = core.emit
+          core.useAsyncPipeline((input, next) => {
+            if (
+              failing &&
+              (input.backendId === 'zero' || input.backendId === 'one') &&
+              input.operation === 'get'
+            )
+              throw original
+            if (
+              failing &&
+              (input.backendId === 'zero' || input.backendId === 'two') &&
+              input.operation === 'set'
+            )
+              throw original
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     const base = await createStorageHost({
       report: (error) => {
         reports.push(error)
       },
       plugins: [
         storageProbe(),
-        memoryBackendPlugin({ id: 'zero' }),
-        memoryBackendPlugin({ id: 'one' }),
-        memoryBackendPlugin({ id: 'two' }),
+        memoryBackendPlugin({ name: 'zero' }),
+        memoryBackendPlugin({ name: 'one' }),
+        memoryBackendPlugin({ name: 'two' }),
         observer
       ]
     })

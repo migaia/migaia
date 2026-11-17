@@ -74,7 +74,7 @@ describe('entity composition through original transaction views', () => {
       )
       /** This actual storage host owns the entity installation for this test scope. */
       const entity2EntityPluginHost = await entityHost(entity2EntityPlugin)
-      const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.id](store)
+      const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.name](store)
       const pending = bound
         ? store.transaction(
             (scope) => {
@@ -101,7 +101,7 @@ describe('entity composition through original transaction views', () => {
     const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
     const store = await memoryBackend()
-    const first = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+    const first = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
 
     /** Explicit entity plugin configuration is installed before requesting a repository. */
     const entity3EntityPlugin = defineEntityPlugin<{ id: string; name: string }>()(
@@ -120,7 +120,7 @@ describe('entity composition through original transaction views', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity3EntityPluginHost = await entityHost(entity3EntityPlugin)
-    const second = entity3EntityPluginHost.extensions[entity3EntityPlugin.id](store)
+    const second = entity3EntityPluginHost.extensions[entity3EntityPlugin.name](store)
     await store
       .tx()
       .lock(first.lockKey('a'))
@@ -142,7 +142,7 @@ describe('entity composition through original transaction views', () => {
     const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
     const store = await memoryBackend()
-    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
     await repo.put({ id: 'a', email: 'one', score: 1 })
     await repo.put({ id: 'b', email: 'two', score: 2 })
     await store.transaction(async (scope) => {
@@ -193,7 +193,7 @@ describe('entity composition through original transaction views', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
-    const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](store)
+    const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.name](store)
     let accepted: Promise<unknown> | undefined
     const pending = store.transaction((scope) => {
       accepted = repo.in(scope).put({ id: 'later' })
@@ -209,9 +209,9 @@ describe('entity composition through original transaction views', () => {
     const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ id: 'left' }), memoryBackendPlugin({ id: 'right' })]
+      plugins: [memoryBackendPlugin({ name: 'left' }), memoryBackendPlugin({ name: 'right' })]
     })
-    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](host.backend('left'))
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](host.backend('left'))
     await host.backend('right').transaction((scope) => {
       expect(() => repo.in(scope)).toThrowError(
         expect.objectContaining({ code: 'INVALID_ARGUMENT' })
@@ -228,7 +228,7 @@ describe('entity composition through original transaction views', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await memoryBackend())
     for (const [id, score] of [
       ['a', 3],
       ['b', 1],

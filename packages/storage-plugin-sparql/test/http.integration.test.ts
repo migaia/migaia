@@ -19,16 +19,14 @@ describe('real configured SPARQL service', () => {
         host = await createStorageHost({
           org,
           plugins: [
-            sparqlBackendPlugin(
-              {
-                endpoint: httpEndpoint({
-                  queryUrl: queryUrl!,
-                  updateUrl: updateUrl!,
-                  graphStoreUrl: graphStoreUrl!
-                })
-              },
-              { graphs: graphStoreFeature(), ontology: ontologyFeature() }
-            )
+            sparqlBackendPlugin({
+              endpoint: httpEndpoint({
+                queryUrl: queryUrl!,
+                updateUrl: updateUrl!,
+                graphStoreUrl: graphStoreUrl!
+              }),
+              features: { graphs: graphStoreFeature(), ontology: ontologyFeature() }
+            })
           ] as const
         }),
         store = host.backend('sparql')

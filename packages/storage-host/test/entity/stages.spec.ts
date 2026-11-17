@@ -10,10 +10,15 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import { assertTransactionOwner } from '../../src/authoring/transaction.ts'
 import { type ICodecStageObserver, type IQueryStageObserver } from '@migaia/storage-contract'
-import { createStorageHost, definePlugin, type IStoragePluginCore } from '../../src/index.ts'
-import { memoryBackendKind } from '../../src/plugins/memory.ts'
+import { createStorageHost, type IStoragePluginCore } from '../../src/index.ts'
 import { createMemoryBackend } from '../../src/backends/memory.ts'
 import { defineEntityPlugin } from '../../src/entity.ts'
+import type { IMemoryBackend } from '../../src/plugins/memory.ts'
+import { defineBackendPlugin } from '../../src/sdk.ts'
+import type { IStorageBackendPluginDefiner } from '../../src/index.ts'
+
+/** Backend-plugin definer typed for the imported backend. */
+const defineMemoryBackend: IStorageBackendPluginDefiner<IMemoryBackend> = defineBackendPlugin
 
 /** Public installation captures only the already declared observation factories from the real core. */
 function observedMemory() {
@@ -21,10 +26,10 @@ function observedMemory() {
   let codec!: ICodecStageObserver
   let query!: IQueryStageObserver
   const factory = (core: IStoragePluginCore) => ({
-    kind: memoryBackendKind,
     capabilityInstaller: (_store: typeof construction.store) => construction.installer,
     featureExpose: () => ({
       getClient: () => undefined,
+      reactiveProfile: () => ({ mode: 'push' as const, visibility: 'instance' as const }),
       getTransactionClient: (scope: object) => {
         assertTransactionOwner(construction.store, scope)
         return undefined
@@ -40,7 +45,7 @@ function observedMemory() {
     }
   })
   return {
-    plugin: definePlugin('observed-memory', factory),
+    plugin: defineMemoryBackend({ name: 'observed-memory', open: factory }),
     ports: () => ({ codecStages: codec, queryStages: query })
   }
 }
@@ -97,7 +102,7 @@ it('binds codec conversions and whole queries to the actual store and current tr
   )
   /** This actual storage host owns the entity installation for this test scope. */
   const entity1EntityPluginHost = await entityHost(entity1EntityPlugin)
-  const repo = entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store, fixture.ports())
+  const repo = entity1EntityPluginHost.extensions[entity1EntityPlugin.name](store, fixture.ports())
   await repo.put({ id: 'a', score: 1 })
   expect(encode).toHaveLength(2)
   expect(encode[0]).toMatchObject({
@@ -184,7 +189,7 @@ it('reports explicit observer failures without changing results and rejects cros
   )
   /** This actual storage host owns the entity installation for this test scope. */
   const entity2EntityPluginHost = await entityHost(entity2EntityPlugin)
-  const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.id](
+  const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.name](
     host.backend('observed-memory'),
     { queryStages: query }
   )
@@ -210,7 +215,7 @@ it('reports explicit observer failures without changing results and rejects cros
   /** This actual storage host owns the entity installation for this test scope. */
   const entity3EntityPluginHost = await entityHost(entity3EntityPlugin)
   expect(() =>
-    entity3EntityPluginHost.extensions[entity3EntityPlugin.id](host.backend('observed-memory'), {
+    entity3EntityPluginHost.extensions[entity3EntityPlugin.name](host.backend('observed-memory'), {
       codecStages: ports.queryStages as never
     })
   ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))

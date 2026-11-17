@@ -18,8 +18,12 @@ export async function runBrowserIndexedDbOrgScenario() {
     const host = await createStorageHost({
       org: defaultOrg,
       plugins: [
-        indexedDbBackendPlugin({ id: 'prefs', dbName: prefix }, indexedDbTestFeatures),
-        indexedDbBackendPlugin({ id: 'cache', dbName: prefix + '-cache' }, indexedDbTestFeatures)
+        indexedDbBackendPlugin({ name: 'prefs', dbName: prefix, features: indexedDbTestFeatures }),
+        indexedDbBackendPlugin({
+          name: 'cache',
+          dbName: prefix + '-cache',
+          features: indexedDbTestFeatures
+        })
       ]
     })
     try {

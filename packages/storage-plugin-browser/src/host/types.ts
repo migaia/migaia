@@ -1,30 +1,16 @@
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IReactiveComputed, IRuntime } from '@migaia/reactive'
 import type { IStorageBase, IStorageChange } from '@migaia/storage-contract'
+import type {
+  IStorageReactiveProfile,
+  IStorageReactiveVisibility as IHostReactiveVisibility
+} from '@migaia/storage-host'
 
-/** Reactive consistency observation domain retained in private feature metadata. */
-export type IStorageReactiveVisibility =
-  | 'instance'
-  | 'document-eventual'
-  | 'top-level-context-eventual'
-  | 'origin-js-visible-eventual'
-  | 'origin-eventual'
+/** Reactive observation domain; the backend that states a profile owns the allowed values. */
+export type IStorageReactiveVisibility = IHostReactiveVisibility
 
-/** Reactive consistency retained in private feature metadata. */
-export type IStorageReactiveFeatureMetadata = {
-  /**
-   * Push uses notifications only; hybrid adds periodic reconciliation; polling uses periodic
-   * reconciliation.
-   */
-  readonly mode: 'push' | 'hybrid' | 'polling'
-  /** Declared observation scope, ranging from this instance to eventual same-origin visibility. */
-  readonly visibility: IStorageReactiveVisibility
-  /**
-   * Required positive finite milliseconds for hybrid/polling, forbidden for push; no implicit
-   * custom-adapter interval.
-   */
-  readonly pollIntervalMs?: number
-}
+/** Reactive consistency retained in private feature metadata; the backend's stated profile. */
+export type IStorageReactiveFeatureMetadata = IStorageReactiveProfile
 
 /**
  * Resource-backed state: loading has no accepted value, ready exposes settlement, refreshing keeps

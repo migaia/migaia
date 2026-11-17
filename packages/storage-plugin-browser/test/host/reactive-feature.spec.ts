@@ -7,7 +7,7 @@ import {
   STORAGE_HOST_ERROR_SOURCE,
   StorageHostErrorCode
 } from '@migaia/storage-contract/error-code'
-import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { reactiveFeature } from '../../src/features/reactive.ts'
@@ -27,11 +27,17 @@ describe('reactive Feature', () => {
         return service
       })
     try {
-      const feature = reactiveFeature(memoryBackendKind)
+      const feature = reactiveFeature()
       const host = await createStorageHost({
         plugins: [
-          memoryBackendPlugin({ id: 'first' }, { ...memoryTestFeatures, reactive: feature }),
-          memoryBackendPlugin({ id: 'second' }, { ...memoryTestFeatures, reactive: feature })
+          memoryBackendPlugin({
+            name: 'first',
+            features: { ...memoryTestFeatures, reactive: feature }
+          }),
+          memoryBackendPlugin({
+            name: 'second',
+            features: { ...memoryTestFeatures, reactive: feature }
+          })
         ]
       })
       expect(services).toHaveLength(2)
@@ -73,7 +79,7 @@ describe('reactive Feature', () => {
       })
     try {
       const host = await createStorageHost({
-        plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })]
+        plugins: [memoryBackendPlugin({ features: { reactive: reactiveFeature() } })]
       })
       try {
         const register = vi.spyOn(services[0]!, 'registerAdapter')
@@ -100,9 +106,11 @@ describe('reactive Feature', () => {
   it('preserves equal settled identity across invalidation', async () => {
     const host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          ...memoryTestFeatures,
-          reactive: reactiveFeature(memoryBackendKind)
+        memoryBackendPlugin({
+          features: {
+            ...memoryTestFeatures,
+            reactive: reactiveFeature()
+          }
         })
       ]
     })
@@ -130,9 +138,11 @@ describe('reactive Feature', () => {
   it('rejects invalid live options before any source subscription', async () => {
     const host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          ...memoryTestFeatures,
-          reactive: reactiveFeature(memoryBackendKind)
+        memoryBackendPlugin({
+          features: {
+            ...memoryTestFeatures,
+            reactive: reactiveFeature()
+          }
         })
       ]
     })
@@ -151,9 +161,11 @@ describe('reactive Feature', () => {
     const host = await createStorageHost({
       scheduler,
       plugins: [
-        memoryBackendPlugin(undefined, {
-          ...memoryTestFeatures,
-          reactive: reactiveFeature(memoryBackendKind)
+        memoryBackendPlugin({
+          features: {
+            ...memoryTestFeatures,
+            reactive: reactiveFeature()
+          }
         })
       ]
     })

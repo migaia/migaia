@@ -8,7 +8,7 @@ import type { IStorageJournalConfigurationSnapshot } from './configuration-optio
 export function prepareStorageJournalConfiguration(
   options: IStorageJournalConfigurationSnapshot,
   access: IStorageJournalBackendAccess,
-  backend: import('@migaia/storage-contract').IBackendKind,
+  backend: string,
   observation?: Pick<
     Parameters<typeof createStorageNativeJournal>[0],
     'report' | 'onBinlogAppendError' | 'beforeRecover' | 'afterRecover' | 'onRecoverError'

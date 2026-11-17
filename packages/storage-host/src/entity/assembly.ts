@@ -1,7 +1,5 @@
 import type { IFeature, IFeatureRecord } from '@migaia/plugin-host'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
-import { defineStorageUnitTarget } from '../contracts.ts'
-import type { IStorageUnitTarget } from '../types.ts'
 import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { EntityText } from './text.ts'
@@ -20,10 +18,6 @@ export type IInstalledRepositoryUnit = Readonly<{
   role: EntityFeatureName
   factory: IRepositoryUnitFactory
 }>
-
-/** Entity units need no repository at native install; their output factories receive it later. */
-export const entityUnitTarget: IStorageUnitTarget<Record<never, never>> =
-  defineStorageUnitTarget<Record<never, never>>()
 
 /** Declaration-only metadata carries role and optional canonical configuration admission. */
 type IEntityUnitMetadata = Readonly<{

@@ -72,10 +72,10 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 try {
   await using host = await createStorageHost({
     plugins: [
-      postgresBackendPlugin(
-        { driver: pgDriver(pool) },
-        { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }
-      )
+      postgresBackendPlugin({
+        driver: pgDriver(pool),
+        features: { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }
+      })
     ] as const
   })
   const items = host
@@ -118,10 +118,10 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 try {
   await using host = await createStorageHost({
     plugins: [
-      postgresBackendPlugin(
-        { driver: pgDriver(pool) },
-        { copy: pgCopyFeature(), listen: pgListenFeature() }
-      )
+      postgresBackendPlugin({
+        driver: pgDriver(pool),
+        features: { copy: pgCopyFeature(), listen: pgListenFeature() }
+      })
     ] as const
   })
   const store = host.backend('postgres')
@@ -185,15 +185,15 @@ try {
     report: console.error,
     plugins: [
       storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),
-      postgresBackendPlugin(
-        { driver: pgDriver(pool) },
-        {
+      postgresBackendPlugin({
+        driver: pgDriver(pool),
+        features: {
           replication: pgLogicalReplicationFeature({
             slot: process.env.PG_REPLICATION_SLOT!,
             publication: process.env.PG_PUBLICATION!
           })
         }
-      )
+      })
     ] as const
   })
   const store = host.backend('postgres')

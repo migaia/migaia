@@ -1,10 +1,11 @@
 import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { describe, it, expect, vi } from 'vitest'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { blob } from '@migaia/storage-contract'
 import type { IStoragePipelineInput } from '@migaia/storage-host'
 import { archivePlugin } from '../src/index.ts'
+import { definePlugin } from '@migaia/storage-host/sdk'
 
 /** Each scenario has genuine isolated hot records, cold objects and an ordinary later extension. */
 async function fixture(
@@ -19,19 +20,22 @@ async function fixture(
     report,
     plugins: [
       storageProbe(),
-      memoryBackendPlugin({ id: 'hot' }),
-      memoryBackendPlugin({ id: 'cold' }),
-      definePlugin('observer', (core) => ({
-        install() {
-          if (stage) core.useAsyncPipeline(stage)
-          return {}
-        }
-      }))
+      memoryBackendPlugin({ name: 'hot' }),
+      memoryBackendPlugin({ name: 'cold' }),
+      definePlugin({
+        name: 'observer',
+        setup: (core) => ({
+          install() {
+            if (stage) core.useAsyncPipeline(stage)
+            return {}
+          }
+        })
+      })
     ]
   })
   const host = await initial.use(
     archivePlugin({
-      id: 'history',
+      name: 'history',
       hot: 'hot',
       cold: 'cold',
       rules: [
@@ -509,8 +513,8 @@ describe('Archive rule and wire admission', () => {
     const initial = await createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin({ id: 'hot' }),
-        memoryBackendPlugin({ id: 'cold' })
+        memoryBackendPlugin({ name: 'hot' }),
+        memoryBackendPlugin({ name: 'cold' })
       ]
     })
     const rules = [
@@ -535,7 +539,7 @@ describe('Archive rule and wire admission', () => {
       }
     ]
     const plugin = archivePlugin({
-      id: 'snapshot',
+      name: 'snapshot',
       hot: 'hot',
       cold: 'cold',
       rules
@@ -603,15 +607,15 @@ describe('Archive rule and wire admission', () => {
   })
   it('rejects invalid options and a real published non-record backend without closing earlier targets', async () => {
     for (const options of [
-      { id: '', hot: 'h', cold: 'c', rules: [] },
+      { name: '', hot: 'h', cold: 'c', rules: [] },
       {
-        id: 'x',
+        name: 'x',
         hot: 'h',
         cold: 'c',
         rules: [{ name: 'a', prefix: '', where: () => ({}), olderThanMs: -1 }]
       },
       {
-        id: 'x',
+        name: 'x',
         hot: 'h',
         cold: 'c',
         rules: [{ name: 'a', prefix: '', where: () => ({}), olderThanMs: 0, segmentBytes: 0 }]
@@ -625,7 +629,7 @@ describe('Archive rule and wire admission', () => {
       await expect(
         host.use(
           archivePlugin({
-            id: 'later',
+            name: 'later',
             hot: 'missing',
             cold: 'cold',
             rules: [{ name: 'all', prefix: '', where: () => ({}), olderThanMs: 0 }]
@@ -746,29 +750,32 @@ it('gives an overlapping candidate only to its first selected rule even when its
   const initial = await createStorageHost({
     plugins: [
       storageProbe(),
-      memoryBackendPlugin({ id: 'hot' }),
-      memoryBackendPlugin({ id: 'cold' }),
-      definePlugin('overlap', (core) => ({
-        install() {
-          core.useAsyncPipeline(async (input, next) => {
-            await next(input)
-            if (input.backendId === 'cold' && input.operation === 'blob.put') {
-              puts++
-              if (update) {
-                const current = update
-                update = undefined
-                await current()
+      memoryBackendPlugin({ name: 'hot' }),
+      memoryBackendPlugin({ name: 'cold' }),
+      definePlugin({
+        name: 'overlap',
+        setup: (core) => ({
+          install() {
+            core.useAsyncPipeline(async (input, next) => {
+              await next(input)
+              if (input.backendId === 'cold' && input.operation === 'blob.put') {
+                puts++
+                if (update) {
+                  const current = update
+                  update = undefined
+                  await current()
+                }
               }
-            }
-          })
-          return {}
-        }
-      }))
+            })
+            return {}
+          }
+        })
+      })
     ]
   })
   const host = await initial.use(
     archivePlugin({
-      id: 'archive',
+      name: 'archive',
       hot: 'hot',
       cold: 'cold',
       rules: [
@@ -813,13 +820,13 @@ it('handles maximum UTF-16 prefixes without visiting private tuple metadata', as
   const initial = await createStorageHost({
     plugins: [
       storageProbe(),
-      memoryBackendPlugin({ id: 'hot' }),
-      memoryBackendPlugin({ id: 'cold' })
+      memoryBackendPlugin({ name: 'hot' }),
+      memoryBackendPlugin({ name: 'cold' })
     ]
   })
   const host = await initial.use(
     archivePlugin({
-      id: 'archive',
+      name: 'archive',
       hot: 'hot',
       cold: 'cold',
       rules: [{ name: 'last', prefix: '\uffff', olderThanMs: 0, where: () => ({}) }]

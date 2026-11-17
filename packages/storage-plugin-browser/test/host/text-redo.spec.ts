@@ -10,10 +10,11 @@ import {
   ConcurrencyPolicy,
   lockKey,
   decodeStorageJournalImage,
-  encodeStorageJournalImage
+  encodeStorageJournalImage,
+  definePlugin
 } from '@migaia/storage-host/sdk'
 import { kv } from '@migaia/storage-contract'
-import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { localStorageBackendPlugin } from '../../src/local-storage.ts'
 import { sessionStorageBackendPlugin } from '../../src/session-storage.ts'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
@@ -454,24 +455,27 @@ describe('text redo through the original host and WAL owners', () => {
     const storage = fakeWebStorage()
     const operations: string[] = []
     let observed: unknown
-    const intervention = definePlugin('text-redo-intervention', (core) => ({
-      install: () => {
-        core.useAsyncPipeline(async (input, next) => {
-          operations.push(input.operation)
-          if (input.operation === 'local-storage.set' && !Array.isArray(input.input)) {
-            const value = input.input as { key: string; value: string }
-            return next({ ...input, input: { ...value, value: value.value + '-changed' } })
-          }
-          try {
-            return await next(input)
-          } catch (cause) {
-            observed = cause
-            throw cause
-          }
-        })
-        return {}
-      }
-    }))
+    const intervention = definePlugin({
+      name: 'text-redo-intervention',
+      setup: (core) => ({
+        install: () => {
+          core.useAsyncPipeline(async (input, next) => {
+            operations.push(input.operation)
+            if (input.operation === 'local-storage.set' && !Array.isArray(input.input)) {
+              const value = input.input as { key: string; value: string }
+              return next({ ...input, input: { ...value, value: value.value + '-changed' } })
+            }
+            try {
+              return await next(input)
+            } catch (cause) {
+              observed = cause
+              throw cause
+            }
+          })
+          return {}
+        }
+      })
+    })
     const host = await createStorageHost({
       plugins: [
         storageJournalPlugin({ logger, namespace: 'text-redo', redoWal: logger.wal }),

@@ -20,7 +20,7 @@ const factories = [
       const storage = fakeWebStorage()
       return {
         plugin: <const N extends string>(id: N, namespace: string) =>
-          localStorageBackendPlugin({ id, namespace, storage })
+          localStorageBackendPlugin({ name: id, namespace, storage })
       }
     }
   },
@@ -30,7 +30,7 @@ const factories = [
       const storage = fakeWebStorage()
       return {
         plugin: <const N extends string>(id: N, namespace: string) =>
-          sessionStorageBackendPlugin({ id, namespace, storage })
+          sessionStorageBackendPlugin({ name: id, namespace, storage })
       }
     }
   },
@@ -40,7 +40,7 @@ const factories = [
       const document = fakeCookieDocument()
       return {
         plugin: <const N extends string>(id: N, namespace: string) =>
-          cookieBackendPlugin({ id, namespace, document })
+          cookieBackendPlugin({ name: id, namespace, document })
       }
     }
   }
@@ -112,11 +112,11 @@ describe('physical organizations in text browser backends', () => {
       /** Install once on the real fixture host and retain exact extension inference. */
       const usersEntityPluginHost = await host.use(usersEntityPlugin)
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const left = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const left = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         host.org(createOrgId()).backend('prefs')
       )
       /** Borrow the supplied backend through the installed repository capability factories. */
-      const right = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+      const right = usersEntityPluginHost.extensions[usersEntityPlugin.name](
         host.org(createOrgId()).backend('prefs')
       )
       await left.put({ id: 'a', email: 'same' })

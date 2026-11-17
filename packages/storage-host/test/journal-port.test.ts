@@ -16,12 +16,11 @@ import {
 import {
   createStorageHost,
   createOrgId,
-  definePlugin,
   type IStoragePluginCore,
   type IStorageJournalNamespaceView,
   type IStorageJournalBackendBinding
 } from '../src/index.ts'
-import { memoryBackendPlugin, memoryBackendKind } from '../src/plugins/memory.ts'
+import { memoryBackendPlugin } from '../src/plugins/memory.ts'
 import { storageLogStore } from '../src/journal.ts'
 import { resolveStorageLogNativeAccess } from '../src/journal/append-port.ts'
 import { createMemoryBackend } from '../src/backends/memory.ts'
@@ -33,6 +32,12 @@ import {
 import { prepareStorageJournalConfiguration } from '../src/journal/configuration.ts'
 import { snapshotStorageJournalConfiguration } from '../src/journal/configuration-options.ts'
 import { createStorageNativeJournal } from '../src/journal/commit.ts'
+import type { IMemoryBackend } from '../src/plugins/memory.ts'
+import { defineBackendPlugin } from '../src/sdk.ts'
+import type { IStorageBackendPluginDefiner } from '../src/index.ts'
+
+/** Backend-plugin definer typed for the imported backend. */
+const defineMemoryBackend: IStorageBackendPluginDefiner<IMemoryBackend> = defineBackendPlugin
 
 /** Delay only an ordinary result after the original owner has actually committed and freed locks. */
 function delayedCommittedPlugin(delay: {
@@ -42,62 +47,65 @@ function delayedCommittedPlugin(delay: {
   entered: ReturnType<typeof deferred<void>>
   release: ReturnType<typeof deferred<void>>
 }) {
-  return definePlugin('data', (core: IStoragePluginCore) => {
-    let constructed: ReturnType<typeof createMemoryBackend>
-    const project = (binding: IStorageJournalBackendBinding): IStorageJournalBackendBinding => ({
-      ...binding,
-      forOrg: (orgId) => project(binding.forOrg(orgId)),
-      openNamespace: async (prefix) => {
-        const namespace = await binding.openNamespace(prefix)
-        return {
-          ...namespace,
-          nativeAtomic: delay.nativeAtomic ?? namespace.nativeAtomic,
-          run: async (work, scope) => {
-            const result = await namespace.run(work, scope)
-            if (scope === undefined && delay.hold) {
-              delay.entered.resolve()
-              await delay.release.promise
-            }
-            return result
-          },
-          runCommitted:
-            delay.terminal === false
-              ? undefined
-              : async <R>(
-                  work: (view: IStorageJournalNamespaceView) => Promise<R>,
-                  committed: (value: R) => void
-                ): Promise<R> => {
-                  const result = await namespace.runCommitted!(work, committed)
-                  if (delay.hold) {
-                    delay.entered.resolve()
-                    await delay.release.promise
+  return defineMemoryBackend({
+    name: 'data',
+    open: (core: IStoragePluginCore) => {
+      let constructed: ReturnType<typeof createMemoryBackend>
+      const project = (binding: IStorageJournalBackendBinding): IStorageJournalBackendBinding => ({
+        ...binding,
+        forOrg: (orgId) => project(binding.forOrg(orgId)),
+        openNamespace: async (prefix) => {
+          const namespace = await binding.openNamespace(prefix)
+          return {
+            ...namespace,
+            nativeAtomic: delay.nativeAtomic ?? namespace.nativeAtomic,
+            run: async (work, scope) => {
+              const result = await namespace.run(work, scope)
+              if (scope === undefined && delay.hold) {
+                delay.entered.resolve()
+                await delay.release.promise
+              }
+              return result
+            },
+            runCommitted:
+              delay.terminal === false
+                ? undefined
+                : async <R>(
+                    work: (view: IStorageJournalNamespaceView) => Promise<R>,
+                    committed: (value: R) => void
+                  ): Promise<R> => {
+                    const result = await namespace.runCommitted!(work, committed)
+                    if (delay.hold) {
+                      delay.entered.resolve()
+                      await delay.release.promise
+                    }
+                    return result
                   }
-                  return result
-                }
+          }
         }
-      }
-    })
-    return {
-      kind: memoryBackendKind,
-      featureExpose: () => ({
-        getClient: () => undefined,
-        getTransactionClient: (
-          scope: Parameters<ReturnType<typeof createMemoryBackend>['assertScope']>[0]
-        ) => {
-          constructed.assertScope(scope)
-          return undefined
+      })
+      return {
+        featureExpose: () => ({
+          getClient: () => undefined,
+          reactiveProfile: () => ({ mode: 'push' as const, visibility: 'instance' as const }),
+          getTransactionClient: (
+            scope: Parameters<ReturnType<typeof createMemoryBackend>['assertScope']>[0]
+          ) => {
+            constructed.assertScope(scope)
+            return undefined
+          }
+        }),
+        capabilityInstaller: (_store: ReturnType<typeof createMemoryBackend>['store']) =>
+          constructed.installer,
+        journalBinding: (_store: ReturnType<typeof createMemoryBackend>['store']) =>
+          project(constructed.journalBinding),
+        install: () => {
+          constructed = createMemoryBackend(core, {})
+          core.registerStore(constructed.store)
+          core.registerChangeController(constructed.store, constructed.controller)
+          core.registerOrgBinding(constructed.store, constructed.orgBinding)
+          return {}
         }
-      }),
-      capabilityInstaller: (_store: ReturnType<typeof createMemoryBackend>['store']) =>
-        constructed.installer,
-      journalBinding: (_store: ReturnType<typeof createMemoryBackend>['store']) =>
-        project(constructed.journalBinding),
-      install: () => {
-        constructed = createMemoryBackend(core, {})
-        core.registerStore(constructed.store)
-        core.registerChangeController(constructed.store, constructed.controller)
-        core.registerOrgBinding(constructed.store, constructed.orgBinding)
-        return {}
       }
     }
   })
@@ -108,9 +116,11 @@ describe('original native log append port', () => {
     await using host = await createStorageHost({
       plugins: [
         storageJournalPlugin(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -316,9 +326,11 @@ describe('original native log append port', () => {
     await using host = await createStorageHost({
       plugins: [
         storageJournalPlugin(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -365,9 +377,11 @@ describe('original native log append port', () => {
     await using host = await createStorageHost({
       plugins: [
         storageJournalPlugin(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })

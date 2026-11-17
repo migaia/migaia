@@ -29,7 +29,7 @@ async function openIndexedDbJournal(dbName: string, wrapFactory = false): Promis
   const host = await createStorageHost({
     plugins: [
       storageJournalPlugin(),
-      indexedDbBackendPlugin({ dbName, factory }, indexedDbTestFeatures)
+      indexedDbBackendPlugin({ dbName, factory, features: indexedDbTestFeatures })
     ]
   })
   try {
@@ -90,7 +90,7 @@ async function runIndexedDbGlobalJournal(dbName: string) {
           atomicUndo: { 'indexed-db': images }
         }
       }),
-      indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)
+      indexedDbBackendPlugin({ dbName, features: indexedDbTestFeatures })
     ]
   })
   try {

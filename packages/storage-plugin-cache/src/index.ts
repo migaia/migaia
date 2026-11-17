@@ -1,5 +1,5 @@
 export { CacheWriteMode } from './constants.ts'
-export { cacheBackendKind } from './kind.ts'
+export type { ICacheBackend } from './plugin.ts'
 export { cacheKey } from './key.ts'
 export type {
   ICacheOptions,

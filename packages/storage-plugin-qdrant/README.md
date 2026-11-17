@@ -98,19 +98,19 @@ pnpm add @qdrant/js-client-rest@^1.11.0
 
 ## 常用 API
 
-| API                                       | 用途                               |
-| ----------------------------------------- | ---------------------------------- |
-| `qdrantBackendPlugin(options, features?)` | 连接、命名空间和可选功能。         |
-| `collection.upsert(points, options?)`     | 写入向量和 payload。               |
-| `collection.near(query).topK(k)`          | 创建近邻查询。                     |
-| `similarTo(id)` / `recommend(...)`        | 使用已存样本创建标准查询。         |
-| `deleteWhere(where, options?)`            | 条件删除与数字计数。               |
-| `store.use(ttl)`                          | `expire`、`persist`、`remaining`。 |
+| API                                              | 用途                               |
+| ------------------------------------------------ | ---------------------------------- |
+| `qdrantBackendPlugin({ ...options, features? })` | 连接、命名空间和可选功能。         |
+| `collection.upsert(points, options?)`            | 写入向量和 payload。               |
+| `collection.near(query).topK(k)`                 | 创建近邻查询。                     |
+| `similarTo(id)` / `recommend(...)`               | 使用已存样本创建标准查询。         |
+| `deleteWhere(where, options?)`                   | 条件删除与数字计数。               |
+| `store.use(ttl)`                                 | `expire`、`persist`、`remaining`。 |
 
 ## 契约细节
 
 只提供 `vector` 和向量目标的 `ttl`，没有 KV、records、RDF、事务、二级索引、change feed 或原生 live 查询。显式锁及不支持的并发策略在原生修改前拒绝。
 
-`url` 必填；`id` 默认 `qdrant`，`collectionPrefix` 默认 `migaia_`。`apiKey`、自备 `http` 可选。自备 HTTP/SDK client 由调用方管理，host 不关闭它们。默认创建 host 时检测；关闭自动检测后，先 `await host.detect()`。
+`url` 必填；`name` 默认 `qdrant`，`collectionPrefix` 默认 `migaia_`。`apiKey`、自备 `http` 可选。自备 HTTP/SDK client 由调用方管理，host 不关闭它们。默认创建 host 时检测；关闭自动检测后，先 `await host.detect()`。
 
 错误 source 为 `storage.backend.qdrant`。原生 4xx、网络/5xx、坏响应分别为 `QDRANT_REQUEST_FAILED`、`QDRANT_UNAVAILABLE`、`QDRANT_RESPONSE_INVALID`。原错误留在原因链。取消不能撤销已发送修改，不自动重放；释放等待真实结果。详见[使用指南](./USEGUIDE.md)。

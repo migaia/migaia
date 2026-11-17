@@ -19,7 +19,7 @@ export function forwardStorageExecution(
     'runPipelineSync' | 'runPipelineAsync'
   >,
   assertCurrent: () => void,
-  identity: () => Pick<IStoragePipelineInput, 'backendId' | 'backend' | 'orgId'>,
+  identity: () => Pick<IStoragePipelineInput, 'backendId' | 'orgId'>,
   observe?: <R>(
     describe: () => IStoragePipelineInput,
     invoke: (observing: boolean) => Promise<R>

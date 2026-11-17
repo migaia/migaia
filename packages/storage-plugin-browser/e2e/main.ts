@@ -129,7 +129,7 @@ const indexedLeaseRepository = async (
   })
   /** Install once on the real fixture host and retain exact extension inference. */
   const entityHost = await host.use(leaseEntityPlugin)
-  return entityHost.extensions[leaseEntityPlugin.id](store)
+  return entityHost.extensions[leaseEntityPlugin.name](store)
 }
 
 /** Seed through an unindexed public repository so its later query must perform real backfill. */
@@ -151,7 +151,7 @@ const seedLeaseRepository = async (
   /** Install once on the real fixture host and retain exact extension inference. */
   const entityHost = await host.use(baselineEntityPlugin)
   /** Borrow the supplied backend through the installed repository capability factories. */
-  const baseline = entityHost.extensions[baselineEntityPlugin.id](store)
+  const baseline = entityHost.extensions[baselineEntityPlugin.name](store)
   await baseline.put({ id: 'seed', value: 1 })
   await baseline.migrate()
 }
@@ -2181,15 +2181,15 @@ window.runIndexedDbEntityMigrationScenario = async () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const result = await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate({
+    const result = await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).migrate({
       batchSize: 1
     })
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const value = await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).get('a')
+    const value = await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).get('a')
     const legacyValue = await store.getRecord(['browser-migrate', 'a'])
     let invalidBatchCode: string | undefined
     try {
-      await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate({
+      await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).migrate({
         batchSize: null as never
       })
     } catch (error) {
@@ -2198,7 +2198,7 @@ window.runIndexedDbEntityMigrationScenario = async () => {
     const invalidOptionsCodes: Array<string | undefined> = []
     for (const options of [null, [], 'options', 1]) {
       try {
-        await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate(
+        await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).migrate(
           options as never
         )
       } catch (error) {
@@ -2206,7 +2206,7 @@ window.runIndexedDbEntityMigrationScenario = async () => {
       }
     }
     try {
-      await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate({
+      await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).migrate({
         batchSize: Number.MAX_SAFE_INTEGER + 1
       })
     } catch (error) {
@@ -2215,7 +2215,7 @@ window.runIndexedDbEntityMigrationScenario = async () => {
     const invalidBatchCallbackCodes: Array<string | undefined> = []
     for (const callback of [null, undefined, {}, 'run']) {
       try {
-        await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).batch(
+        await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).batch(
           callback as never
         )
       } catch (error) {
@@ -2223,7 +2223,7 @@ window.runIndexedDbEntityMigrationScenario = async () => {
       }
     }
     let migrationOptionReads = 0
-    await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate({
+    await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).migrate({
       get batchSize() {
         migrationOptionReads += 1
         if (migrationOptionReads > 1) throw new Error('batchSize read twice')
@@ -2296,9 +2296,9 @@ window.runIndexedDbConcurrentEntityMigrationScenario = async () => {
         /** Install once on the real fixture host and retain exact extension inference. */
         const secondEntityHost = await secondHost.use(concurrentEntityPlugin)
         /** Borrow the supplied backend through the installed repository capability factories. */
-        const firstRepository = firstEntityHost.extensions[concurrentEntityPlugin.id](first)
+        const firstRepository = firstEntityHost.extensions[concurrentEntityPlugin.name](first)
         /** Borrow the supplied backend through the installed repository capability factories. */
-        const secondRepository = secondEntityHost.extensions[concurrentEntityPlugin.id](second)
+        const secondRepository = secondEntityHost.extensions[concurrentEntityPlugin.name](second)
         const [firstResult, secondResult] = await Promise.all([
           firstRepository.migrate({ batchSize: 1 }),
           secondRepository.migrate({ batchSize: 1 })
@@ -2682,7 +2682,7 @@ window.runOperationLifecycleScenario = async () => {
     await withAbort(stableSnapshot, async () => undefined)
     /** Install once on the real fixture host and retain exact extension inference. */
     const lifecycleEntityPluginHost = await memoryHost.use(lifecycleEntityPlugin)
-    await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.id](memory).put(
+    await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.name](memory).put(
       { id: 'snapshot' },
       context
     )
@@ -2753,7 +2753,7 @@ window.runOperationLifecycleScenario = async () => {
     })
     let extensionListenerSetupCode: string | undefined
     try {
-      await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.id](memory).put(
+      await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.name](memory).put(
         { id: 'extension-listener-setup' },
         {
           signal: {
@@ -2768,7 +2768,7 @@ window.runOperationLifecycleScenario = async () => {
     } catch (error) {
       extensionListenerSetupCode = (error as { code?: string }).code
     }
-    await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.id](memory).put(
+    await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.name](memory).put(
       { id: 'extension-listener-cleanup' },
       {
         signal: {
@@ -2782,7 +2782,7 @@ window.runOperationLifecycleScenario = async () => {
     )
     const extensionCleanupPreserved =
       (
-        await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.id](memory).get(
+        await lifecycleEntityPluginHost.extensions[lifecycleEntityPlugin.name](memory).get(
           'extension-listener-cleanup'
         )
       )?.id === 'extension-listener-cleanup'
@@ -3199,7 +3199,7 @@ window.runIndexedDbExtensionFailureScenario = async () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](store)
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.name](store)
     let code: string | undefined
     try {
       await repo.put({ id: 'broken', value: 'value' })
@@ -3238,7 +3238,7 @@ window.runIndexedDbFutureVersionScenario = async () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
+    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.name](store)
     let getCode: string | undefined
     try {
       await repo.get('future')
@@ -3292,7 +3292,7 @@ window.runIndexedDbHangingExtensionAbortScenario = async () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const pending = entityEntityPluginHost.extensions[entityEntityPlugin.id](store).put(
+    const pending = entityEntityPluginHost.extensions[entityEntityPlugin.name](store).put(
       { id: 'hanging', name: 'Ada' },
       { signal: controller.signal }
     )
@@ -3347,9 +3347,12 @@ window.runIndexedDbHangingMigrationAbortScenario = async () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const pending = entityEntityPluginHost.extensions[entityEntityPlugin.id](store).get('hanging', {
-      signal: controller.signal
-    })
+    const pending = entityEntityPluginHost.extensions[entityEntityPlugin.name](store).get(
+      'hanging',
+      {
+        signal: controller.signal
+      }
+    )
     for (let attempt = 0; attempt < 100 && !receivedSignal; attempt += 1)
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
     if (!receivedSignal) throw new Error('migration callback did not start')
@@ -3400,7 +3403,7 @@ window.runIndexedDbPreAbortExtensionScenario = async () => {
     try {
       /** Install once on the real fixture host and retain exact extension inference. */
       const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
-      await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).put(
+      await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).put(
         { id: 'u1', name: 'Ada' },
         { signal: controller.signal }
       )
@@ -3437,7 +3440,7 @@ window.runIndexedDbPreAbortMigrationScenario = async () => {
     try {
       /** Install once on the real fixture host and retain exact extension inference. */
       const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
-      await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).get('missing', {
+      await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).get('missing', {
         signal: controller.signal
       })
     } catch (error) {
@@ -3476,7 +3479,7 @@ window.runIndexedDbSchemaFailureScenario = async () => {
     try {
       /** Install once on the real fixture host and retain exact extension inference. */
       const entityEntityPluginHost = await storeHost.use(entityEntityPlugin)
-      await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).put({
+      await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).put({
         id: 'invalid',
         name: 'Ada'
       })
@@ -3578,7 +3581,7 @@ window.runIndexedDbPagedScanScenario = async () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const streamedEntityPluginHost = await storeHost.use(streamedEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const streamed = streamedEntityPluginHost.extensions[streamedEntityPlugin.id](store, {
+    const streamed = streamedEntityPluginHost.extensions[streamedEntityPlugin.name](store, {
       queryStages
     })
     await streamed.put({ id: 'one', index: 7 })
@@ -4450,7 +4453,7 @@ window.runEntityDefinitionGuardScenario = async () => {
   try {
     /** Install once on the real fixture host and retain exact extension inference. */
     const definitionEntityPluginHost = await definitionMemoryHost.use(definitionEntityPlugin)
-    await definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+    await definitionEntityPluginHost.extensions[definitionEntityPlugin.name](
       definitionMemoryHost.backend('memory')
     ).put({ id: 'stable' })
     const malformedStore = { backend: 'memory' }
@@ -4477,7 +4480,7 @@ window.runEntityDefinitionGuardScenario = async () => {
     const storeCodes: Array<string | undefined> = []
     for (const store of [null, undefined, [], {}, { backend: 'memory' }]) {
       try {
-        storeGuardHost.extensions[entityEntityPlugin.id](store as never)
+        storeGuardHost.extensions[entityEntityPlugin.name](store as never)
       } catch (error) {
         storeCodes.push((error as { code?: string }).code)
       }
@@ -4489,7 +4492,7 @@ window.runEntityDefinitionGuardScenario = async () => {
     try {
       /** Install once on the real fixture host and retain exact extension inference. */
       const entityEntityPluginHost = await entityMemoryHost.use(entityEntityPlugin)
-      entityEntityPluginHost.extensions[entityEntityPlugin.id](entityMemoryHost.backend('memory'))
+      entityEntityPluginHost.extensions[entityEntityPlugin.name](entityMemoryHost.backend('memory'))
       const codecCodes: Array<string | undefined> = []
       for (const codec of [null, [], {}, { name: 'codec' }, { name: 'codec', output: 'unknown' }]) {
         try {
@@ -4605,7 +4608,7 @@ window.runEntityDefinitionGuardScenario = async () => {
         })
         /** Install once on the real fixture host and retain exact extension inference. */
         const alienEntityHost = await entityMemoryHost.use(alienEntityPlugin)
-        alienEntityHost.extensions[alienEntityPlugin.id](alienStore as never)
+        alienEntityHost.extensions[alienEntityPlugin.name](alienStore as never)
       } catch (error) {
         backendCodes.push((error as { code?: string }).code)
       }
@@ -4646,7 +4649,7 @@ window.runEntityDefinitionGuardScenario = async () => {
             clearAll: async () => undefined,
             dispose: async () => undefined
           }
-          capabilityEntityHost.extensions[capabilityEntityPlugin.id](malformedStore as never)
+          capabilityEntityHost.extensions[capabilityEntityPlugin.name](malformedStore as never)
         } catch (error) {
           capabilityCodes.push((error as { code?: string }).code)
         }
@@ -4840,7 +4843,7 @@ window.runEntityComparatorGuardScenario = async () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const entityEntityPluginHost = await entityMemoryHost.use(entityEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.name](
       entityMemoryHost.backend('memory')
     )
     await repo.put({ id: 'a' })

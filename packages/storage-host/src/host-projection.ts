@@ -43,11 +43,6 @@ export class StorageHostProjection {
           StorageErrorText.backendPluginInvalid,
           snapshot.cause
         )
-      if (snapshot.backend !== context.getKind()?.name)
-        throw createStorageTypeError(
-          StorageHostErrorCode.backendKindMismatch,
-          StorageErrorText.backendKindMismatch
-        )
       const ports = context.getOrgContext(orgId)
       const api = context.storeCell.createOrgApi(native, ports.callContext, ports.execution)
       const view = borrowStorageBackend(

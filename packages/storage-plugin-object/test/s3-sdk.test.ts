@@ -90,17 +90,15 @@ async function installed(
       reports.push(error)
     },
     plugins: [
-      objectBackendPlugin(
-        {
-          driver: s3ObjectDriver({
-            client,
-            bucket: 'bucket',
-            partBytes: 5 * 1024 * 1024,
-            partConcurrency: 2
-          })
-        },
-        features
-      )
+      objectBackendPlugin({
+        driver: s3ObjectDriver({
+          client,
+          bucket: 'bucket',
+          partBytes: 5 * 1024 * 1024,
+          partConcurrency: 2
+        }),
+        features: features
+      })
     ] as const
   })
   onTestFinished(async () => {

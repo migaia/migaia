@@ -255,10 +255,10 @@ describe('defineEntityPlugin runtime contract', () => {
 
     for (const store of [null, undefined, [], {}, { backend: 'memory' }])
       expect(() =>
-        entityEntityPluginHost.extensions[entityEntityPlugin.id](store as never)
+        entityEntityPluginHost.extensions[entityEntityPlugin.name](store as never)
       ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     const actual = await memoryBackend()
-    expect(() => entityEntityPluginHost.extensions[entityEntityPlugin.id](actual)).not.toThrow()
+    expect(() => entityEntityPluginHost.extensions[entityEntityPlugin.name](actual)).not.toThrow()
     const alienStore = {
       backend: 'alien',
       capabilities: {},
@@ -272,17 +272,17 @@ describe('defineEntityPlugin runtime contract', () => {
       dispose: async () => undefined
     }
     expect(() =>
-      entityEntityPluginHost.extensions[entityEntityPlugin.id](alienStore as never)
+      entityEntityPluginHost.extensions[entityEntityPlugin.name](alienStore as never)
     ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     expect(() =>
-      entityEntityPluginHost.extensions[entityEntityPlugin.id]({
+      entityEntityPluginHost.extensions[entityEntityPlugin.name]({
         ...alienStore,
         backend: 'memory',
         capabilities: { syncRead: 'yes' }
       } as never)
     ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     expect(() =>
-      entityEntityPluginHost.extensions[entityEntityPlugin.id]({
+      entityEntityPluginHost.extensions[entityEntityPlugin.name]({
         ...alienStore,
         backend: 'memory',
         capabilities: {
@@ -369,7 +369,7 @@ describe('defineEntityPlugin runtime contract', () => {
     const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
 
     await using store = await memoryBackend()
-    const repository = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](store)
+    const repository = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](store)
     await repository.put({ id: 'stable-schema' })
     await expect(repository.get('stable-schema')).resolves.toEqual({ id: 'stable-schema' })
   })

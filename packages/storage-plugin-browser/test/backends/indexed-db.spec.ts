@@ -1241,10 +1241,14 @@ describe('indexedDbHost backend', () => {
   })
 
   it('安装时拒绝 null、数组和 primitive options', async () => {
-    for (const options of [null, [], 'options', 1])
-      await expectNativeInstallationFailure(createIndexedDbTestStore(options as never), {
-        code: 'INVALID_CONFIG'
-      })
+    expect(() => indexedDbBackendPlugin(null as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
+    )
+    for (const options of [[], 'options', 1])
+      await expectNativeInstallationFailure(
+        createStorageHost({ plugins: [indexedDbBackendPlugin(options as never)] }),
+        { code: 'INVALID_CONFIG' }
+      )
   })
 
   it('安装时拒绝非 boolean cleanupLegacyRecords', async () => {

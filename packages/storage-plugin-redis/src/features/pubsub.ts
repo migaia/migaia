@@ -1,9 +1,9 @@
 import { RedisOperation } from '../constants.ts'
 import { RedisCommand } from '../constants.ts'
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import type { IOperationContext, IStorageResource } from '@migaia/storage-contract'
 import { encodeUtf8 } from '@migaia/utils/bytes'
-import { redisBackendKind } from '../plugin.ts'
+import { defineRedisFeature } from '../plugin.ts'
 import { readNativeFeaturePort } from '../native-feature.ts'
 import { featureName, featureInteger, featureBytes, readFeatureBytes } from '../feature-input.ts'
 import { RedisSuffix, replyInteger } from '../layout.ts'
@@ -33,7 +33,7 @@ export type IRedisPubSubOutput = IStorageFeatureOutput<
 >
 /** Native subscriptions are owned by the injected driver; the backend seals callbacks on disposal. */
 export function redisPubSubFeature() {
-  return defineFeature<typeof redisBackendKind, {}, IRedisPubSubOutput>(redisBackendKind, () => ({
+  return defineRedisFeature<{}, IRedisPubSubOutput>(() => ({
     capabilities: [] as const,
     chain: {},
     api: {

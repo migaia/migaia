@@ -91,14 +91,14 @@ Node 24+ 与 Deno 使用 `/node` 的 `nodeSqliteDriver(path)`；Bun 使用 `/bun
 
 ## 常用 API
 
-| API                                             | 用途                       |
-| ----------------------------------------------- | -------------------------- |
-| `sqliteBackendPlugin({ driver, table?, wal? })` | 安装 SQLite 存储           |
-| `store.use(kv / records / sql / ttl / counter)` | 标准数据、查询、期限与计数 |
-| `store.transaction` / `store.tx()`              | 同一连接中的原生事务       |
-| `store.sql` / `tx.sql`                          | 绑定参数 SQL               |
-| `host.org(id).backend('sqlite')`                | 固定组织的数据视图         |
-| `sqliteMaintenanceFeature()`                    | 增加 backup 与 vacuum      |
+| API                                              | 用途                       |
+| ------------------------------------------------ | -------------------------- |
+| `sqliteBackendPlugin({ driver, table?, wal?  })` | 安装 SQLite 存储           |
+| `store.use(kv / records / sql / ttl / counter)`  | 标准数据、查询、期限与计数 |
+| `store.transaction` / `store.tx()`               | 同一连接中的原生事务       |
+| `store.sql` / `tx.sql`                           | 绑定参数 SQL               |
+| `host.org(id).backend('sqlite')`                 | 固定组织的数据视图         |
+| `sqliteMaintenanceFeature()`                     | 增加 backup 与 vacuum      |
 
 ## 契约细节
 

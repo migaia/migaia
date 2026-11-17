@@ -1,8 +1,8 @@
 import { RedisOperation } from '../constants.ts'
 import { RedisCommand } from '../constants.ts'
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import type { IOperationContext } from '@migaia/storage-contract'
-import { redisBackendKind } from '../plugin.ts'
+import { defineRedisFeature } from '../plugin.ts'
 import { readNativeFeaturePort } from '../native-feature.ts'
 import { featureName, featureInteger } from '../feature-input.ts'
 import { RedisSuffix, replyInteger } from '../layout.ts'
@@ -35,56 +35,53 @@ const rateScript =
 export function redisRateLimitFeature(options: IRedisRateLimitOptions) {
   const limit = featureInteger(options.limit),
     windowMs = featureInteger(options.windowMs)
-  return defineFeature<typeof redisBackendKind, {}, IRedisRateLimitOutput>(
-    redisBackendKind,
-    () => ({
-      capabilities: [] as const,
-      chain: {},
-      api: {
-        transaction: {},
-        store: {
-          rateLimit: {
-            async consume(
-              key: string,
-              cost = 1,
-              ctx?: IOperationContext
-            ): Promise<IRedisRateLimitResult> {
-              const input = { name: featureName(key), cost: featureInteger(cost) }
-              return readNativeFeaturePort(this.store).run(
-                RedisOperation.rateLimitConsume,
-                input,
-                ctx,
-                true,
-                async (actual, connection, layout) => {
-                  const result = await connection.command([
-                    RedisCommand.eval,
-                    rateScript,
-                    '1',
-                    layout.feature(RedisSuffix.rate, featureName(actual.name)),
-                    String(limit),
-                    String(featureInteger(actual.cost)),
-                    String(windowMs)
-                  ])
-                  if (!Array.isArray(result) || result.length !== 3)
-                    throw redisError(RedisErrorCode.decodeFailed, result)
-                  const allowed = replyInteger(result[0]),
-                    remaining = replyInteger(result[1]),
-                    resetAfterMs = replyInteger(result[2])
-                  if (
-                    (allowed !== 0 && allowed !== 1) ||
-                    remaining < 0 ||
-                    remaining > limit ||
-                    resetAfterMs < 0
-                  )
-                    throw redisError(RedisErrorCode.decodeFailed, result)
-                  return { allowed: allowed === 1, remaining, resetAfterMs }
-                },
-                false
-              )
-            }
+  return defineRedisFeature<{}, IRedisRateLimitOutput>(() => ({
+    capabilities: [] as const,
+    chain: {},
+    api: {
+      transaction: {},
+      store: {
+        rateLimit: {
+          async consume(
+            key: string,
+            cost = 1,
+            ctx?: IOperationContext
+          ): Promise<IRedisRateLimitResult> {
+            const input = { name: featureName(key), cost: featureInteger(cost) }
+            return readNativeFeaturePort(this.store).run(
+              RedisOperation.rateLimitConsume,
+              input,
+              ctx,
+              true,
+              async (actual, connection, layout) => {
+                const result = await connection.command([
+                  RedisCommand.eval,
+                  rateScript,
+                  '1',
+                  layout.feature(RedisSuffix.rate, featureName(actual.name)),
+                  String(limit),
+                  String(featureInteger(actual.cost)),
+                  String(windowMs)
+                ])
+                if (!Array.isArray(result) || result.length !== 3)
+                  throw redisError(RedisErrorCode.decodeFailed, result)
+                const allowed = replyInteger(result[0]),
+                  remaining = replyInteger(result[1]),
+                  resetAfterMs = replyInteger(result[2])
+                if (
+                  (allowed !== 0 && allowed !== 1) ||
+                  remaining < 0 ||
+                  remaining > limit ||
+                  resetAfterMs < 0
+                )
+                  throw redisError(RedisErrorCode.decodeFailed, result)
+                return { allowed: allowed === 1, remaining, resetAfterMs }
+              },
+              false
+            )
           }
         }
       }
-    })
-  )
+    }
+  }))
 }

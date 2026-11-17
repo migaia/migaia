@@ -22,9 +22,11 @@ describe('memory native vectors', () => {
   it('drains an accepted asynchronous reranker before host disposal completes', async () => {
     const host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -62,9 +64,11 @@ describe('memory native vectors', () => {
   it('ranks exact finite scores with UTF-16 ties and detached payload/vector output', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -121,9 +125,11 @@ describe('memory native vectors', () => {
   it('filters declarative payloads before topK and runs JavaScript only on bounded engine hits', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -172,9 +178,11 @@ describe('memory native vectors', () => {
   it('uses shared similarTo/recommend sample semantics and rejects invalid directions', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -235,9 +243,11 @@ describe('memory native vectors', () => {
     await using host = await createStorageHost({
       scheduler,
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -293,9 +303,11 @@ describe('memory native vectors', () => {
     await using host = await createStorageHost({
       scheduler,
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -329,9 +341,11 @@ describe('memory native vectors', () => {
   it('keeps org, notifications, extracted sources and lock admission on their original owner', async () => {
     const host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })

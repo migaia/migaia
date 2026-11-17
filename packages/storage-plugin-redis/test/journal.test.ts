@@ -148,13 +148,14 @@ for (const service of [
       const host = await createStorageHost({
         plugins: [
           storageJournalPlugin({ logger, namespace: 'telemetry', telemetry: true }),
-          redisBackendPlugin(
-            { driver, prefix },
-            {
+          redisBackendPlugin({
+            driver,
+            prefix,
+            features: {
               streams: redisStreamsFeature(),
               pubsub: redisPubSubFeature()
             }
-          )
+          })
         ] as const
       })
       try {
@@ -455,7 +456,7 @@ for (const service of [
         const host = await createStorageHost({
           plugins: [
             storageJournalPlugin(options),
-            redisBackendPlugin({ driver, prefix }, { search: rediSearchVectorFeature() })
+            redisBackendPlugin({ driver, prefix, features: { search: rediSearchVectorFeature() } })
           ] as const
         })
         try {

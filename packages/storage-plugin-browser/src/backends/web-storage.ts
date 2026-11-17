@@ -47,7 +47,7 @@ import type {
   ISyncKeyValueStore,
   IWebStorageLike
 } from '../types/storage.ts'
-import type { IBackendKind, IStorageCapabilities } from '../types/capabilities.ts'
+import type { IStorageCapabilities } from '../types/capabilities.ts'
 import type { IStorageKey } from '../types/context.ts'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
@@ -97,7 +97,7 @@ export const assertWebStorageOptions: (
 /** Validate an injected Storage surface from one observation of each member. */
 const assertWebStorageInjection: (
   storage: IWebStorageLike | undefined,
-  backend: IBackendKind
+  backend: string
 ) => asserts storage is IWebStorageLike = (storage, backend) => {
   if (storage === undefined) return
   if (typeof storage !== 'object' || storage === null || Array.isArray(storage))
@@ -136,7 +136,7 @@ type IWebStorageConstruction = IBackendConstruction<
 /** One physical browser namespace owns its native port, change controller and redo assembly. */
 type IWebStorageContext = {
   /** Original backend is captured before native construction begins. */
-  readonly backend: IBackendKind
+  readonly backend: string
   /** Original storage is captured before native construction begins. */
   readonly storage: IWebStorageLike | undefined
   /** Original options is captured before native construction begins. */
@@ -205,7 +205,7 @@ type IWebStorageContext = {
 }
 /** Construct one physical browser namespace with its original native and lifecycle ownership. */
 export function createWebStorageBackend(
-  backend: IBackendKind,
+  backend: string,
   storage: IWebStorageLike | undefined,
   options: IWebStorageOptions,
   runtime: IBackendRuntime,

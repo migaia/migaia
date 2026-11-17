@@ -1,9 +1,13 @@
-import { createStorageHost, defineFeature } from '@migaia/storage-host'
-import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { createStorageHost, type IStorageFeatureDefiner } from '@migaia/storage-host'
+import { memoryBackendPlugin, type IMemoryBackend } from '@migaia/storage-host/plugins/memory'
+import { defineStorageFeature } from '@migaia/storage-host/sdk'
 import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
 import { lockKey } from '../src/authoring/concurrency.ts'
 import { records, rdf, vector, type IQuad, type IVectorHit } from '@migaia/storage-contract'
+
+/** Feature definer typed for the imported backend. */
+const defineMemoryFeature: IStorageFeatureDefiner<IMemoryBackend> = defineStorageFeature
 
 /** A domain row retains exact field names through each public query family. */
 type ITypeCostRow = { id: string; name: string; active: boolean }
@@ -14,7 +18,7 @@ type IEqual<A, B> =
 type IAssert<T extends true> = T
 
 /** Feature 1 retains the exact receiver in every original chain family. */
-const feature1 = defineFeature(memoryBackendKind, () => ({
+const feature1 = defineMemoryFeature(() => ({
   capabilities: [],
   chain: {
     query: {
@@ -42,7 +46,7 @@ const feature1 = defineFeature(memoryBackendKind, () => ({
 }))
 
 /** Feature 2 retains the exact receiver in every original chain family. */
-const feature2 = defineFeature(memoryBackendKind, () => ({
+const feature2 = defineMemoryFeature(() => ({
   capabilities: [],
   chain: {
     query: {
@@ -70,7 +74,7 @@ const feature2 = defineFeature(memoryBackendKind, () => ({
 }))
 
 /** Feature 3 retains the exact receiver in every original chain family. */
-const feature3 = defineFeature(memoryBackendKind, () => ({
+const feature3 = defineMemoryFeature(() => ({
   capabilities: [],
   chain: {
     query: {
@@ -98,7 +102,7 @@ const feature3 = defineFeature(memoryBackendKind, () => ({
 }))
 
 /** Feature 4 retains the exact receiver in every original chain family. */
-const feature4 = defineFeature(memoryBackendKind, () => ({
+const feature4 = defineMemoryFeature(() => ({
   capabilities: [],
   chain: {
     query: {
@@ -126,7 +130,7 @@ const feature4 = defineFeature(memoryBackendKind, () => ({
 }))
 
 /** Feature 5 retains the exact receiver in every original chain family. */
-const feature5 = defineFeature(memoryBackendKind, () => ({
+const feature5 = defineMemoryFeature(() => ({
   capabilities: [],
   chain: {
     query: {
@@ -155,7 +159,7 @@ const feature5 = defineFeature(memoryBackendKind, () => ({
 
 /** Five actual Feature installations flow through the original memory backend authoring entry. */
 const host = await createStorageHost({
-  plugins: [memoryBackendPlugin(undefined, { feature1, feature2, feature3, feature4, feature5 })]
+  plugins: [memoryBackendPlugin({ features: { feature1, feature2, feature3, feature4, feature5 } })]
 })
 /** Exact backend lookup must preserve every selected Feature. */
 const store = host.backend('memory')
@@ -267,7 +271,7 @@ const entity1EntityPlugin = defineEntityPlugin<ITypeCostRow>()('type-cost-ts-ent
 })
 /** This actual storage host owns the entity installation for this test scope. */
 const entity1EntityPluginHost = await host.use(entity1EntityPlugin)
-const repository = entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store)
+const repository = entity1EntityPluginHost.extensions[entity1EntityPlugin.name](store)
 /** Ten real immutable query steps retain the entity domain before projection. */
 const entityResult = repository
   .query()

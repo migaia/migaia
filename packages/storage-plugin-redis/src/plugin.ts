@@ -1,21 +1,23 @@
 import {
-  definePlugin,
-  defineStorageBackendKind,
   type IStorageBackendPlugin,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
   type IStorageFeatureRecord,
   type IStorageFeatureStoreCompatibility,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendPluginDefiner
 } from '@migaia/storage-host'
+import { defineBackendPlugin, defineStorageFeature } from '@migaia/storage-host/sdk'
 import type { ICapabilityInstallPort } from '@migaia/storage-contract'
 import { createRedisStore, type IRedisConstruction } from './store.ts'
 import type { IRedisOptions, IRedisStore } from './types.ts'
 import type { IRedisDriver } from './driver.ts'
 import { RedisText } from './constants.ts'
 
-/** Exact kind identity prevents a Feature from borrowing an unrelated backend's native driver. */
-export const redisBackendKind = defineStorageBackendKind<IRedisStore, IRedisDriver>()(
-  RedisText.backend
-)
+/** The Redis engine as a type: its Store and the borrowed native driver. */
+export type IRedisBackend = IStorageBackendType<IRedisStore, IRedisDriver>
+/** Defines this package's Features; the annotation carries the Redis backend type. */
+export const defineRedisFeature: IStorageFeatureDefiner<IRedisBackend> = defineStorageFeature
 /** One plugin installation owns the selected construction and borrowed driver metadata. */
 class RedisInstallation<F extends IStorageFeatureRecord> {
   /** Captured deployment options remain stable until deferred installation. */
@@ -29,8 +31,6 @@ class RedisInstallation<F extends IStorageFeatureRecord> {
     this.#options = options
     this.#core = core
   }
-  /** Kind is an own descriptor field consumed by original host projection. */
-  readonly kind = redisBackendKind
   /** Install remains an own port, preserving the host's existing finite descriptor shape. */
   readonly install = () => {
     this.#construction = createRedisStore(this.#options, this.#core)
@@ -50,14 +50,21 @@ class RedisInstallation<F extends IStorageFeatureRecord> {
   /** Features receive the original borrowed driver identity. */
   readonly featureExpose = () => ({ getClient: () => this.#options.driver })
 }
+/** Backend-plugin definer typed for this backend; the annotation enables the descriptor checks. */
+const defineRedisBackend: IStorageBackendPluginDefiner<IRedisBackend> = defineBackendPlugin
 /** Capture pure configuration; the original host alone owns detection, installation and cleanup. */
 export function redisBackendPlugin<
   const TId extends string = 'redis',
   const F extends IStorageFeatureRecord = {}
 >(
-  options: IRedisOptions & { readonly id?: TId },
-  features?: F & IStorageFeatureStoreCompatibility<typeof redisBackendKind, NoInfer<F>, IRedisStore>
-): IStorageBackendPlugin<typeof redisBackendKind, NoInfer<TId>, F, IRedisStore> {
+  options: IRedisOptions & {
+    /** Plugin name and backend lookup key; `'redis'` when omitted. */
+    readonly name?: TId
+    /** Features installed on this backend. */
+    readonly features?: F &
+      IStorageFeatureStoreCompatibility<IRedisBackend, NoInfer<F>, IRedisStore>
+  }
+): IStorageBackendPlugin<IRedisBackend, NoInfer<TId>, F, IRedisStore> {
   const owner = options.owner,
     captured: IRedisOptions = {
       driver: options.driver,
@@ -66,10 +73,10 @@ export function redisBackendPlugin<
       owner: owner === undefined ? undefined : { label: owner.label },
       maxLockMs: options.maxLockMs
     },
-    id = (options.id ?? RedisText.backend) as TId
-  return definePlugin<TId, (core: IStoragePluginCore<F>) => RedisInstallation<F>, F>(
-    id,
-    (core: IStoragePluginCore<F>) => new RedisInstallation(captured, core),
-    features
-  )
+    id = (options.name ?? RedisText.backend) as TId
+  return defineRedisBackend<TId, (core: IStoragePluginCore<F>) => RedisInstallation<F>, F>({
+    name: id,
+    features: options.features,
+    open: (core: IStoragePluginCore<F>) => new RedisInstallation(captured, core)
+  })
 }

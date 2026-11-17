@@ -29,9 +29,11 @@ describe('memory native RDF', () => {
   it('matches every bound-position subset through real fixed native indexes and preserves ground identity', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -65,9 +67,11 @@ describe('memory native RDF', () => {
   it('accepts legal large RDF literals through native query and deletion', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -86,13 +90,13 @@ describe('memory native RDF', () => {
     await using host = await createStorageHost({
       org: defaultOrg,
       plugins: [
-        memoryBackendPlugin(
-          { namespace: 'configured' },
-          {
+        memoryBackendPlugin({
+          namespace: 'configured',
+          features: {
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           }
-        )
+        })
       ]
     })
     const orgA = createOrgId()
@@ -124,9 +128,11 @@ describe('memory native RDF', () => {
   it('shares the original transaction draft, rollback, conflict revisions and expired scope admission', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -186,9 +192,11 @@ describe('memory native RDF', () => {
   it('reuses same-graph client traversal and canonical page cursors without claiming native traversal', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -219,13 +227,13 @@ describe('memory native RDF', () => {
   it('uses the original logical RDF lock for root mutation and capacity victims', async () => {
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(
-          { capacity: { maxEntries: 1 } },
-          {
+        memoryBackendPlugin({
+          capacity: { maxEntries: 1 },
+          features: {
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           }
-        )
+        })
       ]
     })
     const store = host.backend('memory')

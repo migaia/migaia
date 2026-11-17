@@ -2,18 +2,31 @@ import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
-import { createStorageHost, defineFeature } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { kv, type ITransactionScope } from '@migaia/storage-contract'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { localStorageBackendKind, localStorageBackendPlugin } from '../../src/local-storage.ts'
-import {
-  sessionStorageBackendKind,
-  sessionStorageBackendPlugin
-} from '../../src/session-storage.ts'
-import { cookieBackendKind, cookieBackendPlugin } from '../../src/cookies.ts'
-import { indexedDbBackendKind, indexedDbBackendPlugin } from '../../src/indexed-db.ts'
+import { localStorageBackendPlugin } from '../../src/local-storage.ts'
+import { sessionStorageBackendPlugin } from '../../src/session-storage.ts'
+import { cookieBackendPlugin } from '../../src/cookies.ts'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
 import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
+import type { ILocalStorageBackend } from '../../src/local-storage.ts'
+import type { ISessionStorageBackend } from '../../src/session-storage.ts'
+import type { ICookieBackend } from '../../src/cookies.ts'
+import type { IIndexedDbBackend } from '../../src/indexed-db.ts'
+import { defineStorageFeature } from '@migaia/storage-host/sdk'
+import type { IStorageFeatureDefiner } from '@migaia/storage-host'
+
+/** Feature definer typed for the imported backend. */
+const defineLocalStorageFeature: IStorageFeatureDefiner<ILocalStorageBackend> = defineStorageFeature
+/** Feature definer typed for the imported backend. */
+const defineSessionStorageFeature: IStorageFeatureDefiner<ISessionStorageBackend> =
+  defineStorageFeature
+/** Feature definer typed for the imported backend. */
+const defineCookieFeature: IStorageFeatureDefiner<ICookieBackend> = defineStorageFeature
+/** Feature definer typed for the imported backend. */
+const defineIndexedDbFeature: IStorageFeatureDefiner<IIndexedDbBackend> = defineStorageFeature
 
 describe('browser backend installation through the neutral host', () => {
   it('retains default ids, canonical kinds and the same borrowed native clients with Features', async () => {
@@ -26,25 +39,25 @@ describe('browser backend installation through the neutral host', () => {
     /** The fake native database exercises real opener requests without claiming browser activity. */
     const factory = new IDBFactory()
     /** Each Feature reads its own registration's native client only at a real API terminal. */
-    const localClient = defineFeature(localStorageBackendKind, (core) => ({
+    const localClient = defineLocalStorageFeature((core) => ({
       capabilities: [],
       chain: {},
       api: { store: { client: async () => core.featureExpose.getClient() }, transaction: {} }
     }))
     /** The same Feature shape retains the session kind and client type. */
-    const sessionClient = defineFeature(sessionStorageBackendKind, (core) => ({
+    const sessionClient = defineSessionStorageFeature((core) => ({
       capabilities: [],
       chain: {},
       api: { store: { client: async () => core.featureExpose.getClient() }, transaction: {} }
     }))
     /** Cookie clients remain documents rather than a host-created replacement. */
-    const cookieClient = defineFeature(cookieBackendKind, (core) => ({
+    const cookieClient = defineCookieFeature((core) => ({
       capabilities: [],
       chain: {},
       api: { store: { client: async () => core.featureExpose.getClient() }, transaction: {} }
     }))
     /** IndexedDB exposes the prepared connection belonging to this same store. */
-    const databaseClient = defineFeature(indexedDbBackendKind, (core) => ({
+    const databaseClient = defineIndexedDbFeature((core) => ({
       capabilities: [],
       chain: {},
       api: { store: { client: async () => core.featureExpose.getClient() }, transaction: {} }
@@ -52,13 +65,15 @@ describe('browser backend installation through the neutral host', () => {
     /** Inline factories must retain their defaults under the host's contextual type. */
     const host = await createStorageHost({
       plugins: [
-        localStorageBackendPlugin({ storage: local }, { native: localClient }),
-        sessionStorageBackendPlugin({ storage: session }, { native: sessionClient }),
-        cookieBackendPlugin({ document }, { native: cookieClient }),
-        indexedDbBackendPlugin(
-          { factory, keyRange: IDBKeyRange, dbName: 'browser-installation' },
-          { ...indexedDbTestFeatures, native: databaseClient }
-        )
+        localStorageBackendPlugin({ storage: local, features: { native: localClient } }),
+        sessionStorageBackendPlugin({ storage: session, features: { native: sessionClient } }),
+        cookieBackendPlugin({ document, features: { native: cookieClient } }),
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          dbName: 'browser-installation',
+          features: { ...indexedDbTestFeatures, native: databaseClient }
+        })
       ]
     })
     try {
@@ -102,8 +117,8 @@ describe('browser backend installation through the neutral host', () => {
     /** Both factories are inline so host context cannot widen either id. */
     const host = await createStorageHost({
       plugins: [
-        localStorageBackendPlugin({ id: 'prefs', namespace: 'prefs', storage }),
-        localStorageBackendPlugin({ id: 'cache', namespace: 'cache', storage })
+        localStorageBackendPlugin({ name: 'prefs', namespace: 'prefs', storage }),
+        localStorageBackendPlugin({ name: 'cache', namespace: 'cache', storage })
       ]
     })
     try {
@@ -146,7 +161,7 @@ describe('browser backend installation through the neutral host', () => {
 
   it('creates declared stores in the original database and lends only its own live native transaction', async () => {
     /** One reusable Feature declares schema separately for each actual registration. */
-    const nativeFeature = defineFeature(indexedDbBackendKind, ({ featureExpose }) => {
+    const nativeFeature = defineIndexedDbFeature(({ featureExpose }) => {
       featureExpose.requireObjectStore('assets')
       return {
         capabilities: [],
@@ -163,14 +178,18 @@ describe('browser backend installation through the neutral host', () => {
     /** Independent registrations cannot authorize each other's authentic scopes. */
     const host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin(
-          { id: 'first', factory: new IDBFactory(), keyRange: IDBKeyRange },
-          { ...indexedDbTestFeatures, native: nativeFeature }
-        ),
-        indexedDbBackendPlugin(
-          { id: 'second', factory: new IDBFactory(), keyRange: IDBKeyRange },
-          { ...indexedDbTestFeatures, native: nativeFeature }
-        )
+        indexedDbBackendPlugin({
+          name: 'first',
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: { ...indexedDbTestFeatures, native: nativeFeature }
+        }),
+        indexedDbBackendPlugin({
+          name: 'second',
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: { ...indexedDbTestFeatures, native: nativeFeature }
+        })
       ]
     })
     /** The retired callback view is checked again after its native transaction finishes. */
@@ -201,7 +220,7 @@ describe('browser backend installation through the neutral host', () => {
 
   it('rejects a Feature store collision before the native opener performs I/O', async () => {
     /** The selected Feature collides with the existing authoritative text channel. */
-    const collision = defineFeature(indexedDbBackendKind, ({ featureExpose }) => {
+    const collision = defineIndexedDbFeature(({ featureExpose }) => {
       featureExpose.requireObjectStore('kv')
       return { capabilities: [], chain: {}, api: { store: {}, transaction: {} } }
     })
@@ -211,10 +230,11 @@ describe('browser backend installation through the neutral host', () => {
     const open = vi.spyOn(factory, 'open')
     const failure: unknown = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin(
-          { factory, keyRange: IDBKeyRange },
-          { ...indexedDbTestFeatures, collision }
-        )
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          features: { ...indexedDbTestFeatures, collision }
+        })
       ]
     }).catch((cause: unknown) => cause)
     expect(failure).toMatchObject({

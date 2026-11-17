@@ -8,15 +8,13 @@ describe('IndexedDB backend plugin', () => {
   it('prepares the canonical layout before publishing the exact store', async () => {
     const host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin(
-          {
-            id: 'idb',
-            factory: new IDBFactory(),
-            keyRange: IDBKeyRange,
-            dbName: 'r07-host-idb'
-          },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          name: 'idb',
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          dbName: 'r07-host-idb',
+          features: indexedDbTestFeatures
+        })
       ] as const
     })
     const store = host.backend('idb')
@@ -39,15 +37,13 @@ describe('IndexedDB backend plugin', () => {
     await expect(
       createStorageHost({
         plugins: [
-          indexedDbBackendPlugin(
-            {
-              id: 'idb-conflict',
-              factory,
-              keyRange: IDBKeyRange,
-              dbName: 'r07-host-conflict'
-            },
-            indexedDbTestFeatures
-          )
+          indexedDbBackendPlugin({
+            name: 'idb-conflict',
+            factory,
+            keyRange: IDBKeyRange,
+            dbName: 'r07-host-conflict',
+            features: indexedDbTestFeatures
+          })
         ] as const
       })
     ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
@@ -70,14 +66,12 @@ describe('IndexedDB backend plugin', () => {
       await expect(
         createStorageHost({
           plugins: [
-            indexedDbBackendPlugin(
-              {
-                factory,
-                keyRange: IDBKeyRange,
-                dbName: 'register-before-native-prepare'
-              },
-              indexedDbTestFeatures
-            )
+            indexedDbBackendPlugin({
+              factory,
+              keyRange: IDBKeyRange,
+              dbName: 'register-before-native-prepare',
+              features: indexedDbTestFeatures
+            })
           ]
         })
       ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })

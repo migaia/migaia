@@ -163,14 +163,12 @@ describe('native memory capacity', () => {
     expect(evicted.mock.calls.map(([event]) => event)).toEqual([
       {
         backendId: 'memory',
-        backend: 'memory',
         orgId: '00000000-0000-0000-0000-000000000000',
         channel: 'value',
         count: 1
       },
       {
         backendId: 'memory',
-        backend: 'memory',
         orgId: '00000000-0000-0000-0000-000000000000',
         channel: 'bytes',
         count: 1

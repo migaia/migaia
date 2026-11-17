@@ -109,11 +109,11 @@ it('measures exact UTF-8 line budgets and keeps embedded newlines inside their c
   ).byteLength
   for (const exact of [true, false]) {
     const base = await createStorageHost({
-      plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+      plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
     })
     const host = await base.use(
       archivePlugin({
-        id: 'archive',
+        name: 'archive',
         hot: 'hot',
         cold: 'cold',
         rules: [

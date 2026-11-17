@@ -1,4 +1,3 @@
-import type { IBackendKind } from './capabilities.ts'
 import type { IStorageKey } from './context.ts'
 import type { ILockKey, IConcurrencyHolder } from './concurrency.ts'
 import {
@@ -15,7 +14,7 @@ export const STORAGE_CONTRACT_SOURCE = ERROR_SOURCE
 /** Contains neutral contract error details. Provider-specific diagnostics stay with their owner. */
 export type IStorageContractErrorDetails = {
   /** Optional provider family for diagnostics. */
-  readonly backend?: IBackendKind
+  readonly backend?: string
   /** Optional missing capability name retained by the original frozen diagnostic constructor. */
   readonly capability?: string
   /** Optional offending or affected key; retained by reference rather than copied. */
@@ -43,7 +42,7 @@ export class StorageContractError extends Error {
   /** Semantic contract failure category from StorageContractErrorCode. */
   readonly code: IStorageContractErrorCode
   /** Provider family supplied in details, or undefined. */
-  readonly backend?: IBackendKind
+  readonly backend?: string
   /** Missing capability supplied in details, without granting authority by its name. */
   readonly capability?: string
   /** Key supplied in details, or undefined. */

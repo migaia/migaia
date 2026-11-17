@@ -2,7 +2,6 @@ import {
   assertStorageKey,
   StorageContractError,
   StorageContractErrorCode,
-  type IBackendKind,
   type IStorageKey,
   type IStorageBatchKey,
   type IStorageBatchKeyCapture,
@@ -29,7 +28,7 @@ function cloneStorageKey(candidate: IStorageKey): IStorageKey {
  */
 export function snapshotStorageKey(
   value: unknown,
-  backend: IBackendKind | undefined,
+  backend: string | undefined,
   label = 'key'
 ): IStorageKey {
   assertStorageKey(value, backend, label)
@@ -156,10 +155,7 @@ function encodeKeySnapshot(snapshot: IStorageKey, prefix: boolean): Uint8Array {
  * Snapshots the existing key domain and writes its complete independent order-preserving bytes.
  * UTF-16, binary prefixes, nested keys and normalized signed zero retain canonical comparison.
  */
-export function encodeOrderedStorageKey(
-  key: unknown,
-  backend: IBackendKind | undefined
-): Uint8Array {
+export function encodeOrderedStorageKey(key: unknown, backend: string | undefined): Uint8Array {
   assertStorageKey(key, backend)
   return encodeKeySnapshot(key, false)
 }
@@ -172,7 +168,7 @@ export function encodeOrderedStorageKey(
 /** One native wire reader owns only its original input view and bounded cursors. */
 type IOrderedKeyReader = {
   readonly encoded: Uint8Array
-  readonly backend: IBackendKind | undefined
+  readonly backend: string | undefined
   offset: number
   nodes: number
 }
@@ -255,7 +251,7 @@ function readOrderedKey(context: IOrderedKeyReader, depth: number): IStorageKey 
 /** Decode the unchanged wire format into new private data without cloning that output again. */
 export function decodeOrderedStorageKey(
   encoded: Uint8Array,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): IStorageKey {
   /** The reader borrows bytes synchronously; no callback or await can mutate them mid-read. */
   const context: IOrderedKeyReader = { encoded, backend, offset: 0, nodes: 0 }
@@ -271,13 +267,13 @@ export function decodeOrderedStorageKey(
 export function encodeStorageOrgKey(
   orgId: string,
   key: IStorageKey,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): Uint8Array {
   return encodeKeySnapshot(prefixStorageOrgKey(orgId, key, backend), false)
 }
 
 /** The same writer supplies the original fixed marker and UUID header for native ranges. */
-function storageOrgKeyHeader(orgId: string, backend: IBackendKind | undefined): Uint8Array {
+function storageOrgKeyHeader(orgId: string, backend: string | undefined): Uint8Array {
   /** Known empty logical content identifies only the original envelope boundary. */
   const emptyEnvelope = encodeStorageOrgKey(orgId, '', backend)
   return emptyEnvelope.subarray(0, emptyEnvelope.byteLength - measureKey('') - 1)
@@ -298,7 +294,7 @@ function strictByteSuccessor(encoded: Uint8Array): Uint8Array {
 export function snapshotStorageOrgKeyPrefix(
   orgId: string,
   prefix: IStorageKey | undefined,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): Pick<IStorageKeyPrefix, 'lower' | 'upper'> {
   /** The original fixed organization envelope is outside logical key limits. */
   const header = storageOrgKeyHeader(orgId, backend)
@@ -323,7 +319,7 @@ export function snapshotStorageOrgKeyPrefix(
 export function decodeStorageOrgKey(
   orgId: string,
   encoded: Uint8Array,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): IStorageKey {
   /** The original writer supplies the exact marker and UUID header without duplicating its tags. */
   const header = storageOrgKeyHeader(orgId, backend)
@@ -353,13 +349,13 @@ export function storageKeyBytesIdentity(encoded: Uint8Array): string {
 /** One batch's equality facts belong to this short-lived projector, never a backend cache. */
 class StorageBatchKeyProjector {
   /** Canonical validation errors retain the requesting backend's identity. */
-  readonly #backend: IBackendKind | undefined
+  readonly #backend: string | undefined
   /** Only equivalent keys in this admitted batch share a first position. */
   readonly #firstPositions = new Map<string, number>()
   /** Failed key validation never consumes a successful input position. */
   #position = 0
   /** Keep key admission and identity projection in their one existing owner. */
-  constructor(backend: IBackendKind | undefined) {
+  constructor(backend: string | undefined) {
     this.#backend = backend
   }
   /** Compute metadata from an admitted key using the original canonical writer. */
@@ -384,9 +380,7 @@ class StorageBatchKeyProjector {
 }
 
 /** Capture per-entry keys before deferred native work while preserving canonical equality. */
-export function createStorageBatchKeyCapture(
-  backend: IBackendKind | undefined
-): IStorageBatchKeyCapture {
+export function createStorageBatchKeyCapture(backend: string | undefined): IStorageBatchKeyCapture {
   /** The short-lived owner belongs only to this admitted batch. */
   const projector = new StorageBatchKeyProjector(backend)
   return (input) => projector.capture(input)
@@ -394,7 +388,7 @@ export function createStorageBatchKeyCapture(
 
 /** Recompute transformed batch metadata without copying keys in a synchronous native terminal. */
 export function createStorageBatchKeyProjection(
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): IStorageBatchKeyCapture {
   /** Only the synchronous terminal owns these recomputed first-position facts. */
   const projector = new StorageBatchKeyProjector(backend)
@@ -404,7 +398,7 @@ export function createStorageBatchKeyProjection(
 /** Validate one batch and project its original order and optional duplicate rejection once. */
 function prepareStorageBatchKeys(
   keys: readonly IStorageKey[],
-  backend: IBackendKind | undefined,
+  backend: string | undefined,
   options: { readonly rejectDuplicates?: boolean } | undefined,
   project: IStorageBatchKeyCapture
 ): readonly IStorageBatchKey[] {
@@ -445,7 +439,7 @@ function prepareStorageBatchKeys(
 /** Detach caller keys before middleware, logical locks or physical native admission can await. */
 export function snapshotStorageBatchKeys(
   keys: readonly IStorageKey[],
-  backend: IBackendKind | undefined,
+  backend: string | undefined,
   options?: { readonly rejectDuplicates?: boolean }
 ): readonly IStorageBatchKey[] {
   return prepareStorageBatchKeys(keys, backend, options, createStorageBatchKeyCapture(backend))
@@ -454,7 +448,7 @@ export function snapshotStorageBatchKeys(
 /** Borrow keys only while a synchronous terminal recomputes metadata after middleware rewrites. */
 export function projectStorageBatchKeys(
   keys: readonly IStorageKey[],
-  backend: IBackendKind | undefined,
+  backend: string | undefined,
   options?: { readonly rejectDuplicates?: boolean }
 ): readonly IStorageBatchKey[] {
   return prepareStorageBatchKeys(keys, backend, options, createStorageBatchKeyProjection(backend))
@@ -469,7 +463,7 @@ export function projectStorageBatchKeys(
 /** Public prefix facts and private matcher bytes share one explicit owner. */
 class StorageKeyPrefix implements IStorageKeyPrefix {
   /** Backend labels invalid candidates without adding a separate key validator. */
-  readonly #backend: IBackendKind | undefined
+  readonly #backend: string | undefined
   /** Private matching bytes must survive consumer mutation of the public key and bounds. */
   readonly #encoded: Uint8Array
   /** This public logical key is detached from the caller and from the private byte matcher. */
@@ -479,7 +473,7 @@ class StorageKeyPrefix implements IStorageKeyPrefix {
   /** A fresh successor is the original half-open upper bound. */
   readonly upper: Uint8Array
   /** Capture the prefix once before native callers retain and expose it across queued work. */
-  constructor(prefix: unknown, backend: IBackendKind | undefined) {
+  constructor(prefix: unknown, backend: string | undefined) {
     this.#backend = backend
     this.key = snapshotStorageKey(prefix, backend)
     this.#encoded = encodeKeySnapshot(this.key, true)
@@ -499,7 +493,7 @@ class StorageKeyPrefix implements IStorageKeyPrefix {
 /** Detach a typed prefix and preserve its matcher across later public/native consumption. */
 export function snapshotStorageKeyPrefix(
   prefix: unknown,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): IStorageKeyPrefix {
   return new StorageKeyPrefix(prefix, backend)
 }
@@ -620,7 +614,7 @@ export function orderStorageKeysByBytes<T>(
 export function encodeStorageOrgStringPrefix(
   orgId: string,
   prefix: string,
-  backend: IBackendKind
+  backend: string
 ): Uint8Array {
   assertStringStorageKey(prefix, backend)
   /** This exact envelope is shared with Redis/blob physical key composition. */
@@ -639,7 +633,7 @@ const storageOrgKeyMarker = '$o'
 export const prefixStorageOrgKey = (
   orgId: string,
   key: IStorageKey,
-  backend?: IBackendKind
+  backend?: string
 ): IStorageKey => {
   assertStorageOrgId(orgId)
   return [storageOrgKeyMarker, orgId, snapshotStorageKey(key, backend)]

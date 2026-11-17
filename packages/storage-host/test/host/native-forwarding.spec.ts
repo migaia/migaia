@@ -3,31 +3,36 @@ import { type IFeatureReference } from '@migaia/plugin-host'
 import { defineFeature } from '@migaia/plugin-host/features'
 import {
   createStorageHost,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendPluginDefiner,
+  type IStorageBackendType
 } from '../../src/index.ts'
-import { readStorageNativePluginDefinition } from '../../src/contracts.ts'
 import { catalog } from '../helpers/catalog.ts'
+import { defineBackendPlugin, definePlugin } from '../../src/sdk.ts'
+import { type IStorageBase } from '@migaia/storage-contract'
 
 /** These native forwarding baselines use ordinary composition Features, not backend API publication. */
-const kind = defineStorageBackendKind()('catalog')
+type IKindBackend = IStorageBackendType<IStorageBase, undefined>
+/** Backend-plugin definer typed for this test backend. */
+const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
 
 describe('native host forwarding migration baselines', () => {
   it('rejects reserved feature expose collisions before native commit', async () => {
     const install = vi.fn(() => ({}))
-    const plugin = definePlugin('reserved-store', (_core) => ({
-      kind,
-      featureExpose: () =>
-        ({
-          getClient: () => undefined,
-          getStore: () => undefined,
-          getBackendId: () => 'forged'
-        }) as never,
-      install: () => {
-        return install()
-      }
-    }))
+    const plugin = defineKindBackend({
+      name: 'reserved-store',
+      open: (_core: IStoragePluginCore) => ({
+        featureExpose: () =>
+          ({
+            getClient: () => undefined,
+            getStore: () => undefined,
+            getBackendId: () => 'forged'
+          }) as { getClient: () => undefined },
+        install: () => {
+          return install()
+        }
+      })
+    })
     await expect(createStorageHost({ plugins: [plugin] as const })).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
     })
@@ -35,11 +40,13 @@ describe('native host forwarding migration baselines', () => {
   })
 
   it('rejects a native install that omits its required Store transfer before commit', async () => {
-    const plugin = definePlugin('missing-store', () => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => ({})
-    }))
+    const plugin = defineKindBackend({
+      name: 'missing-store',
+      open: () => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => ({})
+      })
+    })
     await expect(createStorageHost({ plugins: [plugin] as const })).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
     })
@@ -54,11 +61,14 @@ describe('native host forwarding migration baselines', () => {
       Object.create({ inherited: true })
     ]
     for (const [index, output] of outputs.entries()) {
-      const plugin = definePlugin(`invalid-output-${index}`, (_core) => ({
-        install: () => {
-          return output as never
-        }
-      }))
+      const plugin = definePlugin({
+        name: `invalid-output-${index}`,
+        setup: (_core) => ({
+          install: () => {
+            return output as never
+          }
+        })
+      })
       await expect(createStorageHost({ plugins: [plugin] as const })).rejects.toMatchObject({
         code: 'BACKEND_INSTALL_FAILED'
       })
@@ -67,16 +77,22 @@ describe('native host forwarding migration baselines', () => {
 
   it('preserves user symbols across a second use while hiding native Store symbols', async () => {
     const visible = Symbol('visible-extension')
-    const first = definePlugin('symbol-first', (_core) => ({
-      install: () => {
-        return { [visible]: 'visible' }
-      }
-    }))
-    const second = definePlugin('symbol-second', (_core) => ({
-      install: () => {
-        return {}
-      }
-    }))
+    const first = definePlugin({
+      name: 'symbol-first',
+      setup: (_core) => ({
+        install: () => {
+          return { [visible]: 'visible' }
+        }
+      })
+    })
+    const second = definePlugin({
+      name: 'symbol-second',
+      setup: (_core) => ({
+        install: () => {
+          return {}
+        }
+      })
+    })
     const host = await createStorageHost({ plugins: [first] as const })
     await host.use(second)
     expect(host.extensions[visible]).toBe('visible')
@@ -85,16 +101,21 @@ describe('native host forwarding migration baselines', () => {
   })
 
   it('keeps the last public extension snapshot after a failed later native use and closes its getter', async () => {
-    const first = definePlugin('stable-first', (_core) => ({
-      install: () => {
-        return { stable: true }
-      }
-    }))
-    const failed = definePlugin('stable-failed', () => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => ({})
-    }))
+    const first = definePlugin({
+      name: 'stable-first',
+      setup: (_core) => ({
+        install: () => {
+          return { stable: true }
+        }
+      })
+    })
+    const failed = defineKindBackend({
+      name: 'stable-failed',
+      open: () => ({
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => ({})
+      })
+    })
     const host = await createStorageHost({ plugins: [first] as const })
     const snapshot = host.extensions
     await expect(host.use(failed)).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
@@ -107,7 +128,6 @@ describe('native host forwarding migration baselines', () => {
     let first!: ReturnType<typeof catalog>
     let second!: ReturnType<typeof catalog>
     const descriptor = (_core: IStoragePluginCore) => ({
-      kind,
       featureExpose: () => ({ getClient: () => undefined }),
       install: () => {
         first = catalog(_core)
@@ -118,7 +138,9 @@ describe('native host forwarding migration baselines', () => {
       }
     })
     await expect(
-      createStorageHost({ plugins: [definePlugin('duplicate-store', descriptor)] })
+      createStorageHost({
+        plugins: [defineKindBackend({ name: 'duplicate-store', open: descriptor })]
+      })
     ).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED',
       cause: { code: 'PLUGIN_INSTALL_FAILED', cause: { code: 'BACKEND_PLUGIN_INVALID' } }
@@ -130,30 +152,30 @@ describe('native host forwarding migration baselines', () => {
 
   it('forwards a native feature capability only to a declared later dependency', async () => {
     const capability = defineFeature(() => ({ read: () => 'feature' }))
-    const producer = definePlugin(
-      'feature-producer',
-      (_core) => ({
+    const producer = definePlugin({
+      name: 'feature-producer',
+      features: { capability },
+      setup: (_core) => ({
         install: () => {
           return {}
         }
-      }),
-      { capability }
-    )
-    const producerDefinition = readStorageNativePluginDefinition(producer)! as {
+      })
+    })
+    const producerDefinition = producer as unknown as {
       getFeature(name: 'capability'): IFeatureReference<{ readonly read: () => string }, false>
     }
     const dependency = defineFeature((_core, dependencies) => dependencies.capability, {
       capability: producerDefinition.getFeature('capability')
     })
-    const consumer = definePlugin(
-      'feature-consumer',
-      (_core) => ({
+    const consumer = definePlugin({
+      name: 'feature-consumer',
+      features: { dependency },
+      setup: (_core) => ({
         install: () => {
           return { readFeature: () => _core.features.dependency.read() }
         }
-      }),
-      { dependency }
-    )
+      })
+    })
     const host = await createStorageHost({ plugins: [producer, consumer] as const })
     expect(host.extensions.readFeature()).toBe('feature')
     await host.dispose()
@@ -164,15 +186,15 @@ describe('native host forwarding migration baselines', () => {
     const rejected = defineFeature(() => {
       throw original
     })
-    const plugin = definePlugin(
-      'feature-rejection',
-      (_core) => ({
+    const plugin = definePlugin({
+      name: 'feature-rejection',
+      features: { rejected },
+      setup: (_core) => ({
         install: () => {
           return {}
         }
-      }),
-      { rejected }
-    )
+      })
+    })
     let failure: unknown
     try {
       await createStorageHost({ plugins: [plugin] as const })
@@ -194,15 +216,15 @@ describe('native host forwarding migration baselines', () => {
       enumerable: true
     })
     const capability = defineFeature(() => output)
-    const plugin = definePlugin(
-      'feature-data-then',
-      (_core) => ({
+    const plugin = definePlugin({
+      name: 'feature-data-then',
+      features: { capability },
+      setup: (_core) => ({
         install: () => {
           return { readFeature: _core.features.capability.read }
         }
-      }),
-      { capability }
-    )
+      })
+    })
     const host = await createStorageHost({ plugins: [plugin] as const })
     expect(host.extensions.readFeature()).toBe('feature-data')
     await host.dispose()
@@ -210,15 +232,15 @@ describe('native host forwarding migration baselines', () => {
 
   it('rejects an undefined feature result before injecting Storage capabilities', async () => {
     const invalid = defineFeature(() => undefined as never)
-    const plugin = definePlugin(
-      'feature-undefined',
-      (_core) => ({
+    const plugin = definePlugin({
+      name: 'feature-undefined',
+      features: { invalid },
+      setup: (_core) => ({
         install: () => {
           return {}
         }
-      }),
-      { invalid }
-    )
+      })
+    })
     await expect(createStorageHost({ plugins: [plugin] as const })).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
     })
@@ -234,16 +256,16 @@ describe('native host forwarding migration baselines', () => {
       read: () =>
         (_core.featureExpose as unknown as { readonly receiver: () => boolean }).receiver()
     }))
-    const plugin = definePlugin(
-      'feature-expose-receiver',
-      (_core) => ({
+    const plugin = definePlugin({
+      name: 'feature-expose-receiver',
+      features: { feature },
+      setup: (_core) => ({
         install: () => {
           return { receiver: _core.features.feature.read }
         },
         featureExpose: () => expose
-      }),
-      { feature }
-    )
+      })
+    })
     const host = await createStorageHost({ plugins: [plugin] as const })
     expect(host.extensions.receiver()).toBe(true)
     await host.dispose()
@@ -252,7 +274,10 @@ describe('native host forwarding migration baselines', () => {
   it('preserves thenable descriptor and featureExpose outputs for PluginHost rejection', async () => {
     const descriptorOriginal = new Error('storage descriptor rejection')
     const rejectedDescriptor = Promise.reject(descriptorOriginal)
-    const descriptorPlugin = definePlugin('descriptor-promise', () => rejectedDescriptor as never)
+    const descriptorPlugin = definePlugin({
+      name: 'descriptor-promise',
+      setup: () => rejectedDescriptor as never
+    })
     await expect(createStorageHost({ plugins: [descriptorPlugin] as const })).rejects.toMatchObject(
       {
         code: 'BACKEND_INSTALL_FAILED'
@@ -261,16 +286,16 @@ describe('native host forwarding migration baselines', () => {
     const featureOriginal = new Error('storage feature expose rejection')
     const rejectedFeatureExpose = Promise.reject(featureOriginal)
     const feature = defineFeature(() => ({ read: () => undefined }))
-    const featurePlugin = definePlugin(
-      'feature-expose-promise',
-      (_core) => ({
+    const featurePlugin = definePlugin({
+      name: 'feature-expose-promise',
+      features: { feature },
+      setup: (_core) => ({
         install: () => {
           return {}
         },
         featureExpose: () => rejectedFeatureExpose as never
-      }),
-      { feature }
-    )
+      })
+    })
     await expect(createStorageHost({ plugins: [featurePlugin] as const })).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
     })

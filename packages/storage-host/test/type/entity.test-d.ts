@@ -12,12 +12,13 @@ import { memoryBackend } from '../helpers/memory.ts'
 import type { ICapabilityInstallPort, IStorageBase, IStorageKey } from '@migaia/storage-contract'
 import {
   createStorageHost,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendPluginDefiner,
+  type IStorageBackendType
 } from '../../src/index.ts'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import type { IMigrateOptions, IMigrateResult, IRepository } from '../../src/entity/types.ts'
+import { defineBackendPlugin } from '../../src/sdk.ts'
 
 type IUser = {
   id: string
@@ -34,13 +35,13 @@ const inferredUsersEntityPlugin = defineEntityPlugin('typed-inferred', {
   key: 'id',
   features: { reads: entityQueryFeature() }
 })
-expectTypeOf(inferredUsersEntityPlugin.id).toEqualTypeOf<'typed-inferred'>()
+expectTypeOf(inferredUsersEntityPlugin.name).toEqualTypeOf<'typed-inferred'>()
 /** Installing later must retain the inferred plugin extension in the widened host type. */
 const emptyEntityHost = await entityHost()
 /** The native use result carries the newly installed entity's exact extension signature. */
 const installed = await emptyEntityHost.use(inferredUsersEntityPlugin)
 /** Repository acquisition borrows an original backend while retaining its literal feed fact. */
-const inferredRepo = installed.extensions[inferredUsersEntityPlugin.id](await memoryBackend())
+const inferredRepo = installed.extensions[inferredUsersEntityPlugin.name](await memoryBackend())
 expectTypeOf(inferredRepo).toEqualTypeOf<
   IRepository<IUser, Readonly<Record<never, IStorageKey>>, true>
 >()
@@ -60,7 +61,7 @@ const usersEntityPlugin = defineEntityPlugin<IUser>()('type-entity-test-d-ts-use
 /** This actual storage host owns the entity installation for this test scope. */
 const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
+const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await memoryBackend())
 
 // 安装后的扩展返回类型推导出 IRepository<IUser>，get/put/stream
 // 的值类型都是 IUser，不需要调用方手写类型断言。
@@ -103,7 +104,7 @@ const indexedUsersEntityPlugin = defineEntityPlugin<IUser>()(
 /** This actual storage host owns the entity installation for this test scope. */
 const indexedUsersEntityPluginHost = await entityHost(indexedUsersEntityPlugin)
 
-const indexedRepo = indexedUsersEntityPluginHost.extensions[indexedUsersEntityPlugin.id](
+const indexedRepo = indexedUsersEntityPluginHost.extensions[indexedUsersEntityPlugin.name](
   await memoryBackend()
 )
 type IUserIndexMap = {
@@ -147,14 +148,16 @@ defineEntityPlugin<IUser>()('type-entity-test-d-ts-entity4-4', { name: 'bad', ke
 /** Certified borrowed views retain their exact data channels without taking root ownership. */
 const memoryHost = await createStorageHost({
   plugins: [
-    memoryBackendPlugin(undefined, {
-      notifications: memoryNotificationsFeature(),
-      changeFeed: memoryChangeFeedFeature()
+    memoryBackendPlugin({
+      features: {
+        notifications: memoryNotificationsFeature(),
+        changeFeed: memoryChangeFeedFeature()
+      }
     })
   ] as const
 })
 const memoryOrg = memoryHost.org('00000000-0000-0000-0000-000000000001')
-const orgRepository = usersEntityPluginHost.extensions[usersEntityPlugin.id](
+const orgRepository = usersEntityPluginHost.extensions[usersEntityPlugin.name](
   memoryOrg.backend('memory') as IStorageBorrowedBackend<IMemoryBackendWithChangeFeed>
 )
 expectTypeOf(orgRepository.get).returns.toEqualTypeOf<Promise<IUser | undefined>>()
@@ -164,20 +167,25 @@ declare const baseOnlyStore: IStorageBase
 /** The existing installer is only a declaration fixture and grants no runtime data channel. */
 declare const baseOnlyInstaller: ICapabilityInstallPort
 /** Exact kind inference must not widen a base-only organization backend to key-value. */
-const baseOnlyKind = defineStorageBackendKind<IStorageBase, undefined>()('base-only')
+type IBaseOnlyKindBackend = IStorageBackendType<IStorageBase, undefined>
+/** Backend-plugin definer typed for this test backend. */
+const defineBaseOnlyKindBackend: IStorageBackendPluginDefiner<IBaseOnlyKindBackend> =
+  defineBackendPlugin
 /** Public plugin installation preserves the source store shape in the organization projection. */
-const baseOnlyPlugin = definePlugin('base-only', (core: IStoragePluginCore) => ({
-  kind: baseOnlyKind,
-  featureExpose: () => ({ getClient: () => undefined }),
-  capabilityInstaller: () => baseOnlyInstaller,
-  install: () => {
-    core.registerStore(baseOnlyStore)
-    return {}
-  }
-}))
+const baseOnlyPlugin = defineBaseOnlyKindBackend({
+  name: 'base-only',
+  open: (core: IStoragePluginCore) => ({
+    featureExpose: () => ({ getClient: () => undefined }),
+    capabilityInstaller: () => baseOnlyInstaller,
+    install: () => {
+      core.registerStore(baseOnlyStore)
+      return {}
+    }
+  })
+})
 /** The organization view is genuine host output rather than a cast borrowed type. */
 const baseOnlyHost = await createStorageHost({ plugins: [baseOnlyPlugin] as const })
-usersEntityPluginHost.extensions[usersEntityPlugin.id](
+usersEntityPluginHost.extensions[usersEntityPlugin.name](
   // @ts-expect-error a precise base-only backend does not provide entity key-value channels.
   baseOnlyHost.org('00000000-0000-0000-0000-000000000001').backend('base-only')
 )
@@ -226,7 +234,7 @@ repo.batch((scope) => scope.query().watch())
 /** The raw legacy type has no literal true feed fact and cannot advertise a native record watcher. */
 declare const unknownFeedStore: import('@migaia/storage-contract').IKeyValueStore
 // @ts-expect-error a runtime-unknown feed flag cannot publish the root native watcher.
-usersEntityPluginHost.extensions[usersEntityPlugin.id](unknownFeedStore).query().watch()
+usersEntityPluginHost.extensions[usersEntityPlugin.name](unknownFeedStore).query().watch()
 /** An explicitly false feed remains unavailable even if other legacy methods exist. */
 declare const noFeedStore: import('@migaia/storage-contract').IKeyValueStore & {
   readonly capabilities: import('@migaia/storage-contract').IStorageCapabilities & {
@@ -234,4 +242,4 @@ declare const noFeedStore: import('@migaia/storage-contract').IKeyValueStore & {
   }
 }
 // @ts-expect-error false feed capability never grants watch.
-usersEntityPluginHost.extensions[usersEntityPlugin.id](noFeedStore).query().watch()
+usersEntityPluginHost.extensions[usersEntityPlugin.name](noFeedStore).query().watch()

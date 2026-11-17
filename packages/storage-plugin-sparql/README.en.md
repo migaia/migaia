@@ -99,14 +99,14 @@ Use Node.js 24 or later. The root does not load Oxigraph's native runtime. `/oxi
 
 ## Essential API
 
-| API                                                 | Purpose                                     |
-| --------------------------------------------------- | ------------------------------------------- |
-| `sparqlBackendPlugin({ endpoint, id? }, features?)` | Install an endpoint; id defaults to sparql. |
-| `oxigraphEndpoint(store)` / `httpEndpoint(options)` | Adapt local or remote endpoints.            |
-| `store.use(rdf)`                                    | `add`, `delete` and `match`.                |
-| `store.use(sparql)`                                 | Native query/update templates.              |
-| `store.transaction(run)` / `store.tx()`             | Optimistic transactions.                    |
-| `graphStoreFeature()` / `ontologyFeature()`         | Graph-document operations.                  |
+| API                                                   | Purpose                                       |
+| ----------------------------------------------------- | --------------------------------------------- |
+| `sparqlBackendPlugin({ endpoint, name?, features? })` | Install an endpoint; name defaults to sparql. |
+| `oxigraphEndpoint(store)` / `httpEndpoint(options)`   | Adapt local or remote endpoints.              |
+| `store.use(rdf)`                                      | `add`, `delete` and `match`.                  |
+| `store.use(sparql)`                                   | Native query/update templates.                |
+| `store.transaction(run)` / `store.tx()`               | Optimistic transactions.                      |
+| `graphStoreFeature()` / `ontologyFeature()`           | Graph-document operations.                    |
 
 ## Contract details
 

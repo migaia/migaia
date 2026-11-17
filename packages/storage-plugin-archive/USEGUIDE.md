@@ -19,11 +19,11 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'archive',
+    name: 'archive',
     hot: 'hot',
     cold: 'cold',
     rules: [
@@ -54,7 +54,7 @@ true
 true
 ```
 
-id 决定扩展函数前缀；hot/cold 指此前安装的 backend id。rules 非空，name 必须唯一；prefix 是字符串键前缀。olderThanMs 是非负安全整数，where(cutoffMs) 接收本次运行一次采样的当前时间减保留时长，返回记录筛选条件。日期判断由 where 显式表达，插件不会猜测记录哪个字段是时间。
+name 决定扩展函数前缀；hot/cold 指此前安装的后端名称。rules 非空，name 必须唯一；prefix 是字符串键前缀。olderThanMs 是非负安全整数，where(cutoffMs) 接收本次运行一次采样的当前时间减保留时长，返回记录筛选条件。日期判断由 where 显式表达，插件不会猜测记录哪个字段是时间。
 
 segmentBytes 默认 1,048,576，按未压缩 UTF-8 行字节计算，必须为正安全整数。超大单条记录独立成段。rule 可选，只执行该命名规则；省略按声明顺序执行。limit 可选，必须为正安全整数，只累计所有已选规则的匹配候选，同一键不重复计数。
 
@@ -72,11 +72,11 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'archive',
+    name: 'archive',
     hot: 'hot',
     cold: 'cold',
     rules: [
@@ -125,11 +125,11 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'history',
+    name: 'history',
     hot: 'hot',
     cold: 'cold',
     rules: [
@@ -175,11 +175,15 @@ import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [storageProbe(), memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [
+    storageProbe(),
+    memoryBackendPlugin({ name: 'hot' }),
+    memoryBackendPlugin({ name: 'cold' })
+  ]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'archive',
+    name: 'archive',
     hot: 'hot',
     cold: 'cold',
     rules: [

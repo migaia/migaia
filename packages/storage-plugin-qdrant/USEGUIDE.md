@@ -106,14 +106,14 @@ import { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/res
 const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
 await using host = await createStorageHost({
   plugins: [
-    qdrantBackendPlugin(
-      { url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' },
-      {
+    qdrantBackendPlugin({
+      url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333',
+      features: {
         rescore: qdrantRescoreFeature({
           collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }
         })
       }
-    )
+    })
   ]
 })
 const store = host.backend('qdrant')
@@ -203,7 +203,7 @@ console.log((await tenant.near([1, 0]).topK(1).all())[0]?.score)
 
 ## 选择原生功能
 
-工厂第二参数选择 Feature，增加 store.api 下的方法，没有事务投影。
+在工厂选项的 `features` 里选择 Feature，增加 store.api 下的方法，没有事务投影。
 
 | 子入口与工厂                                          | API 与边界                                                                                                                                                            |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

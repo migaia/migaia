@@ -38,7 +38,7 @@ it('stream limit zero performs no backend read or yield', async () => {
   const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
   const store = await memoryBackend()
-  const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+  const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
   await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
   let reads = 0
   const originalIterate = store.iterateRecords
@@ -56,7 +56,7 @@ it('stream direction reverses the explicit comparator order', async () => {
   /** This actual storage host owns the entity installation for this test scope. */
   const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-  const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
+  const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await memoryBackend())
   await repo.put({ id: 'a', name: 'A', email: 'a@b.c' })
   await repo.put({ id: 'b', name: 'B', email: 'b@c.d' })
   const values: IUser[] = []
@@ -102,7 +102,9 @@ it('projects explicit selectors and indexed list through the shared query route'
   /** This actual storage host owns the entity installation for this test scope. */
   const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
-  const repository = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
+  const repository = entityEntityPluginHost.extensions[entityEntityPlugin.name](
+    await memoryBackend()
+  )
   await repository.put({ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] })
   await repository.put({ id: 'u2', email: 'grace@example.com', tags: ['staff'] })
 
@@ -171,7 +173,7 @@ it('fallback batch does not execute secondary-index selectors', async () => {
   /** This actual storage host owns the entity installation for this test scope. */
   const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
-  await entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend()).batch(
+  await entityEntityPluginHost.extensions[entityEntityPlugin.name](await memoryBackend()).batch(
     async (tx) => {
       await tx.put({ id: 'u1', name: 'Ada', email: 'ada@example.com' })
     }
@@ -195,7 +197,7 @@ it('find APIs share fallback range, ordering, direction, and limit semantics', a
   })
   /** This actual storage host owns the entity installation for this test scope. */
   const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
-  const repository = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](
+  const repository = entity4EntityPluginHost.extensions[entity4EntityPlugin.name](
     await memoryBackend()
   )
   await repository.put({ id: 'u2', name: 'Bob', email: 'same@example.com' })
@@ -244,7 +246,9 @@ it('indexed comparator ordering ties by index and id before direction and limit'
   /** This actual storage host owns the entity installation for this test scope. */
   const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
-  const repository = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
+  const repository = entityEntityPluginHost.extensions[entityEntityPlugin.name](
+    await memoryBackend()
+  )
   await repository.put({ id: 'a', name: 'A', email: 'z@example.com' })
   await repository.put({ id: 'b', name: 'B', email: 'a@example.com' })
 
@@ -279,7 +283,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'ada@example.com' })
       await expect(repo.get('u1')).resolves.toEqual({
         id: 'u1',
@@ -292,7 +296,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await expect(repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })).resolves.toBe('u1')
     })
 
@@ -300,7 +304,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await expect(repo.get('missing')).resolves.toBeUndefined()
     })
 
@@ -308,7 +312,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await expect(repo.put({ name: 'Ada' } as unknown as IUser)).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
       })
@@ -318,7 +322,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await repo.remove('u1')
       await expect(repo.get('u1')).resolves.toBeUndefined()
@@ -328,7 +332,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await repo.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
       const all = await repo.list()
@@ -340,7 +344,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await repo.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
       await repo.put({ id: 'u3', name: 'Cy', email: 'c@d.e' })
@@ -352,7 +356,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await repo.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
       const streamed: IUser[] = []
@@ -364,7 +368,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await repo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
       await repo.put({ id: 'b', name: 'Bob', email: 'b@c.d' })
       const streamed: IUser[] = []
@@ -380,7 +384,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await repo.put({ id: 'c', name: 'C', email: 'c@d.e' })
       await repo.put({ id: 'a', name: 'A', email: 'a@b.c' })
       await repo.put({ id: 'b', name: 'B', email: 'b@c.d' })
@@ -393,7 +397,7 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await create())
+      const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await create())
       await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await repo.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
       const seen: string[] = []
@@ -423,8 +427,8 @@ for (const { label, create } of backends) {
       /** This actual storage host owns the entity installation for this test scope. */
       const postsEntityPluginHost = await entityHost(postsEntityPlugin)
 
-      const userRepo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
-      const postRepo = postsEntityPluginHost.extensions[postsEntityPlugin.id](store)
+      const userRepo = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
+      const postRepo = postsEntityPluginHost.extensions[postsEntityPlugin.name](store)
       await userRepo.put({ id: 'shared-id', name: 'Ada', email: 'a@b.c' })
       await postRepo.put({ id: 'shared-id', title: 'Hello' })
       await expect(userRepo.list()).resolves.toEqual([
@@ -456,7 +460,7 @@ describe('KV-only scan diagnostics', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const diagnosedEntityEntityPluginHost = await entityHost(diagnosedEntityEntityPlugin)
 
-    const repo = diagnosedEntityEntityPluginHost.extensions[diagnosedEntityEntityPlugin.id](
+    const repo = diagnosedEntityEntityPluginHost.extensions[diagnosedEntityEntityPlugin.name](
       await memoryBackend()
     )
     await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -484,7 +488,7 @@ describe('查询排序与无效记录策略', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity8EntityPluginHost = await entityHost(entity8EntityPlugin)
-    const repo = entity8EntityPluginHost.extensions[entity8EntityPlugin.id](await memoryBackend())
+    const repo = entity8EntityPluginHost.extensions[entity8EntityPlugin.name](await memoryBackend())
     await repo.put({ id: 'a' })
     await repo.put({ id: 'b' })
     const comparator = () => {
@@ -520,7 +524,7 @@ describe('查询排序与无效记录策略', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity9EntityPluginHost = await entityHost(entity9EntityPlugin)
-    const repo = entity9EntityPluginHost.extensions[entity9EntityPlugin.id](await memoryBackend())
+    const repo = entity9EntityPluginHost.extensions[entity9EntityPlugin.name](await memoryBackend())
     await repo.put({ id: 'a' })
     await repo.put({ id: 'b' })
     await expect(repo.list({ orderBy: () => 'invalid' as never, limit: 2 })).rejects.toMatchObject({
@@ -553,7 +557,9 @@ describe('查询排序与无效记录策略', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity10EntityPluginHost = await entityHost(entity10EntityPlugin)
-    const repo = entity10EntityPluginHost.extensions[entity10EntityPlugin.id](await memoryBackend())
+    const repo = entity10EntityPluginHost.extensions[entity10EntityPlugin.name](
+      await memoryBackend()
+    )
     await expect(repo.list({ orderBy: null as never })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
@@ -582,7 +588,9 @@ describe('查询排序与无效记录策略', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity11EntityPluginHost = await entityHost(entity11EntityPlugin)
-    const repo = entity11EntityPluginHost.extensions[entity11EntityPlugin.id](await memoryBackend())
+    const repo = entity11EntityPluginHost.extensions[entity11EntityPlugin.name](
+      await memoryBackend()
+    )
     for (const range of [null, [], 'range', 1]) {
       await expect(repo.list({ range: range as never })).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT'
@@ -613,7 +621,9 @@ describe('查询排序与无效记录策略', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity12EntityPluginHost = await entityHost(entity12EntityPlugin)
-    const repo = entity12EntityPluginHost.extensions[entity12EntityPlugin.id](await memoryBackend())
+    const repo = entity12EntityPluginHost.extensions[entity12EntityPlugin.name](
+      await memoryBackend()
+    )
     for (const range of [{ lowerOpen: 'yes' }, { upperOpen: 1 }]) {
       await expect(repo.list({ range: range as never })).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT'
@@ -644,7 +654,9 @@ describe('查询排序与无效记录策略', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity13EntityPluginHost = await entityHost(entity13EntityPlugin)
-    const repo = entity13EntityPluginHost.extensions[entity13EntityPlugin.id](await memoryBackend())
+    const repo = entity13EntityPluginHost.extensions[entity13EntityPlugin.name](
+      await memoryBackend()
+    )
     for (const options of [null, [], 'options', 1]) {
       await expect(repo.list(options as never)).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
       await expect(
@@ -673,7 +685,9 @@ describe('查询排序与无效记录策略', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity14EntityPluginHost = await entityHost(entity14EntityPlugin)
-    const repo = entity14EntityPluginHost.extensions[entity14EntityPlugin.id](await memoryBackend())
+    const repo = entity14EntityPluginHost.extensions[entity14EntityPlugin.name](
+      await memoryBackend()
+    )
     for (const onInvalid of [null, [], 'invalid', 1]) {
       await expect(repo.list({ onInvalid: onInvalid as never })).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
@@ -703,7 +717,7 @@ describe('查询排序与无效记录策略', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
-    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.name](await memoryBackend())
     await repo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
     await repo.put({ id: 'b', name: 'Bob', email: 'b@c.d' })
     await expect(repo.list({ limit: 1 })).resolves.toEqual([
@@ -743,11 +757,11 @@ describe('查询排序与无效记录策略', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
-    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.name](await memoryBackend())
     await repo.put({ id: 'good', n: 1 })
     const rawStore = await memoryBackend()
     await rawStore.putRecord({ version: 1, state: { id: 'bad', n: 'x' } }, ['strict-users', 'bad'])
-    const strictRepo = entityEntityPluginHost.extensions[entityEntityPlugin.id](rawStore)
+    const strictRepo = entityEntityPluginHost.extensions[entityEntityPlugin.name](rawStore)
     await expect(strictRepo.get('bad')).rejects.toMatchObject({
       code: 'EXTENSION_FAILED',
       operation: 'entity.schema.validate',
@@ -789,7 +803,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
     const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
     await expect(
-      entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend()).put({
+      entityEntityPluginHost.extensions[entityEntityPlugin.name](await memoryBackend()).put({
         id: 'x'
       })
     ).rejects.toMatchObject({
@@ -800,7 +814,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
 
     const rawStore = await memoryBackend()
     await rawStore.putRecord({ version: 1, state: { id: 'x' } }, ['schema-extension-error', 'x'])
-    const readRepo = entityEntityPluginHost.extensions[entityEntityPlugin.id](rawStore)
+    const readRepo = entityEntityPluginHost.extensions[entityEntityPlugin.name](rawStore)
     await expect(readRepo.get('x')).rejects.toMatchObject({
       code: 'EXTENSION_FAILED',
       operation: 'entity.schema.validate',
@@ -843,7 +857,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
       'u1'
     ])
     await expect(
-      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).get('u1')
+      entityEntityPluginHost.extensions[entityEntityPlugin.name](store).get('u1')
     ).rejects.toMatchObject({
       code: 'INVALID_CONFIG',
       operation: 'entity.schema.validate',
@@ -879,13 +893,13 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
     const store = await memoryBackend()
     await store.putRecord({ version: 1, state: { id: 'ok' } }, ['unchecked-read', 'ok'])
     await expect(
-      uncheckedEntityPluginHost.extensions[uncheckedEntityPlugin.id](store).get('ok')
+      uncheckedEntityPluginHost.extensions[uncheckedEntityPlugin.name](store).get('ok')
     ).resolves.toEqual({ id: 'ok' })
 
     const malformed = await memoryBackend()
     await malformed.putRecord({ broken: true }, ['unchecked-read', 'broken'])
     await expect(
-      uncheckedEntityPluginHost.extensions[uncheckedEntityPlugin.id](malformed).get('broken')
+      uncheckedEntityPluginHost.extensions[uncheckedEntityPlugin.name](malformed).get('broken')
     ).rejects.toMatchObject({
       code: 'DESERIALIZE_FAILED'
     })
@@ -922,7 +936,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   })
 
   it('put 经 normalize+encode，get 经 decode，往返值语义一致', async () => {
-    const repo = withSchemaEntityPluginHost.extensions[withSchemaEntityPlugin.id](
+    const repo = withSchemaEntityPluginHost.extensions[withSchemaEntityPlugin.name](
       await memoryBackend()
     )
     const createdAt = new Date('2024-01-01T00:00:00.000Z')
@@ -931,7 +945,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   })
 
   it('normalize 修改主键时以规范化后的主键写入', async () => {
-    const repo = withSchemaEntityPluginHost.extensions[withSchemaEntityPlugin.id](
+    const repo = withSchemaEntityPluginHost.extensions[withSchemaEntityPlugin.name](
       await memoryBackend()
     )
     await expect(
@@ -945,7 +959,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   })
 
   it('list/stream 同样经过 schema.decode', async () => {
-    const repo = withSchemaEntityPluginHost.extensions[withSchemaEntityPlugin.id](
+    const repo = withSchemaEntityPluginHost.extensions[withSchemaEntityPlugin.name](
       await memoryBackend()
     )
     const createdAt = new Date('2024-01-01T00:00:00.000Z')
@@ -983,7 +997,7 @@ describe('结构化后端上的自定义 repository codec', () => {
     const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
     await expect(
-      entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend()).put({
+      entityEntityPluginHost.extensions[entityEntityPlugin.name](await memoryBackend()).put({
         id: 'x'
       })
     ).rejects.toMatchObject({
@@ -1032,7 +1046,7 @@ describe('结构化后端上的自定义 repository codec', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
-    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.name](await memoryBackend())
 
     await repo.put({ id: 'u1', value: 7 })
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', value: 7 })
@@ -1078,8 +1092,8 @@ describe('list 显式 range', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const rangedUsersEntityPluginHost = await entityHost(rangedUsersEntityPlugin)
 
-    const userRepo = rangedUsersEntityPluginHost.extensions[rangedUsersEntityPlugin.id](store)
-    const postRepo = postsEntityPluginHost.extensions[postsEntityPlugin.id](store)
+    const userRepo = rangedUsersEntityPluginHost.extensions[rangedUsersEntityPlugin.name](store)
+    const postRepo = postsEntityPluginHost.extensions[postsEntityPlugin.name](store)
     await userRepo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
     await userRepo.put({ id: 'm', name: 'Mid', email: 'm@b.c' })
     await userRepo.put({ id: 'z', name: 'Zed', email: 'z@b.c' })
@@ -1112,7 +1126,7 @@ describe('版本迁移', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity25EntityPluginHost = await entityHost(entity25EntityPlugin)
-    const repo = entity25EntityPluginHost.extensions[entity25EntityPlugin.id](store)
+    const repo = entity25EntityPluginHost.extensions[entity25EntityPlugin.name](store)
     await expect(repo.get('u1')).rejects.toMatchObject({ code: 'VERSION_UNSUPPORTED' })
     await expect(repo.list({ onInvalid: 'skip' })).resolves.toEqual([])
     await expect(repo.list({ onInvalid: 'throw' })).rejects.toMatchObject({
@@ -1147,7 +1161,7 @@ describe('版本迁移', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity26EntityPluginHost = await entityHost(entity26EntityPlugin)
-    const repo = entity26EntityPluginHost.extensions[entity26EntityPlugin.id](store)
+    const repo = entity26EntityPluginHost.extensions[entity26EntityPlugin.name](store)
     await expect(repo.get('u1')).rejects.toMatchObject({ code: 'DESERIALIZE_FAILED' })
   })
 
@@ -1170,7 +1184,7 @@ describe('版本迁移', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const v1EntityPluginHost = await entityHost(v1EntityPlugin)
 
-    await v1EntityPluginHost.extensions[v1EntityPlugin.id](store).put({ id: 'u1', name: 'Ada' })
+    await v1EntityPluginHost.extensions[v1EntityPlugin.name](store).put({ id: 'u1', name: 'Ada' })
     const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
       'entity-repository-spec-ts-v2-28',
       {
@@ -1191,7 +1205,7 @@ describe('版本迁移', () => {
     const v2EntityPluginHost = await entityHost(v2EntityPlugin)
 
     await expect(
-      v2EntityPluginHost.extensions[v2EntityPlugin.id](store).migrate({ batchSize: 1 })
+      v2EntityPluginHost.extensions[v2EntityPlugin.name](store).migrate({ batchSize: 1 })
     ).resolves.toEqual({
       scanned: 1,
       eligible: 1,
@@ -1225,7 +1239,9 @@ describe('版本迁移', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity29EntityPluginHost = await entityHost(entity29EntityPlugin)
-    const repo = entity29EntityPluginHost.extensions[entity29EntityPlugin.id](await memoryBackend())
+    const repo = entity29EntityPluginHost.extensions[entity29EntityPlugin.name](
+      await memoryBackend()
+    )
     await expect(repo.migrate({ batchSize: null as never })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
@@ -1249,7 +1265,9 @@ describe('版本迁移', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity30EntityPluginHost = await entityHost(entity30EntityPlugin)
-    const repo = entity30EntityPluginHost.extensions[entity30EntityPlugin.id](await memoryBackend())
+    const repo = entity30EntityPluginHost.extensions[entity30EntityPlugin.name](
+      await memoryBackend()
+    )
     await expect(repo.migrate({ batchSize: Number.MAX_SAFE_INTEGER + 1 })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
@@ -1273,7 +1291,9 @@ describe('版本迁移', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity31EntityPluginHost = await entityHost(entity31EntityPlugin)
-    const repo = entity31EntityPluginHost.extensions[entity31EntityPlugin.id](await memoryBackend())
+    const repo = entity31EntityPluginHost.extensions[entity31EntityPlugin.name](
+      await memoryBackend()
+    )
     for (const options of [null, [], 'options', 1])
       await expect(repo.migrate(options as never)).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
@@ -1315,7 +1335,7 @@ describe('版本迁移', () => {
       'bad'
     ])
     await expect(
-      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).migrate()
+      entityEntityPluginHost.extensions[entityEntityPlugin.name](store).migrate()
     ).resolves.toMatchObject({
       scanned: 2,
       eligible: 0,
@@ -1344,7 +1364,7 @@ describe('版本迁移', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const v1EntityPluginHost = await entityHost(v1EntityPlugin)
 
-    await v1EntityPluginHost.extensions[v1EntityPlugin.id](source).put({ id: 'u1', name: 'Ada' })
+    await v1EntityPluginHost.extensions[v1EntityPlugin.name](source).put({ id: 'u1', name: 'Ada' })
     const conflictStore = {
       ...source,
       transaction: async () => {
@@ -1373,7 +1393,7 @@ describe('版本迁移', () => {
     const v2EntityPluginHost = await entityHost(v2EntityPlugin)
 
     await expect(
-      v2EntityPluginHost.extensions[v2EntityPlugin.id](conflictStore).migrate({ batchSize: 1 })
+      v2EntityPluginHost.extensions[v2EntityPlugin.name](conflictStore).migrate({ batchSize: 1 })
     ).resolves.toEqual({
       scanned: 1,
       eligible: 1,
@@ -1404,7 +1424,7 @@ describe('版本迁移', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity35EntityPluginHost = await entityHost(entity35EntityPlugin)
-    await entity35EntityPluginHost.extensions[entity35EntityPlugin.id](source).put({
+    await entity35EntityPluginHost.extensions[entity35EntityPlugin.name](source).put({
       id: 'u1',
       name: 'Ada'
     })
@@ -1434,7 +1454,7 @@ describe('版本迁移', () => {
     const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
     await expect(
-      entityEntityPluginHost.extensions[entityEntityPlugin.id](failingStore).migrate()
+      entityEntityPluginHost.extensions[entityEntityPlugin.name](failingStore).migrate()
     ).rejects.toMatchObject({
       code: 'TRANSACTION_FAILED',
       cause: { message: 'transaction exploded' }
@@ -1460,7 +1480,7 @@ describe('版本迁移', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const v1EntityPluginHost = await entityHost(v1EntityPlugin)
 
-    await v1EntityPluginHost.extensions[v1EntityPlugin.id](source).put({ id: 'u1', name: 'Ada' })
+    await v1EntityPluginHost.extensions[v1EntityPlugin.name](source).put({ id: 'u1', name: 'Ada' })
     let calls = 0
     const originalTransaction = source.transaction
     type ICurrentScope = Parameters<Parameters<typeof originalTransaction>[0]>[0]
@@ -1496,7 +1516,7 @@ describe('版本迁移', () => {
     const v2EntityPluginHost = await entityHost(v2EntityPlugin)
 
     await expect(
-      v2EntityPluginHost.extensions[v2EntityPlugin.id](retryStore).migrate({ batchSize: 1 })
+      v2EntityPluginHost.extensions[v2EntityPlugin.name](retryStore).migrate({ batchSize: 1 })
     ).resolves.toMatchObject({
       eligible: 1,
       migrated: 1,
@@ -1523,7 +1543,7 @@ describe('版本迁移', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const v1EntityPluginHost = await entityHost(v1EntityPlugin)
 
-    await v1EntityPluginHost.extensions[v1EntityPlugin.id](source).put({ id: 'u1', name: 'Ada' })
+    await v1EntityPluginHost.extensions[v1EntityPlugin.name](source).put({ id: 'u1', name: 'Ada' })
     let first = true
     const originalTransaction = source.transaction
     type ICurrentScope = Parameters<Parameters<typeof originalTransaction>[0]>[0]
@@ -1567,7 +1587,7 @@ describe('版本迁移', () => {
     const v2EntityPluginHost = await entityHost(v2EntityPlugin)
 
     await expect(
-      v2EntityPluginHost.extensions[v2EntityPlugin.id](retryStore).migrate({ batchSize: 1 })
+      v2EntityPluginHost.extensions[v2EntityPlugin.name](retryStore).migrate({ batchSize: 1 })
     ).resolves.toMatchObject({
       migrated: 0,
       alreadyCurrent: 1,
@@ -1596,7 +1616,7 @@ describe('版本迁移', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const v1EntityPluginHost = await entityHost(v1EntityPlugin)
 
-    await v1EntityPluginHost.extensions[v1EntityPlugin.id](inner).put({ id: 'u1', name: 'Ada' })
+    await v1EntityPluginHost.extensions[v1EntityPlugin.name](inner).put({ id: 'u1', name: 'Ada' })
 
     // 读正常、写失败的包装 store：用 putCalls 证明读取路径没有尝试隐式写回。
     let putCalls = 0
@@ -1628,7 +1648,7 @@ describe('版本迁移', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const v2EntityPluginHost = await entityHost(v2EntityPlugin)
 
-    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.id](flakyStore)
+    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.name](flakyStore)
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', displayName: 'Ada' })
     expect(putCalls).toBe(0)
     expect(diagnosed).toHaveLength(0)
@@ -1655,7 +1675,7 @@ describe('版本迁移', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const v1EntityPluginHost = await entityHost(v1EntityPlugin)
 
-    await v1EntityPluginHost.extensions[v1EntityPlugin.id](inner).put({ id: 'u1', name: 'Ada' })
+    await v1EntityPluginHost.extensions[v1EntityPlugin.name](inner).put({ id: 'u1', name: 'Ada' })
 
     const flakyStore = {
       ...inner,
@@ -1685,7 +1705,7 @@ describe('版本迁移', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const v2EntityPluginHost = await entityHost(v2EntityPlugin)
 
-    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.id](flakyStore)
+    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.name](flakyStore)
     await expect(repo.get('u1')).resolves.toEqual({ id: 'u1', displayName: 'Ada' })
     expect(diagnosed).toHaveLength(0)
   })
@@ -1710,7 +1730,7 @@ describe('版本迁移', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const v1EntityPluginHost = await entityHost(v1EntityPlugin)
 
-    await v1EntityPluginHost.extensions[v1EntityPlugin.id](store).put({ id: 'u1', name: 'Ada' })
+    await v1EntityPluginHost.extensions[v1EntityPlugin.name](store).put({ id: 'u1', name: 'Ada' })
 
     const v2EntityPlugin = defineEntityPlugin<{ id: string; displayName: string }>()(
       'entity-repository-spec-ts-v2-46',
@@ -1731,7 +1751,7 @@ describe('版本迁移', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const v2EntityPluginHost = await entityHost(v2EntityPlugin)
 
-    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.id](store)
+    const repo = v2EntityPluginHost.extensions[v2EntityPlugin.name](store)
     /** Normal and authentic transaction reads recover exactly the same persisted envelope. */
     const normal = await repo.get('u1')
     let seen: { id: string; displayName: string } | undefined
@@ -1752,7 +1772,7 @@ describe('batch', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await memoryBackend())
     for (const callback of [null, undefined, {}, 'run'])
       await expect(repo.batch(callback as never)).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
@@ -1763,7 +1783,7 @@ describe('batch', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await memoryBackend())
     await repo.batch(async (tx) => {
       await tx.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await tx.put({ id: 'u2', name: 'Bob', email: 'b@c.d' })
@@ -1795,7 +1815,7 @@ describe('batch', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const batchEntityEntityPluginHost = await entityHost(batchEntityEntityPlugin)
 
-    const repo = batchEntityEntityPluginHost.extensions[batchEntityEntityPlugin.id](
+    const repo = batchEntityEntityPluginHost.extensions[batchEntityEntityPlugin.name](
       await memoryBackend()
     )
     await repo.batch(async (tx) => {
@@ -1811,7 +1831,7 @@ describe('batch', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await memoryBackend())
     await repo.put({ id: 'existing', name: 'Old', email: 'old@x.y' })
     /** The actual callback error must remain reachable through the transaction boundary. */
     const original = new Error('boom')
@@ -1836,7 +1856,7 @@ describe('batch', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const usersEntityPluginHost = await entityHost(usersEntityPlugin)
 
-    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](await memoryBackend())
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](await memoryBackend())
     await repo.batch(async (tx) => {
       await tx.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
       await expect(tx.get('u1')).resolves.toEqual({ id: 'u1', name: 'Ada', email: 'a@b.c' })
@@ -1864,7 +1884,7 @@ describe('entity key and invalid-record boundaries', () => {
     /** This actual storage host owns the entity installation for this test scope. */
     const entityEntityPluginHost = await entityHost(entityEntityPlugin)
 
-    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.id](await memoryBackend())
+    const repo = entityEntityPluginHost.extensions[entityEntityPlugin.name](await memoryBackend())
     for (const id of [
       1,
       new Date('2024-01-01T00:00:00Z'),
@@ -1903,7 +1923,9 @@ describe('entity key and invalid-record boundaries', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity49EntityPluginHost = await entityHost(entity49EntityPlugin)
-    const repo = entity49EntityPluginHost.extensions[entity49EntityPlugin.id](await memoryBackend())
+    const repo = entity49EntityPluginHost.extensions[entity49EntityPlugin.name](
+      await memoryBackend()
+    )
     for (const id of [true, {}, 42n] as unknown[]) {
       await expect(repo.batch((tx) => tx.get(id as IStorageKey))).rejects.toMatchObject({
         code: 'INVALID_KEY'
@@ -1932,7 +1954,9 @@ describe('entity key and invalid-record boundaries', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity50EntityPluginHost = await entityHost(entity50EntityPlugin)
-    const repo = entity50EntityPluginHost.extensions[entity50EntityPlugin.id](await memoryBackend())
+    const repo = entity50EntityPluginHost.extensions[entity50EntityPlugin.name](
+      await memoryBackend()
+    )
     for (const limit of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
       await expect(repo.list({ limit })).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     await expect(repo.list({ limit: 0 })).resolves.toEqual([])
@@ -1956,7 +1980,9 @@ describe('entity key and invalid-record boundaries', () => {
     )
     /** This actual storage host owns the entity installation for this test scope. */
     const entity51EntityPluginHost = await entityHost(entity51EntityPlugin)
-    const repo = entity51EntityPluginHost.extensions[entity51EntityPlugin.id](await memoryBackend())
+    const repo = entity51EntityPluginHost.extensions[entity51EntityPlugin.name](
+      await memoryBackend()
+    )
     await repo.put({ id: 'a' })
     const options = { range: { lower: 'a', upper: 'z' }, limit: 1, onInvalid: 'throw' as const }
     await expect(repo.list(options)).resolves.toEqual([{ id: 'a' }])
@@ -1998,7 +2024,7 @@ describe('entity key and invalid-record boundaries', () => {
 
     await store.putRecord({ version: 1, state: { id: 'bad', n: 1 } }, ['stage-users', 'bad'])
     const stages: string[] = []
-    await decodeEntityEntityPluginHost.extensions[decodeEntityEntityPlugin.id](store).list({
+    await decodeEntityEntityPluginHost.extensions[decodeEntityEntityPlugin.name](store).list({
       onInvalid: (issue) => {
         stages.push(issue.stage)
         return 'skip'
@@ -2037,14 +2063,14 @@ describe('entity key and invalid-record boundaries', () => {
       'bad'
     ])
     await expect(
-      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).list({
+      entityEntityPluginHost.extensions[entityEntityPlugin.name](store).list({
         onInvalid: 'invalid' as never
       })
     ).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
     await expect(
-      entityEntityPluginHost.extensions[entityEntityPlugin.id](store).list({
+      entityEntityPluginHost.extensions[entityEntityPlugin.name](store).list({
         onInvalid: () => 'invalid' as never
       })
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
@@ -2084,7 +2110,7 @@ describe('entity key and invalid-record boundaries', () => {
       'bad'
     ])
     const stages: string[] = []
-    await entityEntityPluginHost.extensions[entityEntityPlugin.id](store).list({
+    await entityEntityPluginHost.extensions[entityEntityPlugin.name](store).list({
       onInvalid: (issue) => {
         stages.push(issue.stage)
         return 'skip'

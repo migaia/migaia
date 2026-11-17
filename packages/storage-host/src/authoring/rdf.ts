@@ -14,7 +14,6 @@ import {
   assertStorageRdfTerm,
   assertStorageRdfPattern,
   assertStorageRdfQuad,
-  type IBackendKind,
   StorageContractError,
   StorageContractErrorCode,
   StorageContractErrorText,
@@ -30,7 +29,7 @@ const DEFAULT_GRAPH: IRdfDefaultGraph = { termType: RdfTermType.defaultGraph }
 let blankSequence = 0
 
 /** Absolute IRI factories allocate only their public result after canonical admission. */
-function rdfIri(value: unknown, backend: IBackendKind | undefined): IRdfNamedNode {
+function rdfIri(value: unknown, backend: string | undefined): IRdfNamedNode {
   assertRdfIri(value, backend)
   return { termType: RdfTermType.namedNode, value }
 }
@@ -40,7 +39,7 @@ function rdfLiteral(
   value: string,
   datatype: string,
   language: string | undefined,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): IRdfLiteral {
   assertRdfLiteral(value, datatype, language, backend)
   return {
@@ -69,10 +68,7 @@ function copyRdfTerm(value: IRdfTerm): IRdfTerm {
 }
 
 /** Snapshots direct structural terms only when a deferred consumer needs an independent value. */
-export function snapshotStorageRdfTerm(
-  value: IRdfTerm,
-  backend: IBackendKind | undefined
-): IRdfTerm {
+export function snapshotStorageRdfTerm(value: IRdfTerm, backend: string | undefined): IRdfTerm {
   assertStorageRdfTerm(value, backend)
   return copyRdfTerm(value)
 }
@@ -92,14 +88,14 @@ function copyRdfPattern(pattern: Partial<IQuad>): Partial<IQuad> {
 /** Capture a partial pattern before a deferred query can observe later caller mutation. */
 export function snapshotStorageRdfPattern(
   pattern: Partial<IQuad>,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): Readonly<Partial<IQuad>> {
   assertStorageRdfPattern(pattern, backend)
   return copyRdfPattern(pattern)
 }
 
 /** Capture all ground positions before a queued write or lock can observe caller mutation. */
-export function snapshotStorageRdfQuad(quad: IQuad, backend: IBackendKind | undefined): IQuad {
+export function snapshotStorageRdfQuad(quad: IQuad, backend: string | undefined): IQuad {
   assertStorageRdfQuad(quad, backend)
   return copyRdfPattern(quad) as IQuad
 }
@@ -117,10 +113,7 @@ function rdfTermKey(value: IRdfTerm): IStorageKey {
  * permutations can concatenate these bytes directly without reclassifying them as public binary
  * keys or applying a second term codec. Raw blank labels remain request-local identities.
  */
-export function encodeStorageRdfTerm(
-  value: IRdfTerm,
-  backend: IBackendKind | undefined
-): Uint8Array {
+export function encodeStorageRdfTerm(value: IRdfTerm, backend: string | undefined): Uint8Array {
   assertStorageRdfTerm(value, backend)
   return encodeOrderedStorageKey(rdfTermKey(value), backend)
 }
@@ -139,7 +132,7 @@ export function encodeRdfQuadSnapshot(quad: IQuad): Uint8Array {
 }
 
 /** Canonical term identity uses only the original self-delimiting ordered-key encoder. */
-export function encodeStorageRdfQuad(quad: IQuad, backend: IBackendKind | undefined): Uint8Array {
+export function encodeStorageRdfQuad(quad: IQuad, backend: string | undefined): Uint8Array {
   assertStorageRdfQuad(quad, backend)
   return encodeRdfQuadSnapshot(quad)
 }

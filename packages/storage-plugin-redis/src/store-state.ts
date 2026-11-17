@@ -192,7 +192,6 @@ export async function redisObserveNative<R>(
   } finally {
     environment.core.emit(RedisOperation.onRedisCommand, () => ({
       backendId: environment.core.getBackendId(),
-      backend: RedisText.backend,
       orgId,
       command: name,
       elapsedMs: environment.core.featureExpose.getScheduler().now() - started

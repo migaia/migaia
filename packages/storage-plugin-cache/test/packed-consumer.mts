@@ -16,10 +16,10 @@ await redis.connect()
 const prefix = 'cache_guide_' + crypto.randomUUID().replaceAll('-', '')
 const base = await createStorageHost({
   plugins: [
-    memoryBackendPlugin({ id: 'l1' }),
-    sqliteBackendPlugin({ id: 'l2', driver: nodeSqliteDriver(':memory:') }),
-    redisBackendPlugin({ id: 'l3', driver: nodeRedisDriver(redis), prefix }),
-    postgresBackendPlugin({ id: 'l4', driver: pgDriver(postgres), prefix })
+    memoryBackendPlugin({ name: 'l1' }),
+    sqliteBackendPlugin({ name: 'l2', driver: nodeSqliteDriver(':memory:') }),
+    redisBackendPlugin({ name: 'l3', driver: nodeRedisDriver(redis), prefix }),
+    postgresBackendPlugin({ name: 'l4', driver: pgDriver(postgres), prefix })
   ]
 })
 const host = await base.use(

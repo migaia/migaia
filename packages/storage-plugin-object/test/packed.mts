@@ -97,7 +97,7 @@ import { objectPresignFeature } from '@migaia/storage-plugin-object/features/pre
 assert.equal(STORAGE_OBJECT_ERROR_SOURCE, 'storage.backend.object')
 assert.equal(s3ObjectDriver({ config: { region: 'us-east-1' }, bucket: 'objects' }).kind, 's3')
 assert.ok(objectPresignFeature())
-const host = await createStorageHost({ plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] })
+const host = await createStorageHost({ plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' })  })] })
 try {
   const objects = host.backend('object').use(blob)
   const info = await objects.put('file', new Uint8Array([1, 2, 3]), { metadata: { owner: 'ada' } })

@@ -2,9 +2,9 @@ import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { it, expect, onTestFinished, vi } from 'vitest'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { kv } from '@migaia/storage-contract'
-import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
+import { ConcurrencyPolicy, lockKey, definePlugin } from '@migaia/storage-host/sdk'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { postgresBackendPlugin } from '../src/index.ts'
 import { pgDriver } from '../src/pg.ts'
@@ -77,15 +77,18 @@ it('keeps original before hooks report-only and one pipeline per actual operatio
     operations: string[] = [],
     seen = new Set<string>()
   const original = new Error('observed-before-hook')
-  const counting = definePlugin('pg-host-counting', (core) => ({
-    install() {
-      core.useAsyncPipeline((request, next) => {
-        operations.push(request.operation)
-        return next(request)
-      })
-      return {}
-    }
-  }))
+  const counting = definePlugin({
+    name: 'pg-host-counting',
+    setup: (core) => ({
+      install() {
+        core.useAsyncPipeline((request, next) => {
+          operations.push(request.operation)
+          return next(request)
+        })
+        return {}
+      }
+    })
+  })
   const host = await createStorageHost({
     plugins: [
       storageProbe(),

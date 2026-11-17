@@ -7,7 +7,6 @@ it('exports only the declared cache entries', async () => {
     'CacheErrorCode',
     'CacheWriteMode',
     'STORAGE_CACHE_ERROR_SOURCE',
-    'cacheBackendKind',
     'cacheKey',
     'cachePlugin'
   ])

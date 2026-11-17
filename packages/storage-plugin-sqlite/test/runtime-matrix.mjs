@@ -56,7 +56,7 @@ const runtimeEntityPlugin = defineEntityPlugin('runtime-entities', {
 /** Install once on the real fixture host and retain exact extension inference. */
 const entityHost = await host.use(runtimeEntityPlugin)
 /** Borrow the supplied backend through the installed repository capability factories. */
-const entities = entityHost.extensions[runtimeEntityPlugin.id](storage)
+const entities = entityHost.extensions[runtimeEntityPlugin.name](storage)
 /** A real legacy archive must remain unchanged when its migrated state is read. */
 const legacy = { version: 1, state: { id: 'legacy', active: true, score: 1 } }
 /** Canonical record order makes ordinary and transaction projections directly comparable. */

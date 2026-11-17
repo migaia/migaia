@@ -1,6 +1,6 @@
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import type { IOperationContext } from '@migaia/storage-contract'
-import { sparqlBackendKind } from '../plugin.ts'
+import { defineSparqlFeature } from '../plugin.ts'
 import {
   snapshotGraphTarget,
   snapshotGraphFormat,
@@ -34,7 +34,7 @@ export type IOntologyOutput = IStorageFeatureOutput<
 >
 /** Ontology uses only the same RDF parser/writer and the endpoint's original Graph Store port. */
 export function ontologyFeature() {
-  return defineFeature<typeof sparqlBackendKind, {}, IOntologyOutput>(sparqlBackendKind, (core) => {
+  return defineSparqlFeature<{}, IOntologyOutput>((core) => {
     core.featureExpose.registerDetect(async () => {
       requireGraphStore(core.featureExpose.getClient())
     })

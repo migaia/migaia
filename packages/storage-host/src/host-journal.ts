@@ -162,9 +162,7 @@ export class StorageHostJournal {
         orgId,
         storageLogStore: (id: string, options: { readonly prefix: string }) => {
           this.#owner.assertOpen()
-          const candidate = candidatesById
-            .get(id)
-            ?.find((context) => context.getKind() !== undefined)
+          const candidate = candidatesById.get(id)?.find((context) => context.backend)
           const published = this.#owner.registry.get(id)
           const context =
             candidate ??
@@ -338,7 +336,7 @@ export class StorageHostJournal {
 
 /**
  * Groups prepared candidates by id in input order. A lookup then visits only same-id candidates,
- * still picking the first whose kind is known at lookup time.
+ * still picking the first whose backend is known at lookup time.
  */
 function indexCandidatesById(
   candidates: readonly IStorageNativeRegistrationContext[] | undefined

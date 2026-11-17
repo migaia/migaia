@@ -13,7 +13,6 @@ import {
   type IUniqueIndexOwner
 } from '@migaia/storage-host/sdk'
 import type {
-  IBackendKind,
   IRecordIndexDefinition,
   IRecordIndexProjection,
   IStorageKey
@@ -39,7 +38,7 @@ export const isStorageErrorFamily = (value: unknown): value is IStorageErrorFami
 /** Unknown failures receive the Web source while the canonical family remains unchanged. */
 export const normalizeError = (
   error: unknown,
-  backend: IBackendKind,
+  backend: string,
   code: IStorageBrowserErrorCode = StorageBrowserErrorCode.transactionFailed,
   operation?: string,
   extensionStage?: IExtensionStage
@@ -53,7 +52,7 @@ export const normalizeError = (
 /** Shared extension execution delegates only Web context attachment to this backend boundary. */
 export const invokeExtension = <T>(
   fn: () => T | Promise<T>,
-  backend: IBackendKind,
+  backend: string,
   operation: string,
   extensionStage: IExtensionStage,
   signal: IAbortSignal | undefined,
@@ -100,7 +99,7 @@ export const planChannelWrite = (
   attempted: IStorageChannel,
   existing: IChannelPresence,
   policy: IStorageConflictPolicy = StorageConflictPolicy.conflict,
-  backend: IBackendKind
+  backend: string
 ): IChannelMutationPlan =>
   planWrite(
     key,
@@ -115,7 +114,7 @@ export const planChannelWrite = (
 export const collectUniqueIndexOwners = (
   definitions: readonly IRecordIndexDefinition[],
   records: Iterable<{ readonly key: IStorageKey; readonly projection: IRecordIndexProjection }>,
-  backend: IBackendKind
+  backend: string
 ): ReadonlyMap<string, IUniqueIndexOwner> =>
   collectOwners(definitions, records, backend, {
     invalidConfig: (owner) =>

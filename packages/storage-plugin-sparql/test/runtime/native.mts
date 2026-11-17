@@ -12,10 +12,10 @@ import { ontologyFeature } from '../../dist/features/ontology.js'
 const native = new Store()
 const host = await createStorageHost({
   plugins: [
-    sparqlBackendPlugin(
-      { endpoint: oxigraphEndpoint(native) },
-      { graphs: graphStoreFeature(), ontology: ontologyFeature() }
-    )
+    sparqlBackendPlugin({
+      endpoint: oxigraphEndpoint(native),
+      features: { graphs: graphStoreFeature(), ontology: ontologyFeature() }
+    })
   ] as const
 })
 try {

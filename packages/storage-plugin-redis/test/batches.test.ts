@@ -1,9 +1,9 @@
 import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { afterAll, describe, expect, it } from 'vitest'
 import { createClientPool } from 'redis'
-import { createOrgId, createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createOrgId, createStorageHost } from '@migaia/storage-host'
 import { kv, records, vector } from '@migaia/storage-contract'
-import { snapshotConcurrencyLockKeys } from '@migaia/storage-host/sdk'
+import { snapshotConcurrencyLockKeys, definePlugin } from '@migaia/storage-host/sdk'
 import { redisBackendPlugin, type IRedisDriver } from '../src/index.ts'
 import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
 import { RedisCommand, RedisText } from '../src/constants.ts'
@@ -65,15 +65,16 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
         const host = await createStorageHost({
           plugins: [
             storageProbe(),
-            redisBackendPlugin(
-              { driver, prefix },
-              {
+            redisBackendPlugin({
+              driver,
+              prefix,
+              features: {
                 streams: redisStreamsFeature(),
                 sorted: redisSortedSetsFeature(),
                 rate: redisRateLimitFeature({ limit: 3, windowMs: 60000 }),
                 pubsub: redisPubSubFeature()
               }
-            )
+            })
           ] as const
         })
         let vectorIndex: string | undefined
@@ -98,7 +99,11 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
             const search = await createStorageHost({
               plugins: [
                 storageProbe(),
-                redisBackendPlugin({ driver, prefix }, { search: rediSearchVectorFeature() })
+                redisBackendPlugin({
+                  driver,
+                  prefix,
+                  features: { search: rediSearchVectorFeature() }
+                })
               ] as const
             })
             try {
@@ -210,15 +215,18 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
             })
           )
       }
-      const counting = definePlugin('batch-observer', (core) => ({
-        install() {
-          core.useAsyncPipeline((input, next) => {
-            pipelines.push(input.operation)
-            return next(input)
-          })
-          return {}
-        }
-      }))
+      const counting = definePlugin({
+        name: 'batch-observer',
+        setup: (core) => ({
+          install() {
+            core.useAsyncPipeline((input, next) => {
+              pipelines.push(input.operation)
+              return next(input)
+            })
+            return {}
+          }
+        })
+      })
       const host = await createStorageHost({
         plugins: [
           storageProbe(),

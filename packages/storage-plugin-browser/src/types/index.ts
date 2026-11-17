@@ -7,7 +7,7 @@ export type {
   ISyncWriteOptions,
   IConflictPolicy
 } from './context.ts'
-export type { IBackendKind, IStorageCapabilities } from './capabilities.ts'
+export type { IStorageCapabilities } from './capabilities.ts'
 export {
   StorageError,
   type IStorageErrorDetails,

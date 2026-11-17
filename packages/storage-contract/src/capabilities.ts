@@ -1,9 +1,3 @@
-/**
- * Open provider label domain. Runtime admission applies the canonical lowercase backend-name
- * pattern; a label never grants capability or extension authority.
- */
-export type IBackendKind = string
-
 /** Provider capability facts, independent of any browser or database implementation. */
 export type IStorageCapabilities = {
   /** Whether native KV batch writes and counted prefix removal are supported. Omission means false. */

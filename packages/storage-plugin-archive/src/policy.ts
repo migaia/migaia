@@ -27,7 +27,7 @@ export function snapshotArchiveOptions<T>(
 /** Validate plugin options; reads happen inside the caller's getter-failure boundary. */
 function readArchiveOptions<T>(options: IArchivePluginOptions<T>): IArchiveConfiguration {
   if (!options || typeof options !== 'object') throw archiveError(ArchiveErrorCode.invalidOption)
-  const { id, hot, cold, rules } = options
+  const { name: id, hot, cold, rules } = options
   if (
     ![id, hot, cold].every((value) => typeof value === 'string' && value.length > 0) ||
     !Array.isArray(rules) ||

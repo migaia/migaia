@@ -4,10 +4,16 @@ import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi, onTestFinished } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { createStorageHost, createOrgId, defineFeature } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { indexedDbBackendPlugin, indexedDbBackendKind } from '../../src/indexed-db.ts'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 import { indexedDbBlobFeature } from '../../src/features/blobs.ts'
+import type { IIndexedDbBackend } from '../../src/indexed-db.ts'
+import { defineStorageFeature } from '@migaia/storage-host/sdk'
+import type { IStorageFeatureDefiner } from '@migaia/storage-host'
+
+/** Feature definer typed for the imported backend. */
+const defineIndexedDbFeature: IStorageFeatureDefiner<IIndexedDbBackend> = defineStorageFeature
 
 describe('native IndexedDB Blob Feature', () => {
   it('uses exact physical org clients and shares the original native record transaction', async () => {
@@ -15,7 +21,7 @@ describe('native IndexedDB Blob Feature', () => {
     const first = createOrgId()
     const second = createOrgId()
     const nativeClients: IDBTransaction[] = []
-    const native = defineFeature(indexedDbBackendKind, () => ({
+    const native = defineIndexedDbFeature(() => ({
       capabilities: [] as const,
       chain: {},
       api: {
@@ -38,10 +44,12 @@ describe('native IndexedDB Blob Feature', () => {
     }))
     await using host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin(
-          { factory, keyRange: IDBKeyRange, dbName: 'native-blobs' },
-          { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature(), native }
-        )
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          dbName: 'native-blobs',
+          features: { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature(), native }
+        })
       ]
     })
     const root = host.backend('indexed-db')
@@ -97,10 +105,14 @@ describe('native IndexedDB Blob Feature', () => {
     const failure = new Error('business callback failed')
     await using host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin(
-          { factory, keyRange: IDBKeyRange },
-          { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature({ storeName: 'attachments' }) }
-        )
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          features: {
+            ...indexedDbTestFeatures,
+            blobs: indexedDbBlobFeature({ storeName: 'attachments' })
+          }
+        })
       ]
     })
     const store = host.backend('indexed-db')
@@ -143,22 +155,27 @@ describe('native IndexedDB Blob Feature', () => {
     await expect(
       createStorageHost({
         plugins: [
-          indexedDbBackendPlugin(
-            { factory, keyRange: IDBKeyRange },
-            {
+          indexedDbBackendPlugin({
+            factory,
+            keyRange: IDBKeyRange,
+            features: {
               ...indexedDbTestFeatures,
               first: indexedDbBlobFeature(),
               second: indexedDbBlobFeature()
             }
-          )
+          })
         ]
       })
     ).rejects.toBeDefined()
     expect(open).not.toHaveBeenCalled()
     await expect(
       createStorageHost({
-        // @ts-expect-error Blob Feature targets only the authentic IndexedDB kind token.
-        plugins: [memoryBackendPlugin({}, { ...memoryTestFeatures, blobs: indexedDbBlobFeature() })]
+        plugins: [
+          memoryBackendPlugin({
+            // @ts-expect-error Blob Feature targets only the IndexedDB backend type.
+            features: { ...memoryTestFeatures, blobs: indexedDbBlobFeature() }
+          })
+        ]
       })
     ).rejects.toBeDefined()
     expect(open).not.toHaveBeenCalled()

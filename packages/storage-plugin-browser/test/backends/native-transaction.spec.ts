@@ -9,12 +9,13 @@ import {
 } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import {
   assertTransactionOwner,
   registerTransactionFinalizer,
   ConcurrencyPolicy,
-  lockKey
+  lockKey,
+  definePlugin
 } from '@migaia/storage-host/sdk'
 import {
   defineConcurrencyPolicy,
@@ -53,34 +54,41 @@ describe('IndexedDB complete native transaction views', () => {
     let committed: string | null = null
     /** The after-next read must observe the actual native terminal, not an issued request. */
     let readCommitted!: () => Promise<string | null>
-    const intervention = definePlugin('root-pipeline', (core) => ({
-      install: () => {
-        core.useAsyncPipeline(async (input, next) => {
-          if (input.operation === 'indexeddb.transaction' && holding) {
-            holding = false
-            acquired.resolve()
-            await release.promise
-          }
-          if (input.operation === 'indexed-db.set') {
-            rootPipelines += 1
-            await next(input)
-            committed = await readCommitted()
-          } else await next(input)
-        })
-        return {}
-      }
-    }))
+    const intervention = definePlugin({
+      name: 'root-pipeline',
+      setup: (core) => ({
+        install: () => {
+          core.useAsyncPipeline(async (input, next) => {
+            if (input.operation === 'indexeddb.transaction' && holding) {
+              holding = false
+              acquired.resolve()
+              await release.promise
+            }
+            if (input.operation === 'indexed-db.set') {
+              rootPipelines += 1
+              await next(input)
+              committed = await readCommitted()
+            } else await next(input)
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { id: 'holder', factory, keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        ),
-        indexedDbBackendPlugin(
-          { id: 'writer', factory, keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        ),
+        indexedDbBackendPlugin({
+          name: 'holder',
+          factory,
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        }),
+        indexedDbBackendPlugin({
+          name: 'writer',
+          factory,
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        }),
         intervention
       ]
     })
@@ -126,31 +134,38 @@ describe('IndexedDB complete native transaction views', () => {
     const factory = new IDBFactory()
     let holding = true
     let pipelines = 0
-    const intervention = definePlugin('prefix-pipeline', (core) => ({
-      install: () => {
-        core.useAsyncPipeline(async (input, next) => {
-          if (input.operation === 'indexeddb.transaction' && holding) {
-            holding = false
-            acquired.resolve()
-            await release.promise
-          }
-          if (input.operation === 'indexed-db.records.removeByPrefix') pipelines += 1
-          await next(input)
-        })
-        return {}
-      }
-    }))
+    const intervention = definePlugin({
+      name: 'prefix-pipeline',
+      setup: (core) => ({
+        install: () => {
+          core.useAsyncPipeline(async (input, next) => {
+            if (input.operation === 'indexeddb.transaction' && holding) {
+              holding = false
+              acquired.resolve()
+              await release.promise
+            }
+            if (input.operation === 'indexed-db.records.removeByPrefix') pipelines += 1
+            await next(input)
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { id: 'holder', factory, keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        ),
-        indexedDbBackendPlugin(
-          { id: 'writer', factory, keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        ),
+        indexedDbBackendPlugin({
+          name: 'holder',
+          factory,
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        }),
+        indexedDbBackendPlugin({
+          name: 'writer',
+          factory,
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        }),
         intervention
       ]
     })
@@ -195,37 +210,44 @@ describe('IndexedDB complete native transaction views', () => {
     const observed: unknown[] = []
     let stages = 0
     let readCurrent!: () => Promise<unknown>
-    const intervention = definePlugin('native-replay-pipeline', (core) => ({
-      install: () => {
-        core.useAsyncPipeline(async (input, next) => {
-          if (input.operation === 'indexeddb.transaction') await release.promise
-          if (input.operation !== 'indexed-db.putRecord') {
-            await next(input)
-            return
-          }
-          stages += 1
-          try {
-            await next(input)
-            observed.push(await readCurrent())
-          } catch (error) {
-            observed.push(error, await readCurrent())
-            throw error
-          }
-        })
-        return {}
-      }
-    }))
+    const intervention = definePlugin({
+      name: 'native-replay-pipeline',
+      setup: (core) => ({
+        install: () => {
+          core.useAsyncPipeline(async (input, next) => {
+            if (input.operation === 'indexeddb.transaction') await release.promise
+            if (input.operation !== 'indexed-db.putRecord') {
+              await next(input)
+              return
+            }
+            stages += 1
+            try {
+              await next(input)
+              observed.push(await readCurrent())
+            } catch (error) {
+              observed.push(error, await readCurrent())
+              throw error
+            }
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { id: 'holder', factory, keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        ),
-        indexedDbBackendPlugin(
-          { id: 'writer', factory, keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        ),
+        indexedDbBackendPlugin({
+          name: 'holder',
+          factory,
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        }),
+        indexedDbBackendPlugin({
+          name: 'writer',
+          factory,
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        }),
         intervention
       ]
     })
@@ -290,10 +312,11 @@ describe('IndexedDB complete native transaction views', () => {
     const host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { factory: new IDBFactory(), keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     /** Direct and symbolic cleanup share the real controller's one native finalization attempt. */
@@ -344,14 +367,18 @@ describe('IndexedDB complete native transaction views', () => {
     const host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { id: 'first', factory, keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        ),
-        indexedDbBackendPlugin(
-          { id: 'second', factory, keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          name: 'first',
+          factory,
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        }),
+        indexedDbBackendPlugin({
+          name: 'second',
+          factory,
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     /** The first real callback signals actual native admission before the second contends. */
@@ -417,28 +444,24 @@ describe('IndexedDB complete native transaction views', () => {
     const host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          {
-            id: 'first',
-            factory,
-            keyRange: IDBKeyRange,
-            dbName: 'native-lock-domain',
-            kvStoreName: 'first-kv',
-            owner: { label: 'agent-a' }
-          },
-          indexedDbTestFeatures
-        ),
-        indexedDbBackendPlugin(
-          {
-            id: 'second',
-            factory,
-            keyRange: IDBKeyRange,
-            dbName: 'native-lock-domain',
-            kvStoreName: 'second-kv',
-            owner: { label: 'agent-b' }
-          },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          name: 'first',
+          factory,
+          keyRange: IDBKeyRange,
+          dbName: 'native-lock-domain',
+          kvStoreName: 'first-kv',
+          owner: { label: 'agent-a' },
+          features: indexedDbTestFeatures
+        }),
+        indexedDbBackendPlugin({
+          name: 'second',
+          factory,
+          keyRange: IDBKeyRange,
+          dbName: 'native-lock-domain',
+          kvStoreName: 'second-kv',
+          owner: { label: 'agent-b' },
+          features: indexedDbTestFeatures
+        })
       ]
     })
     /** These microtask handoffs exercise the same native activity task without a timer boundary. */
@@ -498,10 +521,11 @@ describe('IndexedDB complete native transaction views', () => {
     const host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { factory: new IDBFactory(), keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     /** This is the original store admitted by the neutral host. */
@@ -541,10 +565,11 @@ describe('IndexedDB complete native transaction views', () => {
     const host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { factory: new IDBFactory(), keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     /** Every scoped operation below runs inside this store's one native transaction. */
@@ -605,10 +630,11 @@ describe('IndexedDB complete native transaction views', () => {
       const host = await createStorageHost({
         plugins: [
           storageProbe(),
-          indexedDbBackendPlugin(
-            { factory: new IDBFactory(), keyRange: IDBKeyRange },
-            indexedDbTestFeatures
-          )
+          indexedDbBackendPlugin({
+            factory: new IDBFactory(),
+            keyRange: IDBKeyRange,
+            features: indexedDbTestFeatures
+          })
         ]
       })
       /** The failed second channel write must roll back the accepted first write. */
@@ -645,10 +671,12 @@ describe('IndexedDB complete native transaction views', () => {
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { id: 'first', factory: new IDBFactory(), keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          name: 'first',
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     const store = host.backend('first')
@@ -741,10 +769,11 @@ describe('IndexedDB complete native transaction views', () => {
     const host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { factory: new IDBFactory(), keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     /** All public reads below use the original store after the physical rollback. */
@@ -781,10 +810,11 @@ describe('IndexedDB complete native transaction views', () => {
     const host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { factory: new IDBFactory(), keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     /** Captured old views are retained only to verify that they lose data access. */

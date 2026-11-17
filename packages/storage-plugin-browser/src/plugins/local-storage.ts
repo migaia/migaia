@@ -1,15 +1,12 @@
 import { StorageBackend } from '../constants.ts'
 import { localStorageHost, type ILocalStorageOptions } from '../backends/local-storage.ts'
 import { createBuiltInBackendPlugin, readBuiltInPluginId } from './builtin-factory.ts'
-import { localStorageBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.ts'
-import type {
-  IStorageBackendPlugin,
-  IStorageFeatureRecord,
-  IStorageFeatureStoreCompatibility
-} from '@migaia/storage-host'
+import type { ILocalStorageBackend, IBuiltInPluginOptions } from '../host/builtin-backends.ts'
+import type { IStorageBackendPlugin, IStorageFeatureRecord } from '@migaia/storage-host'
+import { StorageReactiveVisibility } from '@migaia/storage-host/sdk'
 
 /**
- * Define a localStorage backend plugin with default id local. Store acquisition waits for Host
+ * Define a localStorage backend plugin with default name local. Store acquisition waits for Host
  * install, which owns rollback and final disposal; this ordinary plugin adds no reactive adapter.
  * Backend options retain their factory defaults.
  */
@@ -17,19 +14,17 @@ export const localStorageBackendPlugin = <
   const TId extends string = 'local',
   const F extends IStorageFeatureRecord = {}
 >(
-  options: ILocalStorageOptions & IBuiltInPluginId<TId> = {},
-  features?: F & IStorageFeatureStoreCompatibility<typeof localStorageBackendKind, NoInfer<F>>
-): IStorageBackendPlugin<typeof localStorageBackendKind, NoInfer<TId>, F> =>
+  options: ILocalStorageOptions & IBuiltInPluginOptions<ILocalStorageBackend, TId, F> = {}
+): IStorageBackendPlugin<ILocalStorageBackend, NoInfer<TId>, F> =>
   createBuiltInBackendPlugin<
-    typeof localStorageBackendKind.name,
     ReturnType<typeof localStorageHost>['store'],
     ReturnType<ReturnType<typeof localStorageHost>['getClient']>,
     TId,
     F
   >(
-    localStorageBackendKind,
+    StorageReactiveVisibility.documentEventual,
     readBuiltInPluginId(options, 'local', StorageBackend.local),
     (core) => localStorageHost(options, core),
-    features,
+    options.features,
     true
   )

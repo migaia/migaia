@@ -1,12 +1,18 @@
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { Store, quad as nativeQuad, namedNode, literal, defaultGraph } from 'oxigraph'
-import { createStorageHost, defineFeature, createOrgId } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { rdf, sparql, type IQuad, type IRdfApi } from '@migaia/storage-contract'
 import { term } from '@migaia/storage-host/sdk'
 import { runConformance } from '@migaia/storage-contract/conformance'
-import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.ts'
+import { sparqlBackendPlugin } from '../src/index.ts'
 import { oxigraphEndpoint } from '../src/oxigraph.ts'
+import type { ISparqlBackend } from '../src/index.ts'
+import { defineStorageFeature } from '@migaia/storage-host/sdk'
+import type { IStorageFeatureDefiner } from '@migaia/storage-host'
+
+/** Feature definer typed for the imported backend. */
+const defineSparqlFeature: IStorageFeatureDefiner<ISparqlBackend> = defineStorageFeature
 
 runConformance(
   { describe, expect, it },
@@ -173,7 +179,7 @@ describe('native ground RDF reference behavior', () => {
   it('lends the original endpoint to an exact-kind Feature for its native graph update', async () => {
     const native = new Store()
     native.update('INSERT DATA { GRAPH <urn:feature:owned> { <urn:s> <urn:p> "kept" } }')
-    const clear = defineFeature(sparqlBackendKind, (core) => ({
+    const clear = defineSparqlFeature((core) => ({
       capabilities: [] as const,
       chain: {},
       api: {
@@ -185,7 +191,9 @@ describe('native ground RDF reference behavior', () => {
       }
     }))
     await using host = await createStorageHost({
-      plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(native) }, { clear })] as const
+      plugins: [
+        sparqlBackendPlugin({ endpoint: oxigraphEndpoint(native), features: { clear } })
+      ] as const
     })
     const store = host.backend('sparql')
     expect('endpoint' in store).toBe(false)

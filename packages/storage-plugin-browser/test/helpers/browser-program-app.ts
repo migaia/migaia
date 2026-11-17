@@ -2,7 +2,7 @@ import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { entityTestFeatures } from './entity-features.ts'
 import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { indexedDbTestFeatures } from './indexed-db-features.ts'
-import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 import {
@@ -13,6 +13,7 @@ import {
   storageProgramBatchObservations,
   type IStorageProgramResult
 } from '../../../storage-plugin-sqlite/test/helpers/program-app.ts'
+import { definePlugin } from '@migaia/storage-host/sdk'
 
 declare global {
   /** Declaration merging exposes the unchanged public application to the existing browser runner. */
@@ -47,10 +48,10 @@ window.runStorageProgramAutomaticIndex = async () => {
         afterQuery: ({ stats }) => readCounts.push(stats.readCount)
       }),
       storageJournalPlugin(),
-      indexedDbBackendPlugin(
-        { dbName: 'program-index-' + crypto.randomUUID() },
-        indexedDbTestFeatures
-      )
+      indexedDbBackendPlugin({
+        dbName: 'program-index-' + crypto.randomUUID(),
+        features: indexedDbTestFeatures
+      })
     ]
   })
   try {
@@ -69,7 +70,7 @@ window.runStorageProgramAutomaticIndex = async () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const repoEntityPluginHost = await host.use(repoEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store, {
+    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.name](store, {
       queryStages: host.queryStages(store)
     })
     for (let index = 0; index < 12; index++)
@@ -105,15 +106,18 @@ window.runStorageProgramApplication = async () => {
   const { logs, logger } = createStorageProgramJournal()
   const pipelines: string[] = [],
     events: string[] = []
-  const observed = definePlugin('program-observer', (core) => ({
-    install() {
-      core.useAsyncPipeline((input, next) => {
-        pipelines.push(input.operation)
-        return next(input)
-      })
-      return {}
-    }
-  }))
+  const observed = definePlugin({
+    name: 'program-observer',
+    setup: (core) => ({
+      install() {
+        core.useAsyncPipeline((input, next) => {
+          pipelines.push(input.operation)
+          return next(input)
+        })
+        return {}
+      }
+    })
+  })
   const host = await createStorageHost({
     org: createOrgId(),
     plugins: [
@@ -123,7 +127,10 @@ window.runStorageProgramApplication = async () => {
         onStorageOperationError: ({ operation }) => events.push('error:' + operation)
       }),
       storageJournalPlugin({ logger, namespace: 'program' }),
-      indexedDbBackendPlugin({ dbName: 'program-' + crypto.randomUUID() }, indexedDbTestFeatures),
+      indexedDbBackendPlugin({
+        dbName: 'program-' + crypto.randomUUID(),
+        features: indexedDbTestFeatures
+      }),
       observed
     ]
   })
@@ -140,10 +147,10 @@ window.runStorageProgramApplication = async () => {
       org: createOrgId(),
       plugins: [
         storageJournalPlugin(),
-        indexedDbBackendPlugin(
-          { dbName: 'program-org-' + crypto.randomUUID() },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          dbName: 'program-org-' + crypto.randomUUID(),
+          features: indexedDbTestFeatures
+        })
       ]
     })
     let organizations: Awaited<ReturnType<typeof runStorageProgramOrgs>>

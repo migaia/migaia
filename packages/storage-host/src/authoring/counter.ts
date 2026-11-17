@@ -1,6 +1,5 @@
 import {
   type IStorageCounterIncrement,
-  type IBackendKind,
   StorageContractError,
   StorageContractErrorCode,
   StorageContractErrorText
@@ -12,7 +11,7 @@ const COUNTER_INTEGER = /^(?:0|-?[1-9][0-9]*)$/
 /** Captures a valid delta before I/O and retains decimal/overflow validation in this same owner. */
 export function snapshotStorageCounterIncrement(
   by: number | undefined,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): IStorageCounterIncrement {
   /** Omission alone supplies the documented increment; all explicit values must be safe integers. */
   const delta = by === undefined ? 1 : by

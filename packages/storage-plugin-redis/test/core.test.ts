@@ -1,10 +1,11 @@
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createClientPool } from 'redis'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { counter, kv, records, ttl } from '@migaia/storage-contract'
 import { redisBackendPlugin } from '../src/index.ts'
 import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
 import { namespaces } from './helpers/namespaces.ts'
+import { definePlugin } from '@migaia/storage-host/sdk'
 
 /** Native fixtures own their clients and a unique namespace; no unrelated key is modified. */
 for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL]) {
@@ -35,16 +36,19 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
       }
       const host = await createStorageHost({
           plugins: [
-            definePlugin('native-proof', (core) => ({
-              install() {
-                core.onDispose(
-                  core.hooks.on('onRedisCommand', (event) => {
-                    commands.push(event.command)
-                  })
-                )
-                return {}
-              }
-            })),
+            definePlugin({
+              name: 'native-proof',
+              setup: (core) => ({
+                install() {
+                  core.onDispose(
+                    core.hooks.on('onRedisCommand', (event) => {
+                      commands.push(event.command)
+                    })
+                  )
+                  return {}
+                }
+              })
+            }),
             redisBackendPlugin({ driver: observed, prefix: namespaces.prefix() })
           ] as const
         }),

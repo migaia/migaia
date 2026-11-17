@@ -143,7 +143,7 @@ describe('#7 数组主键：get/list 可见性一致', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
+    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.name](store)
 
     await repo.put({ id: ['tenant-1', 'u1'], n: 1 })
     expect(await repo.get(['tenant-1', 'u1'])).toEqual({ id: ['tenant-1', 'u1'], n: 1 })
@@ -176,7 +176,7 @@ describe('#8 单条脏数据不阻断 list()', () => {
     /** Install once on the real fixture host and retain exact extension inference. */
     const repoEntityPluginHost = await storeHost.use(repoEntityPlugin)
     /** Borrow the supplied backend through the installed repository capability factories. */
-    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
+    const repo = repoEntityPluginHost.extensions[repoEntityPlugin.name](store)
 
     await store.putRecord({ version: 1, state: { id: 'good', n: 1 } }, ['rows', 'good'])
     await store.putRecord({ version: 1, state: { id: 'bad', n: 'oops' } }, ['rows', 'bad'])

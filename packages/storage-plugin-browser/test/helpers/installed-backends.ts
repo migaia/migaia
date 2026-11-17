@@ -108,7 +108,7 @@ type IIndexedDbFixture = Readonly<{
 async function createIndexedDbFixture(options: IIndexedDbOptions): Promise<IIndexedDbFixture> {
   /** The fixture does not substitute a scope, transaction, controller or resource owner. */
   const host = await createStorageHost({
-    plugins: [indexedDbBackendPlugin(options, indexedDbTestFeatures)]
+    plugins: [indexedDbBackendPlugin({ ...options, features: indexedDbTestFeatures })]
   })
   onTestFinished(() => host.dispose())
   /** Preserve the exact installed backend while exposing its actual host to entity consumers. */
@@ -138,9 +138,12 @@ async function createMemoryFixture(options: IMemoryOptions) {
   /** Preserve the real registration instead of creating a backend with fabricated runtime ports. */
   const host = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(options, {
-        notifications: memoryNotificationsFeature(),
-        changeFeed: memoryChangeFeedFeature()
+      memoryBackendPlugin({
+        ...options,
+        features: {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
       })
     ]
   })

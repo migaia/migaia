@@ -1,25 +1,25 @@
 import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { it, expect, expectTypeOf, onTestFinished } from 'vitest'
-import {
-  createStorageHost,
-  definePlugin,
-  defineFeature,
-  type IStorageBorrowedBackend
-} from '@migaia/storage-host'
+import { createStorageHost, type IStorageBorrowedBackend } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
 import { persistTransaction } from '@migaia/store-persist'
 import { kv, records, sql, type ISqlExecutor } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/sdk'
+import { lockKey, definePlugin } from '@migaia/storage-host/sdk'
 import {
   sqliteBackendPlugin,
-  sqliteBackendKind,
   type ISqliteValue,
   type ISqliteRunResult,
   type ISqliteDriver
 } from '../src/index.ts'
 import { nodeSqliteDriver } from '../src/node.ts'
+import type { ISqliteBackend } from '../src/index.ts'
+import { defineStorageFeature } from '@migaia/storage-host/sdk'
+import type { IStorageFeatureDefiner } from '@migaia/storage-host'
+
+/** Feature definer typed for the imported backend. */
+const defineSqliteFeature: IStorageFeatureDefiner<ISqliteBackend> = defineStorageFeature
 /** Existing SQL consumers depend only on the shared executor and retain external row interfaces. */
 interface ICountRow {
   readonly count: number
@@ -97,9 +97,12 @@ it('commits persistence and native SQL through one original transaction', async 
 it('limits borrowed KV capabilities to original channel methods and precise sync access', async () => {
   const connection = nodeSqliteDriver(':memory:')
   let borrowed!: IStorageBorrowedBackend
-  const consumer = definePlugin('consumer', (core) => {
-    borrowed = core.getPublishedBackend('sqlite')
-    return { install: () => ({}) }
+  const consumer = definePlugin({
+    name: 'consumer',
+    setup: (core) => {
+      borrowed = core.getPublishedBackend('sqlite')
+      return { install: () => ({}) }
+    }
   })
   const host = await createStorageHost({
     plugins: [sqliteBackendPlugin({ driver: connection })] as const
@@ -149,7 +152,7 @@ it('binds selected Feature scopes and branches to the original native connection
   /** Caller ownership must survive every host operation and final release. */
   const connection = nodeSqliteDriver(':memory:')
   /** Selected output carries pure branch methods and authentic transaction I/O together. */
-  const selected = defineFeature(sqliteBackendKind, () => ({
+  const selected = defineSqliteFeature(() => ({
     capabilities: [],
     chain: {
       tx: {
@@ -195,7 +198,7 @@ it('binds selected Feature scopes and branches to the original native connection
   }))
   /** The real installation publishes methods without replacing backend ownership. */
   const host = await createStorageHost({
-    plugins: [sqliteBackendPlugin({ driver: connection }, { selected })] as const
+    plugins: [sqliteBackendPlugin({ driver: connection, features: { selected } })] as const
   })
   onTestFinished(async () => {
     await host.dispose()

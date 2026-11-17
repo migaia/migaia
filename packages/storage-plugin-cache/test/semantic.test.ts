@@ -26,12 +26,13 @@ async function fixture(options: Partial<ISemanticCacheOptions> = {}) {
   const scheduler = createManualScheduler()
   const initial = await createStorageHost({
     scheduler,
-    plugins: [storageProbe(), memoryBackendPlugin({ id: 'vectors' })]
+    plugins: [storageProbe(), memoryBackendPlugin({ name: 'vectors' })]
   })
   const host = await initial.use(
-    cachePlugin(
-      { tiers: [{ backend: 'vectors' }], propagate: false },
-      {
+    cachePlugin({
+      tiers: [{ backend: 'vectors' }],
+      propagate: false,
+      features: {
         semantic: semanticCacheFeature({
           backend: 'vectors',
           collection: 'answers',
@@ -41,7 +42,7 @@ async function fixture(options: Partial<ISemanticCacheOptions> = {}) {
           ...options
         })
       }
-    )
+    })
   )
   await host.detect()
   return {
@@ -432,11 +433,11 @@ describe('semantic cache over real Memory vectors', () => {
     const failed = createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin({ id: 'vectors' }),
-        cachePlugin(
-          { tiers: [{ backend: 'vectors' }] },
-          { semantic: semanticCacheFeature(options) }
-        )
+        memoryBackendPlugin({ name: 'vectors' }),
+        cachePlugin({
+          tiers: [{ backend: 'vectors' }],
+          features: { semantic: semanticCacheFeature(options) }
+        })
       ]
     })
     await expect(failed).rejects.toMatchObject({
@@ -444,16 +445,17 @@ describe('semantic cache over real Memory vectors', () => {
       cause: { cause: { code: 'BACKEND_NOT_INSTALLED' } }
     })
     const initial = await createStorageHost({
-      plugins: [storageProbe(), memoryBackendPlugin({ id: 'vectors' })]
+      plugins: [storageProbe(), memoryBackendPlugin({ name: 'vectors' })]
     })
     try {
-      const host = await initial.use(cachePlugin({ id: 'text', tiers: [{ backend: 'vectors' }] }))
+      const host = await initial.use(cachePlugin({ name: 'text', tiers: [{ backend: 'vectors' }] }))
       await expect(
         host.use(
-          cachePlugin(
-            { id: 'semantic', tiers: [{ backend: 'vectors' }] },
-            { semantic: semanticCacheFeature({ ...options, backend: 'text' }) }
-          )
+          cachePlugin({
+            name: 'semantic',
+            tiers: [{ backend: 'vectors' }],
+            features: { semantic: semanticCacheFeature({ ...options, backend: 'text' }) }
+          })
         )
       ).rejects.toMatchObject({
         code: 'BACKEND_INSTALL_FAILED',

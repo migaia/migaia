@@ -7,13 +7,12 @@ import {
   type IPluginHostCore,
   type IFeatureRecord
 } from '@migaia/plugin-host'
-import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IStorageBase } from '@migaia/storage-contract'
 import type { IScheduler } from '@migaia/utils/scheduler'
+import { walkErrorCauses } from '@migaia/utils/error'
 import { createStorageTypeError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { installStorageFeatures, type IStorageFeatureProjection } from './feature-install.ts'
-import { pluginNameFromBackendId } from './names.ts'
 import {
   STORAGE_DESCRIPTOR_METADATA,
   STORAGE_DESCRIPTOR_HOOKS,
@@ -21,31 +20,124 @@ import {
 } from './state-constants.ts'
 import { StorageErrorText } from './error-text.ts'
 import type {
-  IStorageBackendKind,
+  IStorageBackendType,
+  IStorageBackendPluginDefiner,
   IStorageDefinePlugin,
-  IStorageDefineFeature,
-  IStorageUnitTarget,
+  IStorageFeatureDefiner,
   IStoragePluginCore,
   IStorageFeatureExpose,
   IStorageExecutionPort,
   IStoragePipelineInput,
   IStorageNativePluginDescriptor
 } from './types.ts'
-/** Authentic kind objects are local identities, never diagnostic names or public type brands. */
-const kinds = new WeakSet<object>()
-/** Defined storage Features retain their required kind identities without a second Feature system. */
-const featureTargets = new WeakMap<object, readonly object[]>()
-/** Mint a package-private unit target admitted by the existing native Feature wrapper. */
-export function defineStorageUnitTarget<TExpose extends object>(): IStorageUnitTarget<TExpose> {
-  /** The opaque identity grants only target matching; it carries no installation state. */
-  const target = Object.freeze({})
-  kinds.add(target)
-  return target as IStorageUnitTarget<TExpose>
+/**
+ * Storage's private facts about each definition it produced, keyed by the native PluginHost
+ * definition. A definition missing here was not made by a storage definer and is rejected.
+ */
+const storageDefinitions = new WeakMap<object, IStorageDefinitionMetadata>()
+/** Immutable definition facts; they hold no store, driver or registration lifetime. */
+export type IStorageDefinitionMetadata = {
+  /** The plugin name, which is also the public backend lookup key. */
+  readonly id: string
+  /** True for `defineBackendPlugin`: the plugin must hand over a Store and gets backend hooks. */
+  readonly backend: boolean
+  /** The plugin's listed Features; read only to name a Feature whose factory failed. */
+  readonly features: IFeatureRecord | undefined
 }
-/** Handles resolve to one original native definition; installation state remains PluginHost-owned. */
-const nativePluginDefinitions = new WeakMap<object, object>()
-/** Immutable definition metadata contains no store, driver or registration lifetime. */
-const nativePluginMetadata = new WeakMap<object, { readonly id: string }>()
+/** Which plugin a failed Feature factory was running for, and its root key when it is a root. */
+export type IStorageFeatureFailure = {
+  /** Name of the plugin whose registration ran the factory. */
+  readonly plugin: string
+  /** Key under which that plugin lists the Feature; absent for a dependency-only Feature. */
+  readonly feature?: string
+}
+/** What the factory wrapper knows when a Feature factory throws. */
+type IStorageFeatureFailureRecord = {
+  /** Name of the plugin whose registration ran the factory. */
+  readonly plugin: string
+  /** The failed Feature's own definition. */
+  readonly definition: object | undefined
+}
+/**
+ * Thrown values of failed Feature factories, mapped to where they failed. The thrown value itself
+ * is rethrown unchanged; the install boundary reads this table to name the plugin and Feature.
+ */
+const featureFailures = new WeakMap<object, IStorageFeatureFailureRecord>()
+/** Lets the factory wrapper name its own definition, which exists only after it is defined. */
+type IStorageFeatureHolder = { feature?: object }
+
+/** Run one Feature factory; on failure record its plugin and definition, then rethrow unchanged. */
+function runStorageFeatureFactory(
+  factory: Function,
+  holder: IStorageFeatureHolder,
+  core: unknown,
+  dependencies: unknown
+): unknown {
+  try {
+    return Reflect.apply(factory, undefined, [core, dependencies])
+  } catch (error) {
+    recordStorageFeatureFailure(error, holder, core)
+    throw error
+  }
+}
+
+/** Remember where a thrown object came from; the first record for one thrown value is kept. */
+function recordStorageFeatureFailure(
+  error: unknown,
+  holder: IStorageFeatureHolder,
+  core: unknown
+): void {
+  if ((typeof error !== 'object' && typeof error !== 'function') || error === null) return
+  if (featureFailures.has(error)) return
+  /** Every storage registration exposes its plugin name to its Features under this key. */
+  const readPluginName = (core as { featureExpose?: { getBackendId?: unknown } } | null)
+    ?.featureExpose?.getBackendId
+  if (typeof readPluginName !== 'function') return
+  /** The registration's own name; no user code runs in this read. */
+  const plugin: unknown = readPluginName()
+  if (typeof plugin !== 'string') return
+  featureFailures.set(error, { plugin, definition: holder.feature })
+}
+
+/**
+ * Find the Feature failure behind an install error of the batch `plugins`. The cause chain and
+ * `AggregateError.errors` are searched in order with the bounded walker; undefined means no Feature
+ * factory threw it. The root key is looked up in the failing plugin's own definition, so it is
+ * absent for a Feature that is only a dependency of a listed root.
+ */
+export function readStorageFeatureFailure(
+  error: unknown,
+  plugins: readonly object[]
+): IStorageFeatureFailure | undefined {
+  for (const candidate of walkErrorCauses(error)) {
+    if ((typeof candidate !== 'object' && typeof candidate !== 'function') || candidate === null)
+      continue
+    /** Recorded only for values thrown by a storage Feature factory. */
+    const record = featureFailures.get(candidate)
+    if (record === undefined) continue
+    /** Key under which the failing plugin lists the failed definition. */
+    const feature = findStorageFeatureRootKey(record, plugins)
+    return feature === undefined ? { plugin: record.plugin } : { plugin: record.plugin, feature }
+  }
+  return undefined
+}
+
+/** Names are unique within one batch, so the first definition of that name is the failing one. */
+function findStorageFeatureRootKey(
+  record: IStorageFeatureFailureRecord,
+  plugins: readonly object[]
+): string | undefined {
+  for (const plugin of plugins) {
+    /** Storage facts of one batch entry; undefined for a definition storage did not make. */
+    const metadata = storageDefinitions.get(plugin)
+    if (metadata?.id !== record.plugin) continue
+    for (const [key, definition] of Object.entries(metadata.features ?? {}))
+      if (definition === record.definition) return key
+    return undefined
+  }
+  return undefined
+}
+
 /** Storage's private additions attached only after a native hook observes the caller output. */
 type IStorageNativeProjectionFields = Readonly<Record<PropertyKey, unknown>>
 
@@ -107,56 +199,24 @@ function createNativeDescriptorProjection(value: unknown, hooks: IStorageDescrip
   return output
 }
 
-/** Define a diagnostic kind token whose exact object identity is checked during installation. */
-export function defineStorageBackendKind<
-  S extends IStorageBase,
-  C = undefined,
-  E extends object = {}
->(): <const N extends string>(name: N) => IStorageBackendKind<N, S, C, E> {
-  return <const N extends string>(name: N): IStorageBackendKind<N, S, C, E> => {
-    assertStorageBackendId(name)
-    /** Capture this registration kind before backend construction or publication. */
-    const kind = { name }
-    kinds.add(kind)
-    return kind as IStorageBackendKind<N, S, C, E>
-  }
-}
-/** Reject a forged target before any Feature factory or native driver can run. */
-function requireTargets(target: unknown): readonly object[] {
-  /** Retain the complete accepted target set for this definition. */
-  const selected = Array.isArray(target) ? target : [target]
-  if (
-    selected.length === 0 ||
-    selected.some((kind) => typeof kind !== 'object' || kind === null || !kinds.has(kind))
-  )
-    throw createStorageTypeError(
-      StorageHostErrorCode.backendKindMismatch,
-      StorageErrorText.backendKindMismatch
-    )
-  return [...selected]
-}
-/** Storage annotates original native Feature identities; PluginHost still compiles their graph. */
-export const defineFeature: IStorageDefineFeature = ((
-  target: unknown,
+/**
+ * Define one storage Feature. The backend it extends exists only in the type: a backend package
+ * annotates this same function as `IStorageFeatureDefiner<ItsBackend>` and defines its Features
+ * with it. PluginHost owns the Feature identity and compiles the dependency graph.
+ */
+export const defineStorageFeature: IStorageFeatureDefiner<never> = ((
   factory: Function,
   dependencies?: IFeatureRecord
 ) => {
-  /** Retain the complete accepted target set for this definition. */
-  const selected = requireTargets(target)
-  for (const dependency of Object.values(dependencies ?? {})) {
-    /** Read private Feature identity metadata instead of public type fields. */
-    const expected = featureTargets.get(dependency)
-    if (expected === undefined || selected.some((kind) => !expected.includes(kind)))
-      throw createStorageTypeError(
-        StorageHostErrorCode.backendKindMismatch,
-        StorageErrorText.backendKindMismatch
-      )
-  }
-  /** Retain the actual native Feature identity used by the dependency owner. */
-  const feature = defineNativeFeature(factory as never, dependencies as never)
-  featureTargets.set(feature, selected)
-  return feature
-}) as unknown as IStorageDefineFeature
+  /** Filled right after definition so the wrapper can name this Feature when its factory fails. */
+  const holder: IStorageFeatureHolder = {}
+  holder.feature = defineNativeFeature(
+    ((core: unknown, resolved: unknown) =>
+      runStorageFeatureFactory(factory, holder, core, resolved)) as never,
+    dependencies as never
+  )
+  return holder.feature
+}) as never
 /** Installation-local native additions come from the original facade, never public object fields. */
 type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly registerJournalRuntime: IStoragePluginCore['registerJournalRuntime']
@@ -168,7 +228,6 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   getStore(): IStorageBase
   getBackendId(): string
   getScheduler(): IScheduler
-  setStorageKind(kind: IStorageBackendKind | undefined): void
   readonly features: Readonly<Record<string, object>>
   readonly featureExpose: object
   readonly execution: IStorageExecutionPort
@@ -193,7 +252,7 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly createChangeController: IStoragePluginCore['createChangeController']
   readonly registerChangeController: IStoragePluginCore['registerChangeController']
   readonly registerValueCommit: IStoragePluginCore['registerValueCommit']
-  readonly getChangeController: IStorageFeatureExpose<IStorageBackendKind>['getChangeController']
+  readonly getChangeController: IStorageFeatureExpose<IStorageBackendType>['getChangeController']
   readonly getPublishedBackend: IStoragePluginCore['getPublishedBackend']
   readonly registerDetect: IStoragePluginCore['registerDetect']
   readonly registerOrgBinding: IStoragePluginCore['registerOrgBinding']
@@ -206,9 +265,8 @@ type IStoragePluginDefinitionContext = {
   readonly name: string
   readonly descriptorFactory: (core: IStoragePluginCore) => IStorageNativePluginDescriptor
   readonly features?: IFeatureRecord
-  readonly plan?: ReturnType<typeof inspectFeatures>
-  /** Internal pure-unit registrations use native outputs rather than backend capability projection. */
-  readonly unitTarget?: object
+  /** True when the plugin must hand over a Store; set by the definer, never by the author. */
+  readonly backend: boolean
 }
 
 /** Registration-local transfer state borrows lifecycle and installation authority from PluginHost. */
@@ -224,39 +282,66 @@ type IStorageNativeRegistrationContext = {
 type IStorageNativeDescriptorContext = {
   readonly registration: IStorageNativeRegistrationContext
   readonly descriptor: IStorageNativePluginDescriptor
-  readonly kind?: IStorageBackendKind
   readonly capabilityInstaller?: IStorageNativePluginDescriptor['capabilityInstaller']
   readonly journalBinding?: IStorageNativePluginDescriptor['journalBinding']
 }
 
-/** Define one native plugin; original PluginHost remains the registration and lifecycle owner. */
-export const definePlugin: IStorageDefinePlugin = ((
+/**
+ * Plugin names are bounded ASCII: a letter, then letters, digits, `_` or `-`, 64 characters at
+ * most. The name is the backend lookup key and the PluginHost plugin name, so it excludes `.`
+ * (PluginHost's separator) and `:` (used by the host's own internal plugin names).
+ */
+const STORAGE_PLUGIN_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/
+
+/** Reject a malformed plugin name with BACKEND_ID_INVALID before a definition is recorded. */
+function assertStoragePluginName(name: unknown): asserts name is string {
+  if (typeof name !== 'string' || !STORAGE_PLUGIN_NAME_PATTERN.test(name))
+    throw createStorageTypeError(
+      StorageHostErrorCode.backendIdInvalid,
+      StorageErrorText.backendIdInvalid
+    )
+}
+
+/** Shared by both definers: one native definition per call, recorded with its storage facts. */
+function defineStoragePlugin(
   name: string,
   descriptorFactory: (core: IStoragePluginCore) => IStorageNativePluginDescriptor,
-  features?: IFeatureRecord,
-  unitTarget?: object
-) => {
-  assertStorageBackendId(name)
-  /** Inspect the existing dependency closure without running any Feature factory. */
-  const context: IStoragePluginDefinitionContext = {
-    name,
-    descriptorFactory,
-    features,
-    unitTarget,
-    plan: features === undefined ? undefined : inspectFeatures(features)
-  }
-  /** Native invokes one bounded adapter for each actual registration. */
+  features: IFeatureRecord | undefined,
+  backend: boolean
+): object {
+  assertStoragePluginName(name)
+  /** Definition data is shared by every registration of this plugin. */
+  const context: IStoragePluginDefinitionContext = { name, descriptorFactory, features, backend }
+  /** PluginHost inspects the Feature record and owns each registration. */
   const definition = defineNativePlugin(
-    pluginNameFromBackendId(name),
+    name,
     (core) => createStorageNativeRegistration(context, core as unknown as IStorageNativeCore),
     features as never
   )
-  /** Public diagnostic identity retains no mutable registration authority. */
-  const handle = { id: name }
-  nativePluginDefinitions.set(handle, definition)
-  nativePluginMetadata.set(handle, { id: name })
-  return handle
-}) as IStorageDefinePlugin
+  storageDefinitions.set(definition, { id: name, backend, features })
+  return definition
+}
+
+/**
+ * Define a backend plugin. `open` runs once per registration and returns the descriptor whose
+ * `install` must hand over exactly one Store with `core.registerStore`; otherwise the install
+ * rejects with BACKEND_PLUGIN_INVALID. Features come from the `features` record.
+ */
+export const defineBackendPlugin: IStorageBackendPluginDefiner<never> = ((definition: {
+  readonly name: string
+  readonly features?: IFeatureRecord
+  readonly open: (core: IStoragePluginCore) => IStorageNativePluginDescriptor
+}) => defineStoragePlugin(definition.name, definition.open, definition.features, true)) as never
+
+/**
+ * Define a plugin that owns no Store, such as the journal, the probe or an entity. `setup` runs
+ * once per registration and returns the descriptor with the `install` hook.
+ */
+export const definePlugin: IStorageDefinePlugin = ((definition: {
+  readonly name: string
+  readonly features?: IFeatureRecord
+  readonly setup: (core: IStoragePluginCore) => IStorageNativePluginDescriptor
+}) => defineStoragePlugin(definition.name, definition.setup, definition.features, false)) as never
 
 /** Create one explicit transfer owner before exposing the original native capabilities to authors. */
 function createStorageNativeRegistration(
@@ -281,8 +366,6 @@ function createStorageNativeRegistration(
   const descriptor = descriptorFactory(createStorageRegistrationCore(registration))
   /** Metadata must survive install awaits without rereading the caller's descriptor. */
   const context = captureStorageDescriptor(registration, descriptor)
-  assertStorageFeatureTargets(context)
-  nativeCore.setStorageKind(context.kind)
   return createNativeDescriptorProjection(descriptor, {
     install: (install) => () => runStorageNativeInstall(context, install),
     expose: (hook) => () => projectStorageNativeExpose(context, hook),
@@ -348,7 +431,7 @@ function registerStorageTransfer(
   context: IStorageNativeRegistrationContext,
   store: IStorageBase
 ): void {
-  if (context.transferred)
+  if (!context.definition.backend || context.transferred)
     throw createStorageTypeError(
       StorageHostErrorCode.backendPluginInvalid,
       StorageErrorText.backendPluginInvalid
@@ -377,10 +460,7 @@ function captureStorageDescriptor(
   for (const key of STORAGE_DESCRIPTOR_METADATA) {
     /** Author-only data fields cannot inject execution through accessors. */
     const property = Object.getOwnPropertyDescriptor(descriptor, key)
-    if (
-      property !== undefined &&
-      (!('value' in property) || (key !== 'kind' && typeof property.value !== 'function'))
-    )
+    if (property !== undefined && (!('value' in property) || typeof property.value !== 'function'))
       throw createStorageTypeError(
         StorageHostErrorCode.backendPluginInvalid,
         StorageErrorText.backendPluginInvalid
@@ -390,34 +470,9 @@ function captureStorageDescriptor(
   return {
     registration,
     descriptor,
-    kind: metadata.kind as IStorageBackendKind | undefined,
     capabilityInstaller:
       metadata.capabilityInstaller as IStorageNativePluginDescriptor['capabilityInstaller'],
     journalBinding: metadata.journalBinding as IStorageNativePluginDescriptor['journalBinding']
-  }
-}
-
-/** Check exact private kind identities before a Feature or native driver executes. */
-function assertStorageFeatureTargets(context: IStorageNativeDescriptorContext): void {
-  if (context.kind !== undefined && !kinds.has(context.kind))
-    throw createStorageTypeError(
-      StorageHostErrorCode.backendKindMismatch,
-      StorageErrorText.backendKindMismatch
-    )
-  /** Pure entity plugins select their private target without claiming a backend kind or Store. */
-  const target = context.kind ?? context.registration.definition.unitTarget
-  for (const feature of context.registration.definition.plan?.ordered ?? []) {
-    /** Dependency compatibility belongs to original Feature identities, not public type metadata. */
-    const expected = featureTargets.get(feature)
-    if (
-      target !== undefined
-        ? expected === undefined || !expected.includes(target)
-        : expected !== undefined
-    )
-      throw createStorageTypeError(
-        StorageHostErrorCode.backendKindMismatch,
-        StorageErrorText.backendKindMismatch
-      )
   }
 }
 
@@ -443,12 +498,12 @@ async function finishStorageNativeInstall(
 ): Promise<unknown> {
   /** Await exactly the author's original install result before validating Store handoff. */
   const extensions = install === undefined ? {} : await install()
-  if (context.kind !== undefined && !context.registration.transferred)
+  if (context.registration.definition.backend && !context.registration.transferred)
     throw createStorageTypeError(
       StorageHostErrorCode.backendPluginInvalid,
       StorageErrorText.backendPluginInvalid
     )
-  if (context.kind !== undefined && context.journalBinding !== undefined) {
+  if (context.registration.definition.backend && context.journalBinding !== undefined) {
     /** A selected backend Feature may omit journal ownership on its basic storage path. */
     const binding = Reflect.apply(context.journalBinding, context.descriptor, [
       context.registration.nativeCore.getStore()
@@ -466,7 +521,11 @@ async function finishStorageNativeInstall(
 
 /** Publish only selected roots after Store and optional journal admission. */
 function publishStorageNativeFeatures(context: IStorageNativeDescriptorContext): void {
-  if (context.kind === undefined || context.registration.definition.features === undefined) return
+  if (
+    !context.registration.definition.backend ||
+    context.registration.definition.features === undefined
+  )
+    return
   /** The original registration owns every provider and cleanup endpoint. */
   const nativeCore = context.registration.nativeCore
   /** Empty selection produces neither a projection nor a cleanup registration. */
@@ -532,7 +591,6 @@ function projectStorageNativeFeatureExpose(
   return createNativeDataProjection(
     expose,
     {
-      getKind: () => context.kind,
       getChangeController: nativeCore.getChangeController,
       getStore: () => nativeCore.getStore(),
       getBackendId: () => nativeCore.getBackendId(),
@@ -546,16 +604,5 @@ function projectStorageNativeFeatureExpose(
     true
   )
 }
-/** Resolve trusted definition identity without exposing its mutable registration authority. */
-export const readStorageNativePluginMetadata = (plugin: object) => nativePluginMetadata.get(plugin)
-/** Only the facade can turn a public handle into its original PluginHost definition. */
-export const readStorageNativePluginDefinition = (plugin: object) =>
-  nativePluginDefinitions.get(plugin)
-/** Bound case-sensitive IDs make exact lookup and duplicate registration unambiguous. */
-export const assertStorageBackendId: (id: unknown) => asserts id is string = (id) => {
-  if (typeof id !== 'string' || !/^[A-Za-z][A-Za-z0-9._-]{0,63}$/.test(id))
-    throw createStorageTypeError(
-      StorageHostErrorCode.backendIdInvalid,
-      StorageErrorText.backendIdInvalid
-    )
-}
+/** Read the storage facts of a definition; undefined means a storage definer did not make it. */
+export const readStorageDefinition = (plugin: object) => storageDefinitions.get(plugin)

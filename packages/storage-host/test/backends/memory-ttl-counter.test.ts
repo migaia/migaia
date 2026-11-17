@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { ttl, counter, kv, type ITransactionTtlApi } from '@migaia/storage-contract'
 import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
-import { createStorageHost, definePlugin } from '../../src/index.ts'
+import { createStorageHost } from '../../src/index.ts'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { definePlugin } from '../../src/sdk.ts'
 
 /** Real native memory capabilities share their original host, clock and transaction owner. */
 describe('memory TTL and counter capabilities', () => {
@@ -116,15 +117,18 @@ describe('memory TTL and counter capabilities', () => {
   it('increments atomically in the original root turn and uses only the current transaction draft', async () => {
     /** The existing pipeline records native endpoints without replacing their implementation. */
     const operations: string[] = []
-    const observe = definePlugin('observe', (core) => ({
-      install: () => {
-        core.usePipeline((input, next) => {
-          operations.push(input.operation)
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observe = definePlugin({
+      name: 'observe',
+      setup: (core) => ({
+        install: () => {
+          core.usePipeline((input, next) => {
+            operations.push(input.operation)
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     const scheduler = createManualScheduler()
     await using host = await createStorageHost({
       scheduler,

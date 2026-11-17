@@ -11,7 +11,6 @@ import {
   type IRecordIndexQuery
 } from './secondary-index.ts'
 import { StorageContractErrorText } from './error-text.ts'
-import { type IBackendKind } from './capabilities.ts'
 import { StorageContractError, StorageContractErrorCode } from './errors.ts'
 
 /** Reduced write options used inside a backend-owned transaction scope. */
@@ -88,7 +87,7 @@ export type ITransactionScope<
  * Valid functions return without being invoked. Invalid input throws INVALID_ARGUMENT with the
  * supplied backend label and a native TypeError cause; this does not validate callback results.
  */
-export const assertTransactionCallback = (run: unknown, backend: IBackendKind): void => {
+export const assertTransactionCallback = (run: unknown, backend: string): void => {
   if (typeof run === 'function') return
   throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
     backend,
@@ -104,7 +103,7 @@ export const assertTransactionCallback = (run: unknown, backend: IBackendKind): 
  */
 export const readTransactionConflictPolicy = (
   options: unknown,
-  backend: IBackendKind
+  backend: string
 ): IConflictPolicy => {
   if (options === undefined) return 'conflict'
   if (typeof options === 'object' && options !== null && !Array.isArray(options)) {

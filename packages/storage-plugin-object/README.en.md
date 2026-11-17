@@ -104,7 +104,7 @@ The SDK packages are declared native peers. `/fs` selects a Node, Bun or Deno fi
 
 | API                                                    | Purpose                                            |
 | ------------------------------------------------------ | -------------------------------------------------- |
-| `objectBackendPlugin({ id?, driver }, features?)`      | Install a backend, default ID `object`             |
+| `objectBackendPlugin({ name?, driver, features? })`    | Install a backend, default name `object`           |
 | `fsObjectDriver({ root })` / `s3ObjectDriver(options)` | Choose a directory or S3                           |
 | `store.use(blob).put/get/head`                         | Write content, open a read, or inspect metadata    |
 | `object.bytes()` / `stream()` / `dispose()`            | Consume content once and release it                |

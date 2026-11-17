@@ -1,7 +1,6 @@
 import { type IStorageBase } from './store.ts'
 import { assertStorageKey, assertStringStorageKey } from './key.ts'
 import { assertStorageRdfQuad, type IQuad } from './capabilities/rdf.ts'
-import { type IBackendKind } from './capabilities.ts'
 import { StorageContractError, StorageContractErrorCode } from './errors.ts'
 import { StorageContractErrorText } from './error-text.ts'
 import { type StorageStageKind } from './stage-kind.ts'
@@ -175,7 +174,7 @@ export function invalidConcurrencyArgument(cause?: unknown): StorageContractErro
 export function assertConcurrencyPolicy(
   policy: unknown,
   locking?: IConcurrencyPolicy['locking'],
-  backend?: IBackendKind
+  backend?: string
 ): asserts policy is IConcurrencyPolicy {
   if (
     typeof policy !== 'object' ||
@@ -234,7 +233,7 @@ export type INormalizedLockKey = { readonly key: ILockKey; readonly encoded: Uin
 
 /** Builds the existing coded lock-argument boundary with an optional actual backend diagnostic. */
 export function invalidLockArgument(
-  backend: IBackendKind | undefined,
+  backend: string | undefined,
   cause?: unknown
 ): StorageContractError {
   return new StorageContractError(
@@ -247,7 +246,7 @@ export function invalidLockArgument(
 /** Validate the canonical lock channels without allocating a detached lock or logical key. */
 export function assertLockKey(
   value: unknown,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): asserts value is ILockKey {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     throw invalidLockArgument(backend)

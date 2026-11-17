@@ -9,18 +9,22 @@ import {
 } from '@migaia/storage-contract'
 import {
   createStorageHost,
-  definePlugin,
-  defineFeature,
-  defineStorageBackendKind,
   type IStoragePluginCore,
   type IStorageBorrowedBackend,
   type IStorageFeatureExpose,
-  type IStorageBackendKind
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
+  type IStorageBackendPluginDefiner
 } from '../src/index.ts'
 import { catalog } from './helpers/catalog.ts'
+import { definePlugin, defineStorageFeature, defineBackendPlugin } from '../src/sdk.ts'
 
 /** One real map-backed catalog is admitted without requiring a capability provider. */
-const kind = defineStorageBackendKind<IStorageBase, Map<string, string>>()('catalog')
+type IKindBackend = IStorageBackendType<IStorageBase, Map<string, string>>
+/** Backend-plugin definer typed for this test backend. */
+const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
+/** Feature definer typed for this test backend. */
+const defineKindFeature: IStorageFeatureDefiner<IKindBackend> = defineStorageFeature
 
 /** Each descriptor owns the original catalog map and captures its actual installer. */
 function source<const N extends string>(id: N, raw = false) {
@@ -28,7 +32,6 @@ function source<const N extends string>(id: N, raw = false) {
   let state!: Omit<ReturnType<typeof catalog>, 'store'> & { readonly store: IStorageBase }
   /** Named factories preserve the exact native store shape for host typing. */
   const descriptor = (core: IStoragePluginCore) => ({
-    kind,
     featureExpose: () => ({ getClient: () => state.client }),
     install: () => {
       /** Keep the actual provider output available while selecting the raw variant. */
@@ -51,7 +54,7 @@ function source<const N extends string>(id: N, raw = false) {
       return {}
     }
   })
-  return { plugin: definePlugin(id, descriptor), state: () => state }
+  return { plugin: defineKindBackend({ name: id, open: descriptor }), state: () => state }
 }
 
 describe('installation-scoped backend borrowing', () => {
@@ -63,9 +66,9 @@ describe('installation-scoped backend borrowing', () => {
     /** Retain the original core solely to prove its existing installation admission. */
     let installedCore!: Pick<IStoragePluginCore, 'getPublishedBackend'>
     /** Feature construction uses the same installation port on its own original expose. */
-    let expose!: IStorageFeatureExpose<IStorageBackendKind>
+    let expose!: IStorageFeatureExpose<IStorageBackendType>
     /** All selected Feature construction runs through the native Feature graph. */
-    const feature = defineFeature(kind, (core) => {
+    const feature = defineKindFeature((core) => {
       expose = core.featureExpose
       for (const id of ['left', 'middle', 'right'])
         views.push(core.featureExpose.getPublishedBackend(id))
@@ -73,15 +76,17 @@ describe('installation-scoped backend borrowing', () => {
     })
     await using host = await createStorageHost({ plugins: sources.map((item) => item.plugin) })
     /** An ordinary plugin borrows through the same core without claiming a backend. */
-    const ordinary = definePlugin('consumer', (core) => {
-      installedCore = core
-      for (const id of ['left', 'middle', 'right']) views.push(core.getPublishedBackend(id))
-      return { install: () => ({ ping: () => 42 }) }
+    const ordinary = definePlugin({
+      name: 'consumer',
+      setup: (core) => {
+        installedCore = core
+        for (const id of ['left', 'middle', 'right']) views.push(core.getPublishedBackend(id))
+        return { install: () => ({ ping: () => 42 }) }
+      }
     })
     /** The Feature-bearing backend owns only its own newly constructed map. */
     let own!: ReturnType<typeof catalog>
     const descriptor = (core: IStoragePluginCore) => ({
-      kind,
       featureExpose: () => ({ getClient: () => own.client }),
       install: () => {
         own = catalog(core)
@@ -89,7 +94,10 @@ describe('installation-scoped backend borrowing', () => {
         return {}
       }
     })
-    await host.use(ordinary, definePlugin('featureConsumer', descriptor, { feature }))
+    await host.use(
+      ordinary,
+      defineKindBackend({ name: 'featureConsumer', features: { feature }, open: descriptor })
+    )
     expect(views).toHaveLength(6)
     for (const [index, view] of views.entries()) {
       expect(view).not.toBe(sources[index % 3]!.state().store)
@@ -101,7 +109,7 @@ describe('installation-scoped backend borrowing', () => {
       expect(Reflect.get(view, Symbol.asyncDispose)).toBeUndefined()
       /** Native methods retain their exact result and original source-map receiver. */
       const read = Reflect.get(view, 'get') as (key: string) => Promise<string>
-      await expect(read('name')).resolves.toBe(sources[index % 3]!.plugin.id)
+      await expect(read('name')).resolves.toBe(sources[index % 3]!.plugin.name)
       /** Original native Promise identity survives the borrowing projection. */
       const original = Reflect.get(view, 'original') as () => Promise<string>
       expect(original()).toBe(sources[index % 3]!.state().nativePromise)
@@ -133,10 +141,13 @@ describe('installation-scoped backend borrowing', () => {
     let view!: IStorageBorrowedBackend
     let rawView!: IStorageBorrowedBackend
     await host.use(
-      definePlugin('reads', (core) => {
-        view = core.getPublishedBackend('provided')
-        rawView = core.getPublishedBackend('raw')
-        return {}
+      definePlugin({
+        name: 'reads',
+        setup: (core) => {
+          view = core.getPublishedBackend('provided')
+          rawView = core.getPublishedBackend('raw')
+          return {}
+        }
       })
     )
     expect(view.has(token)).toBe(false)
@@ -168,12 +179,15 @@ describe('installation-scoped backend borrowing', () => {
     await using host = await createStorageHost({ plugins: [original.plugin] })
     for (const id of ['sameBatch', 'future', 'unknown']) {
       /** Capture the exact admission error through the original batch rollback boundary. */
-      const consumer = definePlugin(`consumer-${id}`, (core) => ({
-        install: () => {
-          core.getPublishedBackend(id)
-          return {}
-        }
-      }))
+      const consumer = definePlugin({
+        name: `consumer-${id}`,
+        setup: (core) => ({
+          install: () => {
+            core.getPublishedBackend(id)
+            return {}
+          }
+        })
+      })
       /** Original PluginHost wrapping remains intact, so inspect the bounded original cause chain. */
       const failure = await host.use(source('sameBatch').plugin, consumer).then(
         () => undefined,
@@ -194,9 +208,12 @@ describe('installation-scoped backend borrowing', () => {
     /** Capture one method independently from the view to exercise the invocation guard. */
     let call!: () => Promise<string>
     await host.use(
-      definePlugin('consumer', (core) => {
-        call = Reflect.get(core.getPublishedBackend('original'), 'original')
-        return {}
+      definePlugin({
+        name: 'consumer',
+        setup: (core) => {
+          call = Reflect.get(core.getPublishedBackend('original'), 'original')
+          return {}
+        }
       })
     )
     expect(call()).toBe(original.state().nativePromise)

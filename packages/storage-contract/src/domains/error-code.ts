@@ -63,8 +63,6 @@ export const StorageHostErrorCode = {
    * retry.
    */
   orgDeleteFailed: 'ORG_DELETE_FAILED',
-  /** A backend token does not match the installed store or selected Feature. */
-  backendKindMismatch: 'BACKEND_KIND_MISMATCH',
   /** Schema or codec configuration is malformed; repair its descriptor before retrying. */
   invalidConfig: 'INVALID_CONFIG',
   /**

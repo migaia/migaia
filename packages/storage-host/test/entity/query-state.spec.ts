@@ -30,7 +30,7 @@ it('retains default ordering and its finite bound after skip and projection', as
   /** This actual storage host owns the entity installation for this test scope. */
   const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
 
-  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](
     await memoryBackend()
   )
   await repo.put({ id: 'a', group: 'one', score: 1 })
@@ -61,7 +61,7 @@ it('preserves entity controls after selector and distinct branches', async () =>
   /** This actual storage host owns the entity installation for this test scope. */
   const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
 
-  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](
     await memoryBackend()
   )
   await repo.put({ id: 'a', group: 'one', score: 2 })
@@ -107,7 +107,7 @@ it('rejects duplicate and late source selection before opening any native iterat
   /** This actual storage host owns the entity installation for this test scope. */
   const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
 
-  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](
     await memoryBackend()
   )
   for (const branch of [
@@ -147,7 +147,7 @@ it('keeps the last page bounds after default comparison and does no work for a z
   })
   /** This actual storage host owns the entity installation for this test scope. */
   const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
-  const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](store)
+  const repo = entity4EntityPluginHost.extensions[entity4EntityPlugin.name](store)
   for (const [id, score] of [
     ['a', 1],
     ['b', 2],
@@ -184,7 +184,7 @@ it('keeps selector failures at the original entity extension boundary', async ()
   })
   /** This actual storage host owns the entity installation for this test scope. */
   const entity5EntityPluginHost = await entityHost(entity5EntityPlugin)
-  const repo = entity5EntityPluginHost.extensions[entity5EntityPlugin.id](store)
+  const repo = entity5EntityPluginHost.extensions[entity5EntityPlugin.name](store)
   await repo.put({ id: 'a', score: 1, group: 'one' })
   const primary = new RangeError('entity selector failure')
   const failure = await repo

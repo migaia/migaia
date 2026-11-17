@@ -392,7 +392,6 @@ export function commitCapacity<T, R>(
     for (const [channel, count] of counts)
       namespaceContext.core.emit(StorageHookName.onEvict, () => ({
         backendId: namespaceContext.core.getBackendId(),
-        backend: STORAGE_MEMORY_BACKEND,
         orgId: namespaceContext.orgId,
         channel,
         count

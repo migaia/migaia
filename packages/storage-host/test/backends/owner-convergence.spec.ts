@@ -3,28 +3,36 @@ import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.t
 import { describe, expect, it } from 'vitest'
 import { isPlainObject } from '@migaia/utils/object'
 import { utf8ByteLength } from '@migaia/utils/bytes'
-import { createStorageHost, defineFeature } from '../../src/index.ts'
-import { memoryBackendKind, memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { createStorageHost } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import {
   safeJsonPayloadByteLength,
   type IBackendChangeController
 } from '../../src/authoring/backend.ts'
+import type { IMemoryBackend } from '../../src/plugins/memory.ts'
+import { defineStorageFeature } from '../../src/sdk.ts'
+import type { IStorageFeatureDefiner } from '../../src/index.ts'
+
+/** Feature definer typed for the imported backend. */
+const defineMemoryFeature: IStorageFeatureDefiner<IMemoryBackend> = defineStorageFeature
 
 /** Causal probes for the shared lifecycle and JSON-domain owners. */
 describe('owner convergence', () => {
   it('keeps one controller lease across publication until disposal drains', async () => {
     /** The actual Feature getter borrows this installation's sole original controller. */
     let getController!: () => IBackendChangeController | undefined
-    const probe = defineFeature(memoryBackendKind, ({ featureExpose }) => {
+    const probe = defineMemoryFeature(({ featureExpose }) => {
       getController = featureExpose.getChangeController
       return { capabilities: [], chain: {}, api: { store: {}, transaction: {} } }
     })
     await using _host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(undefined, {
-          probe,
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            probe,
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })

@@ -68,7 +68,7 @@ describe('authoritative fallback unique writes', () => {
         })
         /** This actual storage host owns the entity installation for this test scope. */
         const entity2EntityPluginHost = await entityHost(entity2EntityPlugin)
-        const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.id](store)
+        const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.name](store)
         await expect(repo.put({ id: 'row', email: 'same' })).rejects.toMatchObject({
           source: 'storage.host',
           code: 'EXTENSION_FAILED',
@@ -92,9 +92,9 @@ describe('authoritative fallback unique writes', () => {
       const store = await create()
       try {
         /** Distinct repository instances cannot maintain separate uniqueness authorities. */
-        const first = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+        const first = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
         /** Reconnect through the actual public definition rather than sharing private state. */
-        const second = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+        const second = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
         await first.put({ id: 'a', email: 'same' })
         await expect(second.put({ id: 'b', email: 'same' })).rejects.toMatchObject({
           source: 'storage.host',
@@ -117,7 +117,7 @@ describe('authoritative fallback unique writes', () => {
     /** Memory's real transaction performs rollback and revision checks. */
     const store = await memoryBackend()
     /** A public repository batch may temporarily draft a duplicate before removing its old owner. */
-    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+    const repo = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
     try {
       await repo.put({ id: 'a', email: 'same' })
       await expect(
@@ -166,11 +166,11 @@ describe('authoritative fallback unique writes', () => {
     try {
       /** Two different owners compete through independent public repository instances. */
       const results = await Promise.allSettled([
-        usersEntityPluginHost.extensions[usersEntityPlugin.id](store).put({
+        usersEntityPluginHost.extensions[usersEntityPlugin.name](store).put({
           id: 'a',
           email: 'same'
         }),
-        usersEntityPluginHost.extensions[usersEntityPlugin.id](store).put({
+        usersEntityPluginHost.extensions[usersEntityPlugin.name](store).put({
           id: 'b',
           email: 'same'
         })
@@ -207,7 +207,7 @@ describe('authoritative fallback unique writes', () => {
       })
       /** This actual storage host owns the entity installation for this test scope. */
       const entity3EntityPluginHost = await entityHost(entity3EntityPlugin)
-      const old = entity3EntityPluginHost.extensions[entity3EntityPlugin.id](store)
+      const old = entity3EntityPluginHost.extensions[entity3EntityPlugin.name](store)
       await old.put({ id: 'a', email: 'same' })
       await old.put({ id: 'b', email: 'SAME' })
       /** The migration would create two owners of one normalized index value. */
@@ -235,7 +235,7 @@ describe('authoritative fallback unique writes', () => {
       })
       /** This actual storage host owns the entity installation for this test scope. */
       const entity4EntityPluginHost = await entityHost(entity4EntityPlugin)
-      const upgraded = entity4EntityPluginHost.extensions[entity4EntityPlugin.id](store)
+      const upgraded = entity4EntityPluginHost.extensions[entity4EntityPlugin.name](store)
       await expect(upgraded.migrate({ batchSize: 2 })).rejects.toMatchObject({
         code: 'INDEX_UNIQUE_CONFLICT'
       })

@@ -1,7 +1,6 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
-  type IBackendKind,
   type ILockKey,
   type ITransactionScope
 } from '@migaia/storage-contract'
@@ -31,7 +30,7 @@ const terminalNamespace = 'storage.journal.terminal'
  */
 type IStorageNativeJournalOptions = {
   readonly access: IStorageJournalBackendAccess
-  readonly backend: IBackendKind
+  readonly backend: string
   readonly namespace: string
   readonly logger: Partial<IBinlogExt & IUndoLogExt & IWalExt>
   readonly atomicBinlog?: ILogStore

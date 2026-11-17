@@ -3,63 +3,71 @@ import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.ts'
 import { isStorageErrorFamily } from '../core/error-family.ts'
-import { definePlugin, defineStorageBackendKind } from '../contracts.ts'
+import { StorageReactiveVisibility } from '../state-constants.ts'
+import { defineBackendPlugin, defineStorageFeature } from '../contracts.ts'
 import type {
+  IStorageBackendPluginDefiner,
   IStoragePluginCore,
   IStorageFeatureRecord,
   IStorageBackendPlugin,
+  IStorageBackendType,
+  IStorageFeatureDefiner,
+  IStorageReactiveProfile,
+  IStorageReactiveProfileExpose,
   IStorageFeatureStoreCompatibility
 } from '../types.ts'
 import { createMemoryBackend, type IMemoryBackendStore, type IMemoryOptions } from './memory.ts'
 import { readMemoryAssembly } from './memory-assembly.ts'
 import { snapshotMemoryCapacity } from './memory-capacity.ts'
 
-/** Exact memory token keeps native data and the original transaction owner in the neutral host. */
-export const memoryBackendKind = defineStorageBackendKind<
+/** The memory engine as a type: native data and the transaction owner stay in the neutral host. */
+export type IMemoryBackend = IStorageBackendType<
   IMemoryBackendStore,
   undefined,
   {
     getTransactionClient(scope: ITransactionScope<unknown, typeof records>): undefined
-  }
->()('memory')
+  } & IStorageReactiveProfileExpose
+>
 
-/** Options preserve the original native fields and literal installation id. */
-type IMemoryPluginOptions<N extends string> = IMemoryOptions & { readonly id?: N }
-/** Default construction stays literal inside the contextual host plugin tuple. */
-export function memoryBackendPlugin(
-  options?: IMemoryPluginOptions<'memory'> & { readonly id?: undefined },
-  features?: undefined
-): IStorageBackendPlugin<typeof memoryBackendKind, 'memory', {}, IMemoryBackendStore>
-/** Selected roots are a separate final parameter, independent of native options. */
-export function memoryBackendPlugin<const F extends IStorageFeatureRecord>(
-  options: (IMemoryPluginOptions<'memory'> & { readonly id?: undefined }) | undefined,
-  features: F & IStorageFeatureStoreCompatibility<typeof memoryBackendKind, F, IMemoryBackendStore>
-): IStorageBackendPlugin<typeof memoryBackendKind, 'memory', F, IMemoryBackendStore>
-/** An explicit id retains its literal without widening the absent Feature set. */
-export function memoryBackendPlugin<const N extends string>(
-  options: IMemoryPluginOptions<N> & { readonly id: N },
-  features?: undefined
-): IStorageBackendPlugin<typeof memoryBackendKind, N, {}, IMemoryBackendStore>
-/** Explicit ids and selected roots retain both exact public type facts. */
-export function memoryBackendPlugin<const N extends string, const F extends IStorageFeatureRecord>(
-  options: IMemoryPluginOptions<N> & { readonly id: N },
-  features: F & IStorageFeatureStoreCompatibility<typeof memoryBackendKind, F, IMemoryBackendStore>
-): IStorageBackendPlugin<typeof memoryBackendKind, N, F, IMemoryBackendStore>
+/** Memory changes reach a live query only through its change controller, within this instance. */
+function memoryReactiveProfile(hasController: boolean): IStorageReactiveProfile {
+  if (!hasController)
+    throw new StorageError(
+      StorageHostErrorCode.changeControllerNotAssembled,
+      {},
+      StorageErrorText.changeControllerNotAssembled
+    )
+  return { mode: 'push', visibility: StorageReactiveVisibility.instance }
+}
+
+/** Defines the memory backend's own Features; the annotation carries the backend type. */
+export const defineMemoryFeature: IStorageFeatureDefiner<IMemoryBackend> = defineStorageFeature
+/** Backend-plugin definer typed for the memory backend. */
+const defineMemoryBackend: IStorageBackendPluginDefiner<IMemoryBackend> = defineBackendPlugin
+
+/** Native options plus the plugin name and the Feature record. */
+type IMemoryPluginOptions<N extends string, F extends IStorageFeatureRecord> = IMemoryOptions & {
+  /** Plugin name and backend lookup key; `'memory'` when omitted. */
+  readonly name?: N
+  /** Features installed on this backend. */
+  readonly features?: F &
+    IStorageFeatureStoreCompatibility<IMemoryBackend, NoInfer<F>, IMemoryBackendStore>
+}
 /** Define an isolated native memory backend; acquisition waits for its original install window. */
 export function memoryBackendPlugin<
   const N extends string = 'memory',
   const F extends IStorageFeatureRecord = {}
 >(
-  options: IMemoryPluginOptions<N> = {},
-  features?: F & IStorageFeatureStoreCompatibility<typeof memoryBackendKind, F, IMemoryBackendStore>
-): IStorageBackendPlugin<typeof memoryBackendKind, N, F, IMemoryBackendStore> {
+  options: IMemoryPluginOptions<N, F> = {}
+): IStorageBackendPlugin<IMemoryBackend, NoInfer<N>, F, IMemoryBackendStore> {
   /** The plugin identity is captured before registering the original static Feature graph. */
   const captured = (() => {
     try {
       if (typeof options !== 'object' || options === null)
         throw new TypeError(StorageErrorText.memoryOptions)
       /** Own getters are consumed once before native acquisition and the Feature graph is captured. */
-      const id = (options.id ?? 'memory') as N
+      const name = (options.name ?? 'memory') as N
+      const features = options.features as F | undefined
       const namespace = options.namespace
       const concurrency = options.concurrency
       const owner = options.owner
@@ -71,7 +79,7 @@ export function memoryBackendPlugin<
       if (label !== undefined && typeof label !== 'string')
         throw new TypeError(StorageErrorText.memoryOwner)
       return {
-        id,
+        name,
         features,
         capacity,
         assembly: readMemoryAssembly(features),
@@ -87,9 +95,9 @@ export function memoryBackendPlugin<
     /** Native acquisition occurs once in install, before any resource is transferred to the host. */
     let constructed: ReturnType<typeof createMemoryBackend> | undefined
     return {
-      kind: memoryBackendKind,
       featureExpose: () => ({
         getClient: () => undefined,
+        reactiveProfile: memoryReactiveProfile,
         getTransactionClient: (scope: ITransactionScope<unknown, typeof records>) => {
           constructed!.assertScope(scope)
           return undefined
@@ -112,5 +120,9 @@ export function memoryBackendPlugin<
       }
     }
   }
-  return definePlugin<N, typeof factory, F>(captured.id, factory, captured.features)
+  return defineMemoryBackend({
+    name: captured.name,
+    features: captured.features as never,
+    open: factory
+  })
 }

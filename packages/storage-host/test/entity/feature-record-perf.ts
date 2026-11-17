@@ -193,7 +193,7 @@ class EntityPerfVariant {
       const start = performance.now()
       await this.#host.use(this.#entityPlugin)
       this.#installationCostNs = (performance.now() - start) * 1e6
-      this.#obtainRepository = this.#host.extensions[this.#entityPlugin.id]
+      this.#obtainRepository = this.#host.extensions[this.#entityPlugin.name]
     } else this.#obtainRepository = this.#entityPlugin.connect
     this.#repository = this.#obtainRepository!(this.#store)
     for (let index = 0; index < ROW_COUNT; index++) await this.#repository.put(rowAt(index))

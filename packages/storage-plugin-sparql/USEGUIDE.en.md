@@ -164,13 +164,13 @@ import { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology
 
 await using host = await createStorageHost({
   plugins: [
-    sparqlBackendPlugin(
-      { endpoint: oxigraphEndpoint(new Store()) },
-      {
+    sparqlBackendPlugin({
+      endpoint: oxigraphEndpoint(new Store()),
+      features: {
         graphs: graphStoreFeature(),
         ontology: ontologyFeature()
       }
-    )
+    })
   ]
 })
 const store = host.backend('sparql')

@@ -16,14 +16,18 @@ describe('physical IndexedDB organizations', () => {
       await using host = await createStorageHost({
         org: defaultOrg,
         plugins: [
-          indexedDbBackendPlugin(
-            { ...options, id: 'prefs', dbName: 'preferences' },
-            indexedDbTestFeatures
-          ),
-          indexedDbBackendPlugin(
-            { ...options, id: 'cache', dbName: 'cache' },
-            indexedDbTestFeatures
-          )
+          indexedDbBackendPlugin({
+            ...options,
+            name: 'prefs',
+            dbName: 'preferences',
+            features: indexedDbTestFeatures
+          }),
+          indexedDbBackendPlugin({
+            ...options,
+            name: 'cache',
+            dbName: 'cache',
+            features: indexedDbTestFeatures
+          })
         ]
       })
       const first = createOrgId()
@@ -78,10 +82,12 @@ describe('physical IndexedDB organizations', () => {
     await using host = await createStorageHost({
       org: defaultOrg,
       plugins: [
-        indexedDbBackendPlugin(
-          { factory, keyRange: IDBKeyRange, dbName: 'drain' },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          dbName: 'drain',
+          features: indexedDbTestFeatures
+        })
       ]
     })
     const store = host.backend('indexed-db')
@@ -138,10 +144,12 @@ describe('physical IndexedDB organizations', () => {
     const org = createOrgId()
     const failure = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin(
-          { factory, keyRange: IDBKeyRange, dbName: 'preferences/' + org },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          dbName: 'preferences/' + org,
+          features: indexedDbTestFeatures
+        })
       ]
     }).catch((error: unknown) => error)
     expect(walkErrorCauses(failure)).toContainEqual(
@@ -151,17 +159,15 @@ describe('physical IndexedDB organizations', () => {
     let reads = 0
     await using host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin(
-          {
-            factory,
-            keyRange: IDBKeyRange,
-            get dbName() {
-              reads += 1
-              return org
-            }
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          get dbName() {
+            reads += 1
+            return org
           },
-          indexedDbTestFeatures
-        )
+          features: indexedDbTestFeatures
+        })
       ]
     })
     await host.org(createOrgId()).backend('indexed-db').set('key', 'child')

@@ -1,5 +1,4 @@
 import {
-  defineFeature,
   StorageError,
   type IStorageFeatureOutput,
   type IStoragePluginCallContext,
@@ -34,7 +33,7 @@ import {
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
-import { cacheBackendKind } from '../kind.ts'
+import { defineCacheFeature, type ICacheBackend } from '../plugin.ts'
 import { cacheKey } from '../key.ts'
 import { cacheError, invalidArgument, missingCapability, isCodedCacheFailure } from '../errors.ts'
 import { CacheErrorCode } from '../error-code.ts'
@@ -202,7 +201,7 @@ function readSnapshotSemanticConfiguration(options: ISemanticCacheOptions) {
 /** One installed semantic policy borrows native APIs and owns only its in-process pending loads. */
 type ISemanticInstallationContext = {
   readonly configuration: ISemanticCacheOptions & IStorageVectorConfiguration
-  readonly core: IStorageFeatureExpose<typeof cacheBackendKind>
+  readonly core: IStorageFeatureExpose<ICacheBackend>
   readonly borrowed: IStorageBorrowedBackend
   readonly flights: Map<string, Promise<ISemanticLoaded<ICodecValue>>>
   readonly reporter: ReturnType<typeof createStorageOperationReporter>
@@ -263,7 +262,6 @@ function reportSemanticFailure(
         : undefined
     return {
       backendId: state.core.getBackendId(),
-      backend: CacheText.backend,
       orgId: context.orgId,
       tier: -1,
       operation,
@@ -648,8 +646,7 @@ function createSemanticFeatureOutput(state: ISemanticInstallationContext) {
 /** Installs semantic policy through the original Feature registration and borrowed native backend. */
 export function semanticCacheFeature(options: ISemanticCacheOptions) {
   const captured = snapshotSemanticConfiguration(options)
-  return defineFeature<
-    typeof cacheBackendKind,
+  return defineCacheFeature<
     {},
     IStorageFeatureOutput<
       readonly [],
@@ -659,7 +656,5 @@ export function semanticCacheFeature(options: ISemanticCacheOptions) {
         readonly transaction: {}
       }
     >
-  >(cacheBackendKind, ({ featureExpose: core }) =>
-    createSemanticFeatureOutput(createSemanticContext(core, captured))
-  )
+  >(({ featureExpose: core }) => createSemanticFeatureOutput(createSemanticContext(core, captured)))
 }

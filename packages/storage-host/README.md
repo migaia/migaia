@@ -132,7 +132,7 @@ pnpm add --workspace @migaia/log-host @migaia/log-plugin-durable
 
 完整路径和依赖说明见 [storage-contract](../storage-contract/README.md#入口与依赖方向)。旧 contract 根入口不保留这些运行时导出。
 
-实体插件：`defineEntityPlugin` 无别名替代 `defineEntity`。以 `xxxEntityPlugin` 命名实例，在 record 中选择不透明原生 `/entity/features/*`，经 storage host plugins 或 `host.use` 安装，再通过 `host.extensions[xxxEntityPlugin.id](store)` 获取仓储。每实体只安装一次 Feature，仓储复用已安装工厂并随实体/宿主失效；插件 ID 可不同于持久化实体命名空间。缺失或重复角色在安装时拒绝。详见[实体仓储](./USEGUIDE.md#使用实体仓储)。
+实体插件：`defineEntityPlugin` 无别名替代 `defineEntity`。以 `xxxEntityPlugin` 命名实例，在 record 中选择不透明原生 `/entity/features/*`，经 storage host plugins 或 `host.use` 安装，再通过 `host.extensions[xxxEntityPlugin.name](store)` 获取仓储。每实体只安装一次 Feature，仓储复用已安装工厂并随实体/宿主失效；插件 ID 可不同于持久化实体命名空间。缺失或重复角色在安装时拒绝。详见[实体仓储](./USEGUIDE.md#使用实体仓储)。
 
 ## 显式装配可选能力
 
@@ -152,9 +152,11 @@ import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-ch
 
 const host = await createStorageHost({
   plugins: [
-    memoryBackendPlugin(undefined, {
-      notifications: memoryNotificationsFeature(),
-      changeFeed: memoryChangeFeedFeature()
+    memoryBackendPlugin({
+      features: {
+        notifications: memoryNotificationsFeature(),
+        changeFeed: memoryChangeFeedFeature()
+      }
     })
   ]
 })

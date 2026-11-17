@@ -2,8 +2,8 @@ import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { it, expect, onTestFinished } from 'vitest'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
-import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
+import { createStorageHost } from '@migaia/storage-host'
+import { ConcurrencyPolicy, lockKey, definePlugin } from '@migaia/storage-host/sdk'
 import { type IConcurrencyPolicy } from '@migaia/storage-contract'
 import { postgresBackendPlugin } from '../src/index.ts'
 import { pgDriver } from '../src/pg.ts'
@@ -29,15 +29,18 @@ async function installed(
   const native = pgDriver(pool)
   const prefix = 'pg_concurrency_' + randomUUID().slice(0, 8)
   const counts = { transaction: 0, conflicts: 0, physical: 0 }
-  const inspect = definePlugin('pg-attempt-observer', (core) => ({
-    install() {
-      core.useAsyncPipeline((request, next) => {
-        if (request.operation === 'transaction') counts.transaction += 1
-        return next(request)
-      })
-      return {}
-    }
-  }))
+  const inspect = definePlugin({
+    name: 'pg-attempt-observer',
+    setup: (core) => ({
+      install() {
+        core.useAsyncPipeline((request, next) => {
+          if (request.operation === 'transaction') counts.transaction += 1
+          return next(request)
+        })
+        return {}
+      }
+    })
+  })
   const driver = {
     ...native,
     query: (...args: Parameters<typeof native.query>) => {

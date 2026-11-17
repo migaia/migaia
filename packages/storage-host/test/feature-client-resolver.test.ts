@@ -4,21 +4,26 @@ import { deferred } from '@migaia/utils/promise'
 import {
   createOrgId,
   createStorageHost,
-  defineFeature,
-  definePlugin,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendType,
+  type IStorageBackendPluginDefiner,
+  type IStorageFeatureDefiner
 } from '../src/index.ts'
 import { createMemoryBackend } from '../src/backends/memory.ts'
+import { defineBackendPlugin, defineStorageFeature } from '../src/sdk.ts'
 
 /** Clients are borrowed fixture identities; actual data and transaction ownership stay in memory. */
 type IClient = { readonly orgId: string; readonly marker: string }
 /** A distinct native kind retains the original memory implementation and authentic scope owner. */
-const kind = defineStorageBackendKind<
+type IKindBackend = IStorageBackendType<
   ReturnType<typeof createMemoryBackend>['store'],
   IClient,
   { getTransactionClient(scope: object): IClient }
->()('memory')
+>
+/** Feature definer typed for this test backend. */
+const defineKindFeature: IStorageFeatureDefiner<IKindBackend> = defineStorageFeature
+/** Backend-plugin definer typed for this test backend. */
+const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
 
 /** Install one original backend and optionally opt in to native organization client selection. */
 function nativeFixture(mode: 'legacy' | 'sync' | 'async') {
@@ -32,7 +37,7 @@ function nativeFixture(mode: 'legacy' | 'sync' | 'async') {
   let constructed!: ReturnType<typeof createMemoryBackend>
   /** Selected Feature construction must remain once even when new organizations are used. */
   let factories = 0
-  const feature = defineFeature(kind, () => {
+  const feature = defineKindFeature(() => {
     factories += 1
     return {
       capabilities: [],
@@ -56,7 +61,6 @@ function nativeFixture(mode: 'legacy' | 'sync' | 'async') {
   const factory = (core: IStoragePluginCore<{ feature: typeof feature }>) => {
     installedCore = core
     return {
-      kind,
       featureExpose: () => ({
         getClient: () => {
           trace.push('legacy client')
@@ -92,11 +96,7 @@ function nativeFixture(mode: 'legacy' | 'sync' | 'async') {
     }
   }
   /** Preserve the same exact descriptor inference used by native backend authoring. */
-  const plugin = definePlugin<'native', typeof factory, { feature: typeof feature }>(
-    'native',
-    factory,
-    { feature }
-  )
+  const plugin = defineKindBackend({ name: 'native', features: { feature }, open: factory })
   return {
     plugin,
     trace,

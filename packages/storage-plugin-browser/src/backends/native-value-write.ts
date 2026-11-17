@@ -1,9 +1,5 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import {
-  StorageContractError,
-  StorageContractErrorCode,
-  type IBackendKind
-} from '@migaia/storage-contract'
+import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { ENTITY_UNIQUE_WRITE_LOCK, StorageOperation } from '../constants.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { normalizeError } from './backend-errors.ts'
@@ -23,7 +19,7 @@ type IHostLockManager = {
 /** Serialize only snapshot verification and commit, after application schema/projection callbacks. */
 const withPhysicalValueWrite = async <T>(
   run: () => Promise<T>,
-  backend: IBackendKind,
+  backend: string,
   signal: IAbortSignal | undefined,
   runtime: IStorageOperationRuntime,
   closingSignal?: IAbortSignal,
@@ -94,7 +90,7 @@ const withPhysicalValueWrite = async <T>(
 /** Native snapshot comparison and write share one turn; only a real Web Lock adds a cross-page gate. */
 export const withNativeValueWrite = (
   run: () => void,
-  backend: IBackendKind,
+  backend: string,
   signal: IAbortSignal | undefined,
   runtime: IStorageOperationRuntime,
   closingSignal: IAbortSignal
@@ -104,7 +100,7 @@ export const withNativeValueWrite = (
 /** Text redo uses this original native lock path for its complete read/recover/apply interval. */
 export const withNativeTextOperation = <R>(
   run: () => Promise<R>,
-  backend: IBackendKind,
+  backend: string,
   runtime: IStorageOperationRuntime,
   closingSignal: IAbortSignal,
   lockName: string,
@@ -116,7 +112,7 @@ export const withNativeTextOperation = <R>(
 export const assertValueSnapshot = (
   actual: readonly (readonly [string, string])[],
   expected: readonly (readonly [string, string])[],
-  backend: IBackendKind
+  backend: string
 ): void => {
   /** This temporary lookup owns no persistent data, resource or retry state. */
   const values = new Map(expected)

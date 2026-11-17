@@ -35,7 +35,7 @@ it('keeps base reads and writes usable while rejecting missing optional assembli
 
 it('selects notification and iterator roots independently in the original backend lifetime', async () => {
   await using host = await createStorageHost({
-    plugins: [memoryBackendPlugin(undefined, { notifications: memoryNotificationsFeature() })]
+    plugins: [memoryBackendPlugin({ features: { notifications: memoryNotificationsFeature() } })]
   })
   const store = host.backend('memory')
   const changes: unknown[] = []
@@ -53,9 +53,11 @@ it('opens private logs only through the selected native journal plugin', async (
   await using host = await createStorageHost({
     plugins: [
       storageJournalPlugin(),
-      memoryBackendPlugin(undefined, {
-        notifications: memoryNotificationsFeature(),
-        changeFeed: memoryChangeFeedFeature()
+      memoryBackendPlugin({
+        features: {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
       })
     ]
   })
@@ -72,7 +74,7 @@ it('accepts journal configuration only once, in the first install batch', async 
   }
   await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
   await expect(
-    host.use(storageJournalPlugin(unused), memoryBackendPlugin({ id: 'late' }))
+    host.use(storageJournalPlugin(unused), memoryBackendPlugin({ name: 'late' }))
   ).rejects.toMatchObject({
     code: StorageHostErrorCode.backendInstallFailed,
     cause: { code: StorageHostErrorCode.invalidConfig }
@@ -80,7 +82,6 @@ it('accepts journal configuration only once, in the first install batch', async 
   expect(host.hasBackend('late')).toBe(false)
   await expect(
     createStorageHost({
-      // @ts-expect-error Two journal plugins share one plugin id, which the types already reject.
       plugins: [storageJournalPlugin(unused), storageJournalPlugin(unused), memoryBackendPlugin()]
     })
   ).rejects.toMatchObject({ cause: { code: StorageHostErrorCode.invalidConfig } })

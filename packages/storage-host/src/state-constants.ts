@@ -1,14 +1,9 @@
 /** Original native descriptor hook names; storage metadata is consumed before this boundary. */
 export const STORAGE_DESCRIPTOR_HOOKS = ['install', 'expose', 'featureExpose'] as const
 /** Storage-owned author metadata never enters PluginHost's closed native descriptor vocabulary. */
-export const STORAGE_DESCRIPTOR_METADATA = [
-  'kind',
-  'capabilityInstaller',
-  'journalBinding'
-] as const
+export const STORAGE_DESCRIPTOR_METADATA = ['capabilityInstaller', 'journalBinding'] as const
 /** Host-injected expose methods cannot be replaced by a backend author. */
 export const STORAGE_RESERVED_EXPOSE = [
-  'getKind',
   'getChangeController',
   'getStore',
   'getBackendId',
@@ -19,8 +14,6 @@ export const STORAGE_RESERVED_EXPOSE = [
   'emit',
   'registerDetect'
 ] as const
-/** Public backend ids are encoded into PluginHost's stricter registration namespace. */
-export const STORAGE_PLUGIN_NAME_PREFIX = 'storage-backend:'
 /** Journal bootstrap remains an internal original PluginHost registration, outside backend ids. */
 export const STORAGE_JOURNAL_BOOTSTRAP_PREFIX = 'storage-journal-bootstrap:'
 
@@ -46,3 +39,15 @@ export const STORAGE_JOURNAL_PLUGIN_ID = 'storage-journal'
  * `unUse` with this id removes every subscription it owns.
  */
 export const STORAGE_PROBE_PLUGIN_ID = 'storage-probe'
+
+/**
+ * Where a backend's changes are visible to a live query. A backend states one value in its
+ * `reactiveProfile()`; the browser reactive Feature validates it before it registers an adapter.
+ */
+export const StorageReactiveVisibility = {
+  instance: 'instance',
+  documentEventual: 'document-eventual',
+  topLevelContextEventual: 'top-level-context-eventual',
+  originJsVisibleEventual: 'origin-js-visible-eventual',
+  originEventual: 'origin-eventual'
+} as const

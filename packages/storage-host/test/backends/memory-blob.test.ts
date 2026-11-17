@@ -4,9 +4,10 @@ import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.t
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { blob, type IBlobApi, type IStorageChange } from '@migaia/storage-contract'
-import { createOrgId, createStorageHost, definePlugin } from '../../src/index.ts'
+import { createOrgId, createStorageHost } from '../../src/index.ts'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import { MemoryOperation } from '../../src/backends/memory-constants.ts'
+import { definePlugin } from '../../src/sdk.ts'
 
 /** Installed stores exercise the reference object backend through the authentic capability token. */
 describe('memory native objects', () => {
@@ -14,9 +15,11 @@ describe('memory native objects', () => {
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -61,9 +64,11 @@ describe('memory native objects', () => {
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -102,9 +107,11 @@ describe('memory native objects', () => {
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -150,9 +157,11 @@ describe('memory native objects', () => {
     const closingHost = await createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         })
       ]
     })
@@ -182,13 +191,13 @@ describe('memory native objects', () => {
       org: defaultOrg,
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(
-          { namespace: 'objects' },
-          {
+        memoryBackendPlugin({
+          namespace: 'objects',
+          features: {
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           }
-        )
+        })
       ]
     })
     const root = host.backend('memory').use(blob)
@@ -224,13 +233,13 @@ describe('memory native objects', () => {
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(
-          { capacity: { maxEntries: 2, maxBytes: 4 } },
-          {
+        memoryBackendPlugin({
+          capacity: { maxEntries: 2, maxBytes: 4 },
+          features: {
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           }
-        )
+        })
       ]
     })
     const store = host.backend('memory')
@@ -260,24 +269,29 @@ describe('memory native objects', () => {
 
   it('honors in-place pipeline intervention once before native body ownership', async () => {
     let entries = 0
-    const intervene = definePlugin('blob-intervention', (core) => ({
-      install() {
-        core.useAsyncPipeline(async (input, next) => {
-          if (input.operation === MemoryOperation.blobPut) {
-            entries++
-            Object.assign(input.input as object, { key: 'changed', body: new Uint8Array([7]) })
-          }
-          await next(input)
-        })
-        return {}
-      }
-    }))
+    const intervene = definePlugin({
+      name: 'blob-intervention',
+      setup: (core) => ({
+        install() {
+          core.useAsyncPipeline(async (input, next) => {
+            if (input.operation === MemoryOperation.blobPut) {
+              entries++
+              Object.assign(input.input as object, { key: 'changed', body: new Uint8Array([7]) })
+            }
+            await next(input)
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        memoryBackendPlugin(undefined, {
-          notifications: memoryNotificationsFeature(),
-          changeFeed: memoryChangeFeedFeature()
+        memoryBackendPlugin({
+          features: {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
         }),
         intervene
       ]

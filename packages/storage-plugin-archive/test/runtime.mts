@@ -3,11 +3,11 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 /** All runtimes reach the same built neutral Archive and native WHATWG gzip implementation. */
 const initial = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const host = await initial.use(
   archivePlugin({
-    id: 'history',
+    name: 'history',
     hot: 'hot',
     cold: 'cold',
     rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]

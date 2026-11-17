@@ -51,7 +51,7 @@ export declare const storageJournalConfigurationBrand: unique symbol
 /** Plugin handle returned by `storageJournalPlugin(options)`; `J` is the given configuration type. */
 export type IStorageJournalPluginHandle<J extends IStorageJournalConfiguration | undefined> =
   import('../types.ts').IStorageBackendPluginHandle & {
-    readonly id: typeof import('../state-constants.ts').STORAGE_JOURNAL_PLUGIN_ID
+    readonly name: typeof import('../state-constants.ts').STORAGE_JOURNAL_PLUGIN_ID
     readonly [storageJournalConfigurationBrand]: { readonly configuration: J }
   }
 /** Journal configuration type selected by the plugin tuple `P`, or `undefined` when none is. */

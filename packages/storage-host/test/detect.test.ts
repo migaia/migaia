@@ -9,24 +9,27 @@ import {
 import {
   createStorageHost,
   createOrgId,
-  definePlugin,
-  defineFeature,
-  defineStorageBackendKind,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageBackendType,
+  type IStorageFeatureDefiner,
+  type IStorageBackendPluginDefiner
 } from '../src/index.ts'
 import { catalog } from './helpers/catalog.ts'
+import { definePlugin, defineStorageFeature, defineBackendPlugin } from '../src/sdk.ts'
 
 /** A native map remains the actual client, store and lifecycle owner throughout detection. */
-const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(
-  'catalog'
-)
+type IKindBackend = IStorageBackendType<ReturnType<typeof catalog>['store'], Map<string, string>>
+/** Backend-plugin definer typed for this test backend. */
+const defineKindBackend: IStorageBackendPluginDefiner<IKindBackend> = defineBackendPlugin
+/** Feature definer typed for this test backend. */
+const defineKindFeature: IStorageFeatureDefiner<IKindBackend> = defineStorageFeature
 
 describe('storage environment checks', () => {
   it('runs plugin and Feature checks in installation order and caches one successful Promise', async () => {
     /** Record actual original callbacks, without a separate execution seam. */
     const order: string[] = []
     /** Feature construction uses the original registration installation window. */
-    const feature = defineFeature(kind, ({ featureExpose }) => {
+    const feature = defineKindFeature(({ featureExpose }) => {
       featureExpose.registerDetect(async (signal) => {
         expect(signal.aborted).toBe(false)
         order.push('feature')
@@ -44,7 +47,6 @@ describe('storage environment checks', () => {
         order.push('factory')
       })
       return {
-        kind,
         featureExpose: () => ({ getClient: () => state.client }),
         capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
         install: () => {
@@ -58,16 +60,22 @@ describe('storage environment checks', () => {
       }
     }
     /** Ordinary plugins use the same lifecycle window and remain in installation order. */
-    const utility = definePlugin('utility', (core) => ({
-      install: () => {
-        core.registerDetect(async () => {
-          order.push('utility')
-        })
-        return {}
-      }
-    }))
+    const utility = definePlugin({
+      name: 'utility',
+      setup: (core) => ({
+        install: () => {
+          core.registerDetect(async () => {
+            order.push('utility')
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({
-      plugins: [definePlugin('catalog', descriptor, { feature }), utility]
+      plugins: [
+        defineKindBackend({ name: 'catalog', features: { feature }, open: descriptor }),
+        utility
+      ]
     })
     expect(order).toEqual(['factory', 'feature', 'install', 'utility'])
     expect(host.detect()).toBe(host.detect())
@@ -93,7 +101,6 @@ describe('storage environment checks', () => {
     let state!: ReturnType<typeof catalog>
     /** Registration keeps its original resource owner and actual execution port. */
     const descriptor = (core: IStoragePluginCore) => ({
-      kind,
       featureExpose: () => ({ getClient: () => state.client }),
       capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
       install: () => {
@@ -111,7 +118,7 @@ describe('storage environment checks', () => {
     })
     /** No constructor probe runs when detection is explicitly delayed. */
     const host = await createStorageHost({
-      plugins: [definePlugin('delayed', descriptor)],
+      plugins: [defineKindBackend({ name: 'delayed', open: descriptor })],
       autoDetect: false
     })
     /** The highest actual native client boundary answers whether any business work was invoked. */
@@ -154,7 +161,6 @@ describe('storage environment checks', () => {
         const descriptor = (core: IStoragePluginCore) => {
           let state!: ReturnType<typeof catalog>
           return {
-            kind,
             featureExpose: () => ({ getClient: () => state.client }),
             capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
             install: () => {
@@ -171,7 +177,7 @@ describe('storage environment checks', () => {
             }
           }
         }
-        return definePlugin(name, descriptor)
+        return defineKindBackend({ name: name, open: descriptor })
       }
       /** The create boundary performs default detection only after both stores are installed. */
       const failure = await createStorageHost({
@@ -195,12 +201,15 @@ describe('storage environment checks', () => {
     const newCheck = vi.fn(async () => {})
     /** Ordinary plugins prove ordering without acquiring an unrelated backend resource. */
     const plugin = (id: string, check: () => Promise<void>) =>
-      definePlugin(id, (core) => ({
-        install: () => {
-          core.registerDetect(check)
-          return {}
-        }
-      }))
+      definePlugin({
+        name: id,
+        setup: (core) => ({
+          install: () => {
+            core.registerDetect(check)
+            return {}
+          }
+        })
+      })
     await using host = await createStorageHost({ plugins: [plugin('old', oldCheck)] })
     /** Retain the successful cached result before a later batch is installed. */
     const first = host.detect()
@@ -232,7 +241,6 @@ describe('storage environment checks', () => {
         expect(state.cleanup).not.toHaveBeenCalled()
       })
       return {
-        kind,
         featureExpose: () => ({ getClient: () => state.client }),
         capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
         install: () => {
@@ -244,7 +252,7 @@ describe('storage environment checks', () => {
     }
     /** Explicit detection allows close to compete with the actual accepted check. */
     const host = await createStorageHost({
-      plugins: [definePlugin('closing', descriptor)],
+      plugins: [defineKindBackend({ name: 'closing', open: descriptor })],
       autoDetect: false
     })
     /** Handle the known losing detect result immediately. */
@@ -270,7 +278,7 @@ describe('storage environment checks', () => {
     /** No backend factory can run when the host's organization input is malformed. */
     const install = vi.fn(() => ({}))
     /** Default identity and caller-supplied identity share the original event subscriber. */
-    const plugin = definePlugin('ordinary', () => ({ install }))
+    const plugin = definePlugin({ name: 'ordinary', setup: () => ({ install }) })
     await using _host = await createStorageHost({
       org,
       plugins: [storageProbe({ beforeDetect: ({ orgId }) => identities.push(orgId) }), plugin]

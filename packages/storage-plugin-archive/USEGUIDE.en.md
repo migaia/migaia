@@ -19,11 +19,11 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'archive',
+    name: 'archive',
     hot: 'hot',
     cold: 'cold',
     rules: [
@@ -54,7 +54,7 @@ true
 true
 ```
 
-id sets extension-function prefixes. hot/cold are previously installed backend IDs. rules must be nonempty, with unique names and string-key prefixes. olderThanMs is a nonnegative safe integer. where(cutoffMs) receives one sampled current time minus retention and returns the record condition. The condition explicitly chooses a time field; the plugin never guesses one.
+name sets extension-function prefixes. hot/cold are the names of previously installed backends. rules must be nonempty, with unique names and string-key prefixes. olderThanMs is a nonnegative safe integer. where(cutoffMs) receives one sampled current time minus retention and returns the record condition. The condition explicitly chooses a time field; the plugin never guesses one.
 
 segmentBytes defaults to 1,048,576 uncompressed UTF-8 row bytes and must be a positive safe integer. An oversized record gets its own segment. Optional rule selects one named rule; omission runs declaration order. Optional limit is a positive safe integer counting matching candidates across selected rules. The same key is not counted twice.
 
@@ -72,11 +72,11 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'archive',
+    name: 'archive',
     hot: 'hot',
     cold: 'cold',
     rules: [
@@ -125,11 +125,11 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'history',
+    name: 'history',
     hot: 'hot',
     cold: 'cold',
     rules: [
@@ -175,11 +175,15 @@ import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [storageProbe(), memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [
+    storageProbe(),
+    memoryBackendPlugin({ name: 'hot' }),
+    memoryBackendPlugin({ name: 'cold' })
+  ]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'archive',
+    name: 'archive',
     hot: 'hot',
     cold: 'cold',
     rules: [

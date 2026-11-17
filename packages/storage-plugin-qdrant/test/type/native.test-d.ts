@@ -8,10 +8,10 @@ import { qdrantRescoreFeature } from '../../src/features/rescore.ts'
 export async function nativeTypes() {
   const host = await createStorageHost({
       plugins: [
-        qdrantBackendPlugin(
-          { url: 'http://127.0.0.1:6333' },
-          { management: qdrantManagementFeature(), hybrid: qdrantHybridFeature() }
-        )
+        qdrantBackendPlugin({
+          url: 'http://127.0.0.1:6333',
+          features: { management: qdrantManagementFeature(), hybrid: qdrantHybridFeature() }
+        })
       ] as const
     }),
     store = host.backend('qdrant')
@@ -38,14 +38,14 @@ export async function nativeTypes() {
 export async function nativeRescoreTypes() {
   const host = await createStorageHost({
     plugins: [
-      qdrantBackendPlugin(
-        { url: 'http://127.0.0.1:6333' },
-        {
+      qdrantBackendPlugin({
+        url: 'http://127.0.0.1:6333',
+        features: {
           rescore: qdrantRescoreFeature({
             collections: { points: { dimensions: 2, metric: 'dot' } }
           })
         }
-      )
+      })
     ] as const
   })
   const store = host.backend('qdrant')

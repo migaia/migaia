@@ -9,7 +9,10 @@ export async function runBrowserIndexedDbBlobsScenario() {
   const org = createOrgId()
   const defaultOrg = createOrgId()
   const plugin = () =>
-    indexedDbBackendPlugin({ dbName }, { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature() })
+    indexedDbBackendPlugin({
+      dbName,
+      features: { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature() }
+    })
   const file = new File(['avatar bytes'], 'avatar.txt', {
     type: 'text/plain',
     lastModified: 123456789

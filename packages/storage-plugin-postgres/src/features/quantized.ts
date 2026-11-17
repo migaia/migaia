@@ -1,7 +1,7 @@
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import { refineStorageVectorQuery } from '@migaia/storage-host/sdk'
 import { type IVectorQuery, type IVectorNativeQuery } from '@migaia/storage-contract'
-import { postgresBackendKind } from '../plugin.ts'
+import { definePostgresFeature } from '../plugin.ts'
 import { PgQuantizedMode } from '../constants.ts'
 import { invalidArgument } from '../errors.ts'
 
@@ -23,15 +23,14 @@ export function pgQuantizedFeature(options: IPgQuantizedOptions) {
   /** Only captured finite modes reach native schema preparation or execution. */
   const { mode } = options
   if (mode !== PgQuantizedMode.halfvec && mode !== PgQuantizedMode.binary) throw invalidArgument()
-  return defineFeature<
-    typeof postgresBackendKind,
+  return definePostgresFeature<
     {},
     IStorageFeatureOutput<
       readonly [],
       { readonly vector: IPgQuantizedQueryMethods },
       { readonly store: {}; readonly transaction: {} }
     >
-  >(postgresBackendKind, ({ featureExpose }) => {
+  >(({ featureExpose }) => {
     featureExpose.selectQuantized(mode)
     /** The canonical refiner owns topology, safe bounds and the original source identity. */
     const methods: IPgQuantizedQueryMethods = {

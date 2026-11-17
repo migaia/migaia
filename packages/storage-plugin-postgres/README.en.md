@@ -72,7 +72,7 @@ Put changes that belong together inside `store.transaction`. Callback failure ro
 | Install storage and release its subscriptions   | `createStorageHost` and `host.dispose()`         |
 | Use text, records, TTL, counters and SQL        | `host.backend('postgres')` or `store.use(token)` |
 | Access one organization's data                  | `host.org(orgId).backend('postgres')`            |
-| Add vectors, COPY, notifications or replication | Features in the plugin's second argument         |
+| Add vectors, COPY, notifications or replication | Features in the plugin's `features` option       |
 
 A capability token such as `kv` or `ttl` selects a set of methods. A Feature is an explicitly installed addition. A cursor is an opaque checkpoint: save and return it unchanged.
 
@@ -106,7 +106,7 @@ The root entry loads no SDK. Logical replication currently requires `/pg`, Node 
 
 | API                                                   | Purpose                                                |
 | ----------------------------------------------------- | ------------------------------------------------------ |
-| `postgresBackendPlugin(options, features?)`           | Install a PostgreSQL backend                           |
+| `postgresBackendPlugin({ ...options, features? })`    | Install a PostgreSQL backend                           |
 | `store.use(kv / records / ttl / counter / sql)`       | Select standard functionality                          |
 | `store.transaction` / `store.tx().lock(...).run(...)` | Native transactions and explicit logical locks         |
 | `store.sql`                                           | Parameterized application SQL                          |

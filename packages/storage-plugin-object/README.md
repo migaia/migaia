@@ -104,7 +104,7 @@ SDK 是包声明的真实 peer。本地 `/fs` 入口按 Node、Bun、Deno 选择
 
 | API                                                    | 用途                           |
 | ------------------------------------------------------ | ------------------------------ |
-| `objectBackendPlugin({ id?, driver }, features?)`      | 安装后端，默认 ID 为 `object`  |
+| `objectBackendPlugin({ name?, driver, features? })`    | 安装后端，默认名称为 `object`  |
 | `fsObjectDriver({ root })` / `s3ObjectDriver(options)` | 选择本地目录或 S3              |
 | `store.use(blob).put/get/head`                         | 写内容、开读取对象、只读元数据 |
 | `object.bytes()` / `stream()` / `dispose()`            | 消费一次内容并释放             |

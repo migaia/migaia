@@ -22,7 +22,7 @@ import { raceWithAbort } from '@migaia/utils/promise'
 import { createStorageError, createStorageTypeError, StorageError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.ts'
-import { readStorageNativePluginDefinition, readStorageNativePluginMetadata } from './contracts.ts'
+import type { IStorageDefinitionMetadata } from './contracts.ts'
 import { forwardStorageExecution } from './execution.ts'
 import { createStorageStoreCell } from './store-cell.ts'
 import type { IStorageBase } from '@migaia/storage-contract'
@@ -56,7 +56,7 @@ export class StorageHostInstaller {
   createInstallEntry(
     installState: IStorageInstallBatchContext,
     plugin: IStorageBackendPluginHandle,
-    metadata: NonNullable<ReturnType<typeof readStorageNativePluginMetadata>>,
+    metadata: IStorageDefinitionMetadata,
     index: number
   ): IStorageInstallEntryResult {
     /** Initialize registration facts in original construction order before any callback can publish. */
@@ -86,7 +86,6 @@ export class StorageHostInstaller {
     entryState.observerBinding = {
       identity: () => ({
         backendId: entryState.native.id,
-        backend: entryState.kind?.name ?? entryState.native.id,
         orgId: this.#owner.orgId
       }),
       assertCurrent: () => this.assertRegistration(entryState),
@@ -98,17 +97,9 @@ export class StorageHostInstaller {
 
     entryState.installState.nativeContexts.set(entryState.index, entryState.context)
 
-    /** The original PluginHost definition remains the registration and lifecycle owner. */
-    entryState.definition = readStorageNativePluginDefinition(entryState.plugin)
-
-    if (entryState.definition === undefined)
-      throw new StorageError(
-        StorageHostErrorCode.backendPluginInvalid,
-        {},
-        StorageErrorText.backendPluginInvalid
-      )
     return {
-      plugin: entryState.definition as IPlugin<IStorageInstallCore, Record<string, unknown>>,
+      /** The storage definer returned the PluginHost definition itself; it owns the lifecycle. */
+      plugin: entryState.plugin as unknown as IPlugin<IStorageInstallCore, Record<string, unknown>>,
       storeCell: entryState.storeCell
     }
   }
@@ -247,10 +238,7 @@ export class StorageHostInstaller {
           queryStages: (store) => this.bindObservers(entryState, store).query
         }),
       scheduler: this.#owner.scheduler,
-      getKind: () => entryState.kind,
-      setKind: (value) => {
-        entryState.kind = value
-      },
+      backend: entryState.native.backend,
       storeCell: entryState.storeCell,
       runInstall: <T>(operation: () => Promise<T>) => this.installRunInstall(entryState, operation),
       isInstallExpired: () => !entryState.installSettled && !this.isRegistrationCurrent(entryState),
@@ -278,7 +266,6 @@ export class StorageHostInstaller {
       entryState.context.assertExecution,
       () => ({
         backendId: entryState.native.id,
-        backend: entryState.kind?.name ?? entryState.native.id,
         orgId
       }),
       entryState.context.observeExecution === undefined
@@ -407,7 +394,7 @@ export class StorageHostInstaller {
     entryState: IStorageInstallEntryContext,
     operation: () => Promise<T>
   ): Promise<T> {
-    if (entryState.kind !== undefined) {
+    if (entryState.native.backend) {
       this.#owner.events.emit(Hook.beforeBackendPluginInstall, entryState.observerBinding.identity)
       this.#owner.events.emit(Hook.beforeBackendCreate, entryState.observerBinding.identity)
     }
@@ -424,13 +411,13 @@ export class StorageHostInstaller {
       entryState.registrationCore!.onDispose(async () => {
         for (const entry of entryState.checks) await entry.pending?.catch(this.#owner.report)
       })
-      if (entryState.kind !== undefined) {
+      if (entryState.native.backend) {
         this.#owner.events.emit(Hook.afterBackendPluginInstall, entryState.observerBinding.identity)
         this.#owner.events.emit(Hook.afterBackendInstall, entryState.observerBinding.identity)
       }
       return installed
     } catch (error) {
-      if (entryState.kind !== undefined) {
+      if (entryState.native.backend) {
         if (this.#owner.events.hasListeners(Hook.onBackendRejected))
           this.#owner.events.emit(Hook.onBackendRejected, () => ({
             ...entryState.observerBinding.identity(),
@@ -527,11 +514,6 @@ export class StorageHostInstaller {
       void this.#owner.disposeLateStore(snapshot)
       throw error
     }
-    if (entryState.kind === undefined || snapshot.backend !== entryState.kind.name)
-      throw createStorageTypeError(
-        StorageHostErrorCode.backendKindMismatch,
-        StorageErrorText.backendKindMismatch
-      )
     /** Every admitted base, including frozen raw stores, shares this host's observer owner. */
     let releaseEnvelope: (() => void) | undefined
     core.onDispose(() => releaseEnvelope?.())

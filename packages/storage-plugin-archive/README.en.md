@@ -26,11 +26,11 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'archive',
+    name: 'archive',
     hot: 'hot',
     cold: 'cold',
     rules: [
@@ -71,7 +71,7 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { blob } from '@migaia/storage-contract'
 
 await using host = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [memoryBackendPlugin({ name: 'hot' }), memoryBackendPlugin({ name: 'cold' })]
 })
 const hot = host.backend('hot')
 const value = await hot.getRecord('event:a')
@@ -121,7 +121,7 @@ Use Node.js 24 or later with gzip CompressionStream/DecompressionStream. The in-
 
 | API                                         | Purpose                                             |
 | ------------------------------------------- | --------------------------------------------------- |
-| `archivePlugin({id, hot, cold, rules})`     | Install an ordinary extension.                      |
+| `archivePlugin({name, hot, cold, rules})`   | Install an ordinary extension.                      |
 | `host.extensions.archiveRun(options?)`      | Move matching records and return progress.          |
 | `host.extensions.archiveGet(key, options?)` | Read a hot/archived value, optionally restoring it. |
 | `host.extensions.archiveSweep(ctx?)`        | Remove unreferenced archive objects.                |
@@ -137,4 +137,4 @@ Segments commit separately; later failures do not roll back earlier segments. Ex
 
 ## Migrating nested extension calls
 
-Earlier drafts used `host.extensions.archive.run()`, `.get()` and `.sweep()`. Replace them with `host.extensions.archiveRun()`, `archiveGet()` and `archiveSweep()`. An `id: 'history'` configuration uses `historyRun`, `historyGet` and `historySweep`. Organization views expose the same flat functions through `host.org(id).extensions`. Arguments and results retain each operation's contract. There is no old nested object or compatibility alias; the host still owns resource cleanup.
+Earlier drafts used `host.extensions.archive.run()`, `.get()` and `.sweep()`. Replace them with `host.extensions.archiveRun()`, `archiveGet()` and `archiveSweep()`. A `name: 'history'` configuration uses `historyRun`, `historyGet` and `historySweep`. Organization views expose the same flat functions through `host.org(id).extensions`. Arguments and results retain each operation's contract. There is no old nested object or compatibility alias; the host still owns resource cleanup.

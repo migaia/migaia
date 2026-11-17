@@ -2,11 +2,19 @@ import { memoryNotificationsFeature } from '../../src/features/memory-notificati
 import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { createStorageHost, defineFeature, definePlugin } from '../../src/index.ts'
-import { memoryBackendKind, memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { walkErrorCauses } from '@migaia/utils/error'
+import { createStorageHost } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { definePlugin } from '../../src/sdk.ts'
+import type { IMemoryBackend } from '../../src/plugins/memory.ts'
+import { defineStorageFeature } from '../../src/sdk.ts'
+import type { IStorageFeatureDefiner } from '../../src/index.ts'
+
+/** Feature definer typed for the imported backend. */
+const defineMemoryFeature: IStorageFeatureDefiner<IMemoryBackend> = defineStorageFeature
 
 /** The actual Feature borrows the same controlled backend object through its declared lazy port. */
-const controllerFeature = defineFeature(memoryBackendKind, ({ featureExpose }) => ({
+const controllerFeature = defineMemoryFeature(({ featureExpose }) => ({
   capabilities: [],
   chain: {},
   api: {
@@ -24,8 +32,8 @@ it('rejects duplicate public ids before either native descriptor or install runs
   const secondInstall = vi.fn(() => ({}))
   const firstDescriptor = vi.fn(() => ({ install: firstInstall }))
   const secondDescriptor = vi.fn(() => ({ install: secondInstall }))
-  const first = definePlugin('duplicate', firstDescriptor)
-  const second = definePlugin('duplicate', secondDescriptor)
+  const first = definePlugin({ name: 'duplicate', setup: firstDescriptor })
+  const second = definePlugin({ name: 'duplicate', setup: secondDescriptor })
   await expect(createStorageHost({ plugins: [first, second] as never })).rejects.toMatchObject({
     code: 'BACKEND_INSTALL_FAILED',
     cause: { code: 'BACKEND_DUPLICATE' }
@@ -45,10 +53,12 @@ it('rejects duplicate public ids before either native descriptor or install runs
 it('commits once, reports listener failure, keeps failed writes silent and preserves disposal identity', async () => {
   await using host = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(undefined, {
-        controller: controllerFeature,
-        notifications: memoryNotificationsFeature(),
-        changeFeed: memoryChangeFeedFeature()
+      memoryBackendPlugin({
+        features: {
+          controller: controllerFeature,
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
       })
     ]
   })
@@ -85,10 +95,12 @@ it('commits once, reports listener failure, keeps failed writes silent and prese
 it('drains an admitted real memory transaction before disposal and publishes no failed draft', async () => {
   await using host = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(undefined, {
-        controller: controllerFeature,
-        notifications: memoryNotificationsFeature(),
-        changeFeed: memoryChangeFeedFeature()
+      memoryBackendPlugin({
+        features: {
+          controller: controllerFeature,
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
       })
     ]
   })
@@ -123,22 +135,22 @@ it('publishes completed transactions and preserves exact multiple-backend public
   const features = { controller: controllerFeature }
   const host = await createStorageHost({
     plugins: [
-      memoryBackendPlugin(
-        { id: 'first' },
-        {
+      memoryBackendPlugin({
+        name: 'first',
+        features: {
           ...features,
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()
         }
-      ),
-      memoryBackendPlugin(
-        { id: 'second' },
-        {
+      }),
+      memoryBackendPlugin({
+        name: 'second',
+        features: {
           ...features,
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()
         }
-      )
+      })
     ]
   })
   const first = host.backend('first')
@@ -153,13 +165,13 @@ it('publishes completed transactions and preserves exact multiple-backend public
   expect(events).toHaveLength(1)
   await expect(
     Reflect.apply(host.use, host, [
-      memoryBackendPlugin(
-        { id: 'first' },
-        {
+      memoryBackendPlugin({
+        name: 'first',
+        features: {
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()
         }
-      )
+      })
     ])
   ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED', cause: { code: 'BACKEND_DUPLICATE' } })
   expect([...host.backends().keys()]).toEqual(['first', 'second'])
@@ -169,4 +181,42 @@ it('publishes completed transactions and preserves exact multiple-backend public
   expect(host.dispose()).toBe(closing)
   await closing
   stop()
+})
+
+it('names the plugin and Feature key when a Feature factory fails during install', async () => {
+  /** The exact thrown value must stay reachable, unchanged, on the install error's cause chain. */
+  const failure = new TypeError('feature factory failure fixture')
+  /** A Feature whose factory fails the way a Feature installed on the wrong backend would. */
+  const brokenFeature = defineMemoryFeature(() => {
+    throw failure
+  })
+  /** Captured so the cause chain can be searched for the original thrown value. */
+  const rejection = await createStorageHost({
+    plugins: [memoryBackendPlugin({ name: 'main', features: { broken: brokenFeature } })]
+  }).then(
+    () => undefined,
+    (error: unknown) => error
+  )
+  expect(rejection).toMatchObject({
+    code: 'BACKEND_INSTALL_FAILED',
+    plugin: 'main',
+    feature: 'broken'
+  })
+  expect(walkErrorCauses(rejection)).toContain(failure)
+})
+
+it('rejects plugin names outside the bounded form before a definition exists', () => {
+  /** A dot is PluginHost's separator; a colon is used by the host's own internal plugin names. */
+  for (const name of ['', 'a.b', 'storage-journal-bootstrap:main', '1st', 'a'.repeat(65)]) {
+    /** Captured so both the native type and the code can be asserted on one thrown value. */
+    let thrown: unknown
+    try {
+      memoryBackendPlugin({ name })
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(TypeError)
+    expect(thrown).toMatchObject({ code: 'BACKEND_ID_INVALID' })
+  }
+  expect(() => memoryBackendPlugin({ name: 'main_1-a' })).not.toThrow()
 })

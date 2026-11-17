@@ -1,9 +1,9 @@
 import { RedisOperation } from '../constants.ts'
 import { RedisCommand } from '../constants.ts'
-import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import { type IStorageFeatureOutput } from '@migaia/storage-host'
 import type { IOperationContext } from '@migaia/storage-contract'
 import type { IRedisStore } from '../types.ts'
-import { redisBackendKind } from '../plugin.ts'
+import { defineRedisFeature } from '../plugin.ts'
 import { readNativeFeaturePort } from '../native-feature.ts'
 import {
   featureName,
@@ -104,7 +104,7 @@ function readStreamEntries(value: unknown): readonly IRedisStreamEntry[] {
 }
 /** Streams retain native IDs, consumer-group ownership and the driver's real blocking lease. */
 export function redisStreamsFeature() {
-  return defineFeature<typeof redisBackendKind, {}, IRedisStreamsOutput>(redisBackendKind, () => ({
+  return defineRedisFeature<{}, IRedisStreamsOutput>(() => ({
     capabilities: [] as const,
     chain: {},
     api: {

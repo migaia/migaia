@@ -71,7 +71,7 @@ describe('authoritative fallback unique writes', () => {
         const repoEntityPluginHost =
           await storeHost.use<readonly [typeof repoEntityPlugin]>(repoEntityPlugin)
         /** Borrow the supplied backend through the installed repository capability factories. */
-        const repo = repoEntityPluginHost.extensions[repoEntityPlugin.id](store)
+        const repo = repoEntityPluginHost.extensions[repoEntityPlugin.name](store)
         await expect(repo.put({ id: 'row', email: 'same' })).rejects.toMatchObject({
           source: 'storage.host',
           code: 'EXTENSION_FAILED',
@@ -125,7 +125,7 @@ describe('authoritative fallback unique writes', () => {
       })
       /** Install once on the real fixture host and retain exact extension inference. */
       const entity1EntityPluginHost = await storeHost.use(entity1EntityPlugin)
-      repo = entity1EntityPluginHost.extensions[entity1EntityPlugin.id](store)
+      repo = entity1EntityPluginHost.extensions[entity1EntityPlugin.name](store)
       await expect(repo.put({ id: 'outer', email: 'same' })).resolves.toBe('outer')
       expect(await repo.get('inner')).toEqual({ id: 'inner', email: 'other' })
     } finally {
@@ -143,9 +143,9 @@ describe('authoritative fallback unique writes', () => {
         const usersEntityPluginHost =
           await storeHost.use<readonly [typeof usersEntityPlugin]>(usersEntityPlugin)
         /** Borrow the supplied backend through the installed repository capability factories. */
-        const first = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+        const first = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
         /** Reconnect through the actual public definition rather than sharing private state. */
-        const second = usersEntityPluginHost.extensions[usersEntityPlugin.id](store)
+        const second = usersEntityPluginHost.extensions[usersEntityPlugin.name](store)
         await first.put({ id: 'a', email: 'same' })
         await expect(second.put({ id: 'b', email: 'same' })).rejects.toMatchObject({
           source: 'storage.host',
@@ -217,7 +217,7 @@ describe('authoritative fallback unique writes', () => {
       try {
         /** Install once on the real fixture host and retain exact extension inference. */
         const definitionEntityPluginHost = await firstStoreHost.use(definitionEntityPlugin)
-        await definitionEntityPluginHost.extensions[definitionEntityPlugin.id](firstStore).put({
+        await definitionEntityPluginHost.extensions[definitionEntityPlugin.name](firstStore).put({
           id: 'seed',
           email: 'other'
         })
@@ -225,11 +225,11 @@ describe('authoritative fallback unique writes', () => {
         /** Both new values collide, while their snapshots initially contain only the seed. */
         const definitionEntityPluginHost2 = await secondStoreHost.use(definitionEntityPlugin)
         const writing = Promise.allSettled([
-          definitionEntityPluginHost.extensions[definitionEntityPlugin.id](firstStore).put({
+          definitionEntityPluginHost.extensions[definitionEntityPlugin.name](firstStore).put({
             id: 'a',
             email: 'same'
           }),
-          definitionEntityPluginHost2.extensions[definitionEntityPlugin.id](secondStore).put({
+          definitionEntityPluginHost2.extensions[definitionEntityPlugin.name](secondStore).put({
             id: 'b',
             email: 'same'
           })
@@ -245,7 +245,7 @@ describe('authoritative fallback unique writes', () => {
           reason: { source: 'storage.contract', code: 'WRITE_CONFLICT' }
         })
         expect(
-          await definitionEntityPluginHost.extensions[definitionEntityPlugin.id](firstStore)
+          await definitionEntityPluginHost.extensions[definitionEntityPlugin.name](firstStore)
             .query()
             .index('byEmail', { lower: 'same', upper: 'same' })
             .all()

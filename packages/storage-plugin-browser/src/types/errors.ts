@@ -1,6 +1,5 @@
 import { StorageError as HostStorageError } from '@migaia/storage-host'
 import { StorageErrorText } from '../error-text.ts'
-import type { IBackendKind } from './capabilities.ts'
 import type { IStorageKey } from './context.ts'
 import { STORAGE_BROWSER_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import type { IStorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
@@ -11,7 +10,7 @@ import type { IStorageBrowserErrorCode } from '@migaia/storage-contract/error-co
  */
 export type IStorageErrorDetails = {
   /** Backend whose operation failed, when known. */
-  readonly backend?: IBackendKind
+  readonly backend?: string
   /** Logical key associated with this failure. */
   readonly key?: string | IStorageKey
   /** Channel already occupying a conflicting logical key. */

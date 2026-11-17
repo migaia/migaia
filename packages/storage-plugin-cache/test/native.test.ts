@@ -10,7 +10,7 @@ import { promisify } from 'node:util'
 import { Pool } from 'pg'
 import { createClientPool } from 'redis'
 import { describe, expect, it } from 'vitest'
-import { createStorageHost, definePlugin, createOrgId } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
@@ -25,7 +25,7 @@ import { fetchHttp } from '@migaia/storage-plugin-qdrant/http'
 import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
 import { cachePlugin } from '../src/index.ts'
 import { vector, type IStorageChange, type IVectorCollection } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/sdk'
+import { lockKey, definePlugin } from '@migaia/storage-host/sdk'
 
 /** Required service fixtures are injected by the repository's sole native-service launcher. */
 const redisUrl = process.env.MIGAIA_REDIS_URL,
@@ -186,11 +186,16 @@ describe('native borrowed cache tiers', () => {
       org: defaultOrg,
       plugins: [
         memoryBackendPlugin(),
-        postgresBackendPlugin({ driver: pgDriver(pg), prefix }, { vector: pgvectorFeature() }),
-        redisBackendPlugin(
-          { driver: nodeRedisDriver(pool), prefix },
-          { search: rediSearchVectorFeature() }
-        ),
+        postgresBackendPlugin({
+          driver: pgDriver(pg),
+          prefix,
+          features: { vector: pgvectorFeature() }
+        }),
+        redisBackendPlugin({
+          driver: nodeRedisDriver(pool),
+          prefix,
+          features: { search: rediSearchVectorFeature() }
+        }),
         qdrantBackendPlugin({ url: qdrantUrl, http, collectionPrefix: prefix })
       ] as const
     })
@@ -252,7 +257,7 @@ describe('native borrowed cache tiers', () => {
       pool = createClientPool({ url: redisUrl }, { maximum: 8 })
     await pool.connect()
     const host = await createStorageHost({
-      plugins: [redisBackendPlugin({ id: 'redis', driver: nodeRedisDriver(pool), prefix })]
+      plugins: [redisBackendPlugin({ name: 'redis', driver: nodeRedisDriver(pool), prefix })]
     })
     await host.detect()
     try {
@@ -333,8 +338,8 @@ describe('native borrowed cache tiers', () => {
       }
       const replayBase = await createStorageHost({
         plugins: [
-          memoryBackendPlugin({ id: 'memory' }),
-          redisBackendPlugin({ id: 'redis', driver: counted, prefix })
+          memoryBackendPlugin({ name: 'memory' }),
+          redisBackendPlugin({ name: 'redis', driver: counted, prefix })
         ]
       })
       const replay = await replayBase.use(
@@ -380,24 +385,27 @@ describe('native borrowed cache tiers', () => {
      * own map.
      */
     const nativePorts: { backend: string; operation: string }[] = []
-    const observer = definePlugin('native-tier-proof', (core) => ({
-      install() {
-        core.useAsyncPipeline(async (input, next) => {
-          await next(input)
-          if (input.backendId !== 'cache' && input.backendId !== 'back')
-            nativePorts.push({ backend: input.backendId, operation: input.operation })
-        })
-        return {}
-      }
-    }))
+    const observer = definePlugin({
+      name: 'native-tier-proof',
+      setup: (core) => ({
+        install() {
+          core.useAsyncPipeline(async (input, next) => {
+            await next(input)
+            if (input.backendId !== 'cache' && input.backendId !== 'back')
+              nativePorts.push({ backend: input.backendId, operation: input.operation })
+          })
+          return {}
+        }
+      })
+    })
     const prefix = 'cache_native_' + crypto.randomUUID().replaceAll('-', '')
     const base = await createStorageHost({
       plugins: [
-        memoryBackendPlugin({ id: 'memory' }),
-        sqliteBackendPlugin({ id: 'sqlite', driver: nodeSqliteDriver(':memory:') }),
-        sqliteBackendPlugin({ id: 'tail', driver: nodeSqliteDriver(':memory:') }),
-        redisBackendPlugin({ id: 'redis', driver: nodeRedisDriver(pool), prefix }),
-        postgresBackendPlugin({ id: 'postgres', driver: pgDriver(pg), prefix }),
+        memoryBackendPlugin({ name: 'memory' }),
+        sqliteBackendPlugin({ name: 'sqlite', driver: nodeSqliteDriver(':memory:') }),
+        sqliteBackendPlugin({ name: 'tail', driver: nodeSqliteDriver(':memory:') }),
+        redisBackendPlugin({ name: 'redis', driver: nodeRedisDriver(pool), prefix }),
+        postgresBackendPlugin({ name: 'postgres', driver: pgDriver(pg), prefix }),
         observer
       ]
     })
@@ -442,7 +450,7 @@ describe('native borrowed cache tiers', () => {
       )
       const configured = await host.use(
         cachePlugin({
-          id: 'back',
+          name: 'back',
           prefix: 'own-back:',
           writeBackIntervalMs: 10000,
           tiers: [
@@ -522,30 +530,35 @@ describe('native borrowed cache tiers', () => {
     let failNextDelete = false,
       failedDeletes = 0
     const failure = new RangeError('native invalidation failed')
-    const observer = definePlugin('invalidation-observer', (core) => ({
-      install() {
-        core.useAsyncPipeline((input, next) => {
-          if (failNextDelete && input.backendId === 'upper' && input.operation === 'remove') {
-            failNextDelete = false
-            failedDeletes++
-            throw failure
-          }
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observer = definePlugin({
+      name: 'invalidation-observer',
+      setup: (core) => ({
+        install() {
+          core.useAsyncPipeline((input, next) => {
+            if (failNextDelete && input.backendId === 'upper' && input.operation === 'remove') {
+              failNextDelete = false
+              failedDeletes++
+              throw failure
+            }
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     const open = async () => {
       const base = await createStorageHost({
         report: (error) => {
           reports.push(error)
         },
         plugins: [
-          sqliteBackendPlugin({ id: 'upper', driver: nodeSqliteDriver(path) }),
-          redisBackendPlugin(
-            { id: 'lower', driver, prefix },
-            { history: redisChangeStreamFeature({ maxLen: 1000 }) }
-          ),
+          sqliteBackendPlugin({ name: 'upper', driver: nodeSqliteDriver(path) }),
+          redisBackendPlugin({
+            name: 'lower',
+            driver,
+            prefix,
+            features: { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+          }),
           observer
         ]
       })
@@ -563,10 +576,12 @@ describe('native borrowed cache tiers', () => {
     let host = await open()
     const peer = await createStorageHost({
       plugins: [
-        redisBackendPlugin(
-          { id: 'lower', driver, prefix },
-          { history: redisChangeStreamFeature({ maxLen: 1000 }) }
-        )
+        redisBackendPlugin({
+          name: 'lower',
+          driver,
+          prefix,
+          features: { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+        })
       ]
     })
     await peer.detect()
@@ -693,11 +708,13 @@ describe('native borrowed cache tiers', () => {
           reports.push(error)
         },
         plugins: [
-          sqliteBackendPlugin({ id: 'upper', driver: nodeSqliteDriver(path) }),
-          redisBackendPlugin(
-            { id: 'lower', driver, prefix },
-            { history: redisChangeStreamFeature({ maxLen: 1 }) }
-          )
+          sqliteBackendPlugin({ name: 'upper', driver: nodeSqliteDriver(path) }),
+          redisBackendPlugin({
+            name: 'lower',
+            driver,
+            prefix,
+            features: { history: redisChangeStreamFeature({ maxLen: 1 }) }
+          })
         ]
       })
       const host = await base.use(
@@ -714,10 +731,12 @@ describe('native borrowed cache tiers', () => {
     let host = await open()
     const peer = await createStorageHost({
       plugins: [
-        redisBackendPlugin(
-          { id: 'lower', driver, prefix },
-          { history: redisChangeStreamFeature({ maxLen: 1 }) }
-        )
+        redisBackendPlugin({
+          name: 'lower',
+          driver,
+          prefix,
+          features: { history: redisChangeStreamFeature({ maxLen: 1 }) }
+        })
       ]
     })
     await peer.detect()

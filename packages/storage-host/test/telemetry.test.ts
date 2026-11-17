@@ -38,7 +38,6 @@ describe('ordinary storage telemetry', () => {
         tag: 'storage',
         message: 'set',
         meta: {
-          backend: 'memory',
           operation: 'set',
           keys: [lockKey.text('key')],
           outcome: 'success',

@@ -23,7 +23,7 @@ export type IStorageProbeApi = {
 
 /** Plugin handle of `storageProbe()`; its id is fixed, so a host has at most one probe. */
 export type IStorageProbePluginHandle = IStorageBackendPluginHandle<IStorageProbeApi> & {
-  readonly id: typeof STORAGE_PROBE_PLUGIN_ID
+  readonly name: typeof STORAGE_PROBE_PLUGIN_ID
 }
 
 /** Owns the listener registrations made through one installed probe's `observe` extension. */
@@ -92,21 +92,24 @@ function assertProbeHandlers(handlers: unknown): asserts handlers is IStoragePro
 export function storageProbe(handlers: IStorageProbeHandlers = {}): IStorageProbePluginHandle {
   assertProbeHandlers(handlers)
   const captured = { ...handlers }
-  const plugin = definePlugin(STORAGE_PROBE_PLUGIN_ID, (core) => ({
-    install() {
-      const observer = new StorageProbeObserver(core.subscribeStorageHook, core.defaultOrgId)
-      core.onDispose(() => observer.dispose())
-      return {
-        observe<K extends keyof IStorageHookMap>(
-          this: IStoragePluginCallContext,
-          name: K,
-          handler: (payload: IStorageHookMap[K]) => void
-        ) {
-          return observer.observe(this, name, handler)
-        }
-      } as IStorageProbeApi
-    }
-  }))
+  const plugin = definePlugin({
+    name: STORAGE_PROBE_PLUGIN_ID,
+    setup: (core) => ({
+      install() {
+        const observer = new StorageProbeObserver(core.subscribeStorageHook, core.defaultOrgId)
+        core.onDispose(() => observer.dispose())
+        return {
+          observe<K extends keyof IStorageHookMap>(
+            this: IStoragePluginCallContext,
+            name: K,
+            handler: (payload: IStorageHookMap[K]) => void
+          ) {
+            return observer.observe(this, name, handler)
+          }
+        } as IStorageProbeApi
+      }
+    })
+  })
   attachStorageProbeHandlers(plugin, captured)
   return plugin as unknown as IStorageProbePluginHandle
 }

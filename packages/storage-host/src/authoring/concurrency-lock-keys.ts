@@ -9,7 +9,6 @@ import {
   assertLockKey,
   assertStringStorageKey,
   type IQuad,
-  type IBackendKind,
   type IStorageKey
 } from '@migaia/storage-contract'
 import {
@@ -28,7 +27,7 @@ const LockChannelRank = { text: 1, bytes: 2, record: 3, vector: 4, rdf: 5 } as c
 /** Capture text identity before queued lock admission can observe caller key changes. */
 function parseTextLock(
   value: Extract<ILockKey, { channel: 'text' }>,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): ILockKey {
   return { channel: LockChannel.text, key: snapshotStorageKey(value.key, backend) }
 }
@@ -41,7 +40,7 @@ function parseBytesLock(value: Extract<ILockKey, { channel: 'bytes' }>): ILockKe
 /** Capture mutable record key components before the real lock queue yields. */
 function parseRecordLock(
   value: Extract<ILockKey, { channel: 'record' }>,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): ILockKey {
   return { channel: LockChannel.record, key: snapshotStorageKey(value.key, backend) }
 }
@@ -54,13 +53,13 @@ function parseVectorLock(value: Extract<ILockKey, { channel: 'vector' }>): ILock
 /** Ground quad fields span queued lock admission and share the canonical RDF capture owner. */
 function parseRdfLock(
   value: Extract<ILockKey, { channel: 'rdf' }>,
-  backend: IBackendKind | undefined
+  backend: string | undefined
 ): ILockKey {
   return { channel: LockChannel.rdf, quad: snapshotStorageRdfQuad(value.quad, backend) }
 }
 
 /** Dispatch the supported channel once; each channel owns exactly its actual input fields. */
-export function snapshotLockKey(value: unknown, backend: IBackendKind | undefined): ILockKey {
+export function snapshotLockKey(value: unknown, backend: string | undefined): ILockKey {
   assertLockKey(value, backend)
   /** Only the snapshot boundary detaches mutable keys or ground term objects for queued use. */
   const key = value
@@ -120,7 +119,7 @@ export const lockKey = Object.freeze({
 })
 
 /** Encodes only canonical channel content for both native identity and unchanged diagnostics. */
-export function encodeLockContent(key: ILockKey, backend: IBackendKind | undefined): Uint8Array {
+export function encodeLockContent(key: ILockKey, backend: string | undefined): Uint8Array {
   return key.channel === LockChannel.rdf
     ? encodeRdfQuadSnapshot(key.quad)
     : encodeOrderedStorageKey(
@@ -130,7 +129,7 @@ export function encodeLockContent(key: ILockKey, backend: IBackendKind | undefin
 }
 
 /** Adds only channel identity around the sole canonical ordered-key encoder. */
-function encodeLockIdentity(key: ILockKey, backend: IBackendKind | undefined): Uint8Array {
+function encodeLockIdentity(key: ILockKey, backend: string | undefined): Uint8Array {
   /** Key-order and RDF own all self-delimiting content bytes. */
   const ordered = encodeLockContent(key, backend)
   /** New vector/RDF markers follow the unchanged text < bytes < record order. */
@@ -171,10 +170,7 @@ function equalLockIdentity(left: Uint8Array, right: Uint8Array): boolean {
  * Internal owner/builder normalization snapshots once, encodes once and sorts by actual byte
  * suffixes. The immutable result has independent keys and no comparison sort or global cache.
  */
-export function normalizeLockKeys(
-  keys: unknown,
-  backend: IBackendKind
-): readonly INormalizedLockKey[] {
+export function normalizeLockKeys(keys: unknown, backend: string): readonly INormalizedLockKey[] {
   if (!Array.isArray(keys)) throw invalidLockArgument(backend)
   /** Normalization keeps only this input's independent key snapshots and encodings. */
   const entries: INormalizedLockKey[] = []
@@ -207,7 +203,7 @@ export function uniqueNormalizedLockKeys(
  */
 export function snapshotConcurrencyLockKeys(
   keys: unknown,
-  backend: IBackendKind
+  backend: string
 ): { readonly keys: readonly ILockKey[]; readonly identities: readonly string[] } {
   /** One normalization supplies both detached logical keys and their already captured bytes. */
   const locks = normalizeLockKeys(keys, backend)
@@ -223,7 +219,7 @@ export function snapshotConcurrencyLockKeys(
  */
 export function snapshotConcurrencyLockRange(
   range: { readonly channel: ILockKey['channel']; readonly prefix?: IStorageKey },
-  backend: IBackendKind
+  backend: string
 ): { readonly lower: string; readonly upper: string } {
   if (typeof range !== 'object' || range === null || Array.isArray(range))
     throw invalidLockArgument(backend)

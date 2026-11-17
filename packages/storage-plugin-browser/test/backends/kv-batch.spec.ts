@@ -2,7 +2,7 @@ import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { IDBDatabase, IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { kv } from '@migaia/storage-contract'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
@@ -15,16 +15,18 @@ import {
   createLocalTestStore,
   createSessionTestStore
 } from '../helpers/installed-backends.ts'
+import { definePlugin } from '@migaia/storage-host/sdk'
 
 describe('standard native KV batches', () => {
   it('keeps a scoped invalid batch on the original first-failure path', async () => {
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { factory: new IDBFactory(), keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     const store = host.backend('indexed-db')
@@ -45,10 +47,11 @@ describe('standard native KV batches', () => {
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { factory: new IDBFactory(), keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     const store = host.backend('indexed-db')
@@ -103,22 +106,26 @@ describe('standard native KV batches', () => {
   it('uses one native transaction and one pipeline per nonempty root batch with atomic rollback', async () => {
     /** The ordinary plugin sees only the actual public execution endpoints. */
     const operations: string[] = []
-    const observer = definePlugin('batch-pipeline', (core) => ({
-      install: () => {
-        core.useAsyncPipeline(async (input, next) => {
-          operations.push(input.operation)
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observer = definePlugin({
+      name: 'batch-pipeline',
+      setup: (core) => ({
+        install: () => {
+          core.useAsyncPipeline(async (input, next) => {
+            operations.push(input.operation)
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { factory: new IDBFactory(), keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        ),
+        indexedDbBackendPlugin({
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        }),
         observer
       ]
     })
@@ -170,7 +177,6 @@ describe('standard native KV batches', () => {
       expect(before).toHaveBeenCalledTimes(1)
       expect(before).toHaveBeenCalledWith({
         backendId: 'indexed-db',
-        backend: 'indexed-db',
         orgId: '00000000-0000-0000-0000-000000000000',
         operation: 'indexed-db.setMany',
         count: 3
@@ -215,7 +221,6 @@ describe('standard native KV batches', () => {
       expect(failed).toHaveBeenCalledTimes(1)
       expect(failed).toHaveBeenCalledWith({
         backendId: 'indexed-db',
-        backend: 'indexed-db',
         orgId: '00000000-0000-0000-0000-000000000000',
         operation: 'indexed-db.setMany',
         code: 'DUPLICATE_KEY',
@@ -232,10 +237,11 @@ describe('standard native KV batches', () => {
     await using host = await createStorageHost({
       plugins: [
         storageProbe(),
-        indexedDbBackendPlugin(
-          { factory: new IDBFactory(), keyRange: IDBKeyRange },
-          indexedDbTestFeatures
-        )
+        indexedDbBackendPlugin({
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: indexedDbTestFeatures
+        })
       ]
     })
     const store = host.backend('indexed-db')

@@ -139,7 +139,7 @@ assert.equal(typeof postgresJsDriver,'function')
 assert.equal(typeof bunSqlDriver,'function')
 assert.equal(typeof pgLogicalReplicationFeature,'function')
 const pool=new Pool({connectionString:process.env.MIGAIA_PG_URL})
-const host=await createStorageHost({plugins:[postgresBackendPlugin({driver:pgDriver(pool),prefix:'pg_packed_'+crypto.randomUUID().slice(0,8)},{vector:pgvectorFeature(),quantized:pgQuantizedFeature({mode:'halfvec'}),copy:pgCopyFeature(),listen:pgListenFeature()})]})
+const host=await createStorageHost({plugins:[postgresBackendPlugin({ driver:pgDriver(pool),prefix:'pg_packed_'+crypto.randomUUID().slice(0,8), features: {vector:pgvectorFeature(),quantized:pgQuantizedFeature({mode:'halfvec'}),copy:pgCopyFeature(),listen:pgListenFeature()} })]})
 try {
  const store=host.backend('postgres')
  await store.use(kv).setMany([{key:['packed',1],value:'one'},{key:['packed',2],value:'two'}])

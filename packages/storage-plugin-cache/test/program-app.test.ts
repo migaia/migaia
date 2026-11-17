@@ -3,7 +3,7 @@ import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { Pool } from 'pg'
 import { createClientPool } from 'redis'
 import { expect, it } from 'vitest'
-import { createStorageHost, definePlugin, createOrgId } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
@@ -18,6 +18,7 @@ import {
   runStorageProgramOrgs,
   storageProgramBatchObservations
 } from '../../storage-plugin-sqlite/test/helpers/program-app.ts'
+import { definePlugin } from '@migaia/storage-host/sdk'
 
 /** All native addresses come from the existing repository service launcher. */
 const redisUrl = process.env.MIGAIA_REDIS_URL,
@@ -34,24 +35,27 @@ it.each(['memory', 'sqlite', 'redis', 'postgres'] as const)(
     const { logs, logger } = createStorageProgramJournal()
     const events: string[] = [],
       pipelines: string[] = []
-    const observed = definePlugin('program-observer', (core) => ({
-      install() {
-        core.useAsyncPipeline((input, next) => {
-          pipelines.push(input.operation)
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const observed = definePlugin({
+      name: 'program-observer',
+      setup: (core) => ({
+        install() {
+          core.useAsyncPipeline((input, next) => {
+            pipelines.push(input.operation)
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     const prefix = 'program_' + crypto.randomUUID().replaceAll('-', '')
     const selectPlugin = () =>
       backend === 'memory'
-        ? memoryBackendPlugin({ id: 'data' })
+        ? memoryBackendPlugin({ name: 'data' })
         : backend === 'sqlite'
-          ? sqliteBackendPlugin({ id: 'data', driver: connection })
+          ? sqliteBackendPlugin({ name: 'data', driver: connection })
           : backend === 'redis'
-            ? redisBackendPlugin({ id: 'data', driver: nodeRedisDriver(pool), prefix })
-            : postgresBackendPlugin({ id: 'data', driver: pgDriver(pg), prefix })
+            ? redisBackendPlugin({ name: 'data', driver: nodeRedisDriver(pool), prefix })
+            : postgresBackendPlugin({ name: 'data', driver: pgDriver(pg), prefix })
     const host = await createStorageHost({
       org: createOrgId(),
       plugins: [

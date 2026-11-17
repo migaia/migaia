@@ -2,13 +2,15 @@ import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import { createStorageHost, defineFeature } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
-import {
-  indexedDbBackendKind,
-  indexedDbBackendPlugin,
-  type IIndexedDbOptions
-} from '../../src/indexed-db.ts'
+import { indexedDbBackendPlugin, type IIndexedDbOptions } from '../../src/indexed-db.ts'
+import type { IIndexedDbBackend } from '../../src/indexed-db.ts'
+import { defineStorageFeature } from '@migaia/storage-host/sdk'
+import type { IStorageFeatureDefiner } from '@migaia/storage-host'
+
+/** Feature definer typed for the imported backend. */
+const defineIndexedDbFeature: IStorageFeatureDefiner<IIndexedDbBackend> = defineStorageFeature
 
 /** Failed installation retains the native validation failure below the actual host wrapper. */
 const expectInvalidInstallation = async (pending: Promise<unknown>): Promise<void> => {
@@ -23,7 +25,7 @@ const expectInvalidInstallation = async (pending: Promise<unknown>): Promise<voi
 }
 
 /** This selected Feature borrows the same controller registered for the native backend. */
-const controllerFeature = defineFeature(indexedDbBackendKind, ({ featureExpose }) => ({
+const controllerFeature = defineIndexedDbFeature(({ featureExpose }) => ({
   capabilities: [],
   chain: {},
   api: {
@@ -37,7 +39,10 @@ const createInstalledStore = async (options: IIndexedDbOptions) => {
   /** The fixture borrows the installed backend while its original host owns cleanup. */
   const host = await createStorageHost({
     plugins: [
-      indexedDbBackendPlugin(options, { ...indexedDbTestFeatures, ownership: controllerFeature })
+      indexedDbBackendPlugin({
+        ...options,
+        features: { ...indexedDbTestFeatures, ownership: controllerFeature }
+      })
     ]
   })
   onTestFinished(() => host.dispose())

@@ -51,7 +51,7 @@ it('selects declared equality indexes once without opening a source during expla
     ] as const
   })
   const store = host.backend('memory')
-  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](store, {
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](store, {
     queryStages: host.queryStages(store)
   })
   for (let index = 0; index < 12; index++)
@@ -104,7 +104,7 @@ it('uses conservative in and prefix candidates with exact canonical matching', a
   /** This actual storage host owns the entity installation for this test scope. */
   const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
 
-  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](
     await memoryBackend()
   )
   for (const [id, group, score] of [
@@ -151,7 +151,7 @@ it('uses the same planned selection for draft reads and committed query mutation
   const definitionEntityPluginHost = await entityHost(definitionEntityPlugin)
 
   const store = await memoryBackend()
-  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.id](store)
+  const repo = definitionEntityPluginHost.extensions[definitionEntityPlugin.name](store)
   await repo.put({ id: 'a', group: 'one', score: 1, email: 'a@test' })
   await repo.put({ id: 'b', group: 'two', score: 2, email: 'b@test' })
   await store.transaction(async (scope) => {
@@ -189,7 +189,7 @@ it('reuses the same default comparator identity across original keyset pages', a
   )
   /** This actual storage host owns the entity installation for this test scope. */
   const entity2EntityPluginHost = await entityHost(entity2EntityPlugin)
-  const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.id](await memoryBackend())
+  const repo = entity2EntityPluginHost.extensions[entity2EntityPlugin.name](await memoryBackend())
   for (const [id, score] of [
     ['a', 1],
     ['b', 2],
@@ -223,7 +223,7 @@ it('uses a full compound equality tuple without parsing projection callbacks', a
   )
   /** This actual storage host owns the entity installation for this test scope. */
   const entity3EntityPluginHost = await entityHost(entity3EntityPlugin)
-  const repo = entity3EntityPluginHost.extensions[entity3EntityPlugin.id](await memoryBackend())
+  const repo = entity3EntityPluginHost.extensions[entity3EntityPlugin.name](await memoryBackend())
   await repo.put({ id: 'a', group: 'one', score: 1, email: 'a@test' })
   await repo.put({ id: 'b', group: 'one', score: 2, email: 'b@test' })
   const query = repo.query().where({ group: 'one', score: 1 })

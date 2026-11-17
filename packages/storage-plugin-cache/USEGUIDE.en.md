@@ -19,7 +19,7 @@ import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
-const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })
+const base = await createStorageHost({ plugins: [memoryBackendPlugin({ name: 'data' })] })
 try {
   const host = await base.use(
     cachePlugin({
@@ -56,7 +56,7 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin, CacheWriteMode } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' })]
+  plugins: [memoryBackendPlugin({ name: 'fast' }), memoryBackendPlugin({ name: 'slow' })]
 })
 try {
   const host = await base.use(
@@ -96,7 +96,7 @@ import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
-const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })
+const base = await createStorageHost({ plugins: [memoryBackendPlugin({ name: 'data' })] })
 try {
   const host = await base.use(
     cachePlugin({
@@ -142,9 +142,9 @@ import { cachePlugin } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({
   plugins: [
-    memoryBackendPlugin({ id: 'values' }),
-    memoryBackendPlugin({ id: 'tags' }),
-    memoryBackendPlugin({ id: 'objects' })
+    memoryBackendPlugin({ name: 'values' }),
+    memoryBackendPlugin({ name: 'tags' }),
+    memoryBackendPlugin({ name: 'objects' })
   ]
 })
 try {
@@ -175,7 +175,7 @@ Invalidation removes references rather than immediately deleting objects that an
 
 ## Opt into semantic caching
 
-Import `semanticCacheFeature` from its separate entry and select it in the cache plugin's second argument. The two-dimensional embedding below demonstrates an exact repeated prompt. Use a real model in an application, with dimensions, metric and model version matching the collection.
+Import `semanticCacheFeature` from its separate entry and select it in the cache plugin's `features` option. The two-dimensional embedding below demonstrates an exact repeated prompt. Use a real model in an application, with dimensions, metric and model version matching the collection.
 
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
@@ -184,13 +184,13 @@ import { cachePlugin } from '@migaia/storage-plugin-cache'
 import { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'
 
 const base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]
+  plugins: [memoryBackendPlugin({ name: 'values' }), memoryBackendPlugin({ name: 'vectors' })]
 })
 try {
   const host = await base.use(
-    cachePlugin(
-      { tiers: [{ backend: 'values', ttlMs: 30000 }] },
-      {
+    cachePlugin({
+      tiers: [{ backend: 'values', ttlMs: 30000 }],
+      features: {
         semantic: semanticCacheFeature({
           backend: 'vectors',
           collection: 'answers',
@@ -201,7 +201,7 @@ try {
           embed: async () => [1, 0]
         })
       }
-    )
+    })
   )
   await host.detect()
   const semantic = host.backend('cache').api.semantic

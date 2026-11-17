@@ -6,7 +6,8 @@ export type {
   IRedisDriver
 } from './driver.ts'
 
-export { redisBackendKind, redisBackendPlugin } from './plugin.ts'
+export { redisBackendPlugin } from './plugin.ts'
+export type { IRedisBackend } from './plugin.ts'
 export type {
   IRedisOptions,
   IRedisCapabilities,

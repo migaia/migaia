@@ -46,6 +46,7 @@ import type { ITransactionScope } from '@migaia/storage-contract'
 import type { IStorageCapabilities } from '../types/capabilities.ts'
 import type { acquireIndexedDbCoordination } from './indexed-db-coordination.ts'
 import type { IBackendLifecycleController } from '@migaia/storage-host/sdk'
+import type { IStorageReactiveProfile } from '@migaia/storage-host'
 import { indexedDbFeatureMissing } from './indexed-db-base-access.ts'
 import type { IIndexedDbAssemblyPlan } from './indexed-db-assembly.ts'
 import type {
@@ -161,6 +162,8 @@ export type IIndexedDbFeatureExpose = {
   getTransactionClient(scope: ITransactionScope<unknown>): IDBTransaction
   /** Resolve only the exact original scope of this immutable physical organization. */
   getTransactionClientForOrg(scope: object, orgId: string): IDBTransaction
+  /** State the live-query profile; fails when the notifications Feature is not selected. */
+  reactiveProfile(hasController: boolean): IStorageReactiveProfile
 }
 
 /** Physical client access shares the original opener and exact native transaction registry. */

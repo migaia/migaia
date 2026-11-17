@@ -873,7 +873,7 @@
     },
     "@migaia/storage-contract": {
       ".": [
-        "BACKEND_KIND_PATTERN",
+        "BACKEND_NAME_PATTERN",
         "ConcurrencyHolderState",
         "ConcurrencyLocking",
         "ConflictPolicy",
@@ -943,7 +943,7 @@
         "invalidLockArgument",
         "invalidRdf",
         "invalidVector",
-        "isBackendKind",
+        "isBackendName",
         "isCapabilityToken",
         "isChangeFeedStore",
         "isKeyValueStore",
@@ -984,20 +984,11 @@
       "./conformance": ["runConformance"]
     },
     "@migaia/storage-host": {
-      ".": [
-        "StorageError",
-        "StorageErrorText",
-        "StorageHost",
-        "assertStorageBackendId",
-        "createOrgId",
-        "createStorageHost",
-        "defineFeature",
-        "definePlugin",
-        "defineStorageBackendKind"
-      ],
+      ".": ["StorageError", "StorageErrorText", "StorageHost", "createOrgId", "createStorageHost"],
       "./sdk": [
         "ConcurrencyPolicy",
         "StorageJournalLock",
+        "StorageReactiveVisibility",
         "assertKeyRange",
         "assertTransactionOwner",
         "associateNormalizedLockKeys",
@@ -1032,6 +1023,9 @@
         "decodeOrderedStorageKey",
         "decodeStorageJournalImage",
         "decodeStorageOrgKey",
+        "defineBackendPlugin",
+        "definePlugin",
+        "defineStorageFeature",
         "deriveStorageSqlQuery",
         "deriveTransactionIterator",
         "encodeFlatStorageKey",
@@ -1127,7 +1121,7 @@
         "useTransactionCapability",
         "withAbort"
       ],
-      "./plugins/memory": ["memoryBackendKind", "memoryBackendPlugin"],
+      "./plugins/memory": ["memoryBackendPlugin"],
       "./plugins/journal": ["storageJournalPlugin", "storageLogStore"],
       "./plugins/probe": ["storageProbe"],
       "./features/memory-notifications": ["memoryNotificationsFeature"],
@@ -1157,10 +1151,10 @@
     },
     "@migaia/storage-plugin-browser": {
       ".": ["StorageError", "StorageErrorText", "lengthPrefixedNamespaceCodec"],
-      "./local-storage": ["localStorageBackendKind", "localStorageBackendPlugin"],
-      "./session-storage": ["sessionStorageBackendKind", "sessionStorageBackendPlugin"],
-      "./cookies": ["cookieBackendKind", "cookieBackendPlugin"],
-      "./indexed-db": ["indexedDbBackendKind", "indexedDbBackendPlugin"],
+      "./local-storage": ["localStorageBackendPlugin"],
+      "./session-storage": ["sessionStorageBackendPlugin"],
+      "./cookies": ["cookieBackendPlugin"],
+      "./indexed-db": ["indexedDbBackendPlugin"],
       "./features/reactive": ["reactiveFeature"],
       "./features/blobs": ["indexedDbBlobFeature"],
       "./features/indexed-db-ttl": ["indexedDbTtlFeature"],
@@ -1176,25 +1170,19 @@
         "CacheErrorCode",
         "CacheWriteMode",
         "STORAGE_CACHE_ERROR_SOURCE",
-        "cacheBackendKind",
         "cacheKey",
         "cachePlugin"
       ],
       "./features/semantic": ["semanticCacheFeature"]
     },
     "@migaia/storage-plugin-object": {
-      ".": ["ObjectDriverKind", "objectBackendKind", "objectBackendPlugin"],
+      ".": ["ObjectDriverKind", "objectBackendPlugin"],
       "./fs": ["fsObjectDriver"],
       "./s3": ["s3ObjectDriver"],
       "./features/presign": ["objectPresignFeature"]
     },
     "@migaia/storage-plugin-postgres": {
-      ".": [
-        "PostgresErrorCode",
-        "STORAGE_POSTGRES_ERROR_SOURCE",
-        "postgresBackendKind",
-        "postgresBackendPlugin"
-      ],
+      ".": ["PostgresErrorCode", "STORAGE_POSTGRES_ERROR_SOURCE", "postgresBackendPlugin"],
       "./pg": ["pgDriver"],
       "./postgres-js": ["postgresJsDriver"],
       "./bun": ["bunSqlDriver"],
@@ -1205,7 +1193,7 @@
       "./features/logical-replication": ["pgLogicalReplicationFeature"]
     },
     "@migaia/storage-plugin-qdrant": {
-      ".": ["qdrantBackendKind", "qdrantBackendPlugin"],
+      ".": ["qdrantBackendPlugin"],
       "./http": ["fetchHttp"],
       "./client": ["qdrantClientHttp"],
       "./features/hybrid": ["qdrantHybridFeature"],
@@ -1215,12 +1203,7 @@
       "./features/rescore": ["qdrantRescoreFeature"]
     },
     "@migaia/storage-plugin-redis": {
-      ".": [
-        "RedisErrorCode",
-        "STORAGE_REDIS_ERROR_SOURCE",
-        "redisBackendKind",
-        "redisBackendPlugin"
-      ],
+      ".": ["RedisErrorCode", "STORAGE_REDIS_ERROR_SOURCE", "redisBackendPlugin"],
       "./ioredis": ["ioredisDriver"],
       "./node-redis": ["nodeRedisDriver"],
       "./bun": ["bunRedisDriver"],
@@ -1232,14 +1215,14 @@
       "./features/search": ["rediSearchVectorFeature"]
     },
     "@migaia/storage-plugin-sparql": {
-      ".": ["sparqlBackendKind", "sparqlBackendPlugin"],
+      ".": ["sparqlBackendPlugin"],
       "./http": ["httpEndpoint"],
       "./oxigraph": ["oxigraphEndpoint"],
       "./features/graph-store": ["graphStoreFeature"],
       "./features/ontology": ["ontologyFeature"]
     },
     "@migaia/storage-plugin-sqlite": {
-      ".": ["sqliteBackendKind", "sqliteBackendPlugin"],
+      ".": ["sqliteBackendPlugin"],
       "./node": ["nodeSqliteDriver"],
       "./bun": ["bunSqliteDriver"],
       "./features/maintenance": ["sqliteMaintenanceFeature"]

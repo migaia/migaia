@@ -98,19 +98,19 @@ Use Node.js 24 or later and Qdrant protocol 1.11 or later. The default fetch ent
 
 ## Essential API
 
-| API                                       | Purpose                                         |
-| ----------------------------------------- | ----------------------------------------------- |
-| `qdrantBackendPlugin(options, features?)` | Connection, namespace and optional features.    |
-| `collection.upsert(points, options?)`     | Write vectors and payloads.                     |
-| `collection.near(query).topK(k)`          | Build a nearest-neighbor query.                 |
-| `similarTo(id)` / `recommend(...)`        | Build standard queries from stored samples.     |
-| `deleteWhere(where, options?)`            | Delete by condition and return a numeric count. |
-| `store.use(ttl)`                          | `expire`, `persist` and `remaining`.            |
+| API                                              | Purpose                                         |
+| ------------------------------------------------ | ----------------------------------------------- |
+| `qdrantBackendPlugin({ ...options, features? })` | Connection, namespace and optional features.    |
+| `collection.upsert(points, options?)`            | Write vectors and payloads.                     |
+| `collection.near(query).topK(k)`                 | Build a nearest-neighbor query.                 |
+| `similarTo(id)` / `recommend(...)`               | Build standard queries from stored samples.     |
+| `deleteWhere(where, options?)`                   | Delete by condition and return a numeric count. |
+| `store.use(ttl)`                                 | `expire`, `persist` and `remaining`.            |
 
 ## Contract details
 
 The backend supplies `vector` and vector-target `ttl`. It has no KV, records, RDF, transactions, secondary indexes, change feed or native live query. Explicit locks and unsupported concurrency policies reject before mutation.
 
-`url` is required. `id` defaults to `qdrant`, and `collectionPrefix` to `migaia_`. `apiKey` and a supplied `http` port are optional. Supplied HTTP/SDK clients remain with the caller and are never closed by the host. Hosts detect by default; if disabled, call `await host.detect()` first.
+`url` is required. `name` defaults to `qdrant`, and `collectionPrefix` to `migaia_`. `apiKey` and a supplied `http` port are optional. Supplied HTTP/SDK clients remain with the caller and are never closed by the host. Hosts detect by default; if disabled, call `await host.detect()` first.
 
 Error source is `storage.backend.qdrant`. Native 4xx, network/5xx failures and invalid responses use `QDRANT_REQUEST_FAILED`, `QDRANT_UNAVAILABLE` and `QDRANT_RESPONSE_INVALID`. Original errors remain on cause chains. Cancellation cannot undo a dispatched mutation; it is never replayed automatically, and disposal waits for its actual result. See the [usage guide](./USEGUIDE.en.md).

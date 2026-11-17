@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { defineFeature } from '@migaia/plugin-host/features'
-import { createStorageHost, definePlugin, type IStoragePluginCore } from '../src/index.ts'
+import { createStorageHost, type IStoragePluginCore } from '../src/index.ts'
+import { definePlugin } from '../src/sdk.ts'
 
 /** Observe only callbacks accepted by the public storage authoring contract. */
 class InstallProbe<const N extends string = string> {
@@ -58,7 +59,7 @@ class InstallProbe<const N extends string = string> {
 }
 /** Ordinary storage plugins need no fabricated Store to expose public extensions. */
 function plugin<const N extends string>(probe: InstallProbe<N>) {
-  return definePlugin(probe.name, (core) => probe.describe(core))
+  return definePlugin({ name: probe.name, setup: (core) => probe.describe(core) })
 }
 /** Retain exact observed failures and their package classifications in test output. */
 async function reject(promise: PromiseLike<unknown>): Promise<unknown> {
@@ -173,7 +174,11 @@ async function dependencyGenerations(): Promise<void> {
   /** Exact native identity, not a structurally matching feature object, supplies the dependency. */
   const second = defineFeature(() => probe.factory(), { previous: first })
   /** Public storage authoring accepts plain native Features without backend-kind metadata. */
-  const definition = definePlugin(probe.name, (core) => probe.describe(core), { first, second })
+  const definition = definePlugin({
+    name: probe.name,
+    features: { first, second },
+    setup: (core) => probe.describe(core)
+  })
   /** The consumer constructor supplies its fixed real feature-dependency module. */
   const host = await createStorageHost()
   try {

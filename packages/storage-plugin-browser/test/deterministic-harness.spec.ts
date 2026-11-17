@@ -6,12 +6,12 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
 import { fakeCookieDocument } from '../src/testing/fake-cookie-document.ts'
 import { fakeWebStorage } from '../src/testing/fake-web-storage.ts'
-import { cookieBackendPlugin, cookieBackendKind } from '../src/cookies.ts'
-import { indexedDbBackendPlugin, indexedDbBackendKind } from '../src/indexed-db.ts'
-import { localStorageBackendPlugin, localStorageBackendKind } from '../src/local-storage.ts'
-import { sessionStorageBackendPlugin, sessionStorageBackendKind } from '../src/session-storage.ts'
+import { cookieBackendPlugin } from '../src/cookies.ts'
+import { indexedDbBackendPlugin } from '../src/indexed-db.ts'
+import { localStorageBackendPlugin } from '../src/local-storage.ts'
+import { sessionStorageBackendPlugin } from '../src/session-storage.ts'
 import { createStorageHost } from '@migaia/storage-host'
-import { memoryBackendPlugin, memoryBackendKind } from '@migaia/storage-host/plugins/memory'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { defineEntityPlugin } from '@migaia/storage-host/entity'
 import { reactiveFeature } from '../src/features/reactive.ts'
 import { createReactiveServiceFixture } from './helpers/reactive-service.ts'
@@ -58,43 +58,35 @@ describe('deterministic shared harness', () => {
     )
     const host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin(
-          { id: 'five-memory' },
-          { ...memoryTestFeatures, reactive: reactiveFeature(memoryBackendKind) }
-        ),
-        localStorageBackendPlugin(
-          {
-            id: 'five-local',
-            namespace: 'five-local',
-            storage: fakeWebStorage()
-          },
-          { reactive: reactiveFeature(localStorageBackendKind) }
-        ),
-        sessionStorageBackendPlugin(
-          {
-            id: 'five-session',
-            namespace: 'five-session',
-            storage: fakeWebStorage()
-          },
-          { reactive: reactiveFeature(sessionStorageBackendKind) }
-        ),
-        cookieBackendPlugin(
-          {
-            id: 'five-cookiesHost',
-            namespace: 'five-cookiesHost',
-            document: fakeCookieDocument()
-          },
-          { reactive: reactiveFeature(cookieBackendKind) }
-        ),
-        indexedDbBackendPlugin(
-          {
-            id: 'five-indexed',
-            dbName: `five-${Math.random().toString(36).slice(2)}`,
-            factory: new IDBFactory(),
-            keyRange: IDBKeyRange
-          },
-          { ...indexedDbTestFeatures, reactive: reactiveFeature(indexedDbBackendKind) }
-        ),
+        memoryBackendPlugin({
+          name: 'five-memory',
+          features: { ...memoryTestFeatures, reactive: reactiveFeature() }
+        }),
+        localStorageBackendPlugin({
+          name: 'five-local',
+          namespace: 'five-local',
+          storage: fakeWebStorage(),
+          features: { reactive: reactiveFeature() }
+        }),
+        sessionStorageBackendPlugin({
+          name: 'five-session',
+          namespace: 'five-session',
+          storage: fakeWebStorage(),
+          features: { reactive: reactiveFeature() }
+        }),
+        cookieBackendPlugin({
+          name: 'five-cookiesHost',
+          namespace: 'five-cookiesHost',
+          document: fakeCookieDocument(),
+          features: { reactive: reactiveFeature() }
+        }),
+        indexedDbBackendPlugin({
+          name: 'five-indexed',
+          dbName: `five-${Math.random().toString(36).slice(2)}`,
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          features: { ...indexedDbTestFeatures, reactive: reactiveFeature() }
+        }),
         repositoryEntityPlugin
       ] as const
     })
@@ -110,7 +102,7 @@ describe('deterministic shared harness', () => {
       for (const backendId of backendIds) {
         const store = host.backend(backendId)
         /** Borrow the supplied backend through the installed repository capability factories. */
-        const repository = host.extensions[repositoryEntityPlugin.id](store)
+        const repository = host.extensions[repositoryEntityPlugin.name](store)
         const chain = repository.query()
         const query = chain.live({ runtime })
         await query.ready

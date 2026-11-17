@@ -9,9 +9,10 @@ import {
 } from '@migaia/storage-contract'
 import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
 import { registerTransactionFinalizer } from '../../src/authoring/transaction.ts'
-import { createStorageHost, definePlugin, StorageError } from '../../src/index.ts'
+import { createStorageHost, StorageError } from '../../src/index.ts'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import type { IStorageHookMap } from '../../src/index.ts'
+import { definePlugin } from '../../src/sdk.ts'
 
 /** The selected row domain belongs to the actual native memory record channel. */
 type IOrder = { state: string; total: number }
@@ -25,15 +26,18 @@ describe('memory native contract integration', () => {
     /** Counts describe the complete high-level call while omitting every business key and value. */
     const beforePayloads: IStorageHookMap['beforeStorageOperation'][] = []
     /** This existing intervention port leaves captured input and native result unchanged. */
-    const counting = definePlugin('counting', (core) => ({
-      install: () => {
-        core.usePipeline((input, next) => {
-          operations.push(input.operation)
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const counting = definePlugin({
+      name: 'counting',
+      setup: (core) => ({
+        install: () => {
+          core.usePipeline((input, next) => {
+            operations.push(input.operation)
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({
       plugins: [
         storageProbe({
@@ -61,7 +65,6 @@ describe('memory native contract integration', () => {
     expect(beforePayloads).toEqual([
       {
         backendId: 'memory',
-        backend: 'memory',
         orgId: '00000000-0000-0000-0000-000000000000',
         operation: 'setMany',
         count: 5
@@ -142,7 +145,6 @@ describe('memory native contract integration', () => {
     ])
     for (const payload of errors)
       expect(Object.keys(payload).sort()).toEqual([
-        'backend',
         'backendId',
         'code',
         'count',
@@ -155,15 +157,18 @@ describe('memory native contract integration', () => {
     /** Reset inside the existing transaction to exclude its own one required pipeline entry. */
     let pipelines = 0
     let observations = 0
-    const counting = definePlugin('counting', (core) => ({
-      install: () => {
-        core.usePipeline((input, next) => {
-          pipelines++
-          return next(input)
-        })
-        return {}
-      }
-    }))
+    const counting = definePlugin({
+      name: 'counting',
+      setup: (core) => ({
+        install: () => {
+          core.usePipeline((input, next) => {
+            pipelines++
+            return next(input)
+          })
+          return {}
+        }
+      })
+    })
     await using host = await createStorageHost({
       plugins: [
         storageProbe({

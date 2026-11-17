@@ -14,7 +14,6 @@ import {
   type IConcurrencyAttemptContext,
   type IConcurrencyPort,
   type IConcurrencyRequest,
-  type IBackendKind,
   StorageContractError,
   StorageContractErrorCode,
   type IConflictPolicy,
@@ -139,7 +138,7 @@ class ConcurrencyRunner<TResult> {
   /** The backend owns every actual attempt through its original port. */
   #port: IConcurrencyPort<TResult>
   /** Original owner diagnostics stay fixed through retries and cancellation. */
-  #backend: IBackendKind
+  #backend: string
   /** Observation uses the original host stage binding without admission authority. */
   #stages: IConcurrencyStageObserver | undefined
   /** The original option policy is forwarded independently of the effective request policy. */

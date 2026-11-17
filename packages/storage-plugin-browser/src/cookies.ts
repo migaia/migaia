@@ -1,5 +1,4 @@
 export { cookieBackendPlugin } from './plugins/cookies.ts'
-export { cookieBackendKind } from './host/builtin-kinds.ts'
-export type { ICookieBackendStore } from './host/builtin-kinds.ts'
+export type { ICookieBackend, ICookieBackendStore } from './host/builtin-backends.ts'
 export type { ICookiesOptions, ICookieDocument } from './backends/cookie.ts'
 export type { ICookieWriteContext, ICookieRemoveContext, ISyncCookieStore } from './types/cookie.ts'
