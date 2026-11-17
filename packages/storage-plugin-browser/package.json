@@ -1,6 +1,6 @@
 {
   "name": "@migaia/storage-plugin-browser",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "private": true,
   "description": "Browser backend plugins for localStorage, sessionStorage, cookies and native IndexedDB, with optional reactive queries.",
   "repository": {
