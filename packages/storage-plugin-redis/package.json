@@ -1,6 +1,6 @@
 {
   "name": "@migaia/storage-plugin-redis",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Native Redis and Valkey storage backend",
   "repository": {
