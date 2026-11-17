@@ -63,9 +63,9 @@ try {
 
 Write options accept a valid `expires: Date` or integer `maxAge`. Expired writes delete the cookie. The 4096-byte bound covers the complete assignment, including attributes. A same-name cookie visible in several scopes yields `COOKIE_SCOPE_AMBIGUOUS`; a normal write that is not visible afterwards yields `WRITE_FAILED`. JS cannot observe HttpOnly entries or guarantee server-side deletion.
 
-## Explicit IndexedDB assembly and migration
+## Assemble IndexedDB as needed
 
-`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes/backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each require their own Feature. Previously these capabilities were automatic. This intentional behavior change lets applications control browser output: an undeclared Feature is not imported by the basic backend entry. Migrate existing applications by selecting each capability they actually use. Basic reads and writes need no additional declaration.
+`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes and backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each have their own Feature; capabilities you do not import and declare stay out of the bundle. Basic reads and writes need no declaration; add the Feature for each capability you use:
 
 ```ts
 import { createStorageHost } from '@migaia/storage-host'
@@ -236,9 +236,7 @@ Inspect both `source` and `code`. After host installation starts, failure reject
 
 `host.dispose()` seals admission, cancels queued members, drains admitted work, then releases listeners and connections. Direct explicit backend cleanup propagates `BACKEND_DISPOSE_FAILED` with original errors reachable. Repeated explicit calls share their Promise. The async-disposal symbol has its own report-only completion projection over the same cleanup. A failure never makes a closed backend reusable.
 
-## Migration from direct factories
-
-Replace direct factories with the four backend plugins installed through `@migaia/storage-host`. Import memory and host primitives from that package, entities, schemas, and storage codecs from its `entity` entry. Replace old reactive wrappers and host live-query calls with an explicit `reactiveFeature(targetKind)` and `query.live()`. No legacy factory aliases are exported.
+## Change notifications, expiry and organization views
 
 With `indexedDbNotificationsFeature()` and `indexedDbChangeFeedFeature()` selected, IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`. Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method.
 

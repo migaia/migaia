@@ -1,34 +1,20 @@
 # @migaia/storage-contract
 
-运行时中立的存储契约。根入口只拥有类型、能力 token/定义、错误、枚举式常量和纯校验；执行、资源与作者快照由 `@migaia/storage-host/sdk` 拥有。基础包不依赖 host、浏览器存储或数据库客户端。
+[English](./README.en.md) · [使用指南](./USEGUIDE.md)
+
+存储家族共用的契约：键值、记录、查询、事务、向量、RDF、blob 等接口类型，能力 token，错误类型和纯校验函数。它不执行任何存储操作，也不依赖 storage-host、浏览器存储或数据库客户端。
+
+**应用通常不需要直接从这里开始**——读写数据从 [`@migaia/storage-host`](../storage-host/README.md) 开始，用 `host.backend(name)` 拿到存储。下面这些情况才直接用到本包：
+
+- 写和存储打交道的通用代码，只想依赖接口类型（例如 `IKeyValueStore`、`IRecordStore`），不绑定具体后端。
+- 判断某个存储有没有某项能力（`asRecordStore`、`asChangeFeedStore` 等），或按 `source: 'storage.contract'` 的错误码分支。
+- 实现自己的后端，并用 `/conformance` 里的契约用例验证它。
 
 ## 入口与依赖方向
 
-- `@migaia/storage-contract`：存储/codec/context/query/transaction 类型、标准 token、定义身份和纯校验。
-- `@migaia/storage-contract/conformance`：由消费者现有 runner 执行的后端契约组；不内置 runner，也不依赖 host。
-- 后端和 host 向内依赖本包。运行时作者 API 从下表入口导入；根入口不保留旧名称重导出或兼容别名。
-
-| host 入口后缀 | 既有作者能力                                                                                   |
-| ------------- | ---------------------------------------------------------------------------------------------- |
-| `/sdk`        | provideCapabilities、hasStorageCapability、useStorageCapability、readTransactionImplementation |
-| `/sdk`        | createRecordQuery、createVectorQuery、createRdfQuery、条件编译与快照                           |
-| `/sdk`        | ConcurrencyPolicy、lockKey、runWithConcurrency、锁身份与快照                                   |
-| `/sdk`        | createTransactionOwner、createTransactionBuilder、事务执行与游标派生                           |
-| `/sdk`        | 键快照、有序键/组织编码、批次键 capture/projection                                             |
-| `/sdk`        | snapshotOperationContext、snapshotSyncWriteOptions                                             |
-| `/sdk`        | store/capabilities 的 snapshot 准入                                                            |
-| `/sdk`        | createStorageIteratorLifetime                                                                  |
-| `/sdk`        | sqlFragment、createSqlTag、deriveStorageSqlQuery                                               |
-| `/sdk`        | sparqlFragment、createSparqlTag                                                                |
-| `/sdk`        | term、RDF 快照/编码、组织图映射                                                                |
-| `/sdk`        | 向量输入快照、recommendStorageVector                                                           |
-| `/sdk`        | snapshotStorageTtlTarget                                                                       |
-| `/sdk`        | snapshotStorageCounterIncrement                                                                |
-| `/sdk`        | blob 输入快照、body reader 与 object 资源                                                      |
-| `/sdk`        | fromValueCodec、snapshotCodec                                                                  |
-| `/sdk`        | createMigrationPlan、迁移执行与 envelope 恢复                                                  |
-
-这些入口属于 `@migaia/storage-host`。`/sdk` 继续拥有既有有限后端接点；共享模板捕获仅是 SQL/SPARQL 的内部模块，不是公开子路径。使用步骤见 [USEGUIDE](./USEGUIDE.md) 与 [host 指南](../storage-host/USEGUIDE.md)。
+- `@migaia/storage-contract`：存储、codec、上下文、查询和事务类型，标准能力 token，定义身份和纯校验。
+- `@migaia/storage-contract/conformance`：后端契约用例组，由你现有的测试运行器执行；不内置运行器，也不依赖 host。
+- 后端和 host 向内依赖本包。执行查询、事务、锁、快照等运行时作者工具都在 `@migaia/storage-host/sdk`，见 [storage-host 的后端作者入口](../storage-host/README.md#后端作者入口)。
 
 ## 类型与纯校验
 
@@ -57,7 +43,7 @@ shape guard 面向普通受支持输入，不承诺拦截抛错 getter、Proxy�
 
 `IOperationContext.timeoutMs` 是非负安全整数，`pageSize` 是 1–4096 的整数；省略不插入缺省值。signal 使用结构化 `IAbortSignal`，已取消的有效信号仍可通过 shape 校验。同步写选项只接纳可选 `conflictPolicy`，不接纳非 undefined 的 signal/timeoutMs。
 
-`IStorageCapabilities.batch` 声明完整 KV 批量写与计数前缀删除；省略表示不支持。共享 conformance 将未声明的 batch 组记为不适用。`secondaryIndexes`、`changeFeed` 的旧省略形状可通过 guard；需要独立规范化说明的 host 快照把这两项补 false。
+`IStorageCapabilities.batch` 声明完整 KV 批量写与计数前缀删除；省略表示不支持。共享 conformance 将未声明的 batch 组记为不适用。省略 `secondaryIndexes`、`changeFeed` 也能通过 guard，host 快照把这两项按 false 处理。
 
 ## 定义身份与原生实现
 
@@ -67,14 +53,14 @@ publication、store has/use 和 transaction implementation lookup 统一由 host
 
 ## 错误与已接受边界
 
-`StorageContractError` 保持 `source: 'storage.contract'`、公开 code、原 `cause`、原 stack 与扩展 details。未改名或新增错误码。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。
+`StorageContractError` 保持 `source: 'storage.contract'`、公开 code、原 `cause`、原 stack 与扩展 details。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。
 
 错误实例保留既有冻结行为，cause 对象不会随之冻结。归档迁移的进度错误通过既有 `onArchiveRunError` 通道报告，不修改已冻结错误实例。codec 不承诺冻结或复制：纯 `assertCodec` 只校验；host `snapshotCodec` 校验后返回同一实例，使 `#private` 方法保持 receiver。
 
 普通 store/options/query 与输入快照不作为冻结协议。需要跨排队、native await 或公开返回值边界隔离可变 Date、bytes、数组、RDF term 时，由相应 host 作者入口说明并执行必要复制。公开锁诊断的键必须与仍活动的原 lease 分离。
 
-## 序列化结果迁移
+## 序列化字节顺序
 
-存储 codec 使用的 `@migaia/serialize` 格式编码器现按对象自身的属性枚举顺序输出字段，不再按字段名排序。相同字段和值、不同插入顺序的对象，编码字节可能不同；解码后的字段和值不变。依赖旧排序字节的快照、签名输入或缓存键应按新顺序重新生成，不能把旧字节顺序当作存储契约。
+存储 codec 使用的 `@migaia/serialize` 格式编码器按对象自身的属性枚举顺序输出字段。字段和值相同、插入顺序不同的对象，编码出的字节可能不同，解码后的字段和值一样。不要把编码字节当作签名输入或缓存键的稳定来源。
 
-递归 `Map`、`Set` 值改用 `@migaia/serialize/codecs/collections-json` 的 `defineCollectionsJsonCodec`，再从 `@migaia/storage-host/sdk` 使用 `fromValueCodec` 适配。普通 JSON codec 不隐式开启集合编码；新写入格式的旧消费者需同步迁移。格式细节见 [serialize 指南](../serialize/USEGUIDE.md)。
+递归的 `Map`、`Set` 值使用 `@migaia/serialize/codecs/collections-json` 的 `defineCollectionsJsonCodec`，再用 `@migaia/storage-host/sdk` 的 `fromValueCodec` 适配。普通 JSON codec 不会自动编码集合；写入方和读取方要使用同一种格式。格式细节见 [serialize 指南](../serialize/USEGUIDE.md)。

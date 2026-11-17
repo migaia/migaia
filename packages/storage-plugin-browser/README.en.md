@@ -1,16 +1,19 @@
-# `@migaia/storage-plugin-browser`
+# @migaia/storage-plugin-browser
 
-Browser backends for `localStorage`, `sessionStorage`, cookies, and IndexedDB. Install the selected backend into `@migaia/storage-host`; the host owns preparation and cleanup.
+[中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
 
-## Install
+Install the browser's `localStorage`, `sessionStorage`, cookies and IndexedDB as backend plugins of [`@migaia/storage-host`](../storage-host/README.en.md) and use one API for all of them. The host handles installation, per-organization isolation and shutdown; this package handles the details of each browser store, such as namespace prefixes, cookie scopes, IndexedDB transactions and version upgrades, and change notifications when other pages write.
 
-```bash
-pnpm add @migaia/storage-plugin-browser @migaia/storage-host @migaia/storage-contract
-```
+## Problems you may have seen
 
-Examples require an ESM browser environment with top-level `await`. Select a backend whose native browser API is available.
+- **You find out the store is full only when a write fails**: exceeding the browser quota throws a different native error in each browser, and code has to recognize each one. This package reports them all as `storage.backend.browser / QUOTA_EXCEEDED`.
+- **Apps or tabs overwrite each other's keys**: everyone writes `theme` at the root of `localStorage`. The cause is no namespace; the Web Storage and cookie backends here prefix keys with `namespace`.
+- **IndexedDB is tedious to use**: opening the database, version upgrades, transactions and cursors all need hand-written callbacks. This package wraps them in the same `set/get/putRecord/transaction` as other backends.
+- **Another tab changed the data, but this page still shows the old value**: the cause is not listening for cross-page changes; with the notifications Feature installed, the backend turns writes from other pages into change notifications.
 
-## Save preferences
+## Start here
+
+The example saves one preference in a browser. It needs a browser ESM environment with top-level `await`.
 
 ```ts
 import { createStorageHost } from '@migaia/storage-host'
@@ -28,7 +31,13 @@ try {
 }
 ```
 
-Prints `dark`. Disposing the host releases owned listeners and connections; it does not clear persistent browser data.
+It prints `dark`. The key is stored with the `my-app` prefix, so it does not collide with another app's `theme` on the same domain. Disposing the host closes the listeners and connections it owns without clearing data persisted in the browser.
+
+## Install
+
+```bash
+pnpm add @migaia/storage-plugin-browser @migaia/storage-host @migaia/storage-contract
+```
 
 ## Choose a backend
 
@@ -45,11 +54,9 @@ Memory, `createStorageHost` and backend authoring belong to `@migaia/storage-hos
 
 Unique entity writes require a real record transaction or the backend’s native atomic value-commit endpoint. Built-in browser backends provide it. A custom value-only backend without `core.registerValueCommit` rejects unique writes with `UNSUPPORTED_CAPABILITY` before schema work or mutation; ordinary KV remains available. See the host entity guide for the authoring contract.
 
-## Explicit IndexedDB assembly and migration
+## Assemble IndexedDB as needed
 
-`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes/backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each require their own Feature.
-
-Previously these capabilities were automatic. This intentional behavior change lets applications control browser output: an undeclared Feature is not imported by the basic backend entry. Migrate existing applications by selecting each capability they actually use. Basic reads and writes need no additional declaration.
+`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes and backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each have their own Feature; capabilities you do not import and declare stay out of the bundle. Basic reads and writes need no declaration; add the Feature for each capability you use:
 
 ```ts
 import { createStorageHost } from '@migaia/storage-host'

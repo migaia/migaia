@@ -63,9 +63,9 @@ try {
 
 写选项接受有效的 `expires: Date` 或整数 `maxAge`，已到期写入删除 Cookie。4096 字节上限覆盖包括属性的完整赋值。同名 Cookie 在多个 scope 同时可见时报 `COOKIE_SCOPE_AMBIGUOUS`，普通写入后不可见时报 `WRITE_FAILED`。JS 无法观察 HttpOnly 条目，也不能保证删除服务端 Cookie。
 
-## IndexedDB 显式装配与迁移
+## IndexedDB 按需装配
 
-`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。以前自动启用的原生索引/backfill、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流，现在各有独立 Feature；业务没有导入并声明的实现不会因这个后端的基础入口进入构建。这是有意的行为变更，用于让应用控制浏览器产物。迁移现有应用时，为实际使用的能力逐项增加下列声明；普通存读不需要增加声明。
+`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。原生索引与回填、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流各有独立的 Feature；没有导入并声明的能力不会进入构建产物。普通读写不需要任何声明，用到哪项能力就加上对应的 Feature：
 
 ```ts
 import { createStorageHost } from '@migaia/storage-host'
@@ -234,9 +234,7 @@ try {
 
 `host.dispose()` 封闭新准入、取消排队成员、排空已接纳工作，再释放监听器与连接。显式后端清理以 `BACKEND_DISPOSE_FAILED` 传播失败，原始错误可达。重复显式调用共享 Promise，异步释放符号通过同一次清理提供独立的只报告完成投影。失败不会让已关闭后端复活。
 
-## 从直接工厂迁移
-
-用四个后端插件代替直接工厂，通过 `@migaia/storage-host` 安装。内存与宿主原语从该包导入，实体、结构适配与存储编解码器从其 `entity` 入口导入。旧响应式包装与宿主实时查询调用改为显式 `reactiveFeature(targetKind)` 和 `query.live()`。不提供历史工厂别名。
+## 变更通知、期限与组织视图
 
 显式选择 `indexedDbNotificationsFeature()` 与 `indexedDbChangeFeedFeature()` 后，IndexedDB 通过 `store.watch(key, ctx?)` 提供原生文本失效迭代器。仅当实例已准入当前 realm 的 IndexedDB 与 BroadcastChannel 时 `capabilities.changeFeed` 为 `true`；未准入时调用报 `UNSUPPORTED_CAPABILITY`。提示携带原宿主的组织 UUID，收到提示后重新读取已提交的原生值；这不提供历史重放或每次写入一条事件的保证。迭代器复用原资源清理，使用后调用 `dispose()`。
 

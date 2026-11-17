@@ -1,16 +1,19 @@
-# `@migaia/storage-plugin-browser`
+# @migaia/storage-plugin-browser
 
-为 `localStorage`、`sessionStorage`、Cookie 和 IndexedDB 提供浏览器后端。把选定后端安装到 `@migaia/storage-host`，由宿主负责准备与释放。
+[English](./README.en.md) · [使用指南](./USEGUIDE.md)
 
-## 安装
+把浏览器的 `localStorage`、`sessionStorage`、Cookie 和 IndexedDB 作为 [`@migaia/storage-host`](../storage-host/README.md) 的后端插件安装，用同一套 API 读写。host 负责安装、按组织隔离和关闭；本包负责各浏览器存储的细节，例如命名空间前缀、Cookie 作用域、IndexedDB 的事务和版本升级，以及其他页面写入时的变更通知。
 
-```bash
-pnpm add @migaia/storage-plugin-browser @migaia/storage-host @migaia/storage-contract
-```
+## 你可能遇到过
 
-示例需要支持顶层 `await` 的浏览器 ESM 环境，以及所选后端对应的原生浏览器 API。
+- **存满了才发现**：写入超过浏览器配额时抛出各家不同的原生错误，代码只能逐个识别。本包把它们统一报告为 `storage.backend.browser / QUOTA_EXCEEDED`。
+- **多个应用或多个标签页的键互相覆盖**：大家都往 `localStorage` 根上写 `theme`。根因是没有命名空间；本包的 Web Storage 和 Cookie 后端都按 `namespace` 加前缀。
+- **IndexedDB 写起来太绕**：打开数据库、版本升级、事务和游标都要手写回调。本包把它包成和其他后端一样的 `set/get/putRecord/transaction`。
+- **另一个标签页改了数据，这个页面还显示旧值**：根因是没有监听跨页面的变化；装上通知 Feature 后，后端会把其他页面的写入转成变更通知。
 
-## 保存偏好设置
+## 从这里开始
+
+下面在浏览器里保存一项偏好设置。示例需要支持顶层 `await` 的浏览器 ESM 环境。
 
 ```ts
 import { createStorageHost } from '@migaia/storage-host'
@@ -28,7 +31,13 @@ try {
 }
 ```
 
-输出 `dark`。释放宿主会关闭其拥有的监听器与连接，不清空浏览器持久化数据。
+输出 `dark`。键实际写成带 `my-app` 前缀的形式，不会和同一域名下其他应用的 `theme` 冲突。释放 host 会关闭它拥有的监听器与连接，不清空浏览器里持久化的数据。
+
+## 安装
+
+```bash
+pnpm add @migaia/storage-plugin-browser @migaia/storage-host @migaia/storage-contract
+```
 
 ## 选择后端
 
@@ -45,9 +54,9 @@ try {
 
 实体唯一约束写入需要真实 record 事务或后端原生原子 value 提交端点；内置浏览器后端均提供。自定义纯 value 后端未登记 `core.registerValueCommit` 时，唯一写入在 schema 执行和修改前报 `UNSUPPORTED_CAPABILITY`，普通 KV 不受影响。作者契约见 host 实体使用指南。
 
-## IndexedDB 显式装配与迁移
+## IndexedDB 按需装配
 
-`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。以前自动启用的原生索引/backfill、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流，现在各有独立 Feature；业务没有导入并声明的实现不会因这个后端的基础入口进入构建。这是有意的行为变更，用于让应用控制浏览器产物。迁移现有应用时，为实际使用的能力逐项增加下列声明；普通存读不需要增加声明。
+`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。原生索引与回填、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流各有独立的 Feature；没有导入并声明的能力不会进入构建产物。普通读写不需要任何声明，用到哪项能力就加上对应的 Feature：
 
 ```ts
 import { createStorageHost } from '@migaia/storage-host'

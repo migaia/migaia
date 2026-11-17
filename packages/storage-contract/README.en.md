@@ -1,32 +1,20 @@
 # @migaia/storage-contract
 
-Runtime-neutral storage contracts. The root owns types, capability tokens/definitions, errors, enum-like constants and pure validators. Execution, resources and authoring snapshots belong to `@migaia/storage-host/sdk`. This package does not depend on host, browser storage or database clients.
+[中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
+
+The contract shared by the storage family: interface types for key-value, records, queries, transactions, vectors, RDF and blobs, capability tokens, error types and pure validators. It performs no storage operation and does not depend on storage-host, browser storage or database clients.
+
+**Applications usually do not start here**: to read and write data, start with [`@migaia/storage-host`](../storage-host/README.en.md) and get a store with `host.backend(name)`. You use this package directly when you:
+
+- write generic storage code that depends only on interface types (such as `IKeyValueStore` or `IRecordStore`), without binding to a backend;
+- check whether a store has a capability (`asRecordStore`, `asChangeFeedStore` and others), or branch on error codes with `source: 'storage.contract'`;
+- implement your own backend and verify it with the contract cases in `/conformance`.
 
 ## Entries and dependency direction
 
-- `@migaia/storage-contract`: storage, codec, context, query and transaction types; standard tokens; definition identity; pure validation.
-- `@migaia/storage-contract/conformance`: backend contract groups run by the consumer's existing runner. It supplies no runner and imports no host runtime.
-- Host and backends depend inward on this package. Runtime authoring APIs use the entries below; the root retains no old runtime re-export or compatibility alias.
-
-| Host entry suffix | Existing responsibility                                                |
-| ----------------- | ---------------------------------------------------------------------- |
-| `/sdk`            | Publication, original store has/use, transaction implementation lookup |
-| `/sdk`            | Record/vector/RDF queries, condition compilation and snapshots         |
-| `/sdk`            | Policies, lock factories, the concurrency loop and lock snapshots      |
-| `/sdk`            | Transaction owner, builder, execution and iterator derivation          |
-| `/sdk`            | Key copies, ordered/organization encoding and batch capture/projection |
-| `/sdk`            | Operation and reduced sync-write snapshots                             |
-| `/sdk`            | Store admission and capability descriptor snapshots                    |
-| `/sdk`            | Original iterator lifetime                                             |
-| `/sdk`            | Fragments, native tags and terminal binding                            |
-| `/sdk`            | Term factories, snapshots, encoding and organization graphs            |
-| `/sdk`            | Vector input snapshots and recommendation synthesis                    |
-| `/sdk`            | Original scalar input helpers                                          |
-| `/sdk`            | Input snapshots, upload readers and object resources                   |
-| `/sdk`            | Value-codec adapter and original codec admission                       |
-| `/sdk`            | Migration plans, execution and envelope recovery                       |
-
-All these entries belong to `@migaia/storage-host`. `/sdk` retains its finite backend ports. Shared template capture remains a private SQL/SPARQL module. See the [usage guide](./USEGUIDE.en.md) and [host guide](../storage-host/USEGUIDE.en.md).
+- `@migaia/storage-contract`: storage, codec, context, query and transaction types; standard capability tokens; definition identity; pure validation.
+- `@migaia/storage-contract/conformance`: backend contract case groups run by your existing test runner. It supplies no runner and imports no host runtime.
+- Host and backends depend inward on this package. Runtime authoring tools for queries, transactions, locks and snapshots live in `@migaia/storage-host/sdk`; see [backend authoring entries in storage-host](../storage-host/README.en.md#backend-authoring-entries).
 
 ## Types and pure validators
 
@@ -55,7 +43,7 @@ Guards accept ordinary supported inputs. They promise no hostile getter, Proxy o
 
 `IOperationContext.timeoutMs` is a nonnegative safe integer and `pageSize` is an integer from 1 through 4096. Omission supplies no default. A structurally valid already-aborted `IAbortSignal` is accepted. Sync write options allow optional `conflictPolicy`, without non-undefined signal/timeoutMs.
 
-`IStorageCapabilities.batch` declares complete KV batch writes and counted prefix deletion. Omission means unsupported, and shared conformance marks that group not applicable. Legacy omissions of secondaryIndexes/changeFeed pass pure shape admission; host descriptor snapshots normalize those two flags to false.
+`IStorageCapabilities.batch` declares complete KV batch writes and counted prefix deletion. Omission means unsupported, and shared conformance marks that group not applicable. Omitting `secondaryIndexes` or `changeFeed` also passes the guard; host snapshots treat both as false.
 
 ## Definition identity and original implementations
 
@@ -65,14 +53,14 @@ Host `/sdk` owns publication, store has/use and transaction implementation looku
 
 ## Errors and accepted boundaries
 
-`StorageContractError` retains source `storage.contract`, its public code, original cause and stack, and extension details. No code was added or renamed. `INVALID_ARGUMENT` denotes argument shape, `INVALID_KEY` denotes the typed-key domain, and `UNSUPPORTED_CAPABILITY` denotes missing requested behavior. Runtime owners reuse the existing lifecycle, query, concurrency and migration codes.
+`StorageContractError` retains source `storage.contract`, its public code, original cause and stack, and extension details. `INVALID_ARGUMENT` denotes argument shape, `INVALID_KEY` denotes the typed-key domain, and `UNSUPPORTED_CAPABILITY` denotes missing requested behavior. Runtime owners reuse the existing lifecycle, query, concurrency and migration codes.
 
 Error instances retain their existing frozen behavior; cause objects are not frozen with them. Archive migration reports progress failures through the existing `onArchiveRunError` hook rather than modifying the frozen error. Codec admission does not clone or freeze: pure `assertCodec` validates, while host `snapshotCodec` returns the same admitted instance so class-private methods keep their receiver.
 
 Ordinary store, option, query and snapshot records are not a freezing protocol. Host authors retain copies only where queued/native awaits or a public ownership boundary exposes mutable Date, bytes, array or RDF data. Public lock diagnostics detach keys from a still-active native lease.
 
-## Migrating serialized output
+## Serialized byte order
 
-The `@migaia/serialize` format encoders used by storage codecs now emit fields in the object's own property enumeration order instead of sorting field names. Objects with equal fields and values but different insertion orders can produce different bytes. Decoded fields and values are unchanged. Regenerate snapshots, signature inputs or cache keys that depend on the former sorted bytes.
+The `@migaia/serialize` format encoders used by storage codecs emit fields in the object's own property enumeration order. Objects with equal fields and values but different insertion orders can produce different bytes, while the decoded fields and values are the same. Do not treat encoded bytes as a stable source for signature inputs or cache keys.
 
-For recursive `Map` and `Set` values, select `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` and adapt it with `fromValueCodec` from `@migaia/storage-host/sdk`. Plain JSON does not enable collection encoding implicitly. Older consumers must migrate together before reading the new format. See the [serialize guide](../serialize/USEGUIDE.en.md).
+For recursive `Map` and `Set` values, use `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` and adapt it with `fromValueCodec` from `@migaia/storage-host/sdk`. Plain JSON does not encode collections automatically; writers and readers must use the same format. See the [serialize guide](../serialize/USEGUIDE.en.md).
