@@ -1,6 +1,6 @@
 {
   "name": "@migaia/storage-host",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Runtime-neutral storage host and typed backend authoring",
   "repository": {
