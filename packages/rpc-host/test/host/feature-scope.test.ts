@@ -1,13 +1,13 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public feature placement and fixed native stage positions use the original Memory transport. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { schemaFeature } from '@migaia/rpc-host/plugins/schema'
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
-import { batchFeature } from '@migaia/rpc-host/plugins/batch'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { schemaFeature } from '@migaia/rpc-host/features/schema'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
+import { batchFeature } from '@migaia/rpc-host/features/batch'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import {
   defineFlowFeature,
@@ -62,7 +62,11 @@ it('owns one host feature setup and one setup for each transport-local placement
   /** Native Host ownership, rather than a fixture disposer table, controls every callback. */
   const host = await createRpcHost({
     ...first.options,
-    plugins: [rpcFeaturesPlugin({ features: { shared } }), first.transport, second.transport]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { shared } }),
+      first.transport,
+      second.transport
+    ]
   })
   try {
     expect(hostSetup).toHaveBeenCalledTimes(1)
@@ -212,7 +216,10 @@ it('keeps three host/local record key orders and different endpoint orders equiv
         ...server.options,
         plugins: local
           ? [server.transport]
-          : [rpcFeaturesPlugin({ features: serverFeatures }), server.transport],
+          : [
+              defineFlowPlugin({ name: 'rpc-flow-features', features: serverFeatures }),
+              server.transport
+            ],
         provide: {
           echo: (value: unknown) => value,
           fail: () => {
@@ -222,7 +229,7 @@ it('keeps three host/local record key orders and different endpoint orders equiv
       })
       /** Client uses its actual public Host; no request or pipeline facade is inserted. */
       const client = await server.connect('scope-client', {
-        plugins: [rpcFeaturesPlugin({ features: clientFeatures })]
+        plugins: [defineFlowPlugin({ name: 'rpc-flow-features', features: clientFeatures })]
       })
       /** Observe post-handshake frames at the original physical write boundary. */
       const clientWrite = vi.spyOn(client.pair[1], 'write')
@@ -401,7 +408,8 @@ it.each([false, true])(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({ sign: (value) => value, verify: (value) => value }),
             chunk: chunkFeature({ chunkBytes: 1024 })
@@ -414,7 +422,8 @@ it.each([false, true])(
     /** The client alone installs witnesses so reply stages cannot satisfy request assertions. */
     const client = await server.connect('layer-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             ...(reverse ? { wire, dependent } : { dependent, wire }),
             auth: authFeature({ sign: (value) => value, verify: (value) => value }),
@@ -460,7 +469,10 @@ it('A3 rejects custom phase collisions before transport acquisition', async () =
   const transport = defineTransportPlugin({ name: 'collision', namespace: 'collision', open })
   await expect(
     createRpcHost({
-      plugins: [rpcFeaturesPlugin({ features: { before: first, after: second } }), transport],
+      plugins: [
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { before: first, after: second } }),
+        transport
+      ],
       report: () => undefined
     })
   ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
@@ -518,13 +530,18 @@ it('overrides host authentication once in one Memory namespace and keeps the oth
   /** Real provider output is the sole source of reply signing. */
   const host = await createRpcHost({
     ...first.options,
-    plugins: [rpcFeaturesPlugin({ features: { hostAuth } }), first.transport, second.transport],
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { hostAuth } }),
+      first.transport,
+      second.transport
+    ],
     provide: { echo: (value: unknown) => value }
   })
   /** Both actual clients install paired verification while owning separate physical Sessions. */
   const a = await first.connect('override-a', {
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
       })
     ]
@@ -532,7 +549,8 @@ it('overrides host authentication once in one Memory namespace and keeps the oth
   /** The second client connects to its original separate listener namespace. */
   const b = await second.connect('override-b', {
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
       })
     ]
@@ -615,7 +633,12 @@ it.each([false, true])(
       plugins: [
         ...(local
           ? []
-          : [rpcFeaturesPlugin({ features: { quota: limitsFeature({ maxGlobal: 1 }) } })]),
+          : [
+              defineFlowPlugin({
+                name: 'rpc-flow-features',
+                features: { quota: limitsFeature({ maxGlobal: 1 }) }
+              })
+            ]),
         first.transport,
         second.transport
       ],

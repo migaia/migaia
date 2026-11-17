@@ -1,6 +1,6 @@
 /** Dedicated worker leaf of the iframe topology: business providers behind the page's worker. */
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { RpcProbeStage } from '@migaia/rpc-contract/interfaces'
 import { dedicatedWorkerPlugin, sharedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { TopologyLeaf } from '../../../rpc-integration/test/host/fixtures/topology-leaf.ts'

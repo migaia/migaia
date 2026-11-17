@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public construction retains its primary failure after dependency setup and failing rollback. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { defineFeature } from '@migaia/plugin-host/features'
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowFeature, defineTransportPlugin } from '@migaia/rpc-host/sdk'
@@ -72,7 +72,7 @@ it('keeps the original construction failure after object dependencies and both c
   /** Observe the actual public rejection, rather than a native Host.use wrapper or its cause. */
   const failure = await createRpcHost({
     plugins: [
-      rpcFeaturesPlugin({ features: { first, second, failing } }),
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { first, second, failing } }),
       defineTransportPlugin({ name: 'construction-transport', namespace: 'native', open })
     ],
     report: (error) => reports.push(error)

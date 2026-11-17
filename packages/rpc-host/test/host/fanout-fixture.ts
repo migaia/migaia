@@ -1,4 +1,4 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { createHmac } from 'node:crypto'
 import { expect, vi } from 'vitest'
@@ -9,7 +9,7 @@ import {
   defineTransportPlugin,
   type IRpcMessageIO
 } from '@migaia/rpc-host/sdk'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 
 /** Target settlement keys are the public endpoint grammar, including names with punctuation. */
 export const key = (target: string) => JSON.stringify(['target', target])
@@ -127,7 +127,10 @@ export async function nativeHosts(provide: IRpcHostOptions['provide']) {
       createRpcHost({
         self: { name: `native-${index}`, instanceId: `native-${index}` },
         plugins: [
-          rpcFeaturesPlugin({ features: { auth: authFeature(authentication) } }),
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { auth: authFeature(authentication) }
+          }),
           defineTransportPlugin({
             name: `native-transport-${index}`,
             namespace: 'native',

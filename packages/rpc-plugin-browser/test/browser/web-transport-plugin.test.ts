@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, type IRpcProvide } from '@migaia/rpc-host'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
 import { RpcWireProfile, normalizeRpcFrame } from '@migaia/rpc-contract/protocol'
 import { encodeRpcStreamTextFrame } from '@migaia/rpc-host/sdk'
 import { webTransportPlugin } from '@migaia/rpc-plugin-browser'
@@ -51,7 +51,10 @@ async function connected(
     createRpcHost({
       self: { name: 'wt-client', instanceId: 'wt-client' },
       plugins: [
-        rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { idempotency: idempotencyFeature() }
+        }),
         webTransportPlugin({ session, connect: { timeoutMs: 1000 } })
       ],
       provide: clientProvide,
@@ -61,7 +64,10 @@ async function connected(
     createRpcHost({
       self: { name: 'wt-server', instanceId: 'wt-server' },
       plugins: [
-        rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { idempotency: idempotencyFeature() }
+        }),
         serverTransport
       ],
       provide: serverProvide,

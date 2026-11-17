@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original ingress rejection and late-verification business assertions use genuine native Sessions. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import auth from '@migaia/rpc-host/plugins/auth'
-import limits from '@migaia/rpc-host/plugins/limits'
+import auth from '@migaia/rpc-host/features/auth'
+import limits from '@migaia/rpc-host/features/limits'
 import {
   defineFlowFeature,
   RpcFlowLayer,
@@ -72,7 +72,8 @@ it('rejecting ingress verification releases the next call; close prevents a late
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { feature0: auth({ sign: (value) => value, verify: verifier.verify }) }
       }),
       ...server.options.plugins
@@ -89,7 +90,8 @@ it('rejecting ingress verification releases the next call; close prevents a late
   /** This original client completes both genuine handshakes through the same native pair. */
   const client = await server.connect('caller', {
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { feature0: auth({ sign: (value) => value, verify: (value) => value }) }
       })
     ]
@@ -195,7 +197,8 @@ it('authenticates two business arrivals concurrently, bypasses their ordered del
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           arrivalWitness,
           feature0: auth({ sign: (value) => value, verify: verifier.verify }),
@@ -216,7 +219,8 @@ it('authenticates two business arrivals concurrently, bypasses their ordered del
   /** The opposite public Host uses independent original Auth and the same linked carrier pair. */
   const client = await server.connect('caller', {
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { feature0: auth({ sign: (value) => value, verify: (value) => value }) }
       })
     ]
@@ -301,7 +305,8 @@ it('bounds opaque ingress verification at three and releases the fourth without 
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { feature0: auth({ sign: (value) => value, verify: verifier.verify }) }
       }),
       ...server.options.plugins
@@ -317,7 +322,8 @@ it('bounds opaque ingress verification at three and releases the fourth without 
   /** Each actual public request crosses the original linked carrier and sole codec. */
   const client = await server.connect('caller', {
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { feature0: auth({ sign: (value) => value, verify: (value) => value }) }
       })
     ]

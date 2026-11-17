@@ -1,12 +1,12 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public Host and real native carriers retain the original observer non-interference oracles. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { createHmac } from 'node:crypto'
 import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import {
   probe as probePlugin,
   defineProbe,
@@ -215,7 +215,8 @@ async function encryptedProbeCase(mode: IProbeMode) {
     createRpcHost({
       self: { name: 'encrypted-server', instanceId: 'encrypted-server' },
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             encryptedAuthentication: encryptedAuthentication(transforms.right),
             chunk: chunkFeature({ chunkBytes: 96 }),
@@ -255,7 +256,8 @@ async function encryptedProbeCase(mode: IProbeMode) {
     createRpcHost({
       self: { name: 'encrypted-client', instanceId: 'encrypted-client' },
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             encryptedAuthentication: encryptedAuthentication(transforms.left),
             chunk: chunkFeature({ chunkBytes: 96 })
@@ -449,7 +451,10 @@ async function nativeTransferProbeCase(protection: IProbeProtection, mode: IProb
     createRpcHost({
       self: { name: 'left', instanceId: 'transfer-left' },
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature(authenticationConfig) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature(authenticationConfig) }
+        }),
         ...observation,
         probeTransport(leftWire)
       ],
@@ -458,7 +463,10 @@ async function nativeTransferProbeCase(protection: IProbeProtection, mode: IProb
     createRpcHost({
       self: { name: 'right', instanceId: 'transfer-right' },
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature(authenticationConfig) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature(authenticationConfig) }
+        }),
         ...observation,
         probeTransport(rightWire)
       ],

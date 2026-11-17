@@ -171,9 +171,12 @@ export class RpcHostInstallation {
   readonly use = async (...plugins: readonly IRpcHostPlugin[]): Promise<IRpcHost> => {
     this.#ports.assertOpen()
     for (const plugin of plugins) {
-      /** Reject cold-only defaults before native duplicate-name checks or resource acquisition. */
-      const kind = readRpcDefinition(plugin)?.kind
-      if (kind === RpcDefinitionKind.features || kind === RpcDefinitionKind.policy)
+      /**
+       * Reject cold-only Feature carriers before native duplicate-name checks or resource
+       * acquisition.
+       */
+      const metadata = readRpcDefinition(plugin)
+      if (metadata?.kind === RpcDefinitionKind.flow && metadata.shared)
         throw tagRpcError(new TypeError(HostErrorText.flowStarted), RpcCoreErrorCode.invalidConfig)
     }
     /** The same compiler fixes placement order before any new transport opens IO. */

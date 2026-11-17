@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
 import { coreMemoryServer } from './core-fixture.ts'
 
 describe('accepted host session provider policy', () => {
@@ -17,7 +17,8 @@ describe('accepted host session provider policy', () => {
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({ verifyCredentials: (value) => ({ principalId: String(value) }) }),
             idempotency: idempotencyFeature()
@@ -35,7 +36,10 @@ describe('accepted host session provider policy', () => {
     /** Each actual client sends its own credential through the real handshake verification path. */
     const first = await server.connect('first', {
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: 'principal-a' }) } })
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature({ credentials: 'principal-a' }) }
+        })
       ]
     })
     try {
@@ -49,7 +53,10 @@ describe('accepted host session provider policy', () => {
        */
       const replacement = await server.connect('replacement', {
         plugins: [
-          rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: 'principal-a' }) } })
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { auth: authFeature({ credentials: 'principal-a' }) }
+          })
         ]
       })
       try {
@@ -62,7 +69,10 @@ describe('accepted host session provider policy', () => {
         /** A separately verified principal cannot borrow the first principal's retained outcome. */
         const other = await server.connect('other', {
           plugins: [
-            rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: 'principal-b' }) } })
+            defineFlowPlugin({
+              name: 'rpc-flow-features',
+              features: { auth: authFeature({ credentials: 'principal-b' }) }
+            })
           ]
         })
         try {

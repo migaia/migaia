@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Uses one actual Process middle and one actual Worker leaf, with no synthetic routing. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { isMainThread, workerData } from 'node:worker_threads'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import {
@@ -129,7 +129,8 @@ class FeatureScopeLeaf {
   constructor() {
     this.#opening = createRpcHost({
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { feature1: featureScopeAuth(FeatureScopeFixture.hostKey) }
         }),
         threadPlugin({ namespace: 'native', connectToParent: true })
@@ -172,7 +173,8 @@ class FeatureScopeMiddle {
   constructor() {
     this.#opening = createRpcHost({
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { feature1: featureScopeAuth(FeatureScopeFixture.hostKey) }
         }),
         processPlugin({

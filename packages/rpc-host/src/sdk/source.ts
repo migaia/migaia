@@ -29,12 +29,7 @@ export function defineRpcSourcePlugin(
     Object.values(original.definition.features ?? {}).some((feature) => {
       /** Native resource features stay source-owned; local flow definitions cannot change groups. */
       const kind = readRpcDefinition(feature)?.kind
-      return (
-        kind === RpcDefinitionKind.feature ||
-        kind === RpcDefinitionKind.flow ||
-        kind === RpcDefinitionKind.features ||
-        kind === RpcDefinitionKind.policy
-      )
+      return kind === RpcDefinitionKind.feature || kind === RpcDefinitionKind.flow
     })
   )
     throw tagRpcError(new TypeError(HostErrorText.pluginInvalid), RpcCoreErrorCode.invalidConfig)

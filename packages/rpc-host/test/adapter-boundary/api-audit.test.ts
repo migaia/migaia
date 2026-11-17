@@ -1,4 +1,4 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import {
@@ -6,7 +6,7 @@ import {
   createRpcMessageCarrier,
   defineTransportPlugin
 } from '@migaia/rpc-host/sdk'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { duplex, reaches } from './audit-byte-fixture.ts'
 
 it('refuses a pre-aborted peer signal before opening its byte source', async () => {
@@ -238,7 +238,8 @@ it('retains the verifier failure locally and keeps it out of the unauthenticated
           plugins: [
             ...(index === 1
               ? [
-                  rpcFeaturesPlugin({
+                  defineFlowPlugin({
+                    name: 'rpc-flow-features',
                     features: {
                       authentication: authFeature({
                         verifyCredentials() {

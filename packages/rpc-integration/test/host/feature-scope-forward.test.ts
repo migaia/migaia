@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Checks per-namespace flow execution during one actual Process-to-Worker forward. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
@@ -14,7 +14,10 @@ it('forwards a through b to c using only the source and target namespace flow gr
   /** Both real physical hops use the same actual auth Feature, independent of scope observation. */
   const host = await createRpcHost({
     plugins: [
-      rpcFeaturesPlugin({ features: { feature1: featureScopeAuth(FeatureScopeFixture.hostKey) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { feature1: featureScopeAuth(FeatureScopeFixture.hostKey) }
+      }),
       processPlugin({
         name: Fixture.middle,
         spawn: {

@@ -1,11 +1,11 @@
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { it, vi } from 'vitest'
@@ -104,7 +104,10 @@ for (const control of ['abort', 'deadline', 'late-failure'] as const) {
     const caller = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { feature0: signing.protection(true) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { feature0: signing.protection(true) }
+        }),
         ...server.options.plugins!
       ],
       report: signing.report
@@ -115,7 +118,12 @@ for (const control of ['abort', 'deadline', 'late-failure'] as const) {
       /** The original native connection performs both authenticating handshakes and deliveries. */
       const connected = await server.connect('provider', {
         provide: { ready: () => 'ready' },
-        plugins: [rpcFeaturesPlugin({ features: { feature0: signing.protection(false) } })],
+        plugins: [
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { feature0: signing.protection(false) }
+          })
+        ],
         report: signing.report
       })
       provider = connected.host

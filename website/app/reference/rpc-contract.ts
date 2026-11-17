@@ -2914,18 +2914,24 @@ dataType(
 )
 dataType(
   'IRpcCallFeatures',
-  'Call override selects a full instance or false; omission inherits transport then link-policy defaults.',
-  '调用覆盖选择完整实例或假值，省略时依次继承传输及链路策略默认值。',
+  'Call override selects a full instance or false; omission inherits transport then host-level flow plugin defaults.',
+  '调用覆盖选择完整实例或假值，省略时依次继承传输及宿主级 flow 插件默认值。',
   {
     timeout: p(
       'Complete timeout instance or false to disable the inherited instance.',
       '完整超时实例，或假值以禁用继承实例。',
-      t('Inherit transport, then link policy.', '默认继承传输，再继承链路策略。')
+      t(
+        'Inherit transport, then host-level flow plugin defaults.',
+        '默认继承传输，再继承宿主级 flow 插件默认值。'
+      )
     ),
     retry: p(
       'Complete origin retry instance or false; notify/outcome do not gain automatic replay.',
       '完整来源重试实例或假值，通知及结果查询不会因此自动重放。',
-      t('Inherit transport, then link policy.', '默认继承传输，再继承链路策略。')
+      t(
+        'Inherit transport, then host-level flow plugin defaults.',
+        '默认继承传输，再继承宿主级 flow 插件默认值。'
+      )
     )
   },
   featureExample

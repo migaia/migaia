@@ -4,7 +4,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import * as sdk from '@migaia/rpc-host/sdk'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { retryFeature } from '@migaia/rpc-host/features/retry'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import {
   RpcContractErrorCode,
   RpcCoreErrorCode,
@@ -35,7 +35,9 @@ type IHost = Readonly<{
 type IApi = Readonly<{
   createRpcMessageCarrier: typeof sdk.createRpcMessageCarrier
   defineTransportPlugin(definition: Readonly<Record<string, unknown>>): unknown
-  rpcFeaturesPlugin(options: Readonly<{ features: Readonly<Record<string, unknown>> }>): unknown
+  defineFlowPlugin(
+    definition: Readonly<{ name: string; features: Readonly<Record<string, unknown>> }>
+  ): unknown
 }>
 /** Native attachment remains the real SDK context in each independent bundled implementation. */
 type IContext = Parameters<Parameters<typeof sdk.defineTransportPlugin>[0]['open']>[0]
@@ -167,7 +169,7 @@ class FeatureRecordSession implements IFeatureRecordSession {
     })
     /** B makes assembly explicit; A uses the supported historical root flow Feature form. */
     const flow = FEATURE_RECORD_FORM
-      ? this.#api.rpcFeaturesPlugin({ features: { quotas } })
+      ? this.#api.defineFlowPlugin({ name: 'rpc-flow-features', features: { quotas } })
       : quotas
     /** Timer and retry facts execute in both variants, without invoking either Feature directly. */
     const timeout = timeoutFeature({ ms: fixture.timeoutMs })

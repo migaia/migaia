@@ -1,11 +1,11 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original keyed-group completion survives a refusal by the genuine installed signer. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/features/idempotency'
 
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { coreMemoryServer } from '../host/core-fixture.ts'
@@ -40,7 +40,8 @@ it('a genuine response signing failure retains the completed keyed group', async
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           auth: authFeature({
             sign: (value) => {
@@ -63,7 +64,8 @@ it('a genuine response signing failure retains the completed keyed group', async
   /** The caller uses the same real paired transform and normal namespace outcome extension. */
   const client = await server.connect('terminal-caller', {
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           auth: authFeature({ sign: (value) => ({ value, signature: signature(value) }), verify }),
           idempotency: idempotencyFeature()

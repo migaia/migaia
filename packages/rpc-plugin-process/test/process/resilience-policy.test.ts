@@ -1,18 +1,18 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Derived policy effects execute in their installed flow owners over actual Process native IO. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import {
   idempotencyFeature,
   createRpcIdempotencyStore,
   type IRpcIdempotencyStore
-} from '@migaia/rpc-host/plugins/idempotency'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+} from '@migaia/rpc-host/features/idempotency'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import { defineTransportPlugin, type IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import type { IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
 import { createProcessCarrier } from '../../dist/process/carrier.js'
@@ -90,7 +90,8 @@ class NativePolicyServer {
     const host = await createRpcHost({
       self: { name: this.#name, instanceId: this.#name },
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             idempotency: idempotencyFeature({ store: this.#store }),
             limits: limitsFeature({ maxGlobal: 3, maxPerPeer: 3 }),
@@ -149,7 +150,10 @@ class NativePolicyServer {
     const client = await createRpcHost({
       self: { name, instanceId: name },
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: credential }) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature({ credentials: credential }) }
+        }),
         source
       ],
       report: (error) => this.reports.push(error)

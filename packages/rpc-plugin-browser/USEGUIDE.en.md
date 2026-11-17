@@ -168,13 +168,13 @@ export async function observeFrame(target: Window, origin: string) {
 }
 ```
 
-The caller closes the returned Host. Timeout/retry factories return native tokens for the transport's `features: { localName: feature }` record. Schema/auth/chunk/batch also assemble through `rpcFeaturesPlugin` or a transport record; probe/typegen are host observer plugins under `@migaia/rpc-host/plugins/*`. `connect.timeoutMs` bounds handshake only; business calls use `timeout: { ms }` and `signal`. Cancellation does not prove remote non-execution.
+The caller closes the returned Host. Timeout/retry factories return native tokens for the transport's `features: { localName: feature }` record. Schema/auth/chunk/batch also assemble through a `defineFlowPlugin` `features` record or a transport record, with factories under `@migaia/rpc-host/features/*`; probe/typegen are host observer plugins under `@migaia/rpc-host/plugins/*`. `connect.timeoutMs` bounds handshake only; business calls use `timeout: { ms }` and `signal`. Cancellation does not prove remote non-execution.
 
 Optional extensions such as outcome require their actual plugin. Automatic claim, identity scope and replay across reconnects remain incomplete. Do not restore root Host policy fields, deployment assemblers, manual profile/ACKs or casts of unsupported options.
 
 ## Responsibilities and current limits
 
-Contract owns pure protocol/capability types/error contracts, Host owns calls/sessions, and Browser owns native sources/I/O. `/plugins/schema` performs business validation. Custom carrier authors use canonical carriers from `@migaia/rpc-host/sdk`, without another Host or codec.
+Contract owns pure protocol/capability types/error contracts, Host owns calls/sessions, and Browser owns native sources/I/O. `/features/schema` performs business validation. Custom carrier authors use canonical carriers from `@migaia/rpc-host/sdk`, without another Host or codec.
 
 Native origin/source checks do not establish completed auth verification/principal/session wiring. Host close/drain, restart downtime and parts of observer diagnostic compatibility retain known differences; this guide does not claim they are closed. Mixing transports usually adds routing/permission ambiguity; prefer separate Hosts.
 

@@ -1,10 +1,10 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original queued keyed cancellation uses genuine native stores, quotas and all four call modes. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/features/idempotency'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { deferred } from '@migaia/utils/promise'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
@@ -34,7 +34,8 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { limits: limitsFeature(), idempotency: idempotencyFeature() }
         }),
         server.transport
@@ -57,7 +58,12 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
     })
     /** This genuine caller uses the original published namespace outcome extension. */
     const client = await server.connect('store-lifetime-caller', {
-      plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })]
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { idempotency: idempotencyFeature() }
+        })
+      ]
     })
     /** Only dynamic fixture typing erases the genuine cold namespace extension's callable type. */
     const lookup = Reflect.get(client.host.memory, 'outcome') as IRpcOutcomeLookup

@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Retained execution business uses actual public namespaces and the existing native carrier. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
 
-import limits from '@migaia/rpc-host/plugins/limits'
+import limits from '@migaia/rpc-host/features/limits'
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import {
@@ -271,7 +271,10 @@ it('public groups reject unknown or over-budget work and retain the original fai
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { feature0: limits({ maxGlobal: 3, maxPerPeer: 3 }) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { feature0: limits({ maxGlobal: 3, maxPerPeer: 3 }) }
+      }),
       ...server.options.plugins
     ],
     provide: {

@@ -1,11 +1,14 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Actual public dispatch consumes the sole keyed store and verified principal/Session facts. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { createRpcIdempotencyStore, idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import {
+  createRpcIdempotencyStore,
+  idempotencyFeature
+} from '@migaia/rpc-host/features/idempotency'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 /** These public fixture credentials are shared only by the real verifier and actual clients. */
@@ -42,7 +45,10 @@ it('withdraws cancelled pending claims without retaining their waiters or cancel
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature({ store }) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature({ store }) }
+      }),
       server.transport
     ],
     provide: {
@@ -113,7 +119,8 @@ it('claims once across one principal and treats a different own-key order as a c
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           idempotency: idempotencyFeature(),
           auth: authFeature({
@@ -142,13 +149,19 @@ it('claims once across one principal and treats a different own-key order as a c
   try {
     const alice = await server.connect('alice-one', {
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: principals.alice }) } })
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature({ credentials: principals.alice }) }
+        })
       ]
     })
     clients.push(alice)
     const sibling = await server.connect('alice-two', {
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: principals.alice }) } })
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature({ credentials: principals.alice }) }
+        })
       ]
     })
     clients.push(sibling)
@@ -199,7 +212,10 @@ it('claims once across one principal and treats a different own-key order as a c
     ).toBe(2)
     const bob = await server.connect('bob', {
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: principals.bob }) } })
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature({ credentials: principals.bob }) }
+        })
       ]
     })
     clients.push(bob)
@@ -232,7 +248,8 @@ it('keeps concurrency local to each real Session even when their authenticated p
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           limits: limitsFeature({ maxGlobal: 2, maxPerPeer: 1 }),
           auth: authFeature({ verifyCredentials: () => ({ principalId: principals.alice }) })
@@ -264,13 +281,19 @@ it('keeps concurrency local to each real Session even when their authenticated p
   try {
     const first = await server.connect('first-session', {
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: principals.alice }) } })
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature({ credentials: principals.alice }) }
+        })
       ]
     })
     clients.push(first)
     const second = await server.connect('second-session', {
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: principals.alice }) } })
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature({ credentials: principals.alice }) }
+        })
       ]
     })
     clients.push(second)
@@ -311,12 +334,20 @@ it('seals and replays only the original actual stream final completion without r
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      }),
       server.transport
     ]
   })
   const client = await server.connect('stream-caller', {
-    plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
+    plugins: [
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      })
+    ],
     provide: {
       values: async function* () {
         starts += 1

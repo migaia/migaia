@@ -1,8 +1,7 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original relative-deadline oracles cross genuine namespaces, timeout features and native IO. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
-import { linkPolicy } from '@migaia/rpc-host/plugins'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { defineFlowFeature, RpcFlowPoint } from '@migaia/rpc-host/sdk'
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
@@ -67,7 +66,10 @@ async function subtractReceiverResolutionDelay(): Promise<void> {
   /** The complete native Feature precedes transport startup through the ordinary public factory. */
   const relay = await createRpcHost({
     ...server.options,
-    plugins: [rpcFeaturesPlugin({ features: { feature: resolution.feature } }), server.transport]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature: resolution.feature } }),
+      server.transport
+    ]
   })
   /** The real provider stays pending until the original deadline oracle has completed. */
   const finished = deferred<null>()
@@ -78,7 +80,8 @@ async function subtractReceiverResolutionDelay(): Promise<void> {
   /** The provider is present in the original directory before the client captures its ready view. */
   const client = await server.connect('client', {
     plugins: [
-      linkPolicy({
+      defineFlowPlugin({
+        name: 'rpc-link-policy',
         features: { deadline: timeoutFeature({ ms: 100, scheduler: clock.scheduler }) }
       })
     ]
@@ -136,7 +139,10 @@ async function omitDisabledDeadline(): Promise<void> {
   /** Moves the original timeout default into an installed complete link-policy feature. */
   const client = await server.connect('client', {
     plugins: [
-      linkPolicy({ features: { timeout: timeoutFeature({ ms: 100, scheduler: clientScheduler }) } })
+      defineFlowPlugin({
+        name: 'rpc-link-policy',
+        features: { timeout: timeoutFeature({ ms: 100, scheduler: clientScheduler }) }
+      })
     ]
   })
   try {
@@ -228,7 +234,8 @@ async function abortAtMonotonicDeadline(): Promise<void> {
   /** The originating complete timeout owns exactly its real client deadline. */
   const client = await server.connect('client', {
     plugins: [
-      linkPolicy({
+      defineFlowPlugin({
+        name: 'rpc-link-policy',
         features: { deadline: timeoutFeature({ ms: 100, scheduler: clock.scheduler }) }
       })
     ]

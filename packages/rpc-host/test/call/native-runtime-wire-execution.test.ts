@@ -1,11 +1,11 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original runtime-wire business vectors execute through genuine native Host namespaces. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { PassThrough } from 'node:stream'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batchFeature } from '@migaia/rpc-host/plugins/batch'
-import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
-import limits from '@migaia/rpc-host/plugins/limits'
+import { batchFeature } from '@migaia/rpc-host/features/batch'
+import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/features/idempotency'
+import limits from '@migaia/rpc-host/features/limits'
 
 import {
   createRpcByteCarrier,
@@ -38,7 +38,10 @@ async function assertOversizedGroupResult(encoding: 'ascii' | 'unicode'): Promis
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      }),
       server.transport
     ],
     provide: {
@@ -86,7 +89,13 @@ async function assertOversizedGroupResult(encoding: 'ascii' | 'unicode'): Promis
   /** The public namespace originates the same keyed atomic group under a complete timeout. */
   const client = await createRpcHost({
     self: { name: 'parent', instanceId: 'parent-1' },
-    plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }), transport],
+    plugins: [
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      }),
+      transport
+    ],
     report: physical.report
   })
   try {
@@ -285,7 +294,10 @@ it('notify send completion precedes business completion while its before-start r
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      }),
       server.transport
     ],
     provide: {
@@ -301,7 +313,12 @@ it('notify send completion precedes business completion while its before-start r
   const client = await server.connect(
     'parent',
     {
-      plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { idempotency: idempotencyFeature() }
+        })
+      ],
       report: (error) => failures.push(error)
     },
     'parent-1'
@@ -493,7 +510,10 @@ it('real ordered requests share provider leases; queued cancel wins and started 
   /** The complete limits feature owns the original pending/running lease counts. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [rpcFeaturesPlugin({ features: { feature0: limits() } }), server.transport],
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: limits() } }),
+      server.transport
+    ],
     provide: {
       hold: async (_payload, context) => {
         effects.push('hold')
@@ -583,7 +603,10 @@ it('real outcome lookup observes the original pending claim and complete sealed 
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      }),
       server.transport
     ],
     provide: {
@@ -597,7 +620,14 @@ it('real outcome lookup observes the original pending claim and complete sealed 
   /** Outcome is the real installed namespace extension, not a locally generated store facade. */
   const client = await server.connect(
     'parent',
-    { plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })] },
+    {
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { idempotency: idempotencyFeature() }
+        })
+      ]
+    },
     'parent-1'
   )
   /** Cleanup observes the one genuine operation even after an assertion failure. */
@@ -665,7 +695,10 @@ it('rejects an ordinary oversized byte frame during capture with its original Ra
   /** Only optional physical Batch is needed; no chunk transformation changes the oversize input. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [rpcFeaturesPlugin({ features: { batch: batchFeature() } }), server.transport],
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { batch: batchFeature() } }),
+      server.transport
+    ],
     provide: {
       echo: (value: string) => {
         calls.push(value)
@@ -712,7 +745,10 @@ it('rejects an ordinary oversized byte frame during capture with its original Ra
   /** All three logical operations use this same real public namespace and native Batch lane. */
   const client = await createRpcHost({
     self: { name: 'ordinary-oversize-caller', instanceId: 'ordinary-oversize-caller' },
-    plugins: [rpcFeaturesPlugin({ features: { batch: batchFeature() } }), transport],
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { batch: batchFeature() } }),
+      transport
+    ],
     report: physical.report
   })
   /** The original capture rejection stays observable without executing another encoding path. */

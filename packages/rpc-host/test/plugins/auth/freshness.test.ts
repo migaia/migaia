@@ -1,11 +1,11 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Signed captured traffic cannot reconstruct a fresh source in the same installed Auth owner. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createHmac } from 'node:crypto'
 import { MessageChannel } from 'node:worker_threads'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { defineTransportPlugin, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import type {
   IRpcCarrierFrame,
@@ -78,7 +78,10 @@ it('rejects a captured signed handshake and call after the original physical sou
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { authentication: authentication() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { authentication: authentication() }
+      }),
       ...server.options.plugins
     ],
     provide: {
@@ -105,7 +108,12 @@ it('rejects a captured signed handshake and call after the original physical sou
   try {
     /** The caller's original encoder capture is active before its first physical hello. */
     first = await server.connect('caller', {
-      plugins: [rpcFeaturesPlugin({ features: { authentication: authentication() } })]
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { authentication: authentication() }
+        })
+      ]
     })
     expect(await first.host.memory.send('server', 'echo', 'original')).toBe('original')
     /** Retire the real accepted receipt before reconstructing the physical route. */
@@ -122,7 +130,12 @@ it('rejects a captured signed handshake and call after the original physical sou
     await accepted.closed
     /** Genuine new signing callbacks can answer the new receiver challenge on the same Host. */
     fresh = await server.connect('caller', {
-      plugins: [rpcFeaturesPlugin({ features: { authentication: authentication() } })]
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { authentication: authentication() }
+        })
+      ]
     })
     expect(await fresh.host.memory.send('server', 'echo', 'fresh')).toBe('fresh')
     expect(providerCalls).toBe(2)
@@ -145,7 +158,8 @@ it('publishes only an explicit authenticated principal on the actual accepted Se
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           auth: authFeature({
             verifyCredentials: (value) => {
@@ -166,7 +180,10 @@ it('publishes only an explicit authenticated principal on the actual accepted Se
     /** Native identity and authentication identity deliberately have distinct literal values. */
     const authenticated = await server.connect('wire-name', {
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: identity.credential }) } })
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature({ credentials: identity.credential }) }
+        })
       ]
     })
     clients.push(authenticated)
@@ -178,7 +195,8 @@ it('publishes only an explicit authenticated principal on the actual accepted Se
     /** A string return remains ignored and cannot silently grant a new principal. */
     const legacy = await server.connect('legacy-name', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { auth: authFeature({ credentials: identity.legacyCredential }) }
         })
       ]
@@ -268,7 +286,7 @@ class PhysicalAuthenticationPair {
     this.#serverHost = await createRpcHost({
       ...this.server.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { feature0: this.serverFeature } }),
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: this.serverFeature } }),
         ...this.server.options.plugins
       ],
       report: (error) => this.inboundFailures.push(error),

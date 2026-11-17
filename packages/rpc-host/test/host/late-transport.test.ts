@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Keeps late and cold installation on the same public native transaction boundary. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import {
@@ -48,7 +48,10 @@ it('late use returns the same public Host, inherits one shared setup and preserv
   /** Public construction owns the actual native Host, provider and both eventual namespace groups. */
   const host = await createRpcHost({
     ...first.options,
-    plugins: [rpcFeaturesPlugin({ features: { shared } }), first.transport],
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { shared } }),
+      first.transport
+    ],
     provide: { echo: (value: unknown) => value }
   })
   /** The cold path already has a real physical client before the next transport is installed. */
@@ -196,7 +199,11 @@ it('cold construction rolls back every acquired transport and the shared flow in
   await expect(
     createRpcHost({
       self: { name: 'cold-atomic', instanceId: 'cold-atomic' },
-      plugins: [rpcFeaturesPlugin({ features: { shared } }), acquired, rejected],
+      plugins: [
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { shared } }),
+        acquired,
+        rejected
+      ],
       report: () => undefined
     })
   ).rejects.toBe(primary)

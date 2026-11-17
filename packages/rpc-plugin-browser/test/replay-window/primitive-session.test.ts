@@ -1,9 +1,9 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { describe, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { windowPlugin } from '../../dist/index.js'
 import { windowPair } from '../browser/message-fixture.ts'
 
@@ -21,7 +21,8 @@ describe('replay-window r12 physical session authority', () => {
       createRpcHost({
         self: { name: 'client', instanceId: 'client' },
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
           }),
           windowPlugin({
@@ -35,7 +36,8 @@ describe('replay-window r12 physical session authority', () => {
       createRpcHost({
         self: { name: 'server', instanceId: 'server' },
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: {
               auth: authFeature({
                 sign: (value) => value,

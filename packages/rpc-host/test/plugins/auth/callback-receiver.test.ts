@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Credential verification follows the receiver-free contract used by other Auth callbacks. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins'
+import { authFeature } from '@migaia/rpc-host/features'
 import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 it('calls verifyCredentials without a receiver through a public connection', async () => {
@@ -20,7 +20,10 @@ it('calls verifyCredentials without a receiver through a public connection', asy
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { auth: authFeature({ verifyCredentials }) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { auth: authFeature({ verifyCredentials }) }
+      }),
       ...server.options.plugins
     ],
     provide: { echo: (value) => value }
@@ -30,7 +33,10 @@ it('calls verifyCredentials without a receiver through a public connection', asy
   try {
     client = await server.connect('receiver-client', {
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature({ credentials: 'receiver-token' }) } })
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature({ credentials: 'receiver-token' }) }
+        })
       ]
     })
     expect(await client.host.memory.send('receiver-server', 'echo', 42)).toBe(42)

@@ -14,7 +14,7 @@ contract 只定义协议、接口、可移植值和错误契约。host 负责 RP
 
 一个 host 支持多个传输命名空间，但通常选择一种传输，不建议混用。所有调用写成 `host.<ns>.*`；`provide` 与整个 host 的 `close` 留在根上。完整可运行的双向协程示例见 [README](./README.md#开始使用)。
 
-`createRpcHost` 先在同一个原生宿主上提交信息流 plugin、链路策略 plugin 及其 feature，再安装传输 plugin 及其 feature。这样 auth 等 stage 在首次握手前已经可见。两次安装共用生命周期 owner；传输安装失败时，已提交的前缀也由该 owner 回滚和清理。
+`createRpcHost` 先在同一个原生宿主上提交宿主级 flow plugin 及其 feature，再安装传输 plugin 及其 feature。这样 auth 等 stage 在首次握手前已经可见。两次安装共用生命周期 owner；传输安装失败时，已提交的前缀也由该 owner 回滚和清理。
 
 ## 注册普通方法与生成器
 
@@ -79,10 +79,11 @@ stream 在第一次 `next()` 才启动。调用 `return()` 结束消费并等待
 
 ```ts doc-test=check
 import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'
-import { linkPolicy } from '@migaia/rpc-host/plugins'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-export const policy = linkPolicy({
+export const policy = defineFlowPlugin({
+  name: 'call-defaults',
   features: { timeout: timeoutFeature({ ms: 3000 }), retry: retryFeature({ attempts: 2 }) }
 })
 export const transport = threadPlugin({
@@ -93,7 +94,7 @@ export const transport = threadPlugin({
 export const callOptions = { timeout: { ms: 100 }, retry: false } as const
 ```
 
-解析顺序唯一：单次调用策略配置对象或 `false`，然后传输 plugin 的 feature，最后链路策略 plugin。把 `callOptions` 传给 `host.thread.request(method, payload, callOptions)` 即可覆盖本次调用。不能写 `{ timeout: 100 }`、`timeoutMs` 或 `defaultTimeoutMs`。
+解析顺序唯一：单次调用策略配置对象或 `false`，然后传输 plugin 的 feature，最后宿主级 flow plugin 里的默认值。把 `callOptions` 传给 `host.thread.request(method, payload, callOptions)` 即可覆盖本次调用。不能写 `{ timeout: 100 }`、`timeoutMs` 或 `defaultTimeoutMs`。
 
 `timeout: false` 不启用 feature 超时，持续等待响应；已经继承的上游剩余期限仍递减。`retry: false` 禁用重试。下游只得到剩余预算，转发不能延期。只有发起方的标量调用和 group 重试，stream 从不重放、只使用 timeout；超时或失联不证明业务未执行，非幂等操作须先对账。传输提供的握手准备期限是另一项配置，不是业务 timeout feature。
 
@@ -104,13 +105,18 @@ export const callOptions = { timeout: { ms: 100 }, retry: false } as const
 `createRpcHost({ plugins })` 构造时安装的整批定义一起成功或一起回滚。构造完成后，`host.use(...)` 每次开启一个独立的原生安装事务；失败只回滚本批新资源，已提交的命名空间继续工作。返回值还是同一个公开 host；用新变量接住它，才能在类型上取得新命名空间。
 
 ```ts doc-test=check
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import { limitsFeature } from '@migaia/rpc-host/plugins'
+import { limitsFeature } from '@migaia/rpc-host/features'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
 const host = await createRpcHost({
-  plugins: [rpcFeaturesPlugin({ features: { limits: limitsFeature({ maxGlobal: 256 }) } })]
+  plugins: [
+    defineFlowPlugin({
+      name: 'shared-limits',
+      features: { limits: limitsFeature({ maxGlobal: 256 }) }
+    })
+  ]
 })
 try {
   const extended = await host.use(threadPlugin({ spawn: new URL('./worker.ts', import.meta.url) }))
@@ -136,7 +142,7 @@ auth、chunk、batch 等通过握手协商并改变线上格式的能力，只�
 import { defineHost } from '@migaia/plugin-host'
 import {
   rpcHostPipelines,
-  rpcFeaturesPlugin,
+  defineFlowPlugin,
   type IRpcFlowFeature,
   type IRpcFlowPlugin,
   type IRpcTransportPlugin
@@ -159,12 +165,12 @@ export async function installRpc(
   observers: readonly IRpcFlowPlugin[],
   transports: readonly IRpcTransportPlugin[]
 ) {
-  await host.use(...observers, rpcFeaturesPlugin({ features }))
+  await host.use(...observers, defineFlowPlugin({ name: 'shared-features', features }))
   await host.use(...transports)
 }
 ```
 
-`rpcFeaturesPlugin({ features })` 是普通原生宿主安装共享信息流 Feature 的封装，实际 setup 与清理由原生注册持有；不能把 `authFeature()` 等 Feature 直接当原生 plugin 交给 `host.use`。先提交这个封装和只读观察插件，再装传输，确保首次握手已经有完整策略。
+带 `features` 的 `defineFlowPlugin` 是普通原生宿主安装共享信息流 Feature 的方式，实际 setup 与清理由原生注册持有；不能把 `authFeature()` 等 Feature 直接当原生 plugin 交给 `host.use`。先提交这个 plugin 和只读观察插件，再装传输，确保首次握手已经有完整策略。
 
 class 宿主同样通过 helper 延迟读取 `this`。`createPluginDomainCore` 必须转交本次构造请求；无需公开原本受保护的 `pipeline`。构造完成后按上面的顺序安装 plugin。
 
@@ -203,7 +209,7 @@ export class NativeRpcHost extends PluginHost<IRpcCore, unknown, readonly []> {
 
 ## 编写信息流与载体
 
-`defineFlowFeature` 的每次 `setup` 返回本次安装的 `stages`，该 feature 放进 `rpcFeaturesPlugin` 的 `features` record 或某个传输的 `features` record；setup 同时返回独立的 `observe` 与可选 `dispose`。stage 使用 SDK 的 `RpcFlowPoint` 和推导出的 payload 类型，转发时调用原生 `next(payload)`。握手、信封和 frame 的替换值分别放在 `handshake`、`prepared` 和 `frame`；dispatch 转发后从同一个 `payload.outcome.value` 读取结果，短路时也写入这个 cell。
+`defineFlowFeature` 的每次 `setup` 返回本次安装的 `stages`，该 feature 放进 `defineFlowPlugin` 的 `features` record 或某个传输的 `features` record；setup 同时返回独立的 `observe` 与可选 `dispose`。stage 使用 SDK 的 `RpcFlowPoint` 和推导出的 payload 类型，转发时调用原生 `next(payload)`。握手、信封和 frame 的替换值分别放在 `handshake`、`prepared` 和 `frame`；dispatch 转发后从同一个 `payload.outcome.value` 读取结果，短路时也写入这个 cell。
 
 frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当前 stage：捕获并 report 后可以继续下一个成员；stage 不观察失败的 Promise 时，管道在所有已启动遍历结算后拒绝，多个未观察失败按提交顺序汇总。观察回调不负责执行或推进这些 stage。
 
@@ -227,7 +233,7 @@ frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当
 
 ```ts doc-test=check
 import { createHmac } from 'node:crypto'
-import { authFeature } from '@migaia/rpc-host/plugins'
+import { authFeature } from '@migaia/rpc-host/features'
 
 /** Both peers use the same application-owned key and binding representation. */
 function mac(value: unknown, key: string): string {
@@ -266,9 +272,9 @@ auth 始终挡住还在执行的同一请求 ID，直到实际业务及 stream �
 verifier 或凭据解析器抛出、拒绝时，auth 在本地错误的 `cause` 上保留原始错误。用 `errorMapFeature(map)` 决定对端能看到哪些错误信息，例如把含凭据的细节换成公开提示。本地抛出的错误、`report`、警告和只读观察插件看到的仍是原始错误，与插件安装先后无关。它可放在宿主 `plugins` 或传输 `features`，传输级覆盖宿主级。
 
 ```ts doc-test=check
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/plugins'
+import { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/features'
 
 /** Decide what remote callers may learn while preserving local diagnostic causes. */
 const redact: IRpcErrorMap = (error) =>
@@ -279,7 +285,9 @@ const redact: IRpcErrorMap = (error) =>
   )
 
 export const host = await createRpcHost({
-  plugins: [rpcFeaturesPlugin({ features: { errorMap: errorMapFeature(redact) } })]
+  plugins: [
+    defineFlowPlugin({ name: 'error-map', features: { errorMap: errorMapFeature(redact) } })
+  ]
 })
 ```
 
@@ -391,7 +399,7 @@ export const host = await createRpcHost({
 | 根 `defaultTimeoutMs` / 单次数字 timeout              | plugin 的 `features` record 与单次 timeout 配置 |
 | `poolPlugin`、pool assembler                          | 传输 `features: { workers: pool({ size }) }`    |
 | endpoint、RuntimePeer、v1、JSON-RPC profile           | 单一 Host 调用 owner 与新协议，无兼容入口       |
-| 根级 `outcome` / 幂等 store                           | 安装 `/plugins/idempotency`，在命名空间查询     |
+| 根级 `outcome` / 幂等 store                           | 安装 `/features/idempotency`，在命名空间查询    |
 
 `remote.host.use`、`remote.host.unUse` 和 `remote.host.inspect` 已移除，不再提供通过 RPC 管理远端宿主插件的协议；本地原生宿主的安装与释放 API 保持各自契约。
 
@@ -431,7 +439,7 @@ verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证�
 
 ## 默认策略的安装边界
 
-在首次 transport 启动前安装 `linkPolicy` 与 feature carrier。启动后 `host.use(linkPolicy(...))` 和新增 carrier 均以现有 `INVALID_CONFIG` 拒绝，消息为 `RPC flow hooks cannot be installed after transport startup`；失败调用不会改变已编译的调用策略。每次调用仍可通过 timeout/retry 选项或 `false` 覆盖。合法的安装失败回滚用例必须在启动前安装策略，不能依赖 late link-policy。原生移除/释放仍由既有生命周期回执处理。
+带 `features` 的 `defineFlowPlugin` 必须放在构造时的 `plugins` 中，在首次 transport 启动前安装。之后用 `host.use(...)` 安装它会以现有 `INVALID_CONFIG` 拒绝，消息为 `RPC flow hooks cannot be installed after transport startup`；失败调用不会改变已编译的调用策略。每次调用仍可通过 timeout/retry 选项或 `false` 覆盖。合法的安装失败回滚用例必须在启动前安装策略，不能依赖后装的默认值。原生移除/释放仍由既有生命周期回执处理。
 
 ## 重复调用策略角色
 

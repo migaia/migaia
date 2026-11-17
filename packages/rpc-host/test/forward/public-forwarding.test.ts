@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
 import { RpcProbeForwardRejection } from '@migaia/rpc-contract/interfaces'
 import {
   probe,
@@ -200,7 +200,10 @@ it.each(['request', 'group'] as const)(
     const provider = await createRpcHost({
       ...providerListener.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { chunk: chunkFeature(chunkOptions) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { chunk: chunkFeature(chunkOptions) }
+        }),
         providerListener.transport
       ],
       provide: {
@@ -214,7 +217,10 @@ it.each(['request', 'group'] as const)(
     const relay = await createRpcHost({
       ...relayListener.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { chunk: chunkFeature(chunkOptions) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { chunk: chunkFeature(chunkOptions) }
+        }),
         probe({
           stages: ['forward'],
           emit: (event) => events.push({ ...event, route: event.route?.slice() })
@@ -228,7 +234,12 @@ it.each(['request', 'group'] as const)(
       await relayListener.link(providerListener)
       relay.provide({ echo: relay.memory.peers['chunk-provider']!.echo! })
       caller = await relayListener.connect('chunk-caller', {
-        plugins: [rpcFeaturesPlugin({ features: { chunk: chunkFeature(chunkOptions) } })]
+        plugins: [
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { chunk: chunkFeature(chunkOptions) }
+          })
+        ]
       })
       /** This exact business input requires several actual extension writes on the relay link. */
       const payload = 'forward-chunk-payload'.repeat(32)

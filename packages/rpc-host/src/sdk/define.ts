@@ -2,23 +2,22 @@
 import {
   definePlugin,
   type IFeatureRecord,
-  type IFeatureOutputs,
   type IPluginHostCore,
   type IPluginBeforeReleaseContext
 } from '@migaia/plugin-host'
-import type { IRpcCallFeature, IRpcTransportDefinition } from '@migaia/rpc-contract/interfaces'
+import type { IRpcTransportDefinition } from '@migaia/rpc-contract/interfaces'
 import {
   registerRpcDefinition,
   RpcDefinitionKind,
   type IRpcDefinitionMetadata
 } from './metadata.ts'
 import { RpcFlowSetup } from './flow-setup.ts'
-import { inspectRpcFeatures, RpcTransportFlowProgram } from './flow-program.ts'
+import { RpcFeatureProgram, RpcTransportFlowProgram } from './flow-program.ts'
 import { RpcFlowPipelines } from './flow-pipelines.ts'
 import type {
   IRpcFlowDefinition,
   IRpcFlowPlugin,
-  IRpcLinkPolicyDefinition,
+  IRpcFlowPluginDefinition,
   IRpcTransportPlugin,
   IRpcTransportFeatureExtensions,
   IRpcTransportSetupContext
@@ -86,44 +85,41 @@ export function defineTransportPlugin<
   return plugin as unknown as IRpcTransportPlugin<N, E & IRpcTransportFeatureExtensions<F>, A>
 }
 
-/** Each native flow install invokes setup anew, preventing cross-host sharing of optional state. */
-export function defineFlowPlugin<E extends object = Record<never, never>>(
-  definition: IRpcFlowDefinition<E>
-): IRpcFlowPlugin<E> {
+/**
+ * Define the one host-level flow plugin. `setup` installs a readonly observer anew for each host;
+ * `features` carries shared flow placements and timeout/retry call defaults. A plugin with
+ * `features` must be installed before the first transport commits; an observer-only plugin may be
+ * installed later. An empty `features` record counts as absent. With neither field the plugin
+ * installs and does nothing.
+ */
+export function defineFlowPlugin<
+  const F extends IFeatureRecord = Record<never, never>,
+  E extends object = Record<never, never>
+>(
+  definition: IRpcFlowPluginDefinition<F, E>
+): IRpcFlowPlugin<E & IRpcTransportFeatureExtensions<F>> {
+  /** The record goes to the native plugin; only observer configuration is captured here. */
+  const { features, ...observer } = definition
   /** Observer configuration is cold; native installation owns every per-host setup output. */
-  const captured = Object.freeze({ ...definition })
+  const captured = Object.freeze(observer)
+  /** Native inspection snapshots the record and compiles dependency-first shared setup. */
+  const program = features === undefined ? undefined : new RpcFeatureProgram(features)
   /** Only this native definition identity receives RPC's private kind metadata. */
   const registration: IRpcDefinitionMetadata = {
     kind: RpcDefinitionKind.flow,
-    definition: captured,
-    prepare: new RpcFlowSetup(captured).prepare
+    prepare:
+      captured.setup === undefined
+        ? undefined
+        : new RpcFlowSetup(captured as IRpcFlowDefinition<object>).prepare,
+    // An empty record carries no Feature, so the plugin stays a plain late-installable observer.
+    shared: program && Object.keys(program.roots).length > 0 ? program : undefined
   }
   /** Thin definitions omit arbitrary metadata fields; callers keep domain owners explicitly. */
-  const plugin = definePlugin<Record<never, never>, Record<never, never>>({
+  const plugin = definePlugin({
     name: captured.name,
+    features: program?.features,
     install: new RpcDefinition(registration).install
   })
   registerRpcDefinition(plugin, registration)
-  return plugin as IRpcFlowPlugin<E>
-}
-
-/** Link policy composes complete feature behavior without introducing another intervention stage. */
-export function defineLinkPolicy<const F extends Readonly<Record<string, IRpcCallFeature>>>(
-  definition: IRpcLinkPolicyDefinition<F>
-): IRpcFlowPlugin<Readonly<{ features: IFeatureOutputs<F> }>> {
-  /** One captured list is read by FeatureScope during native installation. */
-  const captured = Object.freeze({
-    ...definition,
-    features: inspectRpcFeatures(definition.features, true).roots
-  })
-  /** Policy metadata is cold; no timers, retries or host scopes are created by the factory. */
-  const metadata: IRpcDefinitionMetadata = { kind: RpcDefinitionKind.policy, definition: captured }
-  /** The actual native install supplies the policy to the receiving runtime. */
-  const plugin = definePlugin({
-    name: captured.name,
-    features: captured.features as IFeatureRecord,
-    install: new RpcDefinition(metadata).install
-  })
-  registerRpcDefinition(plugin, metadata)
-  return plugin as unknown as IRpcFlowPlugin<Readonly<{ features: IFeatureOutputs<F> }>>
+  return plugin as unknown as IRpcFlowPlugin<E & IRpcTransportFeatureExtensions<F>>
 }

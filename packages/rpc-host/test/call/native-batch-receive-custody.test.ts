@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Real batch ingress preserves each replay refusal and its original physical write failure. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { batchFeature } from '@migaia/rpc-host/plugins/batch'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { batchFeature } from '@migaia/rpc-host/features/batch'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { IpcSendClass, type IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -41,7 +41,10 @@ it('reports each native batch replay refusal and its exact physical write failur
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { authentication, batch: batchFeature() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { authentication, batch: batchFeature() }
+      }),
       server.transport
     ],
     report: (error) => failures.push(error),
@@ -54,7 +57,12 @@ it('reports each native batch replay refusal and its exact physical write failur
   })
   /** The client allocates every real task and retains both original caller operations. */
   const client = await server.connect('batch-custody-client', {
-    plugins: [rpcFeaturesPlugin({ features: { authentication, batch: batchFeature() } })]
+    plugins: [
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { authentication, batch: batchFeature() }
+      })
+    ]
   })
   /** Both refused response writes must preserve this identical original native failure. */
   const cause = new Error('fixture refusal write failure')

@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original privacy atoms use current canonical error admission and real public request/stream IO. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { randomUUID } from 'node:crypto'
 import { assert, describe, expect, it, vi } from 'vitest'
 import type { IRpcHost } from '@migaia/rpc-host'
@@ -7,7 +7,7 @@ import { normalizePortable } from '@migaia/rpc-contract/portable'
 import type { IRpcProviderDeclaration } from '@migaia/rpc-contract/protocol'
 import { RpcContractErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 
-import { errorMapFeature } from '@migaia/rpc-host/plugins/error-map'
+import { errorMapFeature } from '@migaia/rpc-host/features/error-map'
 import { deserializeRpcError } from '@migaia/rpc-contract/errors'
 import { hostErrorWireMetadata, serializeRpcError } from '../../dist/host/error-wire-metadata.js'
 import { connectedCoreHosts } from '../host/core-fixture.ts'
@@ -95,7 +95,12 @@ describe('application-selected contract error privacy through public native Host
         () => undefined,
         undefined,
         (error) => reports.push(error),
-        [rpcFeaturesPlugin({ features: { feature0: errorMapFeature(redactControlledError) } })]
+        [
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { feature0: errorMapFeature(redactControlledError) }
+          })
+        ]
       )
       try {
         local =
@@ -175,7 +180,12 @@ describe('application-selected contract error privacy through public native Host
       () => undefined,
       undefined,
       undefined,
-      [rpcFeaturesPlugin({ features: { feature0: errorMapFeature(redactControlledError) } })]
+      [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { feature0: errorMapFeature(redactControlledError) }
+        })
+      ]
     )
     try {
       /**

@@ -1,11 +1,10 @@
 import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original middleware disposal assertions now exercise the public Host and its real native IO. */
 import { expect, it, vi } from 'vitest'
 import { defineHost } from '@migaia/plugin-host'
 import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
 import { RpcLifecycleError } from '@migaia/rpc-host/contract'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { defineFlowPlugin, rpcHostPipelines, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from './core-fixture.ts'
 
@@ -20,7 +19,8 @@ async function authenticatedConnection(plugins: IRpcHostOptions['plugins'] = [])
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           auth: authFeature({
             encrypt: (value) => value,
@@ -37,7 +37,8 @@ async function authenticatedConnection(plugins: IRpcHostOptions['plugins'] = [])
     /** Completion joins the actual handshake before the disposal assertion can run. */
     const client = await listener.connect('close-owner-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               encrypt: (value) => value,

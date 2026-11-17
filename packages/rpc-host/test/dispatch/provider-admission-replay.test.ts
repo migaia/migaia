@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original replay and capacity business assertions use actual installed flows and native ingress. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import auth from '@migaia/rpc-host/plugins/auth'
-import limits from '@migaia/rpc-host/plugins/limits'
+import auth from '@migaia/rpc-host/features/auth'
+import limits from '@migaia/rpc-host/features/limits'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { deserializeRpcWireError, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
@@ -43,7 +43,8 @@ it('installed replay suppresses a completed task repeated at actual ingress', as
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { feature0: auth({ ...replayAuthenticationOptions, retain: 310_000 }) }
       }),
       ...server.options.plugins
@@ -58,7 +59,9 @@ it('installed replay suppresses a completed task repeated at actual ingress', as
   })
   /** Both original physical endpoints and their canonical Sessions are genuinely ready. */
   const client = await server.connect('r70-client', {
-    plugins: [rpcFeaturesPlugin({ features: { feature0: replayAuthentication } })]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: replayAuthentication } })
+    ]
   })
   try {
     await client.host.memory.send('provider-admission-fixture', 'echo', 'r70-data')
@@ -88,7 +91,7 @@ it('installed replay preserves one execution for the original reentrant task', a
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { feature0: replayAuthentication } }),
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: replayAuthentication } }),
       ...server.options.plugins
     ],
     provide: {
@@ -102,7 +105,9 @@ it('installed replay preserves one execution for the original reentrant task', a
   })
   /** This actual client has the original carrier that the provider reenters. */
   const client = await server.connect('r70-client', {
-    plugins: [rpcFeaturesPlugin({ features: { feature0: replayAuthentication } })]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: replayAuthentication } })
+    ]
   })
   resend = () =>
     client.pair[1].write({ kind: 'message', data: admittedCall(client.pair[1], 'echo') })
@@ -132,7 +137,7 @@ it('concurrent task replay executes once and sends one terminal on its original 
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { feature0: replayAuthentication } }),
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: replayAuthentication } }),
       ...server.options.plugins
     ],
     provide: {
@@ -147,7 +152,9 @@ it('concurrent task replay executes once and sends one terminal on its original 
   })
   /** The same original two native endpoints complete both genuine Session handshakes. */
   const client = await server.connect('r70-client', {
-    plugins: [rpcFeaturesPlugin({ features: { feature0: replayAuthentication } })]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: replayAuthentication } })
+    ]
   })
   try {
     /** This public call remains pending in its original native/provider owner. */
@@ -197,7 +204,8 @@ it('native admission rejects one of65 unique calls and releases all64 running pr
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           feature0: limits({ onRejected: () => refused.resolve() }),
           feature1: replayAuthentication
@@ -218,7 +226,9 @@ it('native admission rejects one of65 unique calls and releases all64 running pr
   })
   /** All capacity observations refer to this actual accepted server-side source. */
   const client = await server.connect('r70-client', {
-    plugins: [rpcFeaturesPlugin({ features: { feature0: replayAuthentication } })]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: replayAuthentication } })
+    ]
   })
   /** Observe every real rejection immediately while keeping its original error object unchanged. */
   const outcomes: Promise<unknown>[] = []
@@ -300,7 +310,8 @@ it.each([
     const host = await createRpcHost({
       ...listener.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             feature0: authentication,
             ...(reason === 'concurrency'
@@ -322,7 +333,14 @@ it.each([
     /** The actual admitted peer id supplies the old Auth observer's verified-peer fixture value. */
     const client = await listener.connect(
       'peer',
-      { plugins: [rpcFeaturesPlugin({ features: { feature0: replayAuthentication } })] },
+      {
+        plugins: [
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { feature0: replayAuthentication }
+          })
+        ]
+      },
       'verified-peer'
     )
     /** This is the first actual call, not a fabricated capacity lease or completed-ledger entry. */

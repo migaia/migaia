@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original provider failure cleanup is observed through actual public hosts and native flows. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowFeature, type IRpcFlowStages } from '@migaia/rpc-host/sdk'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
@@ -39,7 +39,8 @@ it('releases admission and the original request identity when params validation 
   const host = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { limits: limitsFeature({ maxGlobal: 1, maxPerPeer: 1 }), validator }
       }),
       ...listener.options.plugins!
@@ -96,7 +97,8 @@ it('releases same-session capacity when the validation error reply write fails',
   const host = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { limits: limitsFeature({ maxGlobal: 1, maxPerPeer: 1 }), validator }
       }),
       ...listener.options.plugins!

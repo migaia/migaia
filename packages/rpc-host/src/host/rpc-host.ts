@@ -20,6 +20,9 @@ import {
   type IRpcEnvelope,
   type IRpcSemanticFrame
 } from '@migaia/rpc-contract/protocol'
+// Kept above the other local imports: bundlers emit modules in import order, and this order keeps
+// the createRpcHost bundle within its gzip budget (scripts/fixtures/bundle-size-budgets.json).
+import { ownRpcTransportClose, RpcHostInstallation } from './installation.ts'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText, tagRpcError } from '@migaia/rpc-contract/errors'
 import { CallTable } from '../call/table.ts'
@@ -42,13 +45,12 @@ import {
 } from '../sdk/flow-pipelines.ts'
 import type { RpcFlowProgram, RpcTransportFlowProgram } from '../sdk/flow-program.ts'
 import type { IRpcDefinitionMetadata, IRpcSharedFlows } from '../sdk/metadata.ts'
-import { readRpcFeature, RpcDefinitionKind, RpcFeatureCategory } from '../sdk/metadata.ts'
+import { RpcDefinitionKind } from '../sdk/metadata.ts'
 import { HostIdentity, defaultRpcId } from './identity.ts'
 import { createRpcAbortError, createRpcError, createRpcLifecycleError } from './error-owner.ts'
 import { HostErrorText } from './error-text.ts'
 import { HostObservationKind, RpcProtocolEvent } from './state-constants.ts'
 import { deserializeHostWireError } from './error-wire-metadata.ts'
-import { ownRpcTransportClose, RpcHostInstallation } from './installation.ts'
 import type { IRpcHost, IRpcRuntimeOptions } from './public.ts'
 import { defaultRpcReporter, reportDiagnostic } from './report.ts'
 import { resolveAbortReason } from './abort-reason.ts'
@@ -257,58 +259,41 @@ export class RpcHost {
   /** Actual SDK native hooks join this receiving owner; no second plugin-host is created here. */
   async install(core: IPluginHostCore, metadata: IRpcDefinitionMetadata): Promise<void> {
     this.#assertOpen()
-    if (
-      this.#everCommittedTransport &&
-      (metadata.kind === RpcDefinitionKind.policy || metadata.kind === RpcDefinitionKind.features)
-    )
+    if (this.#everCommittedTransport && metadata.kind === RpcDefinitionKind.flow && metadata.shared)
       throw tagRpcError(new TypeError(HostErrorText.flowStarted), RpcCoreErrorCode.invalidConfig)
     if (metadata.kind === RpcDefinitionKind.transport)
       return this.#installTransport(core, metadata.definition, metadata.flows)
     if (metadata.kind === RpcDefinitionKind.source)
       return this.#namespace(metadata.namespace).installSource(core, metadata.definition)
-    if (metadata.kind === RpcDefinitionKind.policy) {
-      this.#flow.registerControls(core, (core as IRpcTransportSetupContext['owner']).features)
-      this.#features.setDefaults(
-        core,
-        metadata.definition.features,
-        (core as IRpcTransportSetupContext['owner']).features
-      )
-      return
-    }
     if (metadata.kind === RpcDefinitionKind.feature)
       throw tagRpcError(
         new TypeError(HostErrorText.flowFeatureRequired),
         RpcCoreErrorCode.invalidConfig
       )
+    if (metadata.kind !== RpcDefinitionKind.flow)
+      throw tagRpcError(new TypeError(HostErrorText.pluginInvalid), RpcCoreErrorCode.invalidConfig)
     /** Setup borrows the same Host lifetime and real work owners for every optional registration. */
     const context = this.#flowSetupContext(core)
-    if (metadata.kind === RpcDefinitionKind.features) {
-      if (
-        Object.values(metadata.features).some(
-          (feature) => readRpcFeature(feature)?.category === RpcFeatureCategory.call
-        )
+    if (metadata.shared) {
+      /** A record without a timeout or retry Feature contributes no call default. */
+      this.#features.setDefaults(
+        core,
+        metadata.shared.roots,
+        (core as IRpcTransportSetupContext['owner']).features
       )
-        this.#features.setDefaults(
-          core,
-          metadata.features,
-          (core as IRpcTransportSetupContext['owner']).features
-        )
       /** The original shared setup lends only its selected group relationship to native removal. */
-      const shared = await metadata.prepare(core, this.#controller.signal, context)
+      const shared = await metadata.shared.prepare(core, this.#controller.signal, context)
       this.#flow.registerShared(core, shared)
       getPluginRuntimeIntegration(core).allowRemovalWhen(
         () => this.closed || !this.#sharedFlowsInUse(shared)
       )
-      return
     }
     /**
      * Readonly observers retain their native registration rather than becoming information-flow
      * Features.
      */
-    if (metadata.kind !== RpcDefinitionKind.flow)
-      throw tagRpcError(new TypeError(HostErrorText.pluginInvalid), RpcCoreErrorCode.invalidConfig)
-    const installed = await metadata.prepare(core, this.#controller.signal, context)
-    this.#flow.register(core, installed)
+    if (metadata.prepare)
+      this.#flow.register(core, await metadata.prepare(core, this.#controller.signal, context))
   }
 
   /** Flow setup borrows stable Root work ports while native cores retain resource ownership. */

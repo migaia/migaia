@@ -10,10 +10,10 @@ import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import type { IRpcNamespace } from '@migaia/rpc-host'
 import {
   rpcHostPipelines,
-  rpcFeaturesPlugin,
+  defineFlowPlugin,
   type IRpcNativeMemberControls
 } from '@migaia/rpc-host/sdk'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import {
   createUnitBudget,
   SUPERVISION_SOURCE,
@@ -268,7 +268,7 @@ it('genuine process and thread Plugin installs share one final Host provider key
     /** The original committed policy keeps its genuine global256/per-peer64 default capacity. */
     await host.use(
       servicePlugin(business.service),
-      rpcFeaturesPlugin({ features: { limits: limitsFeature() } })
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { limits: limitsFeature() } })
     )
     for (const index of [0, 1]) {
       /** Both factories acquire their genuine original native runtime and SDK member owner. */

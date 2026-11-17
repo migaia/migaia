@@ -15,7 +15,6 @@ import type { IRpcDirectory } from '@migaia/rpc-contract/protocol'
 import type { ICallCommand } from '../call/types.ts'
 import type { IRpcCallOptions } from '../namespace/types.ts'
 import type {
-  IRpcCallFeature,
   IRpcDispose,
   IRpcObservation,
   IRpcProbeDescriptor,
@@ -60,7 +59,7 @@ export type IRpcTransportPlugin<
 > = IRpcNamespacePlugin<N, E, 'transport', A> &
   Readonly<{ name: N; pipelines: typeof RpcFlowPipelines }>
 
-/** Native flow/link-policy definitions participate in the same installation and rollback. */
+/** Native flow definitions participate in the same installation and rollback as transports. */
 export type IRpcFlowPlugin<E extends object = Record<never, never>> = IRpcNamespacePlugin<
   string,
   E,
@@ -137,10 +136,16 @@ export type IRpcFlowDefinition<E extends object = Record<never, never>> = Readon
   setup(context: IRpcFlowSetupContext): IRpcFlowInstallation<E> | Promise<IRpcFlowInstallation<E>>
 }>
 
-/** A link policy supplies only complete feature instances; host contains no concrete strategies. */
-export type IRpcLinkPolicyDefinition<
-  F extends Readonly<Record<string, IRpcCallFeature>> = Readonly<Record<string, IRpcCallFeature>>
-> = Readonly<{
-  name: string
-  features: F
-}>
+/**
+ * One host-level flow plugin may observe, carry shared Features, or both. `setup` installs a
+ * readonly observer and may be installed after transports; `features` supplies shared flow
+ * placements and call defaults and is admitted only before the first transport commits.
+ */
+export type IRpcFlowPluginDefinition<
+  F extends IFeatureRecord = Record<never, never>,
+  E extends object = Record<never, never>
+> = Omit<IRpcFlowDefinition<E>, 'setup'> &
+  Readonly<{
+    setup?: IRpcFlowDefinition<E>['setup']
+    features?: F
+  }>

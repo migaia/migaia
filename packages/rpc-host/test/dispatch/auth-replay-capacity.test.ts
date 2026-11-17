@@ -1,7 +1,7 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original reference-Memory capacity and observer assertions use the installed Auth owner. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import auth from '@migaia/rpc-host/plugins/auth'
+import auth from '@migaia/rpc-host/features/auth'
 import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
 import { deserializeRpcWireError } from '@migaia/rpc-contract/protocol'
 import assert from 'node:assert/strict'
@@ -51,7 +51,8 @@ it.each([undefined, 1101])(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             feature0: auth({
               credentials: replayCredential,
@@ -75,7 +76,12 @@ it.each([undefined, 1101])(
     })
     /** Every invocation uses this original accepted Session and its actual allocated task. */
     const client = await server.connect('replay-client', {
-      plugins: [rpcFeaturesPlugin({ features: { feature0: clientAuthentication } })]
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { feature0: clientAuthentication }
+        })
+      ]
     })
     try {
       for (let index = 0; index < admitted; index++) {
@@ -138,7 +144,8 @@ it.each(['none', 'ok', 'throw', 'reject'] as const)(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             feature0: auth({
               credentials: replayCredential,
@@ -158,7 +165,12 @@ it.each(['none', 'ok', 'throw', 'reject'] as const)(
     })
     /** The client uses real routing and call IDs without an inbound capacity surrogate. */
     const client = await server.connect('ledger-client', {
-      plugins: [rpcFeaturesPlugin({ features: { feature0: clientAuthentication } })]
+      plugins: [
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { feature0: clientAuthentication }
+        })
+      ]
     })
     try {
       expect(await client.host.memory.send('ledger-server', 'echo', null)).toBe(null)

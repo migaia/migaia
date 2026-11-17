@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
-import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
+import { defineFlowPlugin, defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { defineHost, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
 import { defineFeature, featuresModule } from '@migaia/plugin-host/features'
@@ -122,7 +121,10 @@ async function latePolicy(): Promise<void> {
   })
   try {
     /** The supported policy factory remains opaque; no internal hook is monkey-patched. */
-    const policy = linkPolicy({ features: { timeout: timeoutFeature({ ms: 1000, scheduler }) } })
+    const policy = defineFlowPlugin({
+      name: 'rpc-link-policy',
+      features: { timeout: timeoutFeature({ ms: 1000, scheduler }) }
+    })
     /** Preserve the exact public startup diagnostic. */
     let failure: unknown
     try {

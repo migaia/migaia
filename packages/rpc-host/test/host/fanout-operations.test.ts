@@ -1,10 +1,10 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { coreMemoryServer } from './core-fixture.ts'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
 import { key, fanout, items, containsCause, nativeHosts } from './fanout-fixture.ts'
 
 it.each([false, true])(
@@ -159,7 +159,10 @@ describe('host direct-target broadcast operations', () => {
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { idempotency: idempotencyFeature() }
+        }),
         server.transport
       ],
       report: (error) => {
@@ -183,7 +186,12 @@ describe('host direct-target broadcast operations', () => {
       }
       /** The first peer supplies actual business methods for every admitted mode. */
       const first = await server.connect('first', {
-        plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
+        plugins: [
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { idempotency: idempotencyFeature() }
+          })
+        ],
         provide: {
           value: (value?: unknown) => `first:${value ?? 'none'}`,
           note: () => {
@@ -222,7 +230,12 @@ describe('host direct-target broadcast operations', () => {
       const secondName = 'second["peer"]'
       /** The second accepted directory contributes its own independent application handlers. */
       const second = await server.connect(secondName, {
-        plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
+        plugins: [
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { idempotency: idempotencyFeature() }
+          })
+        ],
         provide: {
           value: (value?: unknown) => `second:${value ?? 'none'}`,
           note: () => {
@@ -298,7 +311,12 @@ describe('host direct-target broadcast operations', () => {
       host.provide({ relayed: host.memory.peers[secondName]!.value })
       /** A third actual listen session still borrows the same original server endpoint. */
       const third = await server.connect('third', {
-        plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
+        plugins: [
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { idempotency: idempotencyFeature() }
+          })
+        ],
         provide: { value: () => 'third' }
       })
       clients.push(third)
@@ -321,18 +339,31 @@ describe('host direct-target broadcast operations', () => {
       const host = await createRpcHost({
         ...server.options,
         plugins: [
-          rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { idempotency: idempotencyFeature() }
+          }),
           server.transport
         ]
       })
       /** A's source fails locally, without closing the independently live B source. */
       const first = await server.connect('first', {
-        plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
+        plugins: [
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { idempotency: idempotencyFeature() }
+          })
+        ],
         provide: { value: () => 'first', note: () => undefined }
       })
       /** B's actual provider must still execute and settle normally. */
       const second = await server.connect('second', {
-        plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
+        plugins: [
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
+            features: { idempotency: idempotencyFeature() }
+          })
+        ],
         provide: {
           value: () => {
             executed.resolve()

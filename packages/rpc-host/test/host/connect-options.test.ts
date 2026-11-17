@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original connection policy and handshake rollback assertions use canonical public owners. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { EventEmitter } from 'node:events'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
@@ -14,7 +14,6 @@ import {
   type IRpcFlowInstallation
 } from '@migaia/rpc-host/sdk'
 import { retryFeature } from '@migaia/rpc-host/features/retry'
-import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 import type { IRpcCarrier } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
 import { coreMemoryServer } from './core-fixture.ts'
@@ -82,7 +81,10 @@ it.each(['deployment', 'managed'] as const)(
       ...server.options,
       plugins:
         configuration === 'managed'
-          ? [linkPolicy({ features: { strategy } }), server.transport]
+          ? [
+              defineFlowPlugin({ name: 'rpc-link-policy', features: { strategy } }),
+              server.transport
+            ]
           : [server.transport]
     })
     /** Actual provider dispatch observes the received method and unchanged originating key. */
@@ -95,7 +97,7 @@ it.each(['deployment', 'managed'] as const)(
     })
     /** A real accepted declaration is the only authority for retry idempotency. */
     const client = await server.connect('remote', {
-      plugins: [rpcFeaturesPlugin({ features: { observer } })],
+      plugins: [defineFlowPlugin({ name: 'rpc-flow-features', features: { observer } })],
       provide: { api: { value: business } },
       contract: {
         schemaVersion: 1,

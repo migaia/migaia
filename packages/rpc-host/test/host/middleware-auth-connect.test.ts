@@ -1,7 +1,7 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original authentication transforms run through the public Host and the sole native codec. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it } from 'vitest'
@@ -42,7 +42,8 @@ it('preserves original authentication transform order and values through actual 
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           auth: authFeature({
             encrypt: (value) => value,
@@ -72,7 +73,8 @@ it('preserves original authentication transform order and values through actual 
     /** Real ready handshakes precede the one original business transform sequence. */
     const client = await listener.connect('auth-order-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               encrypt: (value) => {

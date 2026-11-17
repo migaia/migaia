@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batchFeature } from '@migaia/rpc-host/plugins/batch'
+import { batchFeature } from '@migaia/rpc-host/features/batch'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
 import { RpcBatchExtension } from '../../../rpc-host/dist/features/batch/constants.js'
@@ -31,14 +31,14 @@ describe('optimal physical writer', () => {
     const hosts = await Promise.all([
       createRpcHost({
         plugins: [
-          rpcFeaturesPlugin({ features: { batch: batchFeature() } }),
+          defineFlowPlugin({ name: 'rpc-flow-features', features: { batch: batchFeature() } }),
           dedicatedWorkerPlugin({ worker: pair.left.target })
         ],
         report: (error) => reports.push(error)
       }),
       createRpcHost({
         plugins: [
-          rpcFeaturesPlugin({ features: { batch: batchFeature() } }),
+          defineFlowPlugin({ name: 'rpc-flow-features', features: { batch: batchFeature() } }),
           dedicatedWorkerPlugin({ worker: pair.right.target })
         ],
         provide: {

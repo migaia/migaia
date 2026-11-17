@@ -19,8 +19,8 @@ import {
   callFeatureRole,
   RpcFeatureCategory
 } from '../sdk/metadata.ts'
-import { createRpcTimeoutExecution } from '../features/timeout.ts'
-import { createRpcRetryExecution } from '../features/retry.ts'
+import { createRpcTimeoutExecution } from './timeout-execution.ts'
+import { createRpcRetryExecution } from './retry-execution.ts'
 
 /** Compiled installations retain execution owners; calls never hold a native Feature token. */
 export type ISelectedCallFeatures = Readonly<{
@@ -118,7 +118,7 @@ class ScopedAttempt<T> {
   }
 }
 
-/** Own installation caches and the sole call > transport > link-policy precedence rule. */
+/** Own installation caches and the sole call > transport > host-default precedence rule. */
 export class FeatureScope {
   /** Original namespace cache is the only object selected by calls without overrides. */
   readonly #namespaces = new Map<

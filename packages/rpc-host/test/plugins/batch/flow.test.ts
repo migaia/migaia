@@ -1,5 +1,5 @@
 import { rpcNativeTestModules } from '../../fixtures/native-modules.ts'
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
@@ -426,10 +426,15 @@ it.each(['single', 'batch'] as const)(
     /** The real optional extension is negotiated by both public hosts. */
     const host = await createRpcHost({
       ...server.options,
-      plugins: [rpcFeaturesPlugin({ features: { batch: batchFeature() } }), server.transport]
+      plugins: [
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { batch: batchFeature() } }),
+        server.transport
+      ]
     })
     const client = await server.connect('malformed-source', {
-      plugins: [rpcFeaturesPlugin({ features: { batch: batchFeature() } })]
+      plugins: [
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { batch: batchFeature() } })
+      ]
     })
     try {
       /** The existing native write port injects one malformed message without a fake Session. */

@@ -1,9 +1,9 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createRpcHost } from '@migaia/rpc-host'
-import { limitsFeature, type IRpcProviderRejection } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature, type IRpcProviderRejection } from '@migaia/rpc-host/features/limits'
 import { deserializeRpcWireError } from '@migaia/rpc-contract/protocol'
 import { coreMemoryServer } from '../../host/core-fixture.ts'
 import { LimitsGovernor } from '../../../dist/features/limits/governor.js'
@@ -44,7 +44,8 @@ describe('limits provider concurrency observer', () => {
       const server = await createRpcHost({
         ...listener.options,
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: {
               limits: limitsFeature({
                 maxGlobal: 1,
@@ -143,7 +144,8 @@ describe('limits accepted host policy', () => {
     const server = await createRpcHost({
       ...listener.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { limits: limitsFeature({ maxGlobal: 1, maxPerPeer: 1, onRejected }) }
         }),
         ...listener.options.plugins!
@@ -190,7 +192,10 @@ describe('limits accepted host policy', () => {
     const server = await createRpcHost({
       ...listener.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { limits: limitsFeature({ maxPayloadBytes: 4096 }) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { limits: limitsFeature({ maxPayloadBytes: 4096 }) }
+        }),
         ...listener.options.plugins!
       ],
       provide: { scalar, stream }
@@ -231,7 +236,10 @@ describe('limits accepted host policy', () => {
     const server = await createRpcHost({
       ...listener.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { limits: limitsFeature({ maxCallsPerMinute: 3 }) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { limits: limitsFeature({ maxCallsPerMinute: 3 }) }
+        }),
         ...listener.options.plugins!
       ],
       provide: { business, warmup: () => null }

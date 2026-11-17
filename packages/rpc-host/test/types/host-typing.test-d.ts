@@ -7,10 +7,10 @@ import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import type { IRpcStepOutcome, IRpcOutcomeLookupResult } from '@migaia/rpc-contract/protocol'
 import type { IRpcFanoutResult } from '@migaia/rpc-host'
 import { createRpcHost, type IRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
 import {
   defineTransportPlugin,
-  rpcFeaturesPlugin,
+  defineFlowPlugin,
   type IRpcTransportPlugin
 } from '@migaia/rpc-host/sdk'
 
@@ -65,7 +65,7 @@ declare const single: IRpcHost<
   IAApi & { math: { add(pair: [number, number]): number } },
   readonly [
     IRpcTransportPlugin<'memory'>,
-    ReturnType<typeof rpcFeaturesPlugin<{ replay: ReturnType<typeof idempotencyFeature> }>>
+    ReturnType<typeof defineFlowPlugin<{ replay: ReturnType<typeof idempotencyFeature> }>>
   ]
 >
 expectTypeOf(single.memory.request('resize', 800)).toEqualTypeOf<

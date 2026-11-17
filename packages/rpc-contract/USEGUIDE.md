@@ -153,4 +153,4 @@ console.log('native error graph preserved')
 
 `RpcWireLimit.maxForwardHops` 为 16；`forwardRoute` 与序列化错误路由最多接受 `RpcWireLimit.maxForwardRouteNodes`（17）个节点 id，包含发起节点。Host 默认跳数仍为 3，协议容量不覆盖 host 自身配置。
 
-已有原生宿主通过 Host SDK 的 `rpcHostPipelines(getHost, pipeline)` 提供 `domainCore(request)`，把同一个原生构造请求交还给宿主的 `pipeline(name, request)`。每个传输插件声明自己的七条短名管道，安装时创建、卸载时删除；helper 不再接收命名空间列表或返回管道声明。普通原生宿主先用 `rpcFeaturesPlugin({ features })` 安装共享信息流，再装传输，具体接法见 [Host 使用指南](../rpc-host/USEGUIDE.md#在已有宿主中安装-rpc)。内置出站顺序为 plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire，入站反向。传输 feature 仅覆盖本命名空间的同种能力，不另建执行器。
+已有原生宿主通过 Host SDK 的 `rpcHostPipelines(getHost, pipeline)` 提供 `domainCore(request)`，把同一个原生构造请求交还给宿主的 `pipeline(name, request)`。每个传输插件声明自己的七条短名管道，安装时创建、卸载时删除；helper 不再接收命名空间列表或返回管道声明。普通原生宿主先用 `defineFlowPlugin({ name, features })` 安装共享信息流，再装传输，具体接法见 [Host 使用指南](../rpc-host/USEGUIDE.md#在已有宿主中安装-rpc)。内置出站顺序为 plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire，入站反向。传输 feature 仅覆盖本命名空间的同种能力，不另建执行器。

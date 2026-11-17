@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Private connection credentials reach only the configured authentication resolver. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import { defineFlowFeature, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from '../../host/core-fixture.ts'
@@ -91,7 +91,7 @@ it.each([false, true])(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { inspect, authentication } }),
+        defineFlowPlugin({ name: 'rpc-flow-features', features: { inspect, authentication } }),
         observation,
         server.transport
       ],
@@ -106,7 +106,7 @@ it.each([false, true])(
         const client = await createRpcHost({
           self: { name: label, instanceId: `credential-${label}` },
           plugins: [
-            rpcFeaturesPlugin({ features: { authentication } }),
+            defineFlowPlugin({ name: 'rpc-flow-features', features: { authentication } }),
             observation,
             credentialTransport(server, label)
           ],

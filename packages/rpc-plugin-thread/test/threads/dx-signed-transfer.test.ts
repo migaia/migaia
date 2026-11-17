@@ -1,6 +1,6 @@
-import { rpcFeaturesPlugin, type IRpcFlowPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin, type IRpcFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { fileURLToPath } from 'node:url'
@@ -49,7 +49,10 @@ describe('ordinary signed native-binary thread profile', () => {
     >({
       report: (error) => reported.push(error),
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature(options.authentication) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature(options.authentication) }
+        }),
         threadPlugin({ name: 'thread', spawn: source(true, (error) => reported.push(error)) })
       ]
     })
@@ -124,7 +127,10 @@ describe('ordinary signed native-binary thread profile', () => {
     >({
       report: () => undefined,
       plugins: [
-        rpcFeaturesPlugin({ features: { auth: authFeature(options.authentication) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { auth: authFeature(options.authentication) }
+        }),
         threadPlugin({ name: 'thread', spawn: source(true, () => undefined) })
       ]
     })

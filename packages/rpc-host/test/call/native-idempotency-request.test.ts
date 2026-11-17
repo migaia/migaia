@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /**
  * Original keyed request custody, overlapping replay and retry failure retain genuine native
  * owners.
  */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
@@ -15,8 +15,8 @@ import {
 } from '@migaia/rpc-host/sdk'
 import type { IRpcCarrierWriteOptions } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
-import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
+import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'
 import { retryFeature } from '@migaia/rpc-host/features/retry'
 import { coreMemoryServer } from '../host/core-fixture.ts'
 import { CallInvocation } from '../../dist/call/invocation.js'
@@ -82,7 +82,10 @@ function keyedPortHost(port: MessagePort, name: string, provide?: IRpcHostOption
   return createRpcHost({
     self: { name, instanceId: name },
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      }),
       defineTransportPlugin({
         name: `${name}-transport`,
         namespace: 'native',
@@ -156,7 +159,10 @@ it('makes the original overlapping keyed requests share the owner result seven e
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      }),
       server.transport
     ],
     provide: {
@@ -257,7 +263,10 @@ it('rejects a new key while the real bounded store owns an executing request', a
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature({ store }) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature({ store }) }
+      }),
       server.transport
     ],
     provide: {
@@ -300,7 +309,10 @@ it('rejects the original malformed injected store during native construction', a
   const opening = createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature({ store: 1 as never }) } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature({ store: 1 as never }) }
+      }),
       server.transport
     ]
   })
@@ -323,7 +335,10 @@ it('replays original sequential keys and rejects invalid keys before any real bu
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      }),
       server.transport
     ],
     provide: { count: () => ++count }
@@ -382,7 +397,12 @@ it('retains the original explicit key through genuine retry and the physical req
   const host = await createRpcHost(server.options)
   /** Real accepted metadata supplies idempotency authority independently from the caller key. */
   const client = await server.connect('explicit-key-provider', {
-    plugins: [rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } })],
+    plugins: [
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      })
+    ],
     provide: { api: { request: () => 'result' } },
     contract: {
       schemaVersion: 1,

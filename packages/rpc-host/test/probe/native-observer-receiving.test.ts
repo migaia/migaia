@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original observer business reaches real native Session, media and collector owners. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import {
   defineProbe,
@@ -15,7 +15,7 @@ import {
   RpcCarrierObservation,
   RpcJsonCarrierCodec
 } from '@migaia/rpc-host/sdk'
-import chunk from '@migaia/rpc-host/plugins/chunk'
+import chunk from '@migaia/rpc-host/features/chunk'
 import type { IRpcTransportContext, IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
 import { devtoolsPlugin } from '../../../rpc-plugin-devtools/src/index.ts'
 import { assert, expect, it, vi } from 'vitest'
@@ -456,12 +456,15 @@ it('keeps the original large public payload fragmented on both actual native dir
   /** The provider has an independent genuine native chunk installation. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [rpcFeaturesPlugin({ features: { feature0: fragments } }), listener.transport],
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: fragments } }),
+      listener.transport
+    ],
     provide: { echo: unchanged }
   })
   /** The caller installs the same cold definition with separate runtime state. */
   const connected = await listener.connect('native-copy-client', {
-    plugins: [rpcFeaturesPlugin({ features: { feature0: fragments } })]
+    plugins: [defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: fragments } })]
   })
   /** Only accepted client physical writes contribute to the original count. */
   const clientFrames = vi.spyOn(connected.pair[1], 'write')
@@ -503,7 +506,10 @@ it('keeps original control and payload order from two actual public chunk source
   /** The same actual server receives both original source payloads through public chunk. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [rpcFeaturesPlugin({ features: { feature0: fragments } }), listener.transport],
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: fragments } }),
+      listener.transport
+    ],
     provide: {
       echo: (value, context) => {
         received.push(value)
@@ -518,10 +524,10 @@ it('keeps original control and payload order from two actual public chunk source
   let second: Awaited<ReturnType<typeof listener.connect>> | undefined
   try {
     first = await listener.connect('opaque-a', {
-      plugins: [rpcFeaturesPlugin({ features: { feature0: fragments } })]
+      plugins: [defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: fragments } })]
     })
     second = await listener.connect('opaque-b', {
-      plugins: [rpcFeaturesPlugin({ features: { feature0: fragments } })]
+      plugins: [defineFlowPlugin({ name: 'rpc-flow-features', features: { feature0: fragments } })]
     })
     expect(first.pair[0].id).not.toBe(second.pair[0].id)
     expect(listener.lookup('opaque-a')!.handle).not.toBe(listener.lookup('opaque-b')!.handle)

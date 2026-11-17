@@ -1,9 +1,9 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Uses actual public Hosts, JSON capture and HMAC to prove conditional backing integrity. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createHmac } from 'node:crypto'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { createRpcBackingDigest, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
@@ -140,7 +140,10 @@ class BinaryIntegrityPair {
       : {}
     this.#server = await createRpcHost({
       ...this.#listener.options,
-      plugins: [rpcFeaturesPlugin({ features }), this.#listener.transport],
+      plugins: [
+        defineFlowPlugin({ name: 'rpc-flow-features', features }),
+        this.#listener.transport
+      ],
       report: (error) => this.failure.resolve(error),
       provide: {
         echo: (value) => {
@@ -153,7 +156,8 @@ class BinaryIntegrityPair {
     const connected = await this.#listener.connect('a33-client', {
       plugins: signed
         ? [
-            rpcFeaturesPlugin({
+            defineFlowPlugin({
+              name: 'rpc-flow-features',
               features: { authentication: authFeature({ sign: this.#sign, verify: this.#verify }) }
             })
           ]

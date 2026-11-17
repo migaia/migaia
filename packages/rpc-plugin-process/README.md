@@ -56,11 +56,11 @@ if (await isProcessChild()) {
 
 调用使用 `host.process.request/notify/stream/group` 和定向的 `host.process.send`。根对象保留 `self`、`provide`、`close`，不提供这些调用方法。原生成员查询、控制与事件位于 `host.process.members`，例如 `list/get/stop/kill/restart/replace/on/watch`；借用连接不因此取得终止外部进程的权限。
 
-`/features` 导出原生 feature token 工厂 `sendQueueFeature`、`flowControlFeature`、`ipcLogFeature`；以调用者命名的 record 传入 `processPlugin({ features })`。`sendQueueFeature({ flow })` 可借用同一个 flow 实例，不能另配一套容量。业务 timeout/retry 也通过传输的 `features` 选择。host 介入插件使用 `@migaia/rpc-host/plugins/*`，在传输之前安装。
+`/features` 导出原生 feature token 工厂 `sendQueueFeature`、`flowControlFeature`、`ipcLogFeature`；以调用者命名的 record 传入 `processPlugin({ features })`。`sendQueueFeature({ flow })` 可借用同一个 flow 实例，不能另配一套容量。业务 timeout/retry 也通过传输的 `features` 选择。host 级 Feature 工厂在 `@migaia/rpc-host/features/*`，经 `defineFlowPlugin({ name, features })` 在传输之前安装；观察插件在 `@migaia/rpc-host/plugins/*`。
 
 ## 协议与扩展职责
 
-使用唯一的 `migaia.rpc/2` 协议。`@migaia/rpc-contract/protocol` 提供纯协议数据与准入；`/interfaces` 提供能力类型，`/errors` 与 `/error-code` 提供错误契约。Contract 不执行 I/O、业务 schema 或监督。业务校验由 `/plugins/schema` 负责；自定义载体作者使用 `@migaia/rpc-host/sdk`，复用 canonical carrier，而不是返回另一个 Host 或端点。
+使用唯一的 `migaia.rpc/2` 协议。`@migaia/rpc-contract/protocol` 提供纯协议数据与准入；`/interfaces` 提供能力类型，`/errors` 与 `/error-code` 提供错误契约。Contract 不执行 I/O、业务 schema 或监督。业务校验由 `/features/schema` 负责；自定义载体作者使用 `@migaia/rpc-host/sdk`，复用 canonical carrier，而不是返回另一个 Host 或端点。
 
 ## 当前边界
 

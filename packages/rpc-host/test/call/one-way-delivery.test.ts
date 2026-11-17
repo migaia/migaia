@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Receive original one-way delivery and physical failure business through public namespaces. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
 import { coreMemoryServer, connectedCoreHosts } from '../host/core-fixture.ts'
@@ -39,7 +39,10 @@ it('one-way delivery does not wait for business or emit a response and releases 
   const provider = await server.connect('one-way-server', {
     provide: { notify: business.notify, ready: () => 'ready' },
     plugins: [
-      rpcFeaturesPlugin({ features: { limits: limitsFeature({ maxGlobal: 1, maxPerPeer: 1 }) } })
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { limits: limitsFeature({ maxGlobal: 1, maxPerPeer: 1 }) }
+      })
     ]
   })
   try {

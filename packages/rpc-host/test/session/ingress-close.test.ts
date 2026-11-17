@@ -1,7 +1,7 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public close cancels native verification without retaining a user callback or execution lease. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import auth, { type IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'
+import auth, { type IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
@@ -49,7 +49,8 @@ it.each(['fulfilled', 'rejected'] as const)(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { feature0: auth({ sign: (value) => value, verify: verifier.verify }) }
         }),
         ...server.options.plugins
@@ -66,7 +67,8 @@ it.each(['fulfilled', 'rejected'] as const)(
     /** The caller's independent Auth and actual native pair perform both real handshakes. */
     const client = await server.connect('caller', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { feature0: auth({ sign: (value) => value, verify: (value) => value }) }
         })
       ]

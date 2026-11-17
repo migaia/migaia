@@ -1,6 +1,6 @@
 import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
 import { createRpcTimeoutExecution, timeoutFeature } from '@migaia/rpc-host/features/timeout'
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 /** Actual feature and native Host clocks replace the removed kernel/time-port configuration. */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -9,7 +9,7 @@ import { expect, it, vi } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
 
-import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -144,7 +144,10 @@ it('timestamps failed responses and expires installed replay policy using manual
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({ features: { idempotency: idempotencyFeature() } }),
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
+        features: { idempotency: idempotencyFeature() }
+      }),
       server.transport
     ],
     provide: { api: { fail: business } },

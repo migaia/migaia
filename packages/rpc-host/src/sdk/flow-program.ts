@@ -1,6 +1,5 @@
 /** Compile explicit native feature carriers and transport placements before traffic starts. */
 import {
-  definePlugin,
   type IPluginHostCore,
   type IFeatureRecord,
   type IFeatureInspection
@@ -11,12 +10,10 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { HostErrorText } from '../host/error-text.ts'
-import { installRpcDefinition } from '../host/installation.ts'
 import { RpcFlowSetup } from './flow-setup.ts'
 import {
   readRpcDefinition,
   readRpcFeature,
-  registerRpcDefinition,
   RpcDefinitionKind,
   callFeatureRole,
   RpcFeatureCategory,
@@ -30,12 +27,9 @@ import type {
   IRpcFlowSetupContext,
   IRpcHostPlugin,
   IRpcFlowPlugin,
-  IRpcTransportPlugin,
-  IRpcTransportFeatureExtensions
+  IRpcTransportPlugin
 } from './types.ts'
 
-/** Default identity belongs to the caller-visible native feature carrier. */
-const flowPluginName = 'rpc-flow-features'
 /** Generated aliases expose dependency outputs only to the owning native install hook. */
 const dependencyAliasPrefix = '$rpc-dependency:'
 
@@ -46,12 +40,9 @@ function invalidFeature(): never {
 
 /**
  * Keep RPC role placement errors in its domain while native inspection owns record shape, opaque
- * identity and graph validation. A call-policy record admits only authenticated call roots.
+ * identity and graph validation.
  */
-export function inspectRpcFeatures<F extends IFeatureRecord>(
-  features: F,
-  callOnly = false
-): IFeatureInspection<F> {
+function inspectRpcFeatures<F extends IFeatureRecord>(features: F): IFeatureInspection<F> {
   if (features !== null && typeof features === 'object' && !Array.isArray(features)) {
     for (const key of Reflect.ownKeys(features)) {
       if (typeof key !== 'string') continue
@@ -62,16 +53,11 @@ export function inspectRpcFeatures<F extends IFeatureRecord>(
       const definition = readRpcDefinition(descriptor.value)
       /** Unknown identities reach canonical native admission before RPC can interpret their role. */
       const role = readRpcFeature(descriptor.value)
-      if (definition && (!role || (callOnly && role.category !== RpcFeatureCategory.call)))
-        invalidFeature()
+      if (definition && !role) invalidFeature()
     }
   }
   /** Preserve the exact native rejection and graph error without wrapping or replacing it. */
-  const inspection = inspectFeatures(features)
-  if (callOnly)
-    for (const feature of Object.values(inspection.roots))
-      if (readRpcFeature(feature)?.category !== RpcFeatureCategory.call) invalidFeature()
-  return inspection
+  return inspectFeatures(features)
 }
 
 /** Admit each private role once while retaining the caller's arbitrary local aliases. */
@@ -253,42 +239,27 @@ export class RpcTransportFlowProgram {
   }
 }
 
-/** Explicit carriers own shared setup through an ordinary native plugin record. */
-class RpcFeatureProgram {
+/** A flow plugin's `features` record owns shared setup through that plugin's native record. */
+export class RpcFeatureProgram {
   /** Caller roots provide call defaults and public control addressing. */
-  readonly #features: IFeatureRecord
+  readonly roots: IFeatureRecord
+  /** The native plugin record: caller roots plus private dependency aliases. */
+  readonly features: IFeatureRecord
   /** Native closure compilation owns aliases and dependency-first setup order. */
   readonly #record: RpcNativeFeatureRecord
   /** Each shared role selects one authentic flow instance. */
   readonly #selection: ReadonlyMap<PropertyKey, IRpcFlowFeature<object>>
 
-  /** Capture a carrier's cold features without installation-local state. */
+  /** Capture a flow plugin's cold features without installation-local state. */
   constructor(features: IFeatureRecord) {
     this.#record = new RpcNativeFeatureRecord(features)
-    this.#features = this.#record.roots
-    this.#selection = selectFlows(this.#features)
-  }
-
-  /** Create one caller-visible native carrier; the host inserts no wrapper. */
-  plugin(name: string): IRpcFlowPlugin {
-    /** Private metadata borrows cold preparation; native installation owns outputs. */
-    const metadata = {
-      kind: RpcDefinitionKind.features,
-      features: this.#features,
-      prepare: this.#prepare
-    }
-    /** The native record assembles policies, flows and helper outputs exactly once. */
-    const plugin = definePlugin({
-      name,
-      features: this.#record.features,
-      install: (core) => installRpcDefinition(core as unknown as IPluginHostCore, metadata)
-    })
-    registerRpcDefinition(plugin, metadata)
-    return plugin as unknown as IRpcFlowPlugin
+    this.roots = this.#record.roots
+    this.features = this.#record.features
+    this.#selection = selectFlows(this.roots)
   }
 
   /** Setup remains under native rollback and exact registration-local output identity. */
-  readonly #prepare = async (
+  readonly prepare = async (
     core: IPluginHostCore,
     rootSignal: IAbortSignal,
     context: IRpcFlowSetupContext
@@ -310,9 +281,9 @@ class RpcFeatureProgram {
   }
 }
 
-/** Cold host classification accepts native plugins only; features need an explicit carrier. */
+/** Cold host classification accepts transport and flow plugins only; bare Features are rejected. */
 export class RpcFlowProgram {
-  /** Shared carriers, observers and policies install before transports. */
+  /** Flow plugins install before transports. */
   readonly flows: readonly IRpcFlowPlugin[]
   /** Transports retain their own native feature record and acquisition lifetime. */
   readonly transports: readonly IRpcTransportPlugin[]
@@ -328,24 +299,10 @@ export class RpcFlowProgram {
       const metadata = readRpcDefinition(plugin)
       if (metadata?.kind === RpcDefinitionKind.transport)
         transports.push(plugin as IRpcTransportPlugin)
-      else if (
-        metadata?.kind === RpcDefinitionKind.flow ||
-        metadata?.kind === RpcDefinitionKind.policy ||
-        metadata?.kind === RpcDefinitionKind.features
-      )
-        flows.push(plugin as IRpcFlowPlugin)
+      else if (metadata?.kind === RpcDefinitionKind.flow) flows.push(plugin as IRpcFlowPlugin)
       else invalidFeature()
     }
     this.flows = Object.freeze(flows)
     this.transports = Object.freeze(transports)
   }
-}
-
-/** Assemble shared features explicitly, preserving original record names for installed controls. */
-export function rpcFeaturesPlugin<const F extends IFeatureRecord>(
-  options: Readonly<{ name?: string; features: F }>
-): IRpcFlowPlugin<IRpcTransportFeatureExtensions<F>> {
-  return new RpcFeatureProgram(options.features).plugin(
-    options.name ?? flowPluginName
-  ) as IRpcFlowPlugin<IRpcTransportFeatureExtensions<F>>
 }

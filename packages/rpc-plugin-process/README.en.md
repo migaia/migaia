@@ -56,11 +56,11 @@ Runtime root exports are `processPlugin`, `isProcessChild`, `RpcProcessErrorCode
 
 Use `host.process.request/notify/stream/group` and targeted `host.process.send`. The root retains `self`, `provide` and `close`, without those call methods. Native member queries, controls and events live under `host.process.members`: `list/get/stop/kill/restart/replace/on/watch`. Borrowing a connection does not authorize terminating its external process.
 
-`/features` exports native feature-token factories `sendQueueFeature`, `flowControlFeature` and `ipcLogFeature`; pass a named record to `processPlugin({ features })`. `sendQueueFeature({ flow })` can borrow that same flow instance without another capacity policy. Business timeout/retry are also selected through transport `features`. Host intervention plugins use `@migaia/rpc-host/plugins/*` and install before transports.
+`/features` exports native feature-token factories `sendQueueFeature`, `flowControlFeature` and `ipcLogFeature`; pass a named record to `processPlugin({ features })`. `sendQueueFeature({ flow })` can borrow that same flow instance without another capacity policy. Business timeout/retry are also selected through transport `features`. Host-level Feature factories live under `@migaia/rpc-host/features/*` and install before transports through `defineFlowPlugin({ name, features })`; observer plugins live under `@migaia/rpc-host/plugins/*`.
 
 ## Protocol and extension ownership
 
-The sole profile is `migaia.rpc/2`. `@migaia/rpc-contract/protocol` provides pure protocol data and admission; `/interfaces` provides capability types, and `/errors` plus `/error-code` provide error contracts. Contract performs no I/O, business schema validation or supervision. `/plugins/schema` owns business validation. Custom carrier authors use `@migaia/rpc-host/sdk` and canonical carriers rather than returning another Host or endpoint.
+The sole profile is `migaia.rpc/2`. `@migaia/rpc-contract/protocol` provides pure protocol data and admission; `/interfaces` provides capability types, and `/errors` plus `/error-code` provide error contracts. Contract performs no I/O, business schema validation or supervision. `/features/schema` owns business validation. Custom carrier authors use `@migaia/rpc-host/sdk` and canonical carriers rather than returning another Host or endpoint.
 
 ## Current boundaries
 

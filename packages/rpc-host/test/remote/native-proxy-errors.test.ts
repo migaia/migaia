@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Original forged-error authority cases run through real Host-held capabilities and native stages. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { RpcLifecycleError, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcPortableValue, IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
@@ -82,7 +82,9 @@ describe('remote generation proxy through public held capabilities', () => {
       })
       /** The separate caller installs the actual Feature before its real native transport. */
       const client = await listener.connect('proxy-caller', {
-        plugins: [rpcFeaturesPlugin({ features: { feature: refusal.feature } })]
+        plugins: [
+          defineFlowPlugin({ name: 'rpc-flow-features', features: { feature: refusal.feature } })
+        ]
       })
       try {
         /** The existing fixture's public dynamic namespace supplies the actual accepted projection. */

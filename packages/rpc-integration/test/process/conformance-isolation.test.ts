@@ -1,4 +1,4 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { spawn, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
@@ -13,7 +13,7 @@ import { serializeRpcError, type IRpcSerializedError } from '@migaia/rpc-contrac
 import { RpcProbeLifecycle } from '@migaia/rpc-contract/interfaces'
 import { createRpcHost } from '@migaia/rpc-host'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 
 import { encodeRpcStreamFrame, RpcEventByteIO, type IRpcByteIO } from '@migaia/rpc-host/sdk'
@@ -238,7 +238,8 @@ describe('real process session and principal isolation', () => {
     const service = await createRpcHost({
       self: { name: 'server', instanceId: 'server' },
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               verifyCredentials(value) {

@@ -4,7 +4,7 @@
  */
 import { RpcProbeStage } from '@migaia/rpc-contract/interfaces'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { dedicatedWorkerPlugin, windowPlugin } from '@migaia/rpc-plugin-browser'
 import {
   HopAuthCounter,

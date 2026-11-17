@@ -1,5 +1,5 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public request settlement retains native idle write order and recovery after physical failure. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -81,7 +81,10 @@ it('public idle writes preserve order, native failure identity and recovery', as
   /** The receiving native Host remains the sole caller runtime and actual pipeline owner. */
   const caller = await createRpcHost({
     ...server.options,
-    plugins: [rpcFeaturesPlugin({ features: { feature: witness.feature } }), server.transport]
+    plugins: [
+      defineFlowPlugin({ name: 'rpc-flow-features', features: { feature: witness.feature } }),
+      server.transport
+    ]
   })
   /** Real provider effects independently prove the failed native write executed no business. */
   const effects: string[] = []

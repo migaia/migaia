@@ -1,8 +1,8 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.ts'
@@ -23,7 +23,8 @@ describe('stream replay custody through public endpoint behavior', () => {
         plugins: [
           ...(authenticated
             ? [
-                rpcFeaturesPlugin({
+                defineFlowPlugin({
+                  name: 'rpc-flow-features',
                   features: {
                     auth: authFeature({ sign: (value) => value, verify: (value) => value })
                   }
@@ -70,7 +71,8 @@ describe('stream replay custody through public endpoint behavior', () => {
       const client = await source.connect('client', {
         plugins: authenticated
           ? [
-              rpcFeaturesPlugin({
+              defineFlowPlugin({
+                name: 'rpc-flow-features',
                 features: {
                   auth: authFeature({ sign: (value) => value, verify: (value) => value })
                 }
@@ -110,7 +112,8 @@ describe('stream replay custody through public endpoint behavior', () => {
     const server = await createRpcHost({
       ...source.options,
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: {
             auth: authFeature({
               sign: (value) => value,
@@ -156,7 +159,8 @@ describe('stream replay custody through public endpoint behavior', () => {
     /** Establish the original held method in the initial directory before testing replay capacity. */
     const client = await source.connect('client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
         })
       ]

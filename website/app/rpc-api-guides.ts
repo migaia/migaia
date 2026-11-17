@@ -355,7 +355,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Positive safe integer total attempt count including the initial attempt.',
           defaultValue: '2 attempts.',
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'backoff',
@@ -407,7 +407,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '包含首次尝试的正安全整数总次数。',
           defaultValue: '两次尝试。',
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'backoff',
@@ -456,7 +456,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           description: 'Finite nonnegative attempt milliseconds; zero allows immediate expiry.',
           whenToUse: 'Finite nonnegative attempt milliseconds; zero allows immediate expiry.',
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'scheduler',
@@ -493,7 +493,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           description: '有限非负的尝试毫秒数，零允许立即到期。',
           whenToUse: '有限非负的尝试毫秒数，零允许立即到期。',
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'scheduler',
@@ -523,7 +523,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         'Complete originating retry implementation borrowing actual replacement availability.',
       quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
+        "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineFlowPlugin({ name: 'call-defaults', features: { timeout: timeoutFeature({ ms: 1500 }) } })",
       options: [
         {
           name: 'attempts',
@@ -531,7 +531,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: 'Positive safe integer total attempt count including the initial attempt.',
           defaultValue: '2 attempts.',
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'backoff',
@@ -568,7 +568,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
     zh: {
       purpose: '借用实际替换可用性的完整发起方重试实现。',
       quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
+        "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineFlowPlugin({ name: 'call-defaults', features: { timeout: timeoutFeature({ ms: 1500 }) } })",
       options: [
         {
           name: 'attempts',
@@ -576,7 +576,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '包含首次尝试的正安全整数总次数。',
           defaultValue: '两次尝试。',
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'backoff',
@@ -611,14 +611,14 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
     en: {
       purpose: 'Complete attempt-timeout implementation with owned timer cleanup.',
       quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
+        "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineFlowPlugin({ name: 'call-defaults', features: { timeout: timeoutFeature({ ms: 1500 }) } })",
       options: [
         {
           name: 'ms',
           description: 'Finite nonnegative attempt milliseconds; zero allows immediate expiry.',
           whenToUse: 'Finite nonnegative attempt milliseconds; zero allows immediate expiry.',
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'scheduler',
@@ -641,14 +641,14 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
     zh: {
       purpose: '拥有计时器清理的完整尝试超时实现。',
       quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
+        "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineFlowPlugin({ name: 'call-defaults', features: { timeout: timeoutFeature({ ms: 1500 }) } })",
       options: [
         {
           name: 'ms',
           description: '有限非负的尝试毫秒数，零允许立即到期。',
           whenToUse: '有限非负的尝试毫秒数，零允许立即到期。',
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const"
         },
         {
           name: 'scheduler',
@@ -2139,60 +2139,6 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:sdk:defineLinkPolicy': {
-    en: {
-      purpose:
-        'Capture complete call-feature defaults for native installation. FeatureScope selects those existing timeout and retry instances without creating timers or executing policy during definition.',
-      quickStart:
-        "import { defineLinkPolicy } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineLinkPolicy({\n  name: 'application-policy',\n  features: [timeoutFeature({ ms: 500 })],\n})",
-      options: [
-        {
-          name: 'name',
-          description: 'Unique genuine native policy name.',
-          whenToUse: 'Unique genuine native policy name.'
-        },
-        {
-          name: 'features',
-          description: 'Complete feature objects; duplicate kinds reject before startup.',
-          whenToUse: 'Complete feature objects; duplicate kinds reject before startup.'
-        }
-      ],
-      scenarios: [
-        'A custom link policy composes complete call features under one reusable native definition.',
-        'Several namespace installations should inherit defaults without sharing per-call execution state.'
-      ],
-      avoidWhen: [
-        'A policy needs carrier acquisition or a second execution loop; use the existing transport and feature owners.',
-        'Plain numbers or partial feature objects are being used as defaults; provide complete feature instances.'
-      ]
-    },
-    zh: {
-      purpose:
-        '为原生安装捕获完整调用功能默认值；FeatureScope 选择已有超时与重试实例，定义阶段不创建计时器，也不执行调用策略。',
-      quickStart:
-        "import { defineLinkPolicy } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineLinkPolicy({\n  name: 'application-policy',\n  features: [timeoutFeature({ ms: 500 })],\n})",
-      options: [
-        {
-          name: 'name',
-          description: '唯一真实原生策略名。',
-          whenToUse: '唯一真实原生策略名。'
-        },
-        {
-          name: 'features',
-          description: '完整功能对象，同种重复项在启动前拒绝。',
-          whenToUse: '完整功能对象，同种重复项在启动前拒绝。'
-        }
-      ],
-      scenarios: [
-        '自定义链路策略需要以可复用原生定义组合完整调用功能。',
-        '多个命名空间安装需要继承默认值，同时保持每次调用执行状态独立。'
-      ],
-      avoidWhen: [
-        '需要获取载体或执行调用循环时，应使用已有传输及功能所有者。',
-        '不能把数字或不完整对象作为默认功能，应提供完整功能实例。'
-      ]
-    }
-  },
   'rpc-host:sdk:defineTransportPlugin': {
     en: {
       purpose:
@@ -3081,12 +3027,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:authFeature': {
+  'rpc-host:features:authFeature': {
     en: {
       purpose:
         'Install the authentication flow plugin on the Host before starting transports. Paired sign/verify callbacks protect the prepared representation; optional encrypt/decrypt callbacks must also match. Explicit credentials and verifyCredentials govern handshake credential exchange without discovering native launch tokens or replacing carrier identity admission. Use namespaces to select links, then close the Host after application calls finish.',
       quickStart:
-        "// Supply the application real paired cryptographic operations.\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport async function run(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  const protection = authFeature({ sign, verify, encodedType: 'string' })\n  const host = await createRpcHost({\n    plugins: [\n      protection,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [protection, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'authenticated value')\n  } finally {\n    await host.close()\n  }\n}\n",
+        "// Supply the application real paired cryptographic operations.\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { authFeature } from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\nexport async function run(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  const protection = authFeature({ sign, verify, encodedType: 'string' })\n  const host = await createRpcHost({\n    plugins: [\n      protection,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [protection, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'authenticated value')\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'encrypt',
@@ -3096,7 +3042,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             'Encrypt the prepared signed representation; input and output must match encodedType and decrypt reverses this operation.',
           defaultValue: 'No transform; configure the corresponding pair together.',
           example:
-            "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
+            "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
         },
         {
           name: 'decrypt',
@@ -3106,7 +3052,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             'Reverse the paired encryption before inbound verification/admission; throw rejects the envelope.',
           defaultValue: 'No transform; configure the corresponding pair together.',
           example:
-            "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
+            "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
         },
         {
           name: 'sign',
@@ -3116,7 +3062,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             'Sign the exact protected representation with its nonce/counter binding; return the representation consumed by verify.',
           defaultValue: 'No transform; configure the corresponding pair together.',
           example:
-            "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
+            "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
         },
         {
           name: 'verify',
@@ -3126,7 +3072,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
             'Verify the paired protected representation and return its authenticated inner data; failure rejects before provider execution.',
           defaultValue: 'No transform; configure the corresponding pair together.',
           example:
-            "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
+            "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
         },
         {
           name: 'encodedType',
@@ -3174,7 +3120,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '在启动传输前把认证信息流插件安装到 Host，让配套的 sign/verify 对已准备表示签名和验证，需要加密时再提供相互匹配的 encrypt/decrypt。credentials 与 verifyCredentials 处理显式握手凭据，不会自动发现原生启动令牌，也不替代载体的身份接纳。通过 namespaces 选择实际链路；业务调用结束后仍由应用关闭 Host，释放该安装拥有的认证资源。',
       quickStart:
-        "// 传入应用实际拥有且相互匹配的签名及验证能力。\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport async function run(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  const protection = authFeature({ sign, verify, encodedType: 'string' })\n  const host = await createRpcHost({\n    plugins: [\n      protection,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [protection, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'authenticated value')\n  } finally {\n    await host.close()\n  }\n}\n",
+        "// 传入应用实际拥有且相互匹配的签名及验证能力。\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { authFeature } from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\nexport async function run(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  const protection = authFeature({ sign, verify, encodedType: 'string' })\n  const host = await createRpcHost({\n    plugins: [\n      protection,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [protection, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'authenticated value')\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'encrypt',
@@ -3182,7 +3128,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '加密已准备签名表示；输入输出须符合编码类别，解密执行逆操作。',
           defaultValue: '不转换；应成对配置对应转换。',
           example:
-            "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
+            "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
         },
         {
           name: 'decrypt',
@@ -3190,7 +3136,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '在入站验证及准入前执行配套解密，抛错会拒绝信封。',
           defaultValue: '不转换；应成对配置对应转换。',
           example:
-            "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
+            "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
         },
         {
           name: 'sign',
@@ -3198,7 +3144,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '签名含随机值及计数绑定的精确保护表示，返回供验证消费的表示。',
           defaultValue: '不转换；应成对配置对应转换。',
           example:
-            "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
+            "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
         },
         {
           name: 'verify',
@@ -3206,7 +3152,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
           whenToUse: '验证配套保护表示并返回已认证内部数据，失败在提供方执行前拒绝。',
           defaultValue: '不转换；应成对配置对应转换。',
           example:
-            "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
+            "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
         },
         {
           name: 'encodedType',
@@ -3247,12 +3193,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:batchFeature': {
+  'rpc-host:features:batchFeature': {
     en: {
       purpose:
         'Install negotiated physical batching for selected namespaces. The plugin combines compatible physical writes while keeping each logical call and application group under its original execution owner.',
       quickStart:
-        "import batch from '@migaia/rpc-host/plugins/batch'\nexport const batching = batch({ required: false })",
+        "import batch from '@migaia/rpc-host/features/batch'\nexport const batching = batch({ required: false })",
       options: [
         {
           name: 'namespaces',
@@ -3284,7 +3230,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '为选定命名空间安装经协商的物理合帧，将兼容写入合并发送；每个逻辑调用与应用分组仍由原执行所有者管理，不把合帧变成业务分组。',
       quickStart:
-        "import batch from '@migaia/rpc-host/plugins/batch'\nexport const batching = batch({ required: false })",
+        "import batch from '@migaia/rpc-host/features/batch'\nexport const batching = batch({ required: false })",
       options: [
         {
           name: 'namespaces',
@@ -3309,12 +3255,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:chunkFeature': {
+  'rpc-host:features:chunkFeature': {
     en: {
       purpose:
         'Install chunk on both peers when an encoded string or byte message must travel as bounded fragments. The plugin negotiates chunk@1, applies per-message and total assembly limits, and retires incomplete assemblies and their timers with the source. chunkBytes counts UTF-16 units for strings and bytes for Uint8Array. required rejects a peer lacking the extension; optional namespaces select existing links without constructing another transport or codec.',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport async function run() {\n  const framing = chunkFeature({ required: true, chunkBytes: 16384, maxMessageBytes: 1048576 })\n  const host = await createRpcHost({\n    plugins: [\n      framing,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [framing, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'large result'.repeat(10000))\n  } finally {\n    await host.close()\n  }\n}\n",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { chunkFeature } from '@migaia/rpc-host/features/chunk'\nexport async function run() {\n  const framing = chunkFeature({ required: true, chunkBytes: 16384, maxMessageBytes: 1048576 })\n  const host = await createRpcHost({\n    plugins: [\n      framing,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [framing, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'large result'.repeat(10000))\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'chunkBytes',
@@ -3408,7 +3354,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '编码后的字符串或字节消息需要拆成有界片段时，在通信双方安装 chunk。插件协商 chunk@1，约束单条消息、分片数量和总体组装保留量，并在来源退场时释放未完成组装及其计时器。chunkBytes 对文本按 UTF-16 码元、对 Uint8Array 按字节计量；required 可拒绝未支持该扩展的对端，namespaces 只选择已有链路，不另建传输或编解码器。',
       quickStart:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport async function run() {\n  const framing = chunkFeature({ required: true, chunkBytes: 16384, maxMessageBytes: 1048576 })\n  const host = await createRpcHost({\n    plugins: [\n      framing,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [framing, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'large result'.repeat(10000))\n  } finally {\n    await host.close()\n  }\n}\n",
+        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { chunkFeature } from '@migaia/rpc-host/features/chunk'\nexport async function run() {\n  const framing = chunkFeature({ required: true, chunkBytes: 16384, maxMessageBytes: 1048576 })\n  const host = await createRpcHost({\n    plugins: [\n      framing,\n      coroutinePlugin({\n        spawn: async ({ connect, signal }) => {\n          const child = await createRpcHost({\n            plugins: [framing, coroutinePlugin({ connectToParent: connect })],\n            provide: { echo: (value: string) => value },\n          })\n          try {\n            if (!signal.aborted) {\n              await new Promise<void>((resolve) =>\n                signal.addEventListener('abort', () => resolve(), { once: true }),\n              )\n            }\n          } finally {\n            await child.close()\n          }\n        },\n      }),\n    ],\n  })\n  try {\n    return await host.coroutine.request('echo', 'large result'.repeat(10000))\n  } finally {\n    await host.close()\n  }\n}\n",
       options: [
         {
           name: 'chunkBytes',
@@ -3487,12 +3433,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:createRpcIdempotencyStore': {
+  'rpc-host:features:createRpcIdempotencyStore': {
     en: {
       purpose:
         'Create a bounded in-memory execution and outcome store. Retention starts at settlement, and result-body eviction preserves the execution record so missing content never authorizes another execution.',
       quickStart:
-        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))",
+        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))",
       options: [
         {
           name: 'retentionMs',
@@ -3545,7 +3491,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '创建有容量上限的内存执行与结果存储；保留期从结算时计算，结果正文被淘汰后仍保留执行事实，不能因内容缺失就允许再次执行。',
       quickStart:
-        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))",
+        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))",
       options: [
         {
           name: 'retentionMs',
@@ -3755,12 +3701,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:idempotencyFeature': {
+  'rpc-host:features:idempotencyFeature': {
     en: {
       purpose:
         'Install provider execution claims, outcome storage and namespace outcome queries using the selected store and scope. A key is metadata for this policy; it does not by itself enable client retry.',
       quickStart:
-        "import idempotency from '@migaia/rpc-host/plugins/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000 })",
+        "import idempotency from '@migaia/rpc-host/features/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000 })",
       options: [
         {
           name: 'retentionMs',
@@ -3837,7 +3783,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '安装提供方执行认领、结果存储及命名空间结果查询，并使用选定的存储与作用域；幂等键是策略输入，单独声明它不会启用客户端重试。',
       quickStart:
-        "import idempotency from '@migaia/rpc-host/plugins/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000 })",
+        "import idempotency from '@migaia/rpc-host/features/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000 })",
       options: [
         {
           name: 'retentionMs',
@@ -3900,12 +3846,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:limitsFeature': {
+  'rpc-host:features:limitsFeature': {
     en: {
       purpose:
         'Install shared provider concurrency and optional connection admission limits. These policy slots count RPC work and accepted connections, independently of native worker or pool capacity.',
       quickStart:
-        "import limits from '@migaia/rpc-host/plugins/limits'\nexport const capacity = limits()",
+        "import limits from '@migaia/rpc-host/features/limits'\nexport const capacity = limits()",
       options: [
         {
           name: 'maxGlobal',
@@ -3996,7 +3942,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '安装共享提供方并发限制及可选连接准入限制；策略计数面向 RPC 工作与已接纳连接，独立于原生工作单元数量及池容量。',
       quickStart:
-        "import limits from '@migaia/rpc-host/plugins/limits'\nexport const capacity = limits()",
+        "import limits from '@migaia/rpc-host/features/limits'\nexport const capacity = limits()",
       options: [
         {
           name: 'maxGlobal',
@@ -4077,51 +4023,6 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:linkPolicy': {
-    en: {
-      purpose:
-        'Install complete timeout and retry instances as link defaults before transport and per-call overrides. The policy selects existing feature owners and adds no separate call pipeline.',
-      quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
-      options: [
-        {
-          name: 'features',
-          description:
-            'Actual executing feature instances; duplicate kinds reject at cold admission.',
-          whenToUse: 'Actual executing feature instances; duplicate kinds reject at cold admission.'
-        }
-      ],
-      scenarios: [
-        'Several transport namespaces should inherit the same explicit timeout and retry defaults.',
-        'A host-wide link default must remain overridable by a complete per-call feature or false.'
-      ],
-      avoidWhen: [
-        'A policy is expected to acquire or supervise native workers; use the concrete transport source.',
-        'A numeric timeout is being passed as a feature; construct timeout with its options first.'
-      ]
-    },
-    zh: {
-      purpose:
-        '在传输及单次调用覆盖之前安装链路默认的完整超时与重试实例；该策略只选择已有功能所有者，不增加另一套调用流水线。',
-      quickStart:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })",
-      options: [
-        {
-          name: 'features',
-          description: '实际执行功能实例；同种重复功能在冷准入时拒绝。',
-          whenToUse: '实际执行功能实例；同种重复功能在冷准入时拒绝。'
-        }
-      ],
-      scenarios: [
-        '多个传输命名空间需要继承同一组显式超时与重试默认值。',
-        '宿主链路默认值需要允许单次调用以完整功能实例或 false 覆盖。'
-      ],
-      avoidWhen: [
-        '需要获取或监管原生工作单元时，应使用具体传输源，而非链路默认策略。',
-        '不能把超时数字直接当作功能，应先用配置构造完整 timeout 实例。'
-      ]
-    }
-  },
   'rpc-host:plugins:probe': {
     en: {
       purpose:
@@ -4154,12 +4055,12 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       ]
     }
   },
-  'rpc-host:plugins:schemaFeature': {
+  'rpc-host:features:schemaFeature': {
     en: {
       purpose:
         'Install explicit method parsers for provider payloads and results using actual method paths. Without this plugin, local contract declarations remain metadata and do not perform business validation.',
       quickStart:
-        "import schema from '@migaia/rpc-host/plugins/schema'\nexport const validation = schema()",
+        "import schema from '@migaia/rpc-host/features/schema'\nexport const validation = schema()",
       options: [
         {
           name: 'schemas',
@@ -4191,7 +4092,7 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
       purpose:
         '按实际方法路径安装提供方负载及结果解析器；没有安装该插件时，本地契约声明仍是元数据，不会自动执行业务数据校验。',
       quickStart:
-        "import schema from '@migaia/rpc-host/plugins/schema'\nexport const validation = schema()",
+        "import schema from '@migaia/rpc-host/features/schema'\nexport const validation = schema()",
       options: [
         {
           name: 'schemas',
@@ -4272,25 +4173,6 @@ const canonicalRpcGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, 
         '不要把生成的声明当成运行时校验、提供方授权或远端方法的实际实现。',
         '不要期待每次后续目录刷新都重新生成文件；该观察器接收真实对端接纳事件，不监听任意元数据变化。'
       ]
-    }
-  },
-  'rpc-host:plugins-link-policy:RpcLinkPolicyName': {
-    en: {
-      purpose:
-        'Stable native plugin identity used by the built-in linkPolicy definition. It is not a transport namespace.',
-      quickStart:
-        "import { RpcLinkPolicyName } from '@migaia/rpc-host/plugins/link-policy'\nexport const policyName = RpcLinkPolicyName",
-      options: [],
-      scenarios: [],
-      avoidWhen: []
-    },
-    zh: {
-      purpose: '内建链路策略定义使用的稳定原生插件身份，不是传输命名空间。',
-      quickStart:
-        "import { RpcLinkPolicyName } from '@migaia/rpc-host/plugins/link-policy'\nexport const policyName = RpcLinkPolicyName",
-      options: [],
-      scenarios: [],
-      avoidWhen: []
     }
   },
   'rpc-host:plugins-probe:RpcProbeDirection': {
@@ -11487,24 +11369,22 @@ export const rpcApiGuides: Readonly<Record<string, Readonly<Record<IGuideLocale,
     canonicalRpcGuides['rpc-host:sdk:createRpcStreamFrameDecoder']!,
   'rpc-host:plugins-typegen:default': canonicalRpcGuides['rpc-host:plugins:typegen']!,
   'rpc-host:plugins-typegen:typegen': canonicalRpcGuides['rpc-host:plugins:typegen']!,
-  'rpc-host:plugins-schema:default': canonicalRpcGuides['rpc-host:plugins:schemaFeature']!,
-  'rpc-host:plugins-schema:schemaFeature': canonicalRpcGuides['rpc-host:plugins:schemaFeature']!,
-  'rpc-host:plugins-auth:authFeature': canonicalRpcGuides['rpc-host:plugins:authFeature']!,
-  'rpc-host:plugins-auth:default': canonicalRpcGuides['rpc-host:plugins:authFeature']!,
-  'rpc-host:plugins-chunk:chunkFeature': canonicalRpcGuides['rpc-host:plugins:chunkFeature']!,
-  'rpc-host:plugins-chunk:default': canonicalRpcGuides['rpc-host:plugins:chunkFeature']!,
-  'rpc-host:plugins-batch:batchFeature': canonicalRpcGuides['rpc-host:plugins:batchFeature']!,
-  'rpc-host:plugins-batch:default': canonicalRpcGuides['rpc-host:plugins:batchFeature']!,
-  'rpc-host:plugins-limits:default': canonicalRpcGuides['rpc-host:plugins:limitsFeature']!,
-  'rpc-host:plugins-limits:limitsFeature': canonicalRpcGuides['rpc-host:plugins:limitsFeature']!,
-  'rpc-host:plugins-link-policy:default': canonicalRpcGuides['rpc-host:plugins:linkPolicy']!,
-  'rpc-host:plugins-link-policy:linkPolicy': canonicalRpcGuides['rpc-host:plugins:linkPolicy']!,
-  'rpc-host:plugins-idempotency:createRpcIdempotencyStore':
-    canonicalRpcGuides['rpc-host:plugins:createRpcIdempotencyStore']!,
-  'rpc-host:plugins-idempotency:default':
-    canonicalRpcGuides['rpc-host:plugins:idempotencyFeature']!,
-  'rpc-host:plugins-idempotency:idempotencyFeature':
-    canonicalRpcGuides['rpc-host:plugins:idempotencyFeature']!,
+  'rpc-host:features-schema:default': canonicalRpcGuides['rpc-host:features:schemaFeature']!,
+  'rpc-host:features-schema:schemaFeature': canonicalRpcGuides['rpc-host:features:schemaFeature']!,
+  'rpc-host:features-auth:authFeature': canonicalRpcGuides['rpc-host:features:authFeature']!,
+  'rpc-host:features-auth:default': canonicalRpcGuides['rpc-host:features:authFeature']!,
+  'rpc-host:features-chunk:chunkFeature': canonicalRpcGuides['rpc-host:features:chunkFeature']!,
+  'rpc-host:features-chunk:default': canonicalRpcGuides['rpc-host:features:chunkFeature']!,
+  'rpc-host:features-batch:batchFeature': canonicalRpcGuides['rpc-host:features:batchFeature']!,
+  'rpc-host:features-batch:default': canonicalRpcGuides['rpc-host:features:batchFeature']!,
+  'rpc-host:features-limits:default': canonicalRpcGuides['rpc-host:features:limitsFeature']!,
+  'rpc-host:features-limits:limitsFeature': canonicalRpcGuides['rpc-host:features:limitsFeature']!,
+  'rpc-host:features-idempotency:createRpcIdempotencyStore':
+    canonicalRpcGuides['rpc-host:features:createRpcIdempotencyStore']!,
+  'rpc-host:features-idempotency:default':
+    canonicalRpcGuides['rpc-host:features:idempotencyFeature']!,
+  'rpc-host:features-idempotency:idempotencyFeature':
+    canonicalRpcGuides['rpc-host:features:idempotencyFeature']!,
   'rpc-host:plugins-probe:default': canonicalRpcGuides['rpc-host:plugins:probe']!,
   'rpc-host:plugins-probe:defineProbe': canonicalRpcGuides['rpc-host:plugins:defineProbe']!,
   'rpc-host:plugins-probe:probe': canonicalRpcGuides['rpc-host:plugins:probe']!,

@@ -1,10 +1,10 @@
 /** Real native children exercise closing calls through the same public namespace as business work. */
 import { createRpcHost, type IRpcHost, type IRpcClosingEvent } from '@migaia/rpc-host'
 import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
 
 /** Each mode chooses an existing public close trigger rather than a fixture-only production seam. */
 export type ICloseFixtureMode = 'namespace' | 'host' | 'limits' | 'idle'
@@ -56,12 +56,18 @@ class CloseChild {
       plugins: [
         ...(mode === 'limits'
           ? [
-              rpcFeaturesPlugin({
+              defineFlowPlugin({
+                name: 'rpc-flow-features',
                 features: { quotas: limitsFeature({ maxPayloadBytes: 32, violationLimit: 1 }) }
               })
             ]
           : mode === 'idle'
-            ? [rpcFeaturesPlugin({ features: { quotas: limitsFeature({ idleTimeoutMs: 500 }) } })]
+            ? [
+                defineFlowPlugin({
+                  name: 'rpc-flow-features',
+                  features: { quotas: limitsFeature({ idleTimeoutMs: 500 }) }
+                })
+              ]
             : []),
         plugin
       ] as const,

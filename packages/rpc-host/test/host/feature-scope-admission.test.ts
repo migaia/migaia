@@ -1,15 +1,13 @@
 import { FeatureOverlay } from '@migaia/plugin-host/feature-overlay'
 import { defineHost, type IPluginHostCore, type IFeatureRecord } from '@migaia/plugin-host'
 import { rpcNativeTestModules } from '../fixtures/native-modules.ts'
-/** Cold call-policy admission, per-call overlays and link-policy record checks. */
+/** Cold call-policy admission, per-call overlays and flow plugin record checks. */
 import { describe, expect, it, vi } from 'vitest'
-import { createRpcHost } from '@migaia/rpc-host'
 import { retryFeature as publicRetryFeature } from '@migaia/rpc-host/features/retry'
 /** Execution owners load from source, the same modules FeatureScope's source graph uses. */
 import { retryFeature, createRpcRetryExecution } from '../../src/features/retry.ts'
 import { timeoutFeature, createRpcTimeoutExecution } from '../../src/features/timeout.ts'
-import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
-import { defineFlowFeature, defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin, defineFlowFeature } from '@migaia/rpc-host/sdk'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { defineFeature } from '@migaia/plugin-host/features'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -61,32 +59,19 @@ function scopePolicy(scope: FeatureScope, name: string, features: IFeatureRecord
   return { name, features, install: owner.install }
 }
 
-/** Empty native transports acquire no resources while exercising genuine installation. */
-function openEmptyTransport() {
-  return { dispose: disposeEmptyTransport }
-}
-
-/** No resource was acquired by the empty transport. */
-function disposeEmptyTransport(): void {}
-
 describe('FeatureScope admission', () => {
-  it('rejects a link policy record holding one call role twice', async () => {
-    await expect(
-      createRpcHost({
-        self: { name: 'scope-admission', instanceId: 'scope-admission' },
-        plugins: [
-          linkPolicy({
-            features: { r1: publicRetryFeature(), r2: publicRetryFeature({ attempts: 3 }) }
-          }),
-          defineTransportPlugin({
-            name: 'scope-transport',
-            namespace: 'local',
-            features: {},
-            open: openEmptyTransport
-          })
-        ]
+  it('rejects a flow plugin record holding one call role twice when it is defined', () => {
+    /** Captured so the code can be asserted on the value thrown by the definer itself. */
+    let thrown: unknown
+    try {
+      defineFlowPlugin({
+        name: 'call-defaults',
+        features: { r1: publicRetryFeature(), r2: publicRetryFeature({ attempts: 3 }) }
       })
-    ).rejects.toSatisfy(hasCode('FEATURE_ROLE_CONFLICT'))
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toSatisfy(hasCode('FEATURE_ROLE_CONFLICT'))
   })
 
   it('rejects a duplicate call role inside one record', async () => {
@@ -177,14 +162,12 @@ describe('FeatureScope admission', () => {
   })
 })
 
-describe('link policy record admission', () => {
-  it('rejects a flow feature in a call-only record', () => {
+describe('flow plugin record admission', () => {
+  it('admits a flow Feature beside a call default in one record', () => {
     const flow = defineFlowFeature({ name: 'policy-flow', phase: 1, setup: () => ({}) })
     expect(() =>
-      linkPolicy({
-        features: { flow } as unknown as Record<string, ReturnType<typeof publicRetryFeature>>
-      })
-    ).toThrow()
+      defineFlowPlugin({ name: 'mixed', features: { flow, retry: publicRetryFeature() } })
+    ).not.toThrow()
   })
 
   it.each([
@@ -192,7 +175,8 @@ describe('link policy record admission', () => {
     ['null', null]
   ])('rejects an %s record', (_name, features) => {
     expect(() =>
-      linkPolicy({
+      defineFlowPlugin({
+        name: 'rpc-link-policy',
         features: features as unknown as Record<string, ReturnType<typeof publicRetryFeature>>
       })
     ).toThrow()
@@ -203,19 +187,16 @@ describe('link policy record admission', () => {
     record[Symbol('hidden')] = publicRetryFeature()
     Object.defineProperty(record, 'lazy', { enumerable: true, get: () => publicRetryFeature() })
     expect(() =>
-      linkPolicy({
+      defineFlowPlugin({
+        name: 'rpc-link-policy',
         features: record as unknown as Record<string, ReturnType<typeof publicRetryFeature>>
       })
     ).toThrow()
   })
 
-  it('rejects a plain plugin-host feature in a call-only record', () => {
+  it('admits a plain plugin-host feature as a helper in the record', () => {
     const helper = defineFeature(() => ({ value: 1 }))
-    expect(() =>
-      linkPolicy({
-        features: { helper } as unknown as Record<string, ReturnType<typeof publicRetryFeature>>
-      })
-    ).toThrow()
+    expect(() => defineFlowPlugin({ name: 'helper', features: { helper } })).not.toThrow()
   })
 })
 

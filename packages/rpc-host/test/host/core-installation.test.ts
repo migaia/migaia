@@ -4,7 +4,6 @@ import { defineHost, definePlugin, getPluginRuntimeIntegration } from '@migaia/p
 import { defineFeature } from '@migaia/plugin-host/features'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { defineFlowPlugin, defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
-import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -110,7 +109,11 @@ it('rolls back a pre-start flow/policy batch before the ordinary native host ret
     }
   })
   await expect(
-    native.use(linkPolicy({ features: { timeout } }), failedFlow, failedTransport)
+    native.use(
+      defineFlowPlugin({ name: 'rpc-link-policy', features: { timeout } }),
+      failedFlow,
+      failedTransport
+    )
   ).rejects.toMatchObject({ cause: failure })
   expect(openedBeforeFailure).toBe(1)
   expect(disposed).toHaveBeenCalledTimes(1)

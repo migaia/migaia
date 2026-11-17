@@ -1,4 +1,4 @@
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
 
 /** Assembly expiry uses the supported timer admission and cancellation callbacks. */
 chunkFeature({ assemblyTimeoutMs: 10, schedule: () => 1, cancel: () => undefined })

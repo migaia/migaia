@@ -1,5 +1,5 @@
 import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
@@ -368,7 +368,8 @@ describe('streaming cancellation', () => {
       undefined,
       undefined,
       [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { deadline: timeoutFeature({ ms: 50, scheduler: clientClock }) }
         })
       ]

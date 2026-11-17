@@ -1,9 +1,9 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import assert from 'node:assert/strict'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { describe, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/features/auth'
 import { sharedWorkerPlugin } from '../../dist/index.js'
 
 describe('replay-window r12 absent browser message source', () => {
@@ -22,7 +22,8 @@ describe('replay-window r12 absent browser message source', () => {
       createRpcHost({
         self: { name: 'null-source-client', instanceId: 'null-source-client' },
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
           }),
           sharedWorkerPlugin({ sharedWorker: { port: port1 } })
@@ -32,7 +33,8 @@ describe('replay-window r12 absent browser message source', () => {
       createRpcHost({
         self: { name: 'null-source-server', instanceId: 'null-source-server' },
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
           }),
           sharedWorkerPlugin({ sharedWorker: { port: port2 } })

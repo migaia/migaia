@@ -1,13 +1,13 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Public Host composition borrows only the genuine Process carrier, FIFO and logical capacity. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { RpcTransportError } from '@migaia/rpc-contract/errors'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batchFeature } from '@migaia/rpc-host/plugins/batch'
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { batchFeature } from '@migaia/rpc-host/features/batch'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
 import {
   defineFlowFeature,
   defineTransportPlugin,
@@ -199,7 +199,8 @@ class NativeProcessAdmissionPair {
       createRpcHost({
         self: { name: 'logical-client', instanceId: 'logical-client' },
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: {
               chunk: chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }),
               witness,
@@ -213,7 +214,8 @@ class NativeProcessAdmissionPair {
       createRpcHost({
         self: { name: 'logical-server', instanceId: 'logical-server' },
         plugins: [
-          rpcFeaturesPlugin({
+          defineFlowPlugin({
+            name: 'rpc-flow-features',
             features: {
               chunks: chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }),
               batching: batchFeature()

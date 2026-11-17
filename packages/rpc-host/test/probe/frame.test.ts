@@ -1,10 +1,10 @@
 /** Real Session/probe owners retain frame capture, transfer and physical write evidence. */
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { RpcJsonCarrierCodec, rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
-import { batchFeature } from '@migaia/rpc-host/plugins/batch'
+import { RpcJsonCarrierCodec, defineFlowPlugin } from '@migaia/rpc-host/sdk'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
+import { batchFeature } from '@migaia/rpc-host/features/batch'
 import {
   probe,
   defineProbe,
@@ -48,7 +48,7 @@ async function observedHosts(options: {
   const caller = await createRpcHost({
     ...listener.options,
     plugins: [
-      rpcFeaturesPlugin({ features: options.features ?? {} }),
+      defineFlowPlugin({ name: 'rpc-flow-features', features: options.features ?? {} }),
       probe(callerProbe),
       listener.transport
     ]
@@ -65,7 +65,7 @@ async function observedHosts(options: {
     /** Both real installations receive independent state from the same cold Feature definitions. */
     const connected = await listener.connect('frame-provider', {
       plugins: [
-        rpcFeaturesPlugin({ features: options.features ?? {} }),
+        defineFlowPlugin({ name: 'rpc-flow-features', features: options.features ?? {} }),
         ...(providerProbe ? [providerProbe] : [])
       ],
       provide: { echo: options.echo ?? ((value: unknown) => value) }

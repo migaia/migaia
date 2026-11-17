@@ -1,7 +1,7 @@
-import { rpcFeaturesPlugin } from '@migaia/rpc-host/sdk'
 /** Genuine Auth capacity retains a stream through its actual iterator and physical terminal work. */
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import auth from '@migaia/rpc-host/plugins/auth'
+import auth from '@migaia/rpc-host/features/auth'
 import { defineFlowFeature, RpcFlowPoint, type IRpcFlowStage } from '@migaia/rpc-host/sdk'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcProviderRejectionReason } from '@migaia/rpc-contract/errors'
@@ -65,7 +65,8 @@ it('retains legacy stream admission through next, return and terminal physical c
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: {
           terminalGate,
           feature0: auth({
@@ -92,7 +93,8 @@ it('retains legacy stream admission through next, return and terminal physical c
   /** The opposite public Host supplies every real opening, credit, cancellation and fresh id. */
   const client = await server.connect('peer', {
     plugins: [
-      rpcFeaturesPlugin({
+      defineFlowPlugin({
+        name: 'rpc-flow-features',
         features: { feature0: auth({ sign: (value) => value, verify: (value) => value }) }
       })
     ]

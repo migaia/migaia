@@ -2,11 +2,11 @@
 import { vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
+import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/features/auth'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import {
   defaultRpcId,
-  rpcFeaturesPlugin,
+  defineFlowPlugin,
   type IRpcTransportSetupContext
 } from '@migaia/rpc-host/sdk'
 import { RpcProbeDirection } from '@migaia/rpc-contract/interfaces'
@@ -144,7 +144,8 @@ export class NativeSocketAuth {
       plugins: [
         ...(this.#applicationAuth
           ? [
-              rpcFeaturesPlugin({
+              defineFlowPlugin({
+                name: 'rpc-flow-features',
                 features: {
                   auth: authFeature({
                     encodedType: 'string',
@@ -204,7 +205,8 @@ export class NativeSocketAuth {
       plugins: [
         ...(this.#applicationAuth
           ? [
-              rpcFeaturesPlugin({
+              defineFlowPlugin({
+                name: 'rpc-flow-features',
                 features: {
                   auth: authFeature({
                     encodedType: 'string',

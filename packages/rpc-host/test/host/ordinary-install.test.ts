@@ -5,7 +5,7 @@ import { defineFeature } from '@migaia/plugin-host/features'
 import {
   defineTransportPlugin,
   defineFlowFeature,
-  rpcFeaturesPlugin,
+  defineFlowPlugin,
   rpcHostPipelines,
   RpcFlowLayer,
   type IRpcFlowStage
@@ -13,9 +13,9 @@ import {
 import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
 import type { IRpcDispatchContext } from '@migaia/rpc-contract/interfaces'
 import { typegen } from '@migaia/rpc-host/plugins/typegen'
-import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
-import { authFeature } from '@migaia/rpc-host/plugins/auth'
-import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { limitsFeature } from '@migaia/rpc-host/features/limits'
+import { authFeature } from '@migaia/rpc-host/features/auth'
+import { chunkFeature } from '@migaia/rpc-host/features/chunk'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import { describe, expect, it, vi, type MockInstance as IMockInstance } from 'vitest'
 import { readRpcDefinition } from '../../dist/sdk/metadata.js'
@@ -257,7 +257,8 @@ describe('ordinary native Host RPC installation', () => {
     /** The common native bridge owns both real Features in this cold worker group. */
     const transport = namedTransport(server)
     /** Removing this generation retires its actual limits instance and original borrowed stages. */
-    const flows = rpcFeaturesPlugin({
+    const flows = defineFlowPlugin({
+      name: 'rpc-flow-features',
       features: {
         auth: authFeature({ sign: (value) => value, verify: (value) => value }),
         limits: limitsFeature(),
@@ -273,7 +274,8 @@ describe('ordinary native Host RPC installation', () => {
     /** This is a genuine connected public client, not a constructed flow context or fake signal. */
     const client = await server.connect('limits-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
         })
       ]
@@ -326,7 +328,8 @@ describe('ordinary native Host RPC installation', () => {
     /** Both peers explicitly install the original wire-changing Feature. */
     const client = await server.connect('local-auth-client', {
       plugins: [
-        rpcFeaturesPlugin({
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
           features: { auth: authFeature({ sign: (value) => value, verify: (value) => value }) }
         })
       ]
@@ -369,7 +372,10 @@ describe('ordinary native Host RPC installation', () => {
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        rpcFeaturesPlugin({ features: { chunk: chunkFeature({ chunkBytes: 1_024 }) } }),
+        defineFlowPlugin({
+          name: 'rpc-flow-features',
+          features: { chunk: chunkFeature({ chunkBytes: 1_024 }) }
+        }),
         server.transport
       ],
       provide: { echo: (value) => value },
