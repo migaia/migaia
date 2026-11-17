@@ -373,15 +373,15 @@ test('RPC error-code subpath retains no protocol, codec or portable implementati
 })
 
 for (const style of ['named', 'default']) {
-  test(`RPC chunk plugin retains only its own optional implementation through ${style} import`, async () => {
+  test(`RPC chunk Feature retains only its own optional implementation through ${style} import`, async () => {
     /** Both entry styles resolve the same real archives and existing inward dependencies. */
     const fixture = createActualPackageFixture()
     try {
       /** Retain the complete factory so elimination must follow actual optional-owner references. */
       const source =
         style === 'named'
-          ? "import { chunkFeature } from '@migaia/rpc-host/plugins'; export { chunkFeature }"
-          : "import chunk from '@migaia/rpc-host/plugins/chunk'; export { chunk }"
+          ? "import { chunkFeature } from '@migaia/rpc-host/features'; export { chunkFeature }"
+          : "import chunk from '@migaia/rpc-host/features/chunk'; export { chunk }"
       /** Rendered module provenance distinguishes shared mandatory owners from unrelated plugins. */
       const result = await buildConsumer(fixture.consumer, source)
       /** Only the chosen plugin may contribute optional implementation bytes. */
@@ -398,7 +398,7 @@ for (const style of ['named', 'default']) {
       const entry = join(fixture.consumer, 'chunk-identity.mjs')
       writeFileSync(
         entry,
-        "import { strict as assert } from 'node:assert'; import { chunkFeature } from '@migaia/rpc-host/plugins'; import direct from '@migaia/rpc-host/plugins/chunk'; assert.equal(chunkFeature, direct)"
+        "import { strict as assert } from 'node:assert'; import { chunkFeature } from '@migaia/rpc-host/features'; import direct from '@migaia/rpc-host/features/chunk'; assert.equal(chunkFeature, direct)"
       )
       execFileSync(process.execPath, [entry], { cwd: fixture.consumer, stdio: 'pipe' })
     } finally {
@@ -409,21 +409,15 @@ for (const style of ['named', 'default']) {
 
 /** Each remaining Host optional owner is selected through both declared publication forms. */
 const rpcOptionalSelections = [
-  { factory: 'authFeature', folder: 'auth', kind: 'plugins', implementation: 'features' },
-  { factory: 'batchFeature', folder: 'batch', kind: 'plugins', implementation: 'features' },
-  { factory: 'errorMapFeature', folder: 'error-map', kind: 'plugins', implementation: 'features' },
-  {
-    factory: 'idempotencyFeature',
-    folder: 'idempotency',
-    kind: 'plugins',
-    implementation: 'features'
-  },
-  { factory: 'limitsFeature', folder: 'limits', kind: 'plugins', implementation: 'features' },
-  { factory: 'schemaFeature', folder: 'schema', kind: 'plugins', implementation: 'features' },
+  { factory: 'authFeature', folder: 'auth', kind: 'features' },
+  { factory: 'batchFeature', folder: 'batch', kind: 'features' },
+  { factory: 'errorMapFeature', folder: 'error-map', kind: 'features' },
+  { factory: 'idempotencyFeature', folder: 'idempotency', kind: 'features' },
+  { factory: 'limitsFeature', folder: 'limits', kind: 'features' },
+  { factory: 'schemaFeature', folder: 'schema', kind: 'features' },
   { factory: 'probe', folder: 'probe', kind: 'plugins' },
   { factory: 'typegen', folder: 'typegen', kind: 'plugins' },
-  { factory: 'linkPolicy', folder: 'link-policy', kind: 'plugins' },
-  { factory: 'retryFeature', folder: 'retry', kind: 'features' }
+  { factory: 'retryFeature', folder: 'retry', kind: 'features', file: true }
 ]
 /** Probe observes shared wire identifiers without retaining batch/chunk execution owners. */
 const probeProtocolMetadata = new Set([
@@ -459,12 +453,9 @@ for (const selection of rpcOptionalSelections) {
         /** Rendered provenance distinguishes live bytes from zero-byte aggregate entries. */
         const result = await buildConsumer(fixture.consumer, source)
         /** The precise selected implementation and its local text share one owning path. */
-        const allowed =
-          selection.kind === 'plugins'
-            ? new RegExp(
-                '^dist/' + (selection.implementation ?? 'plugins') + '/' + selection.folder + '/'
-              )
-            : /^dist\/features\/retry(?:-text)?\.js$/
+        const allowed = selection.file
+          ? /^dist\/features\/retry(?:-text)?\.js$/
+          : new RegExp('^dist/' + selection.kind + '/' + selection.folder + '/')
         /** Existing mandatory Host/SDK modules may be shared; optional owners must remain isolated. */
         const retained = packageModules({ ...result, modules: result.retainedModules }, 'rpc-host')
         assert.ok(
