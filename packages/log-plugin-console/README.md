@@ -1,32 +1,60 @@
 # @migaia/log-plugin-console
 
-按需安装的控制台输出，与相同版本的 `@migaia/log-host` 配合使用。运行时第三方依赖只有 `ansis`；控制台对象和 stdout 均可注入。
+[English](./README.en.md)
 
-```ts
+`@migaia/log-host` 的控制台输出。在终端或 CI 里输出带颜色、保留原生对象和错误堆栈的可读格式；输出被重定向、交给日志采集时默认一行一条 JSON，不用为两种环境各写一套配置。
+
+## 你可能遇到过
+
+- **线上日志没法检索**：开发时好读的彩色文本进了日志系统，变成一堆转义字符和拆散的多行堆栈。根因是输出格式没有随运行环境切换。
+- **对象被打成 `[object Object]`**：日志库先把参数拼成字符串再交给控制台，丢掉了控制台本来能展开的对象和错误堆栈。根因是格式化发生在控制台之前。
+
+## 从这里开始
+
+```ts doc-test=run
 import { createLogHost, levelPlugin } from '@migaia/log-host'
 import { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'
 
 const log = createLogHost({
   plugins: [
     levelPlugin(),
-    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })
+    // 示例里固定不着色、不打时间，便于对照输出；默认按终端和环境自动决定
+    consolePlugin({ features: { pretty: prettyFeature({ color: 'never', timestamp: false }) } })
   ]
 })
-log.info('server ready', { port: 3000 })
-await log.flush()
+log.info('user %s signed in', 'alice')
+log.warn('disk usage at %d%%', 91)
 await log.shutdown('manual')
 ```
 
-`info` 等日志方法同步返回，条目随后异步交付。`warn` 使用 `console.warn`，`error`/`fatal` 使用 `console.error`，其它 tag 使用 `console.log`。`data.silent` 条目不重复输出。
+输出：
 
-`prettyFeature` 保留原始 message 占位符、参数顺序、对象和原生 Error 身份。JSON/plain 使用 host 提供的 `record.text`。默认格式遵循 `LOG_FORMAT=json|pretty`、CI、TTY 的优先级；没有任何提示时使用 JSON。显式 host/output 格式优先于此默认值。
+```text
+[INFO] user alice signed in
+[WARN] disk usage at 91%
+```
 
-安装后 host 另有 `raw(text)` 扩展：优先写入借用的 stdout，缺少 stdout 时使用借用的 `console.log`。写入失败进入 host 失败通道。卸载不会关闭应用提供的 console/stdout。
+`%s`、`%d` 这些占位符由控制台自己处理，参数原样交给 `console.log` / `console.warn` / `console.error`，所以对象可以展开、错误带完整堆栈。`warn` 走 `console.warn`，`error` 和 `fatal` 走 `console.error`，其他级别走 `console.log`。
 
-公开值为 `consolePlugin`、`prettyFeature`、`ConsoleColorMode` 和空码表 `LogConsoleErrorCode`。本包不声明错误 source；能力抛出的原始错误由 host 收口。
+不写 `features` 时格式自动选择：先看环境变量 `LOG_FORMAT=json|pretty`；没有设置时，在 CI 中或输出是终端则用可读格式，否则输出 JSON。要固定输出 JSON，在 `features` 里写 `format: formatFeature({ format: 'json' })`（`@migaia/log-host/features`）。
 
-完整选项与覆盖示例见 [使用指南](./USEGUIDE.md)。
+## 常用选项
 
-meta 保留 host 入口的浅复制语义；同一对象同时作为 args 与 meta 传入时，原 args 对象与额外 meta 副本都会交给控制台。
+| 选项或 API                                        | 说明                                                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `consolePlugin({ console?, stdout?, features? })` | `console` 默认全局 console，`stdout` 默认识别到的 `process.stdout`；都只借用，卸载时不关闭             |
+| `prettyFeature({ color?, timestamp? })`           | 可读格式。`color` 取 `auto`（默认）、`always`、`never`；`timestamp` 默认 `true`                        |
+| `ConsoleColorMode`                                | `color` 的取值常量                                                                                     |
+| `log.raw(text)`                                   | 安装后 host 多出的方法：把原始文本直接写到 stdout（例如进度条的 `\r`），没有 stdout 时用 `console.log` |
 
-`features` 使用 plugin-host 原生 record：`{ alias: feature }`。每个 feature 都是 `defineFeature` 返回的 opaque token；插件负责安装，并通过 host 与插件 handle 的 `console_alias_method` 扩展公开控制方法。运行时状态由每次安装独立拥有，例如 `threshold` alias 对应 `console_threshold_setLevel`。全局默认策略由 `@migaia/log-host/sdk` 的非输出插件 `defineLogPlugin({ name, features })` 声明，再传入 `createLogHost({ plugins: [...] })`；输出端只覆盖全局 record 中同 key 的 feature，不按工厂类别覆盖。不同 key 的 gate 会同时生效。host-wide carrier 之间同 key 冲突；每个输出在实际安装、按 key 合并后最多有一个 format、一个 batch、一个 retry 和一个 timeout，冲突以既有 `INVALID_OPTION` 拒绝。不再支持 `createLogHost({ features })` 或 feature 数组。
+`color: 'auto'` 依次看 `NO_COLOR`、非零的 `FORCE_COLOR`、是否终端、是否 CI。
+
+## 契约细节
+
+- 日志方法同步返回，交付异步进行；读取测试用的控制台或准备退出前，等待 `flush()` 或 `shutdown()`。
+- 作为参数传入的 Error 只交给控制台一次；`data.silent` 为真的条目（例如 reasoning 插件的完整阶段记录）不在控制台重复输出。
+- `meta` 按 host 入口的浅复制规则交付：同一个对象同时作为参数和 `meta` 传入时，参数里的原对象和 `meta` 副本都会交给控制台。
+- 写入失败（包括 `raw`）进入 host 的失败通道，处理器收到原始错误。读取选项失败时同步抛出 `logging.console / INVALID_OPTION`，原因在 `cause`。
+- `features` 的写法、host 级默认策略和覆盖规则与所有输出插件相同，见 [log-host 的组合策略](../log-host/README.md#组合策略)。
+
+公开导出：`consolePlugin`、`prettyFeature`、`ConsoleColorMode`、`LogConsoleErrorCode`。运行时第三方依赖只有 `ansis`。完整示例见 [使用指南](./USEGUIDE.md)。

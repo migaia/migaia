@@ -155,12 +155,16 @@ Not sure where to start? Begin with the problem you have:
 <details open>
 <summary><strong>Storage and encoding</strong></summary>
 
-| Package                                                                    | What it does                                                                                          |
-| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| [`storage-contract`](./packages/storage-contract/README.en.md)             | Define common interfaces for key-value and record storage so applications can use different backends. |
-| [`storage-plugin-browser`](./packages/storage-plugin-browser/README.en.md) | Read and write data in Web Storage, cookies, IndexedDB, and memory through a common interface.        |
-| [`serialize`](./packages/serialize/README.en.md)                           | Encode application data for storage or transmission and decode it when reading.                       |
-| [`wasm`](./packages/wasm/README.en.md)                                     | Allocate reusable byte buffers and transcode between JSON and MessagePack.                            |
+| Package                                                                    | What it does                                                                                                                                                    |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`storage-contract`](./packages/storage-contract/README.en.md)             | Define common interfaces for key-value and record storage so applications can use different backends.                                                           |
+| [`storage-host`](./packages/storage-host/README.en.md)                     | Assemble one or more storage backends from plugins, isolate data per organization, and share transactions, queries and shutdown. Includes an in-memory backend. |
+| [`storage-plugin-sqlite`](./packages/storage-plugin-sqlite/README.en.md)   | Plug a SQLite database into storage-host, with native transactions and SQL queries.                                                                             |
+| [`storage-plugin-browser`](./packages/storage-plugin-browser/README.en.md) | Plug localStorage, sessionStorage, cookies and IndexedDB into storage-host, with optional reactive queries.                                                     |
+| [`serialize`](./packages/serialize/README.en.md)                           | Encode application data for storage or transmission and decode it when reading.                                                                                 |
+| [`wasm`](./packages/wasm/README.en.md)                                     | Allocate reusable byte buffers and transcode between JSON and MessagePack.                                                                                      |
+
+The repository also holds server backend plugins that are not released yet: [`postgres`](./packages/storage-plugin-postgres/README.en.md), [`redis`](./packages/storage-plugin-redis/README.en.md), [`qdrant`](./packages/storage-plugin-qdrant/README.en.md), [`sparql`](./packages/storage-plugin-sparql/README.en.md) and [`object`](./packages/storage-plugin-object/README.en.md) (file system and S3), plus [`cache`](./packages/storage-plugin-cache/README.en.md) (multi-tier caching) and [`archive`](./packages/storage-plugin-archive/README.en.md) (hot and cold archiving), which combine existing backends.
 
 </details>
 
@@ -199,8 +203,9 @@ The packages form layers. A higher layer may depend on a lower one, never the ot
 
 ```text
 Integration            micro-hub   tray
-State and storage      store-*     storage-plugin-browser
+State and storage      store-*     storage-host + storage-plugin-*
 RPC                    rpc-host + rpc-plugin-{process,thread,browser,coroutines,pool,devtools}
+Logging                log-host + log-plugin-*
 Plugins and switches   plugin-host   capability
 Shared foundations     reactive   resource   serialize   storage-contract   supervision
                        lifecycle   event-subscriber   middleware-pipeline

@@ -155,12 +155,16 @@ close database
 <details open>
 <summary><strong>存储与编码</strong></summary>
 
-| 包                                                                      | 用来做什么                                                       |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [`storage-contract`](./packages/storage-contract/README.md)             | 为键值和记录存储定义统一接口，让应用可以接入不同存储后端。       |
-| [`storage-plugin-browser`](./packages/storage-plugin-browser/README.md) | 通过统一接口读写 Web Storage、cookie、IndexedDB 和内存中的数据。 |
-| [`serialize`](./packages/serialize/README.md)                           | 把应用数据编码为可存储或传输的格式，并在读取时解码。             |
-| [`wasm`](./packages/wasm/README.md)                                     | 分配可复用的字节缓冲区，并在 JSON 与 MessagePack 之间转码。      |
+| 包                                                                      | 用来做什么                                                                               |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| [`storage-contract`](./packages/storage-contract/README.md)             | 为键值和记录存储定义统一接口，让应用可以接入不同存储后端。                               |
+| [`storage-host`](./packages/storage-host/README.md)                     | 用插件装配一个或多个存储后端，按组织隔离数据，统一事务、查询和关闭。内置内存后端。       |
+| [`storage-plugin-sqlite`](./packages/storage-plugin-sqlite/README.md)   | 把 SQLite 数据库接入 storage-host，带原生事务和 SQL 查询。                               |
+| [`storage-plugin-browser`](./packages/storage-plugin-browser/README.md) | 把 localStorage、sessionStorage、cookie 和 IndexedDB 接入 storage-host，可选响应式查询。 |
+| [`serialize`](./packages/serialize/README.md)                           | 把应用数据编码为可存储或传输的格式，并在读取时解码。                                     |
+| [`wasm`](./packages/wasm/README.md)                                     | 分配可复用的字节缓冲区，并在 JSON 与 MessagePack 之间转码。                              |
+
+仓库里还有几个服务端后端插件，暂未发布：[`postgres`](./packages/storage-plugin-postgres/README.md)、[`redis`](./packages/storage-plugin-redis/README.md)、[`qdrant`](./packages/storage-plugin-qdrant/README.md)、[`sparql`](./packages/storage-plugin-sparql/README.md)、[`object`](./packages/storage-plugin-object/README.md)（文件系统与 S3），以及组合已有后端的 [`cache`](./packages/storage-plugin-cache/README.md)（多级缓存）和 [`archive`](./packages/storage-plugin-archive/README.md)（冷热归档）。
 
 </details>
 
@@ -199,8 +203,9 @@ RPC（远程过程调用）让你像调用本地函数一样调用另一个线�
 
 ```text
 应用集成          micro-hub   tray
-状态与存储适配     store-*     storage-plugin-browser
+状态与存储        store-*     storage-host + storage-plugin-*
 RPC              rpc-host + rpc-plugin-{process,thread,browser,coroutines,pool,devtools}
+日志             log-host + log-plugin-*
 插件与开关         plugin-host   capability
 通用基础          reactive   resource   serialize   storage-contract   supervision
                  lifecycle   event-subscriber   middleware-pipeline

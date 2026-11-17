@@ -1,32 +1,61 @@
 # @migaia/log-plugin-console
 
-An optional console output for the matching version of `@migaia/log-host`. Its only third-party runtime dependency is `ansis`. Console and stdout capabilities can be supplied independently.
+[中文](./README.md)
 
-```ts
+Console output for `@migaia/log-host`. On a terminal or in CI it prints a readable, colored format that keeps native objects and error stacks; when output is redirected or collected by a log pipeline it prints one JSON object per line by default, so you do not need separate setups for the two environments.
+
+## Problems you may have seen
+
+- **Production logs cannot be searched**: colored text that reads well in development reaches the log system as escape codes and stack traces split across lines. The cause is that the output format does not follow the environment.
+- **Objects print as `[object Object]`**: the logger joins arguments into a string before the console sees them, losing the object expansion and error stacks the console could show. The cause is formatting before the console.
+
+## Start here
+
+```ts doc-test=run
 import { createLogHost, levelPlugin } from '@migaia/log-host'
 import { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'
 
 const log = createLogHost({
   plugins: [
     levelPlugin(),
-    consolePlugin({ features: { pretty: prettyFeature({ color: 'auto' }) } })
+    // The example fixes no color and no timestamp so the output is easy to compare;
+    // by default both follow the terminal and the environment
+    consolePlugin({ features: { pretty: prettyFeature({ color: 'never', timestamp: false }) } })
   ]
 })
-log.info('server ready', { port: 3000 })
-await log.flush()
+log.info('user %s signed in', 'alice')
+log.warn('disk usage at %d%%', 91)
 await log.shutdown('manual')
 ```
 
-Logging methods return synchronously and deliver entries asynchronously. `warn` uses `console.warn`, `error`/`fatal` use `console.error`, and other tags use `console.log`. Entries marked `data.silent` are skipped.
+Output:
 
-`prettyFeature` preserves message placeholders, argument order, object identity and native Error arguments. JSON/plain delivery uses the host's `record.text`. Automatic format selection checks `LOG_FORMAT=json|pretty`, then CI and TTY, and otherwise selects JSON. Explicit host/output formatting overrides this fallback.
+```text
+[INFO] user alice signed in
+[WARN] disk usage at 91%
+```
 
-The installed plugin adds `raw(text)` to the host. It writes unchanged text to borrowed stdout or falls back to the borrowed console's `log`. Writer failures enter the host failure channel. Removal never closes supplied console/stdout capabilities.
+Placeholders such as `%s` and `%d` are handled by the console itself. Arguments reach `console.log` / `console.warn` / `console.error` unchanged, so objects expand and errors keep their full stack. `warn` goes to `console.warn`, `error` and `fatal` go to `console.error`, and other levels go to `console.log`.
 
-Runtime exports are `consolePlugin`, `prettyFeature`, `ConsoleColorMode` and the empty `LogConsoleErrorCode` table. The package declares no error source; the host contains original capability failures.
+Without `features`, the format is chosen automatically: first the `LOG_FORMAT=json|pretty` environment variable; when it is not set, the readable format is used in CI or when output is a terminal, and JSON otherwise. To always print JSON, put `format: formatFeature({ format: 'json' })` (from `@migaia/log-host/features`) in `features`.
 
-See the [usage guide](./USEGUIDE.en.md) for options and scope examples.
+## Common options
 
-Meta retains the host entry’s shallow-copy boundary. Passing the same object in args and as meta delivers both the original argument and an additional meta copy to the console.
+| Option or API                                     | Description                                                                                                                              |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `consolePlugin({ console?, stdout?, features? })` | `console` defaults to the global console and `stdout` to the detected `process.stdout`; both are borrowed and not closed on removal      |
+| `prettyFeature({ color?, timestamp? })`           | Readable format. `color` is `auto` (default), `always` or `never`; `timestamp` defaults to `true`                                        |
+| `ConsoleColorMode`                                | Constants for `color`                                                                                                                    |
+| `log.raw(text)`                                   | Added to the host on install: writes raw text straight to stdout (for example a progress bar's `\r`), or to `console.log` without stdout |
 
-`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `console_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `console_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/sdk`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported.
+`color: 'auto'` checks, in order, `NO_COLOR`, a non-zero `FORCE_COLOR`, whether the output is a terminal, and whether it runs in CI.
+
+## Contract details
+
+- Log methods return synchronously and delivery is asynchronous; await `flush()` or `shutdown()` before reading a test console or exiting.
+- An Error passed as an argument reaches the console once. Entries with a truthy `data.silent` (for example the reasoning plugin's completed-phase records) are not printed again.
+- `meta` follows the host's shallow-copy rule: when one object is passed both as an argument and as `meta`, the console receives the original argument and the `meta` copy.
+- Write failures (including `raw`) go to the host's failure channel, and handlers receive the original error. An option that cannot be read throws `logging.console / INVALID_OPTION` synchronously, with the reason in `cause`.
+- How to write `features`, host-wide defaults and override rules are the same for every output plugin; see [Composing policies in log-host](../log-host/README.en.md#composing-policies).
+
+Public exports: `consolePlugin`, `prettyFeature`, `ConsoleColorMode` and `LogConsoleErrorCode`. The only third-party runtime dependency is `ansis`. See the [usage guide](./USEGUIDE.en.md) for full examples.

@@ -1,34 +1,76 @@
 # @migaia/log-plugin-http
 
-An injectable HTTP POST output for the matching `@migaia/log-host` version. Host features own batching, retry and timeout policy; this package performs one request attempt.
+[中文](./README.md)
 
-```ts
+An output plugin that sends logs to a log service with HTTP POST, used with `@migaia/log-host`. Each delivery sends one request; batching, retries and timeouts come from host Features and follow the same rules as every other output.
+
+## Problems you may have seen
+
+- **One request per log line overloads the log service**: at peak, the request count equals the line count. The cause is no batching.
+- **A short 503 from the log service loses every line sent meanwhile**: failed sends are not retried, or retries ignore the service's `Retry-After` and pile more load on it. The cause is retry rules that do not tell errors apart or follow the server's pace.
+
+## Start here
+
+The example injects a fake `fetcher` instead of a real network: the first call returns 503 and later calls return 200. Run it directly with Node 24.
+
+```ts doc-test=run
 import { createLogHost, levelPlugin } from '@migaia/log-host'
-import { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'
+import { batchFeature, retryFeature } from '@migaia/log-host/features'
 import { httpPlugin } from '@migaia/log-plugin-http'
 
+let calls = 0
 const log = createLogHost({
   plugins: [
     levelPlugin(),
     httpPlugin({
-      url: 'https://example.test/logs',
+      url: 'https://logs.example.invalid/ingest',
+      // A fake network for the example: 503 first, then 200; without fetcher the global fetch is used
+      async fetcher(_url, init) {
+        calls += 1
+        const { entries } = JSON.parse(init.body)
+        console.log(`request ${calls} carries ${entries.length} entries`)
+        const status = calls === 1 ? 503 : 200
+        return { ok: status === 200, status, headers: new Headers() }
+      },
       features: {
-        batch: batchFeature({ maxSize: 20 }),
-        retry: retryFeature({ attempts: 3, backoff: 200 }),
-        timeout: timeoutFeature({ ms: 10000 })
+        batch: batchFeature({ maxSize: 2 }), // two entries per request
+        retry: retryFeature({ attempts: 3, backoff: 0 }) // at most 3 attempts, the first included
       }
     })
   ]
 })
-log.info('request completed', { requestId: 'one' })
-await log.flush()
+log.info('order created')
+log.info('payment captured')
 await log.shutdown('manual')
 ```
 
-The wire body always remains `{ "entries": [...] }`. Entry error fields use the host's canonical error-chain projection. HTTP does not consume formatted text, so host formats are skipped. Adding a format to HTTP features is rejected at creation with the host INVALID_OPTION error. The output borrows `globalThis.fetch` unless a fetcher is supplied. Creation fails synchronously when neither exists.
+Output:
 
-Network failures, 429 and 5xx responses are eligible for `retryFeature`. Strictly parsed `Retry-After` advice overrides the next ordinary backoff and is bounded by `maxRetryAfterMs`. `attempts` includes the first request.
+```text
+request 1 carries 2 entries
+request 2 carries 2 entries
+```
 
-Runtime delivery failures enter the host failure channel. Logging methods do not throw and `flush` does not reject. See the [usage guide](./USEGUIDE.en.md) for configuration and error boundaries.
+The two entries are batched into one request. After the first 503 the plugin retries under `retryFeature`, and the second attempt succeeds. `shutdown()` completes only after the batch is delivered.
 
-`features` uses the native plugin-host record form `{ alias: feature }`. Each feature is an opaque `defineFeature` token; the plugin installs it and exposes its controls as `http_alias_method` extensions on the host and plugin handle. Runtime state belongs to each installation. For example, a `threshold` alias exposes `http_threshold_setLevel`. Host-wide defaults are declared by a non-output `defineLogPlugin({ name, features })` from `@migaia/log-host/sdk`, passed in `createLogHost({ plugins: [...] })`; an output feature overrides only the same host-wide record key. Gates under different keys both apply. A repeated host-wide key is a conflict. At actual installation, each output checks the merged policies after key overrides: at most one format and one each of batch, retry and timeout, rejecting a collision with the existing `INVALID_OPTION`. `createLogHost({ features })` and feature arrays are no longer supported.
+## Common options
+
+| Option            | Description                                                                                                                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`             | Passed to the fetcher unchanged                                                                                                                                                               |
+| `fetcher`         | Defaults to `globalThis.fetch`; receives `(url, { method, headers, body, signal })` and returns a result with `ok`, `status` and `headers.get`. Timeouts and shutdown arrive through `signal` |
+| `headers`         | Copied at creation; `Content-Type: application/json` by default                                                                                                                               |
+| `authToken`       | When non-empty, sets `Authorization: Bearer <token>`                                                                                                                                          |
+| `maxRetryAfterMs` | Upper bound for the server's `Retry-After`, 30000 by default                                                                                                                                  |
+| `features`        | This output's policies, usually `batchFeature`, `retryFeature` and `timeoutFeature`                                                                                                           |
+
+## Contract details
+
+- The request body is always `{ "entries": [...] }`. Each entry's `error` is written through the host's shared projection with the whole error chain (`source`, `code`, `name`, `message`, `stack`, `cause`, `errors`).
+- HTTP does not consume formatted text, so the host skips the format phase for it; a format in this plugin's `features` is rejected at install.
+- Network errors, 429 and 5xx can be retried; other statuses are not. `attempts` includes the first request. A valid `Retry-After` (seconds or an HTTP date) replaces the ordinary backoff and is capped by `maxRetryAfterMs`.
+- Without `retryFeature` there is no retry, without `batchFeature` no batching, and without `timeoutFeature` no extra timeout.
+- With no usable fetcher, or an invalid `maxRetryAfterMs`, creation throws synchronously. Send and serialization errors at run time go to the host's failure channel; log methods do not throw and `flush()` does not reject. The error domain is `logging.http` (`LOG_HTTP_ERROR_SOURCE`); see `LogHttpErrorCode` for codes.
+- `features` is a `{ name: feature }` record; controls appear on the host as `http_<name>_<method>`. For host-wide defaults and override rules see [Composing policies in log-host](../log-host/README.en.md#composing-policies).
+
+See the [usage guide](./USEGUIDE.en.md) for full configuration and error boundaries.

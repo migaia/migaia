@@ -1,5 +1,16 @@
 # log-host 使用指南
 
+## 按场景查找
+
+| 你想做的事                                       | 看这里                                    |
+| ------------------------------------------------ | ----------------------------------------- |
+| 创建 host，写第一条日志，退出前送完              | [建立 host](#建立-host)                   |
+| 按级别过滤，运行时调整门槛或加过滤器             | [级别、过滤与条目](#级别过滤与条目)       |
+| 给所有输出统一批量、重试、超时，或只改某一个输出 | [输出策略与作用域](#输出策略与作用域)     |
+| 把日志写到自己的去处                             | [编写输出插件](#编写输出插件)             |
+| 观察交付失败，保留错误原因链                     | [错误投影与失败通道](#错误投影与失败通道) |
+| 把日志转交给另一个 host，运行时增删插件          | [转发与动态配置](#转发与动态配置)         |
+
 ## 建立 host
 
 ```ts
@@ -68,7 +79,7 @@ entry 在 host 入口执行一次；每个输出端随后按 gate、format、bat
 
 record key 是 feature 的名称：输出级 `features.<key>` 覆盖 host-wide 同 key 的 feature。不同 key 即使使用同一工厂也都保留，例如 `{ a: thresholdFeature(), b: thresholdFeature() }` 会应用两个 gate。未覆盖的 host gate 先运行，输出级 gate 随后按声明顺序运行。entry feature 只允许装在 host-wide carrier。
 
-format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，也不能各自提供同一类，动态 `use()` 同样检查。违反时以既有 `INVALID_OPTION` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。
+format、batch、retry、timeout 每个输出只取一个：输出自己配了其中哪一类，就替换 host-wide 的同类 feature，key 不同也一样。一个插件的 record 里每类最多一个，在安装插件时检查（`createLogHost` 或 `use()`）；多个 host-wide carrier 不能声明同 key，动态 `use()` 同样检查。重复的 host 级名称和单个记录格式错误以 `logging / INVALID_OPTION` 拒绝；两个 host 级载体各自提供同一类 format、batch、retry 或 timeout 时，以 `plugin.host / FEATURE_ROLE_CONFLICT` 拒绝。没有有效显式 format 时采用输出插件的 `defaultFormat`。
 
 | Feature                               | 作用                                                                               |
 | ------------------------------------- | ---------------------------------------------------------------------------------- |

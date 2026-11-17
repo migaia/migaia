@@ -1,5 +1,16 @@
 # log-host usage guide
 
+## Find by scenario
+
+| What you want to do                                                    | Where to look                                                 |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Create a host, write the first line, deliver before exit               | [Create a host](#create-a-host)                               |
+| Filter by level, change the threshold or add filters at run time       | [Levels and entry policies](#levels-and-entry-policies)       |
+| Share batching, retry and timeout across outputs, or change one output | [Output scopes and delivery](#output-scopes-and-delivery)     |
+| Write logs to your own destination                                     | [Define an output](#define-an-output)                         |
+| Observe delivery failures and keep error cause chains                  | [Errors and lifecycle](#errors-and-lifecycle)                 |
+| Hand entries to another host, add or remove plugins at run time        | [Forwarding and configuration](#forwarding-and-configuration) |
+
 ## Create a host
 
 ```ts
