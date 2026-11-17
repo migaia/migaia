@@ -1,5 +1,4 @@
 import { snapshotBrowserConfig } from '../utils/config-snapshot.ts'
-import { BROWSER_REACTIVE_POLL_INTERVAL_MS } from '../constants.ts'
 import {
   type IStorageBackendType,
   type IStorageFeature,
@@ -13,8 +12,7 @@ import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import {
   createStorageOperationReporter,
   defineStorageFeature,
-  reportCleanupError,
-  StorageReactiveVisibility
+  reportCleanupError
 } from '@migaia/storage-host/sdk'
 import type {
   IOperationContext,
@@ -23,11 +21,8 @@ import type {
   IStorageResource
 } from '@migaia/storage-contract'
 import { createStorageReactiveService, type IStorageReactiveAdapter } from '../host/reactive.ts'
-import type {
-  ILiveQuery,
-  ILiveQueryOptions,
-  IStorageReactiveFeatureMetadata
-} from '../host/types.ts'
+import { defaultReactiveProfile } from '../host/reactive-profile.ts'
+import type { ILiveQuery, ILiveQueryOptions } from '../host/types.ts'
 import { StorageErrorText } from '../error-text.ts'
 import { StorageError } from '../types/errors.ts'
 
@@ -73,17 +68,6 @@ export type IReactiveFeatureOutput = IStorageFeatureOutput<
 /** What the reactive Feature reads from any backend; a backend may state its own profile. */
 type IReactiveFeatureExpose = IStorageFeatureExpose<IStorageBackendType> &
   Partial<IStorageReactiveProfileExpose>
-
-/** A backend that states no profile is observed by its controller, else by polling this instance. */
-function defaultReactiveProfile(hasController: boolean): IStorageReactiveFeatureMetadata {
-  return hasController
-    ? { mode: 'push', visibility: StorageReactiveVisibility.instance }
-    : {
-        mode: 'polling',
-        visibility: StorageReactiveVisibility.instance,
-        pollIntervalMs: BROWSER_REACTIVE_POLL_INTERVAL_MS
-      }
-}
 
 /** Validate live-query options synchronously before source admission or Resource allocation. */
 const validateLiveOptions = <T>(options: IChainLiveQueryOptions<T>): void => {
