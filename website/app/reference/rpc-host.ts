@@ -18,11 +18,11 @@ const owned: ILibraryReference = {
     },
     features: {
       summary: {
-        en: 'Import complete timeout and retry implementations. Install them in a transport features list or linkPolicy; one call may override a policy with a complete instance or false, never a number or plain configuration.',
-        zh: '导入包含完整算法的超时与重试实例。安装到传输功能列表或链路策略；单次调用可用完整实例或 `false` 覆盖，不能传数字或普通配置。'
+        en: 'Import complete timeout and retry implementations. Install them in a transport features record or in a flow plugin features record (defineFlowPlugin); one call may override a policy with a complete instance or false, never a number or plain configuration.',
+        zh: '导入包含完整算法的超时与重试实例。安装到传输的 features 记录，或 flow 插件（`defineFlowPlugin`）的 features 记录；单次调用可用完整实例或 `false` 覆盖，不能传数字或普通配置。'
       },
       example:
-        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
     },
     'features/timeout': {
       summary: {
@@ -30,7 +30,7 @@ const owned: ILibraryReference = {
         zh: '默认导出的 `timeout` 捕获有限非负尝试预算。实例拥有实际计时器，结算后移除计时及取消订阅；继承截止时间只能缩短预算。'
       },
       example:
-        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
     },
     'features/retry': {
       summary: {
@@ -38,63 +38,63 @@ const owned: ILibraryReference = {
         zh: '默认导出的 `retry` 拥有发起方重放与退避，借用真实接纳会话替换或原生代际就绪。方法幂等性及物理交接决定恢复，中继转发不重试。'
       },
       example:
-        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
     },
     sdk: {
       summary: {
-        en: 'Author real native definitions through defineTransportPlugin, defineFlowPlugin and defineLinkPolicy. Carriers execute prepare/encode/decode/restore once. Native packages acquire IO, supply identity/transfer/observation facts and reuse RpcMemberGeneration with the original supervisor.',
-        zh: '通过 `defineTransportPlugin`、`defineFlowPlugin` 和 `defineLinkPolicy` 编写真正原生定义。载体只执行一次准备、编码、解码及恢复。原生包获取读写资源，提供身份、转移及观察事实，并通过 `RpcMemberGeneration` 复用原监管器。'
+        en: 'Author real native definitions through defineTransportPlugin and defineFlowPlugin. Carriers execute prepare/encode/decode/restore once. Native packages acquire IO, supply identity/transfer/observation facts and reuse RpcMemberGeneration with the original supervisor.',
+        zh: '通过 `defineTransportPlugin` 和 `defineFlowPlugin` 编写真正原生定义。载体只执行一次准备、编码、解码及恢复。原生包获取读写资源，提供身份、转移及观察事实，并通过 `RpcMemberGeneration` 复用原监管器。'
       },
       example:
         "import { createRpcMessageCarrier } from '@migaia/rpc-host/sdk'\nimport type { IRpcMessageIO } from '@migaia/rpc-host/sdk'\n\nexport function acquire(\n  io: IRpcMessageIO,\n  id: string,\n  report: (error: unknown) => void,\n) {\n  return createRpcMessageCarrier({ id, io, report })\n}\n"
     },
     plugins: {
       summary: {
-        en: 'Install optional flow implementations before transport startup: auth, chunk, batch, idempotency, limits, schema, probe, typegen and linkPolicy. Omission leaves the capability absent. Namespace filters scope installed hooks; extensions cannot replace built-in calls.',
-        zh: '在传输启动前安装可选信息流实现：认证、分片、合帧、幂等、限流、模式校验、探针、类型生成及链路策略。省略即没有对应能力。命名空间过滤限定介入范围，扩展不能覆盖内建调用。'
+        en: 'Host-level plugins probe and typegen. Flow Features (auth, chunk, batch, idempotency, limits, schema, errorMap) are imported from /features and placed in a transport or flow plugin features record. Omission leaves the capability absent.',
+        zh: '宿主级插件：探针与类型生成。信息流 Feature（认证、分片、合帧、幂等、限流、模式校验、错误映射）从 `/features` 导入，放进传输或 flow 插件的 features 记录。省略即没有对应能力。'
       },
       example:
-        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
     },
-    'plugins/auth': {
+    'features/auth': {
       summary: {
         en: 'Authentication transforms protect admitted handshake/envelope data. Supply complete sign/verify and encrypt/decrypt pairs. Credentials are explicit application/native capabilities; transport identity is not inferred from payload metadata.',
         zh: '认证转换保护已接纳的握手及信封数据。签名与验证、加密与解密分别成对提供。凭据来自显式应用或原生能力，不能从载荷元数据推断传输身份。'
       },
       example:
-        "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}\n"
+        "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}\n"
     },
-    'plugins/chunk': {
+    'features/chunk': {
       summary: {
         en: 'Install negotiated chunk@1 with bounded source/message reassembly and expiry. Physical fragments are distinct from ordered business method groups; disposing a source releases its retained assemblies.',
         zh: '安装经协商的 `chunk@1`，限制来源及消息重组与过期。物理分片不同于有序业务方法分组；释放来源会清除所保留组装。'
       },
       example:
-        "import chunk from '@migaia/rpc-host/plugins/chunk'\nexport const framing = chunk({ chunkBytes: 16384, maxMessageBytes: 16777216 })\n"
+        "import chunk from '@migaia/rpc-host/features/chunk'\nexport const framing = chunk({ chunkBytes: 16384, maxMessageBytes: 16777216 })\n"
     },
-    'plugins/batch': {
+    'features/batch': {
       summary: {
         en: 'Coalesce eligible physical frames through negotiated batch@1 while preserving each logical write cancellation and completion. Batching does not make application calls a transaction.',
         zh: '通过已协商的 `batch@1` 合并合格物理帧，保留各逻辑写入的取消及完成。合帧不会把应用调用变成事务。'
       },
       example:
-        "import batch from '@migaia/rpc-host/plugins/batch'\nexport const batching = batch({ required: false })\n"
+        "import batch from '@migaia/rpc-host/features/batch'\nexport const batching = batch({ required: false })\n"
     },
-    'plugins/limits': {
+    'features/limits': {
       summary: {
         en: 'Own shared provider concurrency and optional per-connection rate, payload, timeout-streak and idle admission. Defaults are 256 globally and 64 per peer. Omitting limits installs no such quotas.',
         zh: '拥有共享提供方并发及可选连接速率、载荷、连续超时和空闲准入。默认总并发 `256`、单对端 `64`。省略限流插件就不安装这些配额。'
       },
       example:
-        "import limits from '@migaia/rpc-host/plugins/limits'\nexport const capacity = limits({ maxGlobal: 256, maxPerPeer: 64 })\n"
+        "import limits from '@migaia/rpc-host/features/limits'\nexport const capacity = limits({ maxGlobal: 256, maxPerPeer: 64 })\n"
     },
-    'plugins/schema': {
+    'features/schema': {
       summary: {
         en: 'Validate method inputs and successful results with synchronous application parsers, retaining the original business value. Schema announcements alone are inert Host directory metadata; this plugin enables validation.',
         zh: '使用应用同步解析器校验方法输入及成功结果，保留原业务值。仅公告模式是惰性宿主目录元数据，本插件才启用校验。'
       },
       example:
-        "import schema from '@migaia/rpc-host/plugins/schema'\nexport const validation = schema()\n"
+        "import schema from '@migaia/rpc-host/features/schema'\nexport const validation = schema()\n"
     },
     'plugins/typegen': {
       summary: {
@@ -104,13 +104,13 @@ const owned: ILibraryReference = {
       example:
         "import typegen from '@migaia/rpc-host/plugins/typegen'\nexport const declarations = typegen({\n  out: { write: (fileName, text) => console.log(fileName, text) },\n})\n"
     },
-    'plugins/idempotency': {
+    'features/idempotency': {
       summary: {
         en: 'Install a scoped execution/outcome store and the namespace outcome(key) extension. Explicit claims retain pending ownership and completed tombstones; a lookup does not authorize execution or replay by itself.',
         zh: '安装带作用域的执行及结果存储，为命名空间增加 `outcome(key)`。显式认领保留待决所有权及完成记录；查询本身不授予执行或重放权限。'
       },
       example:
-        "import idempotency from '@migaia/rpc-host/plugins/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000, maxEntries: 1024 })\n"
+        "import idempotency from '@migaia/rpc-host/features/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000, maxEntries: 1024 })\n"
     },
     'plugins/probe': {
       summary: {
@@ -120,14 +120,6 @@ const owned: ILibraryReference = {
       example:
         "import { defineProbe, probe } from '@migaia/rpc-host/plugins/probe'\n\nconst observer = defineProbe({\n  stages: ['message', 'peer'],\n  emit: (view) => console.log({ ...view }),\n})\nexport const observation = probe(observer)\nobserver.setStages(['message'])\n"
     },
-    'plugins/link-policy': {
-      summary: {
-        en: 'Supply complete timeout/retry instances as link defaults. A transport-installed instance overrides the default, then a call instance or false overrides that choice. Inherited chain deadlines cannot be extended.',
-        zh: '将完整超时及重试实例作为链路默认值。传输实例覆盖默认值，调用实例或 `false` 再覆盖传输选择。继承链路截止时间不能延长。'
-      },
-      example:
-        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
-    }
   },
   symbols: {
     createRpcHost: {
@@ -158,11 +150,11 @@ const owned: ILibraryReference = {
       },
       options: 'ITimeoutFeatureOptions',
       returns: {
-        en: 'A frozen complete executing feature; install in the owning transport/linkPolicy or select for one call.',
-        zh: '冻结的完整执行功能，安装在所属传输及链路策略中，或为一次调用选用。'
+        en: 'A frozen complete executing feature; install in the owning transport or a flow plugin features record, or select for one call.',
+        zh: '冻结的完整执行功能，安装在所属传输或 flow 插件的 features 记录中，或为一次调用选用。'
       },
       example:
-        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n",
+        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n",
       scenarios: [
         {
           en: 'Select this complete instance for a single originating invocation or install it on its actual owner.',
@@ -178,11 +170,11 @@ const owned: ILibraryReference = {
       },
       options: 'IRetryFeatureOptions',
       returns: {
-        en: 'A frozen complete executing feature; install in the owning transport/linkPolicy or select for one call.',
-        zh: '冻结的完整执行功能，安装在所属传输及链路策略中，或为一次调用选用。'
+        en: 'A frozen complete executing feature; install in the owning transport or a flow plugin features record, or select for one call.',
+        zh: '冻结的完整执行功能，安装在所属传输或 flow 插件的 features 记录中，或为一次调用选用。'
       },
       example:
-        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n",
+        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n",
       scenarios: [
         {
           en: 'Select this complete instance for a single originating invocation or install it on its actual owner.',
@@ -253,7 +245,7 @@ const owned: ILibraryReference = {
         zh: '返回不拥有计时器及释放义务的幂等存储，由会话或提供方所有者控制作用域及键准入。'
       },
       example:
-        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n",
+        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n",
       optionCases: [
         {
           title: {
@@ -265,7 +257,7 @@ const owned: ILibraryReference = {
             zh: '订单提交后，答复丢失可能触发重试。保留五分钟结果，相同键的重试即可复用先前结果；限制每个会话的条目数，避免某次结算占满存储。'
           },
           example:
-            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\n\nconst orderOutcomes = createRpcIdempotencyStore({\n  retentionMs: 300000,\n  maxEntries: 1000,\n  maxEntriesPerScope: 20,\n})\n",
+            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\n\nconst orderOutcomes = createRpcIdempotencyStore({\n  retentionMs: 300000,\n  maxEntries: 1000,\n  maxEntriesPerScope: 20,\n})\n",
           result: {
             en: 'Recent order results remain available to keyed retries within the configured capacity.',
             zh: '在设置的容量内，近期订单结果可供携带相同键的重试复用。'
@@ -282,7 +274,7 @@ const owned: ILibraryReference = {
             zh: '导出服务的结果远大于普通订单调用。限制总字节数与单个结果大小，避免缓存导出内容时无限占用内存。'
           },
           example:
-            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\n\nconst exportOutcomes = createRpcIdempotencyStore({\n  maxBytes: 8 * 1024 * 1024,\n  maxOutcomeBytes: 256 * 1024,\n})\n",
+            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\n\nconst exportOutcomes = createRpcIdempotencyStore({\n  maxBytes: 8 * 1024 * 1024,\n  maxOutcomeBytes: 256 * 1024,\n})\n",
           result: {
             en: 'The outcome store has an explicit memory budget for retained results.',
             zh: '保留结果的存储有明确内存预算。'
@@ -399,7 +391,7 @@ const owned: ILibraryReference = {
         zh: '冷原生信息流定义；每个接收宿主拥有自己的介入点及精确清理。'
       },
       example:
-        "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}\n"
+        "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}\n"
     },
     chunkFeature: {
       role: 'enhancer',
@@ -413,7 +405,7 @@ const owned: ILibraryReference = {
         zh: '冷原生信息流定义；每个接收宿主拥有自己的介入点及精确清理。'
       },
       example:
-        "import chunk from '@migaia/rpc-host/plugins/chunk'\nexport const framing = chunk({ chunkBytes: 16384, maxMessageBytes: 16777216 })\n"
+        "import chunk from '@migaia/rpc-host/features/chunk'\nexport const framing = chunk({ chunkBytes: 16384, maxMessageBytes: 16777216 })\n"
     },
     batchFeature: {
       role: 'enhancer',
@@ -427,7 +419,7 @@ const owned: ILibraryReference = {
         zh: '冷原生信息流定义；每个接收宿主拥有自己的介入点及精确清理。'
       },
       example:
-        "import batch from '@migaia/rpc-host/plugins/batch'\nexport const batching = batch({ required: false })\n"
+        "import batch from '@migaia/rpc-host/features/batch'\nexport const batching = batch({ required: false })\n"
     },
     limitsFeature: {
       role: 'enhancer',
@@ -441,7 +433,7 @@ const owned: ILibraryReference = {
         zh: '冷原生信息流定义；每个接收宿主拥有自己的介入点及精确清理。'
       },
       example:
-        "import limits from '@migaia/rpc-host/plugins/limits'\nexport const capacity = limits()\n"
+        "import limits from '@migaia/rpc-host/features/limits'\nexport const capacity = limits()\n"
     },
     schemaFeature: {
       role: 'enhancer',
@@ -455,7 +447,7 @@ const owned: ILibraryReference = {
         zh: '冷原生信息流定义；每个接收宿主拥有自己的介入点及精确清理。'
       },
       example:
-        "import schema from '@migaia/rpc-host/plugins/schema'\nexport const validation = schema()\n"
+        "import schema from '@migaia/rpc-host/features/schema'\nexport const validation = schema()\n"
     },
     typegen: {
       role: 'enhancer',
@@ -483,7 +475,7 @@ const owned: ILibraryReference = {
         zh: '冷原生信息流定义；每个接收宿主拥有自己的介入点及精确清理。'
       },
       example:
-        "import idempotency from '@migaia/rpc-host/plugins/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000 })\n"
+        "import idempotency from '@migaia/rpc-host/features/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000 })\n"
     },
     probe: {
       role: 'enhancer',
@@ -503,20 +495,6 @@ const owned: ILibraryReference = {
       },
       example:
         "import probe from '@migaia/rpc-host/plugins/probe'\nexport const observation = probe({\n  stages: ['message'],\n  emit: (view) => console.log({ ...view }),\n})\n"
-    },
-    linkPolicy: {
-      role: 'enhancer',
-      purpose: {
-        en: 'Complete timeout/retry instances used as link defaults before transport and call overrides.',
-        zh: '在传输及调用覆盖之前使用的完整超时及重试链路默认实例。'
-      },
-      options: 'IRpcLinkPolicyOptions',
-      returns: {
-        en: 'Cold native flow definition; each receiving Host owns its own hooks and exact cleanup.',
-        zh: '冷原生信息流定义；每个接收宿主拥有自己的介入点及精确清理。'
-      },
-      example:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })\n"
     },
     createRpcMessageCarrier: {
       role: 'factory',
@@ -1185,26 +1163,6 @@ const owned: ILibraryReference = {
       example:
         "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const trace = defineFlowPlugin({\n  name: 'application-trace',\n  setup() {\n    return { hooks: { observe: (event) => console.log(event) } }\n  },\n})\n"
     },
-    defineLinkPolicy: {
-      role: 'enhancer',
-      purpose: {
-        en: 'Register complete call-feature defaults without adding a second intervention pipeline or call strategy in Host.',
-        zh: '登记完整调用功能默认值，不在宿主增加第二介入流水线或调用策略。'
-      },
-      params: {
-        definition: {
-          en: 'Native policy name and complete feature list.',
-          zh: '原生策略名称及完整功能列表。'
-        }
-      },
-      options: 'IRpcLinkPolicyDefinition',
-      returns: {
-        en: 'Cold native link-policy definition with no timer or retry work until a real invocation.',
-        zh: '冷原生链路策略定义，实际调用前没有计时或重试工作。'
-      },
-      example:
-        "import { defineLinkPolicy } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineLinkPolicy({\n  name: 'application-policy',\n  features: [timeoutFeature({ ms: 500 })],\n})\n"
-    },
     RpcPortableCapture: {
       role: 'factory',
       purpose: {
@@ -1715,15 +1673,6 @@ const owned: ILibraryReference = {
       example:
         "import { RpcMemberStopSignal } from '@migaia/rpc-host/sdk'\nexport const processStop = { signal: RpcMemberStopSignal }\n"
     },
-    'plugins/link-policy:RpcLinkPolicyName': {
-      role: 'constant',
-      purpose: {
-        en: 'Stable native plugin identity used by the built-in linkPolicy definition. It is not a transport namespace.',
-        zh: '内建链路策略定义使用的稳定原生插件身份，不是传输命名空间。'
-      },
-      example:
-        "import { RpcLinkPolicyName } from '@migaia/rpc-host/plugins/link-policy'\nexport const policyName = RpcLinkPolicyName\n"
-    },
     createProbeEmitter: {
       role: 'factory',
       purpose: {
@@ -1961,11 +1910,11 @@ const owned: ILibraryReference = {
             zh: '本次调用的完整超时实例或 `false`，继承链路截止时间仍限制尝试。'
           },
           default: {
-            en: 'Inherit the transport feature, then link policy.',
-            zh: '继承传输实例，再继承链路策略。'
+            en: 'Inherit the transport feature, then host-level flow plugin defaults.',
+            zh: '继承传输实例，再继承宿主级 flow 插件的默认值。'
           },
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
         },
         retry: {
           summary: {
@@ -1973,11 +1922,11 @@ const owned: ILibraryReference = {
             zh: '完整发起方重试实例或 `false`，转发中继不执行此策略。'
           },
           default: {
-            en: 'Inherit the transport feature, then link policy.',
-            zh: '继承传输实例，再继承链路策略。'
+            en: 'Inherit the transport feature, then host-level flow plugin defaults.',
+            zh: '继承传输实例，再继承宿主级 flow 插件的默认值。'
           },
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
         },
         signal: {
           summary: {
@@ -2047,7 +1996,7 @@ const owned: ILibraryReference = {
         }
       },
       example:
-        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
     },
     IRpcNotifyOptions: {
       summary: {
@@ -2061,11 +2010,11 @@ const owned: ILibraryReference = {
             zh: '本次调用的完整超时实例或 `false`，继承链路截止时间仍限制尝试。'
           },
           default: {
-            en: 'Inherit the transport feature, then link policy.',
-            zh: '继承传输实例，再继承链路策略。'
+            en: 'Inherit the transport feature, then host-level flow plugin defaults.',
+            zh: '继承传输实例，再继承宿主级 flow 插件的默认值。'
           },
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
         },
         retry: {
           summary: {
@@ -2073,11 +2022,11 @@ const owned: ILibraryReference = {
             zh: '完整发起方重试实例或 `false`，转发中继不执行此策略。'
           },
           default: {
-            en: 'Inherit the transport feature, then link policy.',
-            zh: '继承传输实例，再继承链路策略。'
+            en: 'Inherit the transport feature, then host-level flow plugin defaults.',
+            zh: '继承传输实例，再继承宿主级 flow 插件的默认值。'
           },
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
         },
         signal: {
           summary: {
@@ -2748,7 +2697,7 @@ const owned: ILibraryReference = {
             zh: '有限非负的尝试毫秒数，零允许立即到期。'
           },
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
         },
         scheduler: {
           summary: {
@@ -2794,7 +2743,7 @@ const owned: ILibraryReference = {
         }
       },
       example:
-        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
     },
     IRetryFeatureOptions: {
       summary: {
@@ -2812,7 +2761,7 @@ const owned: ILibraryReference = {
             zh: '两次尝试。'
           },
           example:
-            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+            "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
         },
         backoff: {
           summary: {
@@ -2895,7 +2844,7 @@ const owned: ILibraryReference = {
         }
       },
       example:
-        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
+        "import { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nexport const defaults = defineFlowPlugin({\n  name: 'call-defaults',\n  features: { timeout: timeoutFeature({ ms: 1500 }), retry: retryFeature({ attempts: 2 }) },\n})\nexport const oneCall = { timeout: timeoutFeature({ ms: 100 }), retry: false } as const\n"
     },
     IRpcIdempotencyOutcome: {
       summary: {
@@ -2951,7 +2900,7 @@ const owned: ILibraryReference = {
         }
       ],
       example:
-        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
+        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
     },
     IRpcIdempotencyClaim: {
       summary: {
@@ -3003,7 +2952,7 @@ const owned: ILibraryReference = {
             zh: '原等待者收到结果或不可用标记，过期结算不能重新取得所有权。'
           },
           example:
-            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
+            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
         },
         release: {
           summary: {
@@ -3016,7 +2965,7 @@ const owned: ILibraryReference = {
             zh: '原预留被移除，这不是重试已经执行的业务。'
           },
           example:
-            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
+            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
         },
         outcome: {
           summary: {
@@ -3032,7 +2981,7 @@ const owned: ILibraryReference = {
         }
       ],
       example:
-        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
+        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
     },
     IRpcIdempotencyStore: {
       summary: {
@@ -3068,7 +3017,7 @@ const owned: ILibraryReference = {
             zh: '返回幂等认领，容量拒绝不会执行业务。'
           },
           example:
-            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
+            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
         },
         lookup: {
           summary: {
@@ -3094,7 +3043,7 @@ const owned: ILibraryReference = {
             zh: '返回等待、未知或含保留可移植结果的完成状态，没有查询的旧存储不能声明结果查询支持。'
           },
           example:
-            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
+            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
         },
         readRuntimeFacts: {
           summary: {
@@ -3107,7 +3056,7 @@ const owned: ILibraryReference = {
             zh: '返回契约运行存储事实，内置内存所有者延迟签发纪元并报告保留连续性。'
           },
           example:
-            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
+            "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
         }
       },
       scenarios: [
@@ -3117,7 +3066,7 @@ const owned: ILibraryReference = {
         }
       ],
       example:
-        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
+        "import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'\nconst store = createRpcIdempotencyStore()\nconst claim = store.claim('actual-session', 'checkout-1', 0, 'checkout-request')\nif (claim.status === 'claimed') claim.settle({ ok: true, data: 'accepted' }, 1)\nconsole.log(store.lookup?.('actual-session', 'checkout-1', 2))\n"
     },
     IRpcProviderRejection: {
       summary: {
@@ -3160,7 +3109,7 @@ const owned: ILibraryReference = {
         }
       ],
       example:
-        "import limits from '@migaia/rpc-host/plugins/limits'\n\nexport const capacity = limits({\n  onRejected: (rejection) => console.error(rejection.method, rejection.reason),\n})\n"
+        "import limits from '@migaia/rpc-host/features/limits'\n\nexport const capacity = limits({\n  onRejected: (rejection) => console.error(rejection.method, rejection.reason),\n})\n"
     },
     IRpcProbeDefinition: {
       summary: {
@@ -3432,7 +3381,7 @@ const owned: ILibraryReference = {
             zh: '省略 encrypt 时不加密；启用加密须同时提供 decrypt 及 sign、verify。'
           },
           example:
-            "import { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport function protectedLink(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n  encrypt: IRpcAuthenticationTransform,\n  decrypt: IRpcAuthenticationTransform,\n) {\n  return authFeature({ sign, verify, encrypt, decrypt, encodedType: 'string' })\n}\n",
+            "import { authFeature } from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\nexport function protectedLink(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n  encrypt: IRpcAuthenticationTransform,\n  decrypt: IRpcAuthenticationTransform,\n) {\n  return authFeature({ sign, verify, encrypt, decrypt, encodedType: 'string' })\n}\n",
           whenToUse: {
             en: 'Use the representation consumed by the actual paired cryptographic transforms; identity transforms do not demonstrate authentication.',
             zh: '选择实际成对加解密及签验能力消费的表示，双方须约定输入输出，不能以恒等转换冒充认证。'
@@ -3448,7 +3397,7 @@ const owned: ILibraryReference = {
             zh: '省略 decrypt 时不解密，encrypt 也必须省略。'
           },
           example:
-            "import { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport function protectedLink(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n  encrypt: IRpcAuthenticationTransform,\n  decrypt: IRpcAuthenticationTransform,\n) {\n  return authFeature({ sign, verify, encrypt, decrypt, encodedType: 'string' })\n}\n",
+            "import { authFeature } from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\nexport function protectedLink(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n  encrypt: IRpcAuthenticationTransform,\n  decrypt: IRpcAuthenticationTransform,\n) {\n  return authFeature({ sign, verify, encrypt, decrypt, encodedType: 'string' })\n}\n",
           whenToUse: {
             en: 'Use the representation consumed by the actual paired cryptographic transforms; identity transforms do not demonstrate authentication.',
             zh: '选择实际成对加解密及签验能力消费的表示，双方须约定输入输出，不能以恒等转换冒充认证。'
@@ -3464,7 +3413,7 @@ const owned: ILibraryReference = {
             zh: '省略 sign 时不签名，verify 也必须省略，且不能启用加密。'
           },
           example:
-            "import { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport function protectedLink(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n  encrypt: IRpcAuthenticationTransform,\n  decrypt: IRpcAuthenticationTransform,\n) {\n  return authFeature({ sign, verify, encrypt, decrypt, encodedType: 'string' })\n}\n",
+            "import { authFeature } from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\nexport function protectedLink(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n  encrypt: IRpcAuthenticationTransform,\n  decrypt: IRpcAuthenticationTransform,\n) {\n  return authFeature({ sign, verify, encrypt, decrypt, encodedType: 'string' })\n}\n",
           whenToUse: {
             en: 'Use the representation consumed by the actual paired cryptographic transforms; identity transforms do not demonstrate authentication.',
             zh: '选择实际成对加解密及签验能力消费的表示，双方须约定输入输出，不能以恒等转换冒充认证。'
@@ -3480,7 +3429,7 @@ const owned: ILibraryReference = {
             zh: '省略 verify 时不验证消息签名，sign 也必须省略。'
           },
           example:
-            "import { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport function protectedLink(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n  encrypt: IRpcAuthenticationTransform,\n  decrypt: IRpcAuthenticationTransform,\n) {\n  return authFeature({ sign, verify, encrypt, decrypt, encodedType: 'string' })\n}\n",
+            "import { authFeature } from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\nexport function protectedLink(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n  encrypt: IRpcAuthenticationTransform,\n  decrypt: IRpcAuthenticationTransform,\n) {\n  return authFeature({ sign, verify, encrypt, decrypt, encodedType: 'string' })\n}\n",
           whenToUse: {
             en: 'Use the representation consumed by the actual paired cryptographic transforms; identity transforms do not demonstrate authentication.',
             zh: '选择实际成对加解密及签验能力消费的表示，双方须约定输入输出，不能以恒等转换冒充认证。'
@@ -3510,7 +3459,7 @@ const owned: ILibraryReference = {
             }
           },
           example:
-            "import { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\nexport function protectedLink(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n  encrypt: IRpcAuthenticationTransform,\n  decrypt: IRpcAuthenticationTransform,\n) {\n  return authFeature({ sign, verify, encrypt, decrypt, encodedType: 'string' })\n}\n",
+            "import { authFeature } from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\nexport function protectedLink(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n  encrypt: IRpcAuthenticationTransform,\n  decrypt: IRpcAuthenticationTransform,\n) {\n  return authFeature({ sign, verify, encrypt, decrypt, encodedType: 'string' })\n}\n",
           whenToUse: {
             en: 'Use the representation consumed by the actual paired cryptographic transforms; identity transforms do not demonstrate authentication.',
             zh: '选择实际成对加解密及签验能力消费的表示，双方须约定输入输出，不能以恒等转换冒充认证。'
@@ -3526,7 +3475,7 @@ const owned: ILibraryReference = {
             zh: '全部已安装命名空间。'
           },
           example:
-            "import { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'\nexport function credentials(\n  verifyCredentials: NonNullable<IRpcAuthenticationOptions['verifyCredentials']>,\n) {\n  return authFeature({\n    namespaces: ['process'],\n    credentials: { application: 'catalog-service' },\n    verifyCredentials,\n  })\n}\n",
+            "import { authFeature } from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationOptions } from '@migaia/rpc-host/features/auth'\nexport function credentials(\n  verifyCredentials: NonNullable<IRpcAuthenticationOptions['verifyCredentials']>,\n) {\n  return authFeature({\n    namespaces: ['process'],\n    credentials: { application: 'catalog-service' },\n    verifyCredentials,\n  })\n}\n",
           whenToUse: {
             en: 'Supply explicit application credentials and the real verifier for selected native namespaces; launch tokens are not inferred.',
             zh: '为所选原生命名空间提供显式应用凭据及真实验证器，不会从载荷推断原生启动令牌。'
@@ -3542,7 +3491,7 @@ const owned: ILibraryReference = {
             zh: '无显式凭据。'
           },
           example:
-            "import { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'\nexport function credentials(\n  verifyCredentials: NonNullable<IRpcAuthenticationOptions['verifyCredentials']>,\n) {\n  return authFeature({\n    namespaces: ['process'],\n    credentials: { application: 'catalog-service' },\n    verifyCredentials,\n  })\n}\n",
+            "import { authFeature } from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationOptions } from '@migaia/rpc-host/features/auth'\nexport function credentials(\n  verifyCredentials: NonNullable<IRpcAuthenticationOptions['verifyCredentials']>,\n) {\n  return authFeature({\n    namespaces: ['process'],\n    credentials: { application: 'catalog-service' },\n    verifyCredentials,\n  })\n}\n",
           whenToUse: {
             en: 'Supply explicit application credentials and the real verifier for selected native namespaces; launch tokens are not inferred.',
             zh: '为所选原生命名空间提供显式应用凭据及真实验证器，不会从载荷推断原生启动令牌。'
@@ -3558,7 +3507,7 @@ const owned: ILibraryReference = {
             zh: '默认 1024；必须为正安全整数。'
           },
           example:
-            "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'\nexport function requestReplay(\n  verifyCredentials: NonNullable<IRpcAuthenticationOptions['verifyCredentials']>,\n  onRejected: NonNullable<IRpcAuthenticationOptions['onRejected']>,\n) {\n  return auth({ verifyCredentials, maxReplayEntriesPerPeer: 1024, onRejected })\n}\n",
+            "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationOptions } from '@migaia/rpc-host/features/auth'\nexport function requestReplay(\n  verifyCredentials: NonNullable<IRpcAuthenticationOptions['verifyCredentials']>,\n  onRejected: NonNullable<IRpcAuthenticationOptions['onRejected']>,\n) {\n  return auth({ verifyCredentials, maxReplayEntriesPerPeer: 1024, onRejected })\n}\n",
           whenToUse: {
             en: 'Bound authenticated request-ID history without substituting provider concurrency for replay capacity.',
             zh: '限制认证请求 ID 历史的容量，不用提供方并发替代重放配额。'
@@ -3581,7 +3530,7 @@ const owned: ILibraryReference = {
             zh: '空值或对应 Promise；失败被隔离并上报。'
           },
           example:
-            "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'\nexport function requestReplay(\n  verifyCredentials: NonNullable<IRpcAuthenticationOptions['verifyCredentials']>,\n  onRejected: NonNullable<IRpcAuthenticationOptions['onRejected']>,\n) {\n  return auth({ verifyCredentials, maxReplayEntriesPerPeer: 1024, onRejected })\n}\n",
+            "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationOptions } from '@migaia/rpc-host/features/auth'\nexport function requestReplay(\n  verifyCredentials: NonNullable<IRpcAuthenticationOptions['verifyCredentials']>,\n  onRejected: NonNullable<IRpcAuthenticationOptions['onRejected']>,\n) {\n  return auth({ verifyCredentials, maxReplayEntriesPerPeer: 1024, onRejected })\n}\n",
           whenToUse: {
             en: 'Distinguish request-ID replay capacity from other OVERLOADED reasons.',
             zh: '区分请求 ID 重放容量与其他 OVERLOADED 原因。'
@@ -3615,7 +3564,7 @@ const owned: ILibraryReference = {
             zh: '同步完成或兑现后接受凭据；抛错或拒绝会在提供方执行前拒绝认证。'
           },
           example:
-            "import { authFeature } from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'\nexport function credentials(\n  verifyCredentials: NonNullable<IRpcAuthenticationOptions['verifyCredentials']>,\n) {\n  return authFeature({\n    namespaces: ['process'],\n    credentials: { application: 'catalog-service' },\n    verifyCredentials,\n  })\n}\n",
+            "import { authFeature } from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationOptions } from '@migaia/rpc-host/features/auth'\nexport function credentials(\n  verifyCredentials: NonNullable<IRpcAuthenticationOptions['verifyCredentials']>,\n) {\n  return authFeature({\n    namespaces: ['process'],\n    credentials: { application: 'catalog-service' },\n    verifyCredentials,\n  })\n}\n",
           whenToUse: {
             en: 'Supply explicit application credentials and the real verifier for selected native namespaces; launch tokens are not inferred.',
             zh: '为所选原生命名空间提供显式应用凭据及真实验证器，不会从载荷推断原生启动令牌。'
@@ -3653,7 +3602,7 @@ const owned: ILibraryReference = {
             zh: '全部已安装命名空间。'
           },
           example:
-            "import { batchFeature } from '@migaia/rpc-host/plugins/batch'\nexport const negotiated = batchFeature({ namespaces: ['process'], required: true })\n",
+            "import { batchFeature } from '@migaia/rpc-host/features/batch'\nexport const negotiated = batchFeature({ namespaces: ['process'], required: true })\n",
           whenToUse: {
             en: 'Require extension negotiation only where both deployed peers provide matching support.',
             zh: '仅在双方部署匹配能力的命名空间要求扩展协商，不支持该能力的对端在握手阶段被拒绝。'
@@ -3669,7 +3618,7 @@ const owned: ILibraryReference = {
             zh: '默认不强制要求该扩展。'
           },
           example:
-            "import { batchFeature } from '@migaia/rpc-host/plugins/batch'\nexport const negotiated = batchFeature({ namespaces: ['process'], required: true })\n",
+            "import { batchFeature } from '@migaia/rpc-host/features/batch'\nexport const negotiated = batchFeature({ namespaces: ['process'], required: true })\n",
           whenToUse: {
             en: 'Require extension negotiation only where both deployed peers provide matching support.',
             zh: '仅在双方部署匹配能力的命名空间要求扩展协商，不支持该能力的对端在握手阶段被拒绝。'
@@ -3693,7 +3642,7 @@ const owned: ILibraryReference = {
             zh: '一万六千三百八十四单位。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
           whenToUse: {
             en: 'Bound each message and aggregate unfinished assemblies when large results share a native stream.',
             zh: '大型结果共享原生流时，同时限制每条消息及未完成组装总量，并通过有限过期时间回收保留。'
@@ -3709,7 +3658,7 @@ const owned: ILibraryReference = {
             zh: '一千六百七十七万七千二百一十六单位。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
           whenToUse: {
             en: 'Bound each message and aggregate unfinished assemblies when large results share a native stream.',
             zh: '大型结果共享原生流时，同时限制每条消息及未完成组装总量，并通过有限过期时间回收保留。'
@@ -3725,7 +3674,7 @@ const owned: ILibraryReference = {
             zh: '四千零九十六片。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
           whenToUse: {
             en: 'Bound each message and aggregate unfinished assemblies when large results share a native stream.',
             zh: '大型结果共享原生流时，同时限制每条消息及未完成组装总量，并通过有限过期时间回收保留。'
@@ -3741,7 +3690,7 @@ const owned: ILibraryReference = {
             zh: '六千七百一十万八千八百六十四单位。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
           whenToUse: {
             en: 'Bound each message and aggregate unfinished assemblies when large results share a native stream.',
             zh: '大型结果共享原生流时，同时限制每条消息及未完成组装总量，并通过有限过期时间回收保留。'
@@ -3757,7 +3706,7 @@ const owned: ILibraryReference = {
             zh: '二百五十六组。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
           whenToUse: {
             en: 'Bound each message and aggregate unfinished assemblies when large results share a native stream.',
             zh: '大型结果共享原生流时，同时限制每条消息及未完成组装总量，并通过有限过期时间回收保留。'
@@ -3773,7 +3722,7 @@ const owned: ILibraryReference = {
             zh: '三万毫秒。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nexport const bounded = chunkFeature({\n  chunkBytes: 16384,\n  maxMessageBytes: 16777216,\n  maxChunks: 1024,\n  maxBufferedBytes: 33554432,\n  maxConcurrentMessages: 8,\n  assemblyTimeoutMs: 5000,\n})\n",
           whenToUse: {
             en: 'Bound each message and aggregate unfinished assemblies when large results share a native stream.',
             zh: '大型结果共享原生流时，同时限制每条消息及未完成组装总量，并通过有限过期时间回收保留。'
@@ -3789,7 +3738,7 @@ const owned: ILibraryReference = {
             zh: '无额外时钟回调。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nimport type { IRpcChunkFeatureOptions } from '@migaia/rpc-host/plugins/chunk'\nexport function clock(\n  now: NonNullable<IRpcChunkFeatureOptions['now']>,\n  schedule: NonNullable<IRpcChunkFeatureOptions['schedule']>,\n  cancel: NonNullable<IRpcChunkFeatureOptions['cancel']>,\n) {\n  return chunkFeature({ now, schedule, cancel, assemblyTimeoutMs: 5000 })\n}\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nimport type { IRpcChunkFeatureOptions } from '@migaia/rpc-host/features/chunk'\nexport function clock(\n  now: NonNullable<IRpcChunkFeatureOptions['now']>,\n  schedule: NonNullable<IRpcChunkFeatureOptions['schedule']>,\n  cancel: NonNullable<IRpcChunkFeatureOptions['cancel']>,\n) {\n  return chunkFeature({ now, schedule, cancel, assemblyTimeoutMs: 5000 })\n}\n",
           whenToUse: {
             en: 'Borrow one existing native clock together with its timer/remover pair so assembly expiry uses one time domain.',
             zh: '借用同一个已有原生时钟及匹配计时与移除器，使组装过期遵循所属时间域，不产生第二计时所有者。'
@@ -3805,7 +3754,7 @@ const owned: ILibraryReference = {
             zh: '宿主超时调度。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nimport type { IRpcChunkFeatureOptions } from '@migaia/rpc-host/plugins/chunk'\nexport function clock(\n  now: NonNullable<IRpcChunkFeatureOptions['now']>,\n  schedule: NonNullable<IRpcChunkFeatureOptions['schedule']>,\n  cancel: NonNullable<IRpcChunkFeatureOptions['cancel']>,\n) {\n  return chunkFeature({ now, schedule, cancel, assemblyTimeoutMs: 5000 })\n}\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nimport type { IRpcChunkFeatureOptions } from '@migaia/rpc-host/features/chunk'\nexport function clock(\n  now: NonNullable<IRpcChunkFeatureOptions['now']>,\n  schedule: NonNullable<IRpcChunkFeatureOptions['schedule']>,\n  cancel: NonNullable<IRpcChunkFeatureOptions['cancel']>,\n) {\n  return chunkFeature({ now, schedule, cancel, assemblyTimeoutMs: 5000 })\n}\n",
           whenToUse: {
             en: 'Borrow one existing native clock together with its timer/remover pair so assembly expiry uses one time domain.',
             zh: '借用同一个已有原生时钟及匹配计时与移除器，使组装过期遵循所属时间域，不产生第二计时所有者。'
@@ -3821,7 +3770,7 @@ const owned: ILibraryReference = {
             zh: '宿主超时取消。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nimport type { IRpcChunkFeatureOptions } from '@migaia/rpc-host/plugins/chunk'\nexport function clock(\n  now: NonNullable<IRpcChunkFeatureOptions['now']>,\n  schedule: NonNullable<IRpcChunkFeatureOptions['schedule']>,\n  cancel: NonNullable<IRpcChunkFeatureOptions['cancel']>,\n) {\n  return chunkFeature({ now, schedule, cancel, assemblyTimeoutMs: 5000 })\n}\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nimport type { IRpcChunkFeatureOptions } from '@migaia/rpc-host/features/chunk'\nexport function clock(\n  now: NonNullable<IRpcChunkFeatureOptions['now']>,\n  schedule: NonNullable<IRpcChunkFeatureOptions['schedule']>,\n  cancel: NonNullable<IRpcChunkFeatureOptions['cancel']>,\n) {\n  return chunkFeature({ now, schedule, cancel, assemblyTimeoutMs: 5000 })\n}\n",
           whenToUse: {
             en: 'Borrow one existing native clock together with its timer/remover pair so assembly expiry uses one time domain.',
             zh: '借用同一个已有原生时钟及匹配计时与移除器，使组装过期遵循所属时间域，不产生第二计时所有者。'
@@ -3837,7 +3786,7 @@ const owned: ILibraryReference = {
             zh: '全部已安装命名空间。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport const negotiated = chunkFeature({ namespaces: ['process'], required: true })\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nexport const negotiated = chunkFeature({ namespaces: ['process'], required: true })\n",
           whenToUse: {
             en: 'Require extension negotiation only where both deployed peers provide matching support.',
             zh: '仅在双方部署匹配能力的命名空间要求扩展协商，不支持该能力的对端在握手阶段被拒绝。'
@@ -3853,7 +3802,7 @@ const owned: ILibraryReference = {
             zh: '默认不强制要求该扩展。'
           },
           example:
-            "import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'\nexport const negotiated = chunkFeature({ namespaces: ['process'], required: true })\n",
+            "import { chunkFeature } from '@migaia/rpc-host/features/chunk'\nexport const negotiated = chunkFeature({ namespaces: ['process'], required: true })\n",
           whenToUse: {
             en: 'Require extension negotiation only where both deployed peers provide matching support.',
             zh: '仅在双方部署匹配能力的命名空间要求扩展协商，不支持该能力的对端在握手阶段被拒绝。'
@@ -3883,7 +3832,7 @@ const owned: ILibraryReference = {
             zh: '返回接纳值或抛原校验失败；宿主保留原业务值。'
           },
           example:
-            "import type { IRpcSchemaParser } from '@migaia/rpc-host/plugins/schema'\n\nexport function validate(parser: IRpcSchemaParser, value: unknown) {\n  parser.parse(value)\n}\n"
+            "import type { IRpcSchemaParser } from '@migaia/rpc-host/features/schema'\n\nexport function validate(parser: IRpcSchemaParser, value: unknown) {\n  parser.parse(value)\n}\n"
         }
       }
     },
@@ -3923,7 +3872,7 @@ const owned: ILibraryReference = {
             zh: '无显式解析器。'
           },
           example:
-            "import { schemaFeature } from '@migaia/rpc-host/plugins/schema'\nimport type { IRpcSchemaParser } from '@migaia/rpc-host/plugins/schema'\nexport function checked(params: IRpcSchemaParser, result: IRpcSchemaParser) {\n  return schemaFeature({\n    namespaces: ['process'],\n    schemas: { 'app.catalog.lookup': { params, result } },\n  })\n}\n",
+            "import { schemaFeature } from '@migaia/rpc-host/features/schema'\nimport type { IRpcSchemaParser } from '@migaia/rpc-host/features/schema'\nexport function checked(params: IRpcSchemaParser, result: IRpcSchemaParser) {\n  return schemaFeature({\n    namespaces: ['process'],\n    schemas: { 'app.catalog.lookup': { params, result } },\n  })\n}\n",
           whenToUse: {
             en: 'Provide real application parsers for exact accepted methods that require business input and result validation.',
             zh: '只为需要业务输入及结果校验的精确接纳方法提供真实应用解析器，不把握手声明元数据当校验算法。'
@@ -3939,7 +3888,7 @@ const owned: ILibraryReference = {
             zh: '全部已安装命名空间。'
           },
           example:
-            "import { schemaFeature } from '@migaia/rpc-host/plugins/schema'\nimport type { IRpcSchemaParser } from '@migaia/rpc-host/plugins/schema'\nexport function checked(params: IRpcSchemaParser, result: IRpcSchemaParser) {\n  return schemaFeature({\n    namespaces: ['process'],\n    schemas: { 'app.catalog.lookup': { params, result } },\n  })\n}\n",
+            "import { schemaFeature } from '@migaia/rpc-host/features/schema'\nimport type { IRpcSchemaParser } from '@migaia/rpc-host/features/schema'\nexport function checked(params: IRpcSchemaParser, result: IRpcSchemaParser) {\n  return schemaFeature({\n    namespaces: ['process'],\n    schemas: { 'app.catalog.lookup': { params, result } },\n  })\n}\n",
           whenToUse: {
             en: 'Provide real application parsers for exact accepted methods that require business input and result validation.',
             zh: '只为需要业务输入及结果校验的精确接纳方法提供真实应用解析器，不把握手声明元数据当校验算法。'
@@ -4029,7 +3978,7 @@ const owned: ILibraryReference = {
             zh: '二百五十六。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
           whenToUse: {
             en: 'Apply provider admission where selected namespaces must share finite execution, rate and payload capacity.',
             zh: '所选命名空间须共享有限执行、速率及载荷容量时配置提供方准入，而不改变载体队列容量。'
@@ -4045,7 +3994,7 @@ const owned: ILibraryReference = {
             zh: '默认每个对端最多六十四个并发。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
           whenToUse: {
             en: 'Apply provider admission where selected namespaces must share finite execution, rate and payload capacity.',
             zh: '所选命名空间须共享有限执行、速率及载荷容量时配置提供方准入，而不改变载体队列容量。'
@@ -4061,7 +4010,7 @@ const owned: ILibraryReference = {
             zh: '不限速率。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
           whenToUse: {
             en: 'Apply provider admission where selected namespaces must share finite execution, rate and payload capacity.',
             zh: '所选命名空间须共享有限执行、速率及载荷容量时配置提供方准入，而不改变载体队列容量。'
@@ -4077,7 +4026,7 @@ const owned: ILibraryReference = {
             zh: '不限载荷。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
           whenToUse: {
             en: 'Apply provider admission where selected namespaces must share finite execution, rate and payload capacity.',
             zh: '所选命名空间须共享有限执行、速率及载荷容量时配置提供方准入，而不改变载体队列容量。'
@@ -4093,7 +4042,7 @@ const owned: ILibraryReference = {
             zh: '不限制连续超时。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nexport const idlePolicy = limitsFeature({\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  violationLimit: 5,\n  scheduler: systemScheduler,\n  onRejected: (rejection) => console.error(rejection.reason),\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nexport const idlePolicy = limitsFeature({\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  violationLimit: 5,\n  scheduler: systemScheduler,\n  onRejected: (rejection) => console.error(rejection.reason),\n})\n",
           whenToUse: {
             en: 'Select explicit idle/violation thresholds and use the real rejection reason for operational diagnosis.',
             zh: '明确选择空闲及违例退场阈值，通过真实拒绝原因诊断运行问题，不能仅凭公共错误码猜测分支。'
@@ -4109,7 +4058,7 @@ const owned: ILibraryReference = {
             zh: '不限制空闲。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nexport const idlePolicy = limitsFeature({\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  violationLimit: 5,\n  scheduler: systemScheduler,\n  onRejected: (rejection) => console.error(rejection.reason),\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nexport const idlePolicy = limitsFeature({\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  violationLimit: 5,\n  scheduler: systemScheduler,\n  onRejected: (rejection) => console.error(rejection.reason),\n})\n",
           whenToUse: {
             en: 'Select explicit idle/violation thresholds and use the real rejection reason for operational diagnosis.',
             zh: '明确选择空闲及违例退场阈值，通过真实拒绝原因诊断运行问题，不能仅凭公共错误码猜测分支。'
@@ -4125,7 +4074,7 @@ const owned: ILibraryReference = {
             zh: '不显式配置时没有自动退场阈值。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nexport const idlePolicy = limitsFeature({\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  violationLimit: 5,\n  scheduler: systemScheduler,\n  onRejected: (rejection) => console.error(rejection.reason),\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nexport const idlePolicy = limitsFeature({\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  violationLimit: 5,\n  scheduler: systemScheduler,\n  onRejected: (rejection) => console.error(rejection.reason),\n})\n",
           whenToUse: {
             en: 'Select explicit idle/violation thresholds and use the real rejection reason for operational diagnosis.',
             zh: '明确选择空闲及违例退场阈值，通过真实拒绝原因诊断运行问题，不能仅凭公共错误码猜测分支。'
@@ -4141,7 +4090,7 @@ const owned: ILibraryReference = {
             zh: '规范提供方过载展示。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
           whenToUse: {
             en: 'Apply provider admission where selected namespaces must share finite execution, rate and payload capacity.',
             zh: '所选命名空间须共享有限执行、速率及载荷容量时配置提供方准入，而不改变载体队列容量。'
@@ -4167,7 +4116,7 @@ const owned: ILibraryReference = {
             zh: '仅发出通知，完成回调不会接纳被拒调用或替换其原始失败。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nexport const idlePolicy = limitsFeature({\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  violationLimit: 5,\n  scheduler: systemScheduler,\n  onRejected: (rejection) => console.error(rejection.reason),\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nexport const idlePolicy = limitsFeature({\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  violationLimit: 5,\n  scheduler: systemScheduler,\n  onRejected: (rejection) => console.error(rejection.reason),\n})\n",
           whenToUse: {
             en: 'Select explicit idle/violation thresholds and use the real rejection reason for operational diagnosis.',
             zh: '明确选择空闲及违例退场阈值，通过真实拒绝原因诊断运行问题，不能仅凭公共错误码猜测分支。'
@@ -4183,7 +4132,7 @@ const owned: ILibraryReference = {
             zh: '系统调度器。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nexport const idlePolicy = limitsFeature({\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  violationLimit: 5,\n  scheduler: systemScheduler,\n  onRejected: (rejection) => console.error(rejection.reason),\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nexport const idlePolicy = limitsFeature({\n  maxConsecutiveTimeouts: 3,\n  idleTimeoutMs: 30000,\n  violationLimit: 5,\n  scheduler: systemScheduler,\n  onRejected: (rejection) => console.error(rejection.reason),\n})\n",
           whenToUse: {
             en: 'Select explicit idle/violation thresholds and use the real rejection reason for operational diagnosis.',
             zh: '明确选择空闲及违例退场阈值，通过真实拒绝原因诊断运行问题，不能仅凭公共错误码猜测分支。'
@@ -4199,7 +4148,7 @@ const owned: ILibraryReference = {
             zh: '全部已安装命名空间。'
           },
           example:
-            "import { limitsFeature } from '@migaia/rpc-host/plugins/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
+            "import { limitsFeature } from '@migaia/rpc-host/features/limits'\nexport const admission = limitsFeature({\n  maxGlobal: 64,\n  maxPerPeer: 8,\n  maxCallsPerMinute: 600,\n  maxPayloadBytes: 1048576,\n  overflow: 'reject',\n  namespaces: ['process'],\n})\n",
           whenToUse: {
             en: 'Apply provider admission where selected namespaces must share finite execution, rate and payload capacity.',
             zh: '所选命名空间须共享有限执行、速率及载荷容量时配置提供方准入，而不改变载体队列容量。'
@@ -4229,26 +4178,6 @@ const owned: ILibraryReference = {
           summary: {
             en: 'Stable diagnostic text with no credential or payload excerpt.',
             zh: '不含凭据及载荷片段的稳定诊断文本。'
-          }
-        }
-      }
-    },
-    IRpcLinkPolicyOptions: {
-      summary: {
-        en: 'Complete timeout/retry instances used as link defaults before transport and call overrides.',
-        zh: '在传输及调用覆盖之前使用的完整超时及重试链路默认实例。'
-      },
-      members: {
-        features: {
-          summary: {
-            en: 'Actual executing feature instances; duplicate kinds reject at cold admission.',
-            zh: '实际执行功能实例；同种重复功能在冷准入时拒绝。'
-          },
-          example:
-            "import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({\n  features: [timeoutFeature({ ms: 1500 }), retryFeature({ attempts: 2 })],\n})\n",
-          whenToUse: {
-            en: 'Install complete attempt policies once when this link should provide consistent per-call defaults.',
-            zh: '链路须为调用提供一致默认值时安装完整尝试策略，不能用只包含配置的普通对象替代执行实例。'
           }
         }
       }
@@ -4327,7 +4256,7 @@ const owned: ILibraryReference = {
             zh: '默认 `300000`，非正数或非安全整数以配置非法失败。'
           },
           example:
-            "import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'\nexport const retained = idempotencyFeature({\n  retentionMs: 60000,\n  maxEntries: 1024,\n  maxEntriesPerScope: 128,\n  maxBytes: 8388608,\n  maxOutcomeBytes: 1048576,\n})\n",
+            "import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'\nexport const retained = idempotencyFeature({\n  retentionMs: 60000,\n  maxEntries: 1024,\n  maxEntriesPerScope: 128,\n  maxBytes: 8388608,\n  maxOutcomeBytes: 1048576,\n})\n",
           whenToUse: {
             en: 'Bound retained replay outcomes independently from provider concurrency and request admission.',
             zh: '独立于提供方并发及请求准入限制重放结果保留，分别约束过期、条目数量及字节成本。'
@@ -4343,7 +4272,7 @@ const owned: ILibraryReference = {
             zh: '默认 `1024`，非正数或非安全整数以配置非法失败。'
           },
           example:
-            "import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'\nexport const retained = idempotencyFeature({\n  retentionMs: 60000,\n  maxEntries: 1024,\n  maxEntriesPerScope: 128,\n  maxBytes: 8388608,\n  maxOutcomeBytes: 1048576,\n})\n",
+            "import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'\nexport const retained = idempotencyFeature({\n  retentionMs: 60000,\n  maxEntries: 1024,\n  maxEntriesPerScope: 128,\n  maxBytes: 8388608,\n  maxOutcomeBytes: 1048576,\n})\n",
           whenToUse: {
             en: 'Bound retained replay outcomes independently from provider concurrency and request admission.',
             zh: '独立于提供方并发及请求准入限制重放结果保留，分别约束过期、条目数量及字节成本。'
@@ -4359,7 +4288,7 @@ const owned: ILibraryReference = {
             zh: '默认 `256`，非正数或非安全整数以配置非法失败。'
           },
           example:
-            "import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'\nexport const retained = idempotencyFeature({\n  retentionMs: 60000,\n  maxEntries: 1024,\n  maxEntriesPerScope: 128,\n  maxBytes: 8388608,\n  maxOutcomeBytes: 1048576,\n})\n",
+            "import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'\nexport const retained = idempotencyFeature({\n  retentionMs: 60000,\n  maxEntries: 1024,\n  maxEntriesPerScope: 128,\n  maxBytes: 8388608,\n  maxOutcomeBytes: 1048576,\n})\n",
           whenToUse: {
             en: 'Bound retained replay outcomes independently from provider concurrency and request admission.',
             zh: '独立于提供方并发及请求准入限制重放结果保留，分别约束过期、条目数量及字节成本。'
@@ -4375,7 +4304,7 @@ const owned: ILibraryReference = {
             zh: '默认 `8388608`，非正数或非安全整数以配置非法失败。'
           },
           example:
-            "import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'\nexport const retained = idempotencyFeature({\n  retentionMs: 60000,\n  maxEntries: 1024,\n  maxEntriesPerScope: 128,\n  maxBytes: 8388608,\n  maxOutcomeBytes: 1048576,\n})\n",
+            "import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'\nexport const retained = idempotencyFeature({\n  retentionMs: 60000,\n  maxEntries: 1024,\n  maxEntriesPerScope: 128,\n  maxBytes: 8388608,\n  maxOutcomeBytes: 1048576,\n})\n",
           whenToUse: {
             en: 'Bound retained replay outcomes independently from provider concurrency and request admission.',
             zh: '独立于提供方并发及请求准入限制重放结果保留，分别约束过期、条目数量及字节成本。'
@@ -4391,7 +4320,7 @@ const owned: ILibraryReference = {
             zh: '默认 `1048576`，非正数或非安全整数以配置非法失败。'
           },
           example:
-            "import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'\nexport const retained = idempotencyFeature({\n  retentionMs: 60000,\n  maxEntries: 1024,\n  maxEntriesPerScope: 128,\n  maxBytes: 8388608,\n  maxOutcomeBytes: 1048576,\n})\n",
+            "import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'\nexport const retained = idempotencyFeature({\n  retentionMs: 60000,\n  maxEntries: 1024,\n  maxEntriesPerScope: 128,\n  maxBytes: 8388608,\n  maxOutcomeBytes: 1048576,\n})\n",
           whenToUse: {
             en: 'Bound retained replay outcomes independently from provider concurrency and request admission.',
             zh: '独立于提供方并发及请求准入限制重放结果保留，分别约束过期、条目数量及字节成本。'
@@ -6177,26 +6106,6 @@ const owned: ILibraryReference = {
           returns: {
             en: 'Local extension values for that namespace only; built-in call members cannot be replaced.',
             zh: '只返回该命名空间的本地扩展值，不能替换内建调用成员。'
-          }
-        }
-      }
-    },
-    IRpcLinkPolicyDefinition: {
-      summary: {
-        en: 'Cold native policy name and complete timeout/retry instances; no hooks or strategy state live in Host configuration.',
-        zh: '冷原生策略名及完整超时和重试实例；宿主配置不保存介入点或策略状态。'
-      },
-      members: {
-        name: {
-          summary: {
-            en: 'Unique genuine native policy name.',
-            zh: '冷策略定义使用的稳定安装名称，不用于授权。'
-          }
-        },
-        features: {
-          summary: {
-            en: 'Complete feature objects; duplicate kinds reject before startup.',
-            zh: '完整功能对象，同种重复项在启动前拒绝。'
           }
         }
       }
@@ -9305,9 +9214,9 @@ const owned: ILibraryReference = {
         zh: '认证插件捕获的完整成对转换及可选显式握手凭据能力；原生获取和接纳身份仍由不同所有者管理。'
       },
       install:
-        "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}\n",
+        "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}\n",
       example:
-        "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}\n",
+        "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(\n  sign: IRpcAuthenticationTransform,\n  verify: IRpcAuthenticationTransform,\n) {\n  return auth({ sign, verify, encodedType: 'string' })\n}\n",
       grants: [],
       scenarios: [
         {
@@ -9330,9 +9239,9 @@ const owned: ILibraryReference = {
         zh: '仅由已安装分片实现使用的有界保留及计时能力。'
       },
       install:
-        "import chunk from '@migaia/rpc-host/plugins/chunk'\nexport const framing = chunk({ chunkBytes: 16384, maxMessageBytes: 16777216 })\n",
+        "import chunk from '@migaia/rpc-host/features/chunk'\nexport const framing = chunk({ chunkBytes: 16384, maxMessageBytes: 16777216 })\n",
       example:
-        "import chunk from '@migaia/rpc-host/plugins/chunk'\nexport const framing = chunk({ chunkBytes: 16384, maxMessageBytes: 16777216 })\n",
+        "import chunk from '@migaia/rpc-host/features/chunk'\nexport const framing = chunk({ chunkBytes: 16384, maxMessageBytes: 16777216 })\n",
       grants: [],
       scenarios: [
         {
@@ -9355,9 +9264,9 @@ const owned: ILibraryReference = {
         zh: '物理合帧的冷命名空间及协商要求，不安装提供方或应用分组策略。'
       },
       install:
-        "import batch from '@migaia/rpc-host/plugins/batch'\nexport const batching = batch({ required: false })\n",
+        "import batch from '@migaia/rpc-host/features/batch'\nexport const batching = batch({ required: false })\n",
       example:
-        "import batch from '@migaia/rpc-host/plugins/batch'\nexport const batching = batch({ required: false })\n",
+        "import batch from '@migaia/rpc-host/features/batch'\nexport const batching = batch({ required: false })\n",
       grants: [],
       scenarios: [
         {
@@ -9380,9 +9289,9 @@ const owned: ILibraryReference = {
         zh: '共享提供方并发及可选连接治理，与原生执行单元或池容量不同。'
       },
       install:
-        "import limits from '@migaia/rpc-host/plugins/limits'\nexport const capacity = limits()\n",
+        "import limits from '@migaia/rpc-host/features/limits'\nexport const capacity = limits()\n",
       example:
-        "import limits from '@migaia/rpc-host/plugins/limits'\nexport const capacity = limits()\n",
+        "import limits from '@migaia/rpc-host/features/limits'\nexport const capacity = limits()\n",
       grants: [],
       scenarios: [
         {
@@ -9405,9 +9314,9 @@ const owned: ILibraryReference = {
         zh: '按实际方法路径索引的显式解析器表；不安装本插件时，本地声明保持惰性元数据。'
       },
       install:
-        "import schema from '@migaia/rpc-host/plugins/schema'\nexport const validation = schema()\n",
+        "import schema from '@migaia/rpc-host/features/schema'\nexport const validation = schema()\n",
       example:
-        "import schema from '@migaia/rpc-host/plugins/schema'\nexport const validation = schema()\n",
+        "import schema from '@migaia/rpc-host/features/schema'\nexport const validation = schema()\n",
       grants: [],
       scenarios: [
         {
@@ -9455,9 +9364,9 @@ const owned: ILibraryReference = {
         zh: '已安装存储、作用域选择及命名空间结果扩展；仅声明键不会授予自动重放策略。'
       },
       install:
-        "import idempotency from '@migaia/rpc-host/plugins/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000 })\n",
+        "import idempotency from '@migaia/rpc-host/features/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000 })\n",
       example:
-        "import idempotency from '@migaia/rpc-host/plugins/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000 })\n",
+        "import idempotency from '@migaia/rpc-host/features/idempotency'\nexport const outcomes = idempotency({ retentionMs: 300000 })\n",
       grants: [
         {
           signature: 'host.<namespace>.outcome(idempotencyKey, options?)',
@@ -9480,7 +9389,7 @@ const owned: ILibraryReference = {
             zh: '一个目标的待决、未知及完成事实，或独立目标字典；未知不代表可以重放副作用。'
           },
           example:
-            "import type { IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'\n\nexport function reconcile(outcome: IRpcOutcomeLookup, key: string) {\n  return outcome(key)\n}\n"
+            "import type { IRpcOutcomeLookup } from '@migaia/rpc-host/features/idempotency'\n\nexport function reconcile(outcome: IRpcOutcomeLookup, key: string) {\n  return outcome(key)\n}\n"
         }
       ],
       scenarios: [
@@ -9515,31 +9424,6 @@ const owned: ILibraryReference = {
         }
       ]
     },
-    linkPolicy: {
-      kind: 'plugin',
-      target: 'IRpcHostOptions.plugins',
-      summary: {
-        en: 'Complete timeout/retry instances used as link defaults before transport and call overrides.',
-        zh: '在传输及调用覆盖之前使用的完整超时及重试链路默认实例。'
-      },
-      install:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })\n",
-      example:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })\n",
-      grants: [],
-      scenarios: [
-        {
-          en: 'Install before the first transport starts and restrict namespaces when the policy should apply only to selected links.',
-          zh: '在首个传输启动前安装；仅需作用于选中链路时限定命名空间。'
-        }
-      ],
-      behaviors: [
-        {
-          en: 'Unspecified per-call timeout and retry selections inherit complete feature instances from this link policy; a call may explicitly disable either.',
-          zh: '未明确指定的单次超时及重试选项继承此链路策略的完整实例，调用可显式禁用其中任一功能。'
-        }
-      ]
-    },
     timeoutFeature: {
       kind: 'feature',
       target: 'IRpcCallFeatures',
@@ -9548,9 +9432,9 @@ const owned: ILibraryReference = {
         zh: '为发起调用提供完整计时、取消订阅及结算清理算法的超时实例。'
       },
       install:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })\n",
+        "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineFlowPlugin({ name: 'call-defaults', features: { timeout: timeoutFeature({ ms: 1500 }) } })\n",
       example:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })\n",
+        "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineFlowPlugin({ name: 'call-defaults', features: { timeout: timeoutFeature({ ms: 1500 }) } })\n",
       grants: [],
       scenarios: [
         {
@@ -9573,9 +9457,9 @@ const owned: ILibraryReference = {
         zh: '借用真实接纳会话或原生代际就绪能力的完整发起方重试实现。'
       },
       install:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })\n",
+        "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineFlowPlugin({ name: 'call-defaults', features: { timeout: timeoutFeature({ ms: 1500 }) } })\n",
       example:
-        "import linkPolicy from '@migaia/rpc-host/plugins/link-policy'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = linkPolicy({ features: [timeoutFeature({ ms: 1500 })] })\n",
+        "import { defineFlowPlugin } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineFlowPlugin({ name: 'call-defaults', features: { timeout: timeoutFeature({ ms: 1500 }) } })\n",
       grants: [],
       scenarios: [
         {
@@ -9662,31 +9546,6 @@ const owned: ILibraryReference = {
         }
       ]
     },
-    defineLinkPolicy: {
-      kind: 'plugin',
-      target: 'IRpcHostOptions.plugins',
-      summary: {
-        en: 'Register complete call-feature defaults without adding a second intervention pipeline or call strategy in Host.',
-        zh: '登记完整调用功能默认值，不在宿主增加第二介入流水线或调用策略。'
-      },
-      install:
-        "import { defineLinkPolicy } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineLinkPolicy({\n  name: 'application-policy',\n  features: [timeoutFeature({ ms: 500 })],\n})\n",
-      example:
-        "import { defineLinkPolicy } from '@migaia/rpc-host/sdk'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nexport const defaults = defineLinkPolicy({\n  name: 'application-policy',\n  features: [timeoutFeature({ ms: 500 })],\n})\n",
-      grants: [],
-      scenarios: [
-        {
-          en: 'Use the receiving native Host installation and original cleanup ownership.',
-          zh: '使用接收原生宿主安装及原清理所有权。'
-        }
-      ],
-      behaviors: [
-        {
-          en: 'The cold link-policy definition installs complete call features at its declared native scope without adding a transport or business-call facade.',
-          zh: '冷链路策略定义在声明的原生范围安装完整调用功能，不增加传输或业务调用门面，也不复制待决调用。'
-        }
-      ]
-    }
   }
 }
 

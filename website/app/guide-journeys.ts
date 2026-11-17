@@ -1029,7 +1029,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'rpc-host:host-and-plugins': {
     en: {
       title: 'Install behavior at its real owner',
-      lede: 'Install optional flow implementations before transport startup: auth, chunk, batch, idempotency, limits, schema, probe, typegen and linkPolicy. Omission leaves the capability absent. Namespace filters scope installed hooks; extensions cannot replace built-in calls.',
+      lede: 'Flow Features (auth, chunk, batch, idempotency, limits, schema) come from /features; probe and typegen are host-level plugins. Omission leaves the capability absent. Namespace filters scope installed hooks; extensions cannot replace built-in calls.',
       document: {
         sections: [
           {
@@ -1038,7 +1038,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Import complete timeout and retry implementations. Install them in a transport features list or linkPolicy; one call may override a policy with a complete instance or false, never a number or plain configuration.'
+                text: 'Import complete timeout and retry implementations. Install them in a transport features record or in a flow plugin features record (defineFlowPlugin); one call may override a policy with a complete instance or false, never a number or plain configuration.'
               },
               {
                 type: 'paragraph',
@@ -1053,7 +1053,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nconst host = await createRpcHost({\n  plugins: [\n    linkPolicy({ features: [timeoutFeature({ ms: 1500 })] }),\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted) await new Promise<void>((resolve) =>\n            signal.addEventListener('abort', () => resolve(), { once: true }))\n        } finally { await child.close() }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21, {\n    timeout: timeoutFeature({ ms: 100 }), retry: false\n  }))\n} finally { await host.close() }"
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nconst host = await createRpcHost({\n  plugins: [\n    defineFlowPlugin({ name: 'call-defaults', features: { timeout: timeoutFeature({ ms: 1500 }) } }),\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted) await new Promise<void>((resolve) =>\n            signal.addEventListener('abort', () => resolve(), { once: true }))\n        } finally { await child.close() }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21, {\n    timeout: timeoutFeature({ ms: 100 }), retry: false\n  }))\n} finally { await host.close() }"
               }
             ]
           }
@@ -1068,7 +1068,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     },
     zh: {
       title: '在真实所有者安装行为',
-      lede: '在传输启动前安装可选信息流实现：认证、分片、合帧、幂等、限流、模式校验、探针、类型生成及链路策略。省略即没有对应能力。命名空间过滤限定介入范围，扩展不能覆盖内建调用。',
+      lede: '信息流 Feature（认证、分片、合帧、幂等、限流、模式校验）来自 `/features`；探针与类型生成是宿主级插件。省略即没有对应能力。命名空间过滤限定介入范围，扩展不能覆盖内建调用。',
       document: {
         sections: [
           {
@@ -1077,7 +1077,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '导入包含完整算法的超时与重试实例。安装到传输功能列表或链路策略；单次调用可用完整实例或 `false` 覆盖，不能传数字或普通配置。'
+                text: '导入包含完整算法的超时与重试实例。安装到传输的 features 记录，或 flow 插件（`defineFlowPlugin`）的 features 记录；单次调用可用完整实例或 `false` 覆盖，不能传数字或普通配置。'
               },
               {
                 type: 'paragraph',
@@ -1092,7 +1092,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nconst host = await createRpcHost({\n  plugins: [\n    linkPolicy({ features: [timeoutFeature({ ms: 1500 })] }),\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted) await new Promise<void>((resolve) =>\n            signal.addEventListener('abort', () => resolve(), { once: true }))\n        } finally { await child.close() }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21, {\n    timeout: timeoutFeature({ ms: 100 }), retry: false\n  }))\n} finally { await host.close() }"
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { defineFlowPlugin } from '@migaia/rpc-host/sdk'\n\nconst host = await createRpcHost({\n  plugins: [\n    defineFlowPlugin({ name: 'call-defaults', features: { timeout: timeoutFeature({ ms: 1500 }) } }),\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted) await new Promise<void>((resolve) =>\n            signal.addEventListener('abort', () => resolve(), { once: true }))\n        } finally { await child.close() }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21, {\n    timeout: timeoutFeature({ ms: 100 }), retry: false\n  }))\n} finally { await host.close() }"
               }
             ]
           }
@@ -1137,7 +1137,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(sign: IRpcAuthenticationTransform, verify: IRpcAuthenticationTransform) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
+                code: "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(sign: IRpcAuthenticationTransform, verify: IRpcAuthenticationTransform) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
               }
             ]
           }
@@ -1180,7 +1180,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(sign: IRpcAuthenticationTransform, verify: IRpcAuthenticationTransform) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
+                code: "import auth from '@migaia/rpc-host/features/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'\n\nexport function signed(sign: IRpcAuthenticationTransform, verify: IRpcAuthenticationTransform) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
               }
             ]
           }
