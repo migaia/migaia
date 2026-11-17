@@ -96,6 +96,11 @@ class NodePluginFixture {
   #tray
   /** Actual target cancellation receipts are counted independently of caller completion. */
   #aborted = 0
+  /**
+   * Sleep handler entries. Cancellation tests wait for this before aborting, because a request
+   * cancelled before it reaches the target never runs there and leaves #aborted unchanged.
+   */
+  #sleepStarts = 0
   /** Successful one-way dispatch increments only this generation's receipt count. */
   #noted = 0
   /** Actual stream entry count proves only the specifically addressed native record runs. */
@@ -212,6 +217,7 @@ class NodePluginFixture {
       sleep: this.#sleepAction,
       held: (milliseconds) => this.#heldAction(milliseconds),
       aborted: this.#abortedAction,
+      sleepStarts: this.#sleepStartsAction,
       notedCount: this.#notedCountAction,
       noted: this.#notedAction,
       fail: this.#failAction,
@@ -296,6 +302,7 @@ class NodePluginFixture {
    */
   #sleepAction = (milliseconds, context) =>
     new Promise((resolve) => {
+      this.#sleepStarts += 1
       /** Timer belongs to this request and is released on cancellation. */
       const timer = setTimeout(() => {
         context?.signal?.removeEventListener('abort', cancel)
@@ -323,6 +330,9 @@ class NodePluginFixture {
 
   /** @returns {number} Target-side cancellation count. */
   #abortedAction = () => this.#aborted
+
+  /** @returns {number} Sleep handler entries on this target. */
+  #sleepStartsAction = () => this.#sleepStarts
 
   /** @returns {number} Successful one-way deliveries. */
   #notedCountAction = () => this.#noted

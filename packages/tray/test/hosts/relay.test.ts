@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { setTimeout as delay } from 'node:timers/promises'
 import { chainHas, fixture, lines, marker, until } from './helper.ts'
+
+/**
+ * Deadline of the relayed request in the timeout case. It only needs to exceed the time for the
+ * request to reach the target through both hops; the target holds for 10 seconds regardless.
+ */
+const RELAY_DEADLINE_MS = 2000
 
 /** Cartesian product proves every runtime can be both a relay caller and target. */
 const pairs = [0, 1, 2].flatMap((caller) => [0, 1, 2].map((target) => [caller, target] as const))
@@ -99,16 +104,30 @@ describe('Tray receipt-bound relay', () => {
         const cancelled = caller
           .request('node.svc.wait', address, { signal: controller.signal })
           .catch((error: unknown) => error)
-        await delay(50)
+        // Abort only once the target handler runs. Aborting earlier is also valid, but then the
+        // request never reaches the target and nothing proves propagation through both hops.
+        await until(
+          () => target.request('node.svc.sleepStarts'),
+          (count) => count === 1
+        )
         controller.abort()
         expect(await cancelled).toMatchObject({ code: 'CANCELLED' })
         await until(
           () => target.request('node.svc.aborted'),
           (count) => count === 1
         )
-        await expect(
-          caller.request('node.svc.wait', address, { timeoutMs: 50 })
-        ).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
+        /**
+         * The deadline must outlast the two relay hops even on a loaded machine, so the target is
+         * running when it expires; the start is observed before the expiry is awaited.
+         */
+        const expired = caller
+          .request('node.svc.wait', address, { timeoutMs: RELAY_DEADLINE_MS })
+          .catch((error: unknown) => error)
+        await until(
+          () => target.request('node.svc.sleepStarts'),
+          (count) => count === 2
+        )
+        expect(await expired).toMatchObject({ code: 'DEADLINE_EXCEEDED' })
         await until(
           () => target.request('node.svc.aborted'),
           (count) => count === 2
