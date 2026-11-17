@@ -2,6 +2,18 @@
 
 Import types, tokens, definitions, errors and pure validators from `storage.contract`. Input retention, query execution and resources use the [host entry table](./README.en.md#entries-and-dependency-direction).
 
+## Find by scenario
+
+Jump to the section for what you want to do:
+
+- [Validate a key without copying](#validate-a-key-without-copying)
+- [Validate operation intent](#validate-operation-intent)
+- [Inspect capabilities without acquiring a resource](#inspect-capabilities-without-acquiring-a-resource)
+- [Define a token and implementation](#define-a-token-and-implementation)
+- [Codec receiver ownership](#codec-receiver-ownership)
+- [Original errors and progress](#original-errors-and-progress)
+- [Backend conformance](#backend-conformance)
+
 ## Validate a key without copying
 
 ```ts

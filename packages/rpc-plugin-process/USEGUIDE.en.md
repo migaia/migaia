@@ -4,6 +4,16 @@
 
 A Host normally selects one transport kind. The root owns `self/provide/close`; calls live under a namespace, `process` by default. These complete TypeScript modules are checked against current public dist, not proof of native-environment or authentication acceptance.
 
+## Find by scenario
+
+Jump to the section for what you want to do:
+
+- [Bidirectional local connections](#bidirectional-local-connections)
+- [Complete feature instances and probe](#complete-feature-instances-and-probe)
+- [Options and deadlines](#options-and-deadlines)
+- [Native members and ordinary PluginHost](#native-members-and-ordinary-pluginhost)
+- [Closure and errors](#closure-and-errors)
+
 ## Bidirectional local connections
 
 Both sides of a connection may provide methods. This Node/POSIX named-service example demonstrates calls without asserting completed service authentication.

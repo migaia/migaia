@@ -4,6 +4,15 @@
 
 Contract defines pure protocol rules and interfaces. Host owns sessions, directories, providers, and call lifetime. The Thread transport acquires and supervises real Workers. Flow plugins provide auth, chunk, batch, and probe at fixed message hooks; features provide their owning plugin's timeout, retry, or pool. A Host may install several transports in distinct namespaces; this guide needs only Thread.
 
+## Find by scenario
+
+Jump to the section for what you want to do:
+
+- [Explicit parent and child entries](#explicit-parent-and-child-entries)
+- [Calls and policies](#calls-and-policies)
+- [Streams, transfer, and observation](#streams-transfer-and-observation)
+- [Member management and closure](#member-management-and-closure)
+
 ## Explicit parent and child entries
 
 The parent uses a real `worker.js` and installs native policy tokens in the transport `features` record. When declaring remote methods, retain `typeof plugins` as well, so namespaces and member controls retain their types.

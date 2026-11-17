@@ -4,6 +4,15 @@
 
 Contract provides pure event/interface contracts. Host owns business sessions and calls; transports provide real carriers. Devtools is a flow plugin borrowing real events at the canonical probe observe hook; timeout/retry features execute call policies. The application owns the collector without a second observation connection. A Host may have distinct transport namespaces; this example uses only coroutine.
 
+## Find by scenario
+
+Jump to the section for what you want to do:
+
+- [Observe real calls](#observe-real-calls)
+- [Capture, redaction, queries, and service](#capture-redaction-queries-and-service)
+- [Recording and NDJSON](#recording-and-ndjson)
+- [Cleanup and boundaries](#cleanup-and-boundaries)
+
 ## Observe real calls
 
 This example additionally needs `@migaia/rpc-plugin-coroutines`. Install tools.plugin on two real parent/child Hosts. The watch's first next subscribes to future events before business begins. Flow plugins go in Host.plugins rather than transport.features.

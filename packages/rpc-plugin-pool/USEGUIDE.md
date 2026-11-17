@@ -4,6 +4,16 @@
 
 Contract 定义纯协议与接口，Host 拥有会话、provider 和调用结算，transport 获取并监管真实原生资源。flow plugin 通过消息介入点提供 auth、chunk、batch、probe。`pool` 是 transport 的完整 feature：只拥有同载体成员调度、FIFO、扩缩容和排空；timeout/retry feature 各自拥有调用策略。
 
+## 按场景查找
+
+按你要做的事跳到对应章节：
+
+- [安装在 transport 上](#安装在-transport-上)
+- [一个逻辑目标](#一个逻辑目标)
+- [容量、队列与取消](#容量队列与取消)
+- [流、扩缩容与排空](#流扩缩容与排空)
+- [错误与观察](#错误与观察)
+
 ## 安装在 transport 上
 
 父端示例使用三个真实 Thread 成员。一个 Host 允许安装命名空间不同的 transport；本例只安装一个 `thread` namespace，pool 不混合不同载体。

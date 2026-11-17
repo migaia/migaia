@@ -2,6 +2,30 @@
 
 [README](./README.en.md) · [中文](./USEGUIDE.md)
 
+## Find by scenario
+
+Jump to the section for what you want to do:
+
+- [Installation](#installation)
+- [Register functions and generators](#register-functions-and-generators)
+- [Select targets and consume streams](#select-targets-and-consume-streams)
+- [Install complete policies](#install-complete-policies)
+- [Install and remove transports after construction](#install-and-remove-transports-after-construction)
+- [Install RPC in an existing host](#install-rpc-in-an-existing-host)
+- [Author flows and carriers](#author-flows-and-carriers)
+- [Authentication, signing, and duplicate requests](#authentication-signing-and-duplicate-requests)
+- [Map errors sent to the peer](#map-errors-sent-to-the-peer)
+- [Binary integrity and transfer](#binary-integrity-and-transfer)
+- [Notifications, groups, and retained outcomes](#notifications-groups-and-retained-outcomes)
+- [Forward and hold capabilities](#forward-and-hold-capabilities)
+- [Observe and generate types](#observe-and-generate-types)
+- [Warnings and child names](#warnings-and-child-names)
+- [Entries](#entries)
+- [Close and retain errors](#close-and-retain-errors)
+- [Behavior details](#behavior-details)
+- [Default-policy installation boundary](#default-policy-installation-boundary)
+- [Duplicate call-policy roles](#duplicate-call-policy-roles)
+
 ## Installation
 
 Install `@migaia/rpc-host`, `@migaia/rpc-contract`, and the required transport plugin at the same version. The contract is an exact lockstep peer dependency shared from the application installation. Explicitly introduced duplicate copies are unsupported.

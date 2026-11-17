@@ -4,6 +4,19 @@
 
 Contract owns data, interfaces, and pure shape checks. Host owns RPC sessions and call execution. Transport plugins own carriers, codecs, framing, and transfer; flow plugins and their features own optional state and policies. Normally choose one transport kind per host rather than mixing kinds.
 
+## Find by scenario
+
+Jump to the section for what you want to do:
+
+- [Version and input boundary](#version-and-input-boundary)
+- [Handshake and directory](#handshake-and-directory)
+- [Calls, routes, and generations](#calls-routes-and-generations)
+- [Streams, groups, and controls](#streams-groups-and-controls)
+- [Carriers, binary, and stage order](#carriers-binary-and-stage-order)
+- [Portable values and snapshots](#portable-values-and-snapshots)
+- [Error graphs and native classes](#error-graphs-and-native-classes)
+- [Schemas and bounds](#schemas-and-bounds)
+
 ## Version and input boundary
 
 Every semantic message uses profile `migaia.rpc/2`. The only protocol version is `{ major: 2, minor: 0 }`. Decode through the actual carrier, then check shapes with `/protocol` normalizers. A TypeScript assertion on received data is not admission.

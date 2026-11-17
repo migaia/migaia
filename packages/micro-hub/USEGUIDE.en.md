@@ -2,6 +2,23 @@
 
 [中文](./USEGUIDE.md)
 
+## Find by scenario
+
+Jump to the section for what you want to do:
+
+- [Contents](#contents)
+- [1. Hub](#1-hub)
+- [2. Contracts](#2-contracts)
+- [3. App handle](#3-app-handle)
+- [4. State](#4-state)
+- [5. Events and requests](#5-events-and-requests)
+- [6. Persistence](#6-persistence)
+- [7. Shared asynchronous values](#7-shared-asynchronous-values)
+- [8. Web Components](#8-web-components)
+- [9. Lifecycle and concurrency](#9-lifecycle-and-concurrency)
+- [10. Public constants](#10-public-constants)
+- [Error codes](#error-codes)
+
 ## Contents
 
 - [1. Hub](#1-hub)

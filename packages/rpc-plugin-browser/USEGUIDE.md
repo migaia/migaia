@@ -4,6 +4,20 @@
 
 应用取得真实原生资源，每个 Host 通常选择一种传输。根对象管理身份、provider 与关闭；调用进入对应 namespace。以下示例只做类型检查；真实的跨页面来源和认证需要在浏览器里验证。
 
+## 按场景查找
+
+按你要做的事跳到对应章节：
+
+- [Dedicated Worker](#dedicated-worker)
+- [Window 与 iframe](#window-与-iframe)
+- [SharedWorker 多端口](#sharedworker-多端口)
+- [BroadcastChannel 多参与者](#broadcastchannel-多参与者)
+- [ServiceWorker 的发送与接收](#serviceworker-的发送与接收)
+- [可靠 RTCDataChannel](#可靠-rtcdatachannel)
+- [WebTransport 可靠字节流](#webtransport-可靠字节流)
+- [Feature 与介入插件](#feature-与介入插件)
+- [职责与已知边界](#职责与已知边界)
+
 ## Dedicated Worker
 
 ```ts doc-test=check

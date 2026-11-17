@@ -4,6 +4,15 @@
 
 Contract 只定义纯协议和接口；Host 拥有会话、目录、provider 与调用生命周期；Thread transport 获取和监管真实 Worker。flow plugin 通过固定消息介入点提供 auth、chunk、batch、probe；feature 提供所属 plugin 的 timeout、retry 或 pool。一个 Host 可以按不同命名空间安装多个 transport；本指南只需要 Thread。
 
+## 按场景查找
+
+按你要做的事跳到对应章节：
+
+- [显式父子入口](#显式父子入口)
+- [调用与策略](#调用与策略)
+- [流、transfer 与观察](#流transfer-与观察)
+- [成员管理与关闭](#成员管理与关闭)
+
 ## 显式父子入口
 
 父入口使用真实 `worker.js`，并将原生策略 token 放入 transport 的 `features` record。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。

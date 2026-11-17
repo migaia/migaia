@@ -2,6 +2,23 @@
 
 Use the selected browser plugin with the real host. The examples require native browser APIs; an injected port does not turn a Node process into a browser.
 
+## Find by scenario
+
+Jump to the section for what you want to do:
+
+- [Own named browser backends](#own-named-browser-backends)
+- [Web Storage options](#web-storage-options)
+- [Cookie scope and expiry](#cookie-scope-and-expiry)
+- [Assemble IndexedDB as needed](#assemble-indexeddb-as-needed)
+- [KV batches and typed keys](#kv-batches-and-typed-keys)
+- [Native IndexedDB transactions](#native-indexeddb-transactions)
+- [Entity repositories](#entity-repositories)
+- [Optional live queries](#optional-live-queries)
+- [Errors and shutdown](#errors-and-shutdown)
+- [Change notifications, expiry and organization views](#change-notifications-expiry-and-organization-views)
+- [Native Blob and File storage](#native-blob-and-file-storage)
+- [IndexedDB global journal and explicit undo](#indexeddb-global-journal-and-explicit-undo)
+
 ## Own named browser backends
 
 ```ts

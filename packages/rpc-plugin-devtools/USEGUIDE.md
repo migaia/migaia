@@ -4,6 +4,15 @@
 
 Contract 提供纯事件/接口契约；Host 拥有业务会话和调用；transport 提供真实载体。Devtools 是 flow plugin，通过统一 probe 的 observe 入口借用真实事件；timeout/retry feature 则拥有调用策略。应用持有 collector，不创建第二个观察连接。一个 Host 可有不同 namespace 的 transport；示例仅使用 coroutine。
 
+## 按场景查找
+
+按你要做的事跳到对应章节：
+
+- [观察真实调用](#观察真实调用)
+- [捕获、脱敏、查询与服务](#捕获脱敏查询与服务)
+- [录制与 NDJSON](#录制与-ndjson)
+- [清理与边界](#清理与边界)
+
 ## 观察真实调用
 
 此示例另需安装 `@migaia/rpc-plugin-coroutines`。将同一 tools.plugin 安装到父子两个真实 Host，watch 首次 next 先订阅未来事件，再发业务。安装 flow plugin 时使用 Host.plugins，而非 transport.features。

@@ -4,6 +4,16 @@
 
 Contract defines pure protocol rules and interfaces. Host owns sessions, providers, and call settlement; transports acquire and supervise real native resources. Flow plugins provide auth, chunk, batch, and probe at message hooks. The complete `pool` transport feature owns only same-carrier member scheduling, FIFO, resize, and drain. Timeout/retry features own their respective call policies.
 
+## Find by scenario
+
+Jump to the section for what you want to do:
+
+- [Install on the transport](#install-on-the-transport)
+- [One logical target](#one-logical-target)
+- [Capacity, queues, and cancellation](#capacity-queues-and-cancellation)
+- [Streams, resize, and drain](#streams-resize-and-drain)
+- [Errors and observation](#errors-and-observation)
+
 ## Install on the transport
 
 The parent example uses three real Thread members. A Host may install transports in distinct namespaces; this example installs only `thread`, and the pool does not mix carrier kinds.

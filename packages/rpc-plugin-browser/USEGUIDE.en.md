@@ -4,6 +4,20 @@
 
 Applications supply actual native resources and normally select one transport per Host. The root owns identity, providers and closure; calls use the corresponding namespace. The examples below are only typechecked; real cross-page origins and authentication must be verified in a browser.
 
+## Find by scenario
+
+Jump to the section for what you want to do:
+
+- [Dedicated Worker](#dedicated-worker)
+- [Window and iframe](#window-and-iframe)
+- [SharedWorker ports](#sharedworker-ports)
+- [BroadcastChannel participants](#broadcastchannel-participants)
+- [ServiceWorker target and receiver](#serviceworker-target-and-receiver)
+- [Reliable RTCDataChannel](#reliable-rtcdatachannel)
+- [WebTransport reliable bytes](#webtransport-reliable-bytes)
+- [Features and intervention plugins](#features-and-intervention-plugins)
+- [Responsibilities and current limits](#responsibilities-and-current-limits)
+
 ## Dedicated Worker
 
 ```ts doc-test=check

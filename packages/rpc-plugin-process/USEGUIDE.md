@@ -4,6 +4,16 @@
 
 一个 Host 通常选择一种传输。根对象管理 `self/provide/close`，业务调用在 namespace 下；Process 的默认 namespace 为 `process`。下面所有 TypeScript 模块按当前公开 dist 做类型检查，不代表真实环境和认证验收已完成。
 
+## 按场景查找
+
+按你要做的事跳到对应章节：
+
+- [双向本机连接](#双向本机连接)
+- [完整 feature 实例与 probe](#完整-feature-实例与-probe)
+- [选项与期限](#选项与期限)
+- [原生成员与普通 PluginHost](#原生成员与普通-pluginhost)
+- [关闭与错误](#关闭与错误)
+
 ## 双向本机连接
 
 同一个连接两端都可提供业务。下面是 Node/POSIX 本机命名服务的调用形态；它不证明该服务已配置认证。
