@@ -25,7 +25,7 @@ window.runIndexedDbNativeTtlScenario = async () => {
   const dbName = 'native-ttl-' + crypto.randomUUID()
   const host = await createStorageHost({
     scheduler,
-    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+    plugins: [indexedDbBackendPlugin({ dbName, features: indexedDbTestFeatures })]
   })
   try {
     const store = host.backend('indexed-db')
@@ -62,14 +62,14 @@ window.runIndexedDbNativeTtlScenario = async () => {
 async function reopen() {
   const dbName = 'native-ttl-reopen-' + crypto.randomUUID()
   const first = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+    plugins: [indexedDbBackendPlugin({ dbName, features: indexedDbTestFeatures })]
   })
   const before = first.backend('indexed-db')
   await before.set('kept', 'value')
   await before.use(ttl).expire({ channel: 'text', key: 'kept' }, 60000)
   await first.dispose()
   const second = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+    plugins: [indexedDbBackendPlugin({ dbName, features: indexedDbTestFeatures })]
   })
   try {
     const after = second.backend('indexed-db')

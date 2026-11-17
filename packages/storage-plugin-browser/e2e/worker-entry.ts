@@ -37,13 +37,16 @@ const getFailureCode = async (
 
 self.onmessage = async (): Promise<void> => {
   const memoryHost = await createStorageHost({
-    plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+    plugins: [memoryBackendPlugin({ features: memoryTestFeatures })]
   })
   const memory = memoryHost.backend('memory')
   await memory.set('worker-memory', 'ok')
   const databaseHost = await createStorageHost({
     plugins: [
-      indexedDbBackendPlugin({ dbName: `worker-${crypto.randomUUID()}` }, indexedDbTestFeatures)
+      indexedDbBackendPlugin({
+        dbName: `worker-${crypto.randomUUID()}`,
+        features: indexedDbTestFeatures
+      })
     ]
   })
   const database = databaseHost.backend('indexed-db')

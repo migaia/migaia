@@ -23,10 +23,10 @@ window.runIndexedDbNativeBatchScenario = async () => {
   /** Each real host owns its original connection and disposes after the complete scenario. */
   const host = await createStorageHost({
     plugins: [
-      indexedDbBackendPlugin(
-        { dbName: `native-batch-${crypto.randomUUID()}` },
-        indexedDbTestFeatures
-      )
+      indexedDbBackendPlugin({
+        dbName: `native-batch-${crypto.randomUUID()}`,
+        features: indexedDbTestFeatures
+      })
     ]
   })
   try {

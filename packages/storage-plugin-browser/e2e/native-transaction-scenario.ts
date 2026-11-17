@@ -32,8 +32,8 @@ window.runIndexedDbNativeActivityScenario = async (mode) => {
   /** The actual public installation owns both native connections and their cleanup. */
   const host = await createStorageHost({
     plugins: [
-      indexedDbBackendPlugin({ id: 'writer', dbName }, indexedDbTestFeatures),
-      indexedDbBackendPlugin({ id: 'reader', dbName }, indexedDbTestFeatures)
+      indexedDbBackendPlugin({ name: 'writer', dbName, features: indexedDbTestFeatures }),
+      indexedDbBackendPlugin({ name: 'reader', dbName, features: indexedDbTestFeatures })
     ]
   })
   /** This same store starts the original transaction rather than a test-authored scope. */
