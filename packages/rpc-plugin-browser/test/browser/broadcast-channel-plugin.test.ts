@@ -101,7 +101,7 @@ class BroadcastRoomFixture {
     /** Default host identities must be unique without manually assigning aliases. */
     const host = await createRpcHost({
       plugins: [
-        defineFlowPlugin<Record<never, never>>({
+        defineFlowPlugin({
           name: 'broadcast-native-observer',
           setup: () => ({
             observe: (event: IRpcObservation) => {

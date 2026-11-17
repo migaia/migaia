@@ -1,6 +1,7 @@
 /** Admit cold RPC configuration, then create its one native plugin-host and namespace projections. */
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
+// Imported before the flow program so bundlers emit the host first; see the note in rpc-host.ts.
 import { RpcHost } from './rpc-host.ts'
 import { readRpcDefinition } from '../sdk/metadata.ts'
 import { RpcFlowProgram } from '../sdk/flow-program.ts'

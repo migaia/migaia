@@ -20,6 +20,8 @@ import {
   type IRpcEnvelope,
   type IRpcSemanticFrame
 } from '@migaia/rpc-contract/protocol'
+// Kept above the other local imports: bundlers emit modules in import order, and this order keeps
+// the createRpcHost bundle within its gzip budget (scripts/fixtures/bundle-size-budgets.json).
 import { ownRpcTransportClose, RpcHostInstallation } from './installation.ts'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText, tagRpcError } from '@migaia/rpc-contract/errors'

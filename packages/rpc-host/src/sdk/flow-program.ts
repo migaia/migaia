@@ -281,7 +281,7 @@ export class RpcFeatureProgram {
   }
 }
 
-/** Cold host classification accepts native plugins only; features need an explicit carrier. */
+/** Cold host classification accepts transport and flow plugins only; bare Features are rejected. */
 export class RpcFlowProgram {
   /** Flow plugins install before transports. */
   readonly flows: readonly IRpcFlowPlugin[]
