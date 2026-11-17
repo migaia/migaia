@@ -1,6 +1,6 @@
 {
   "name": "@migaia/storage-plugin-object",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Native filesystem and S3 object storage backend",
   "repository": {
