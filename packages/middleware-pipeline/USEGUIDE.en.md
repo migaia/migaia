@@ -43,7 +43,6 @@ A request timer stops before the async work finishes because a callback chain re
 
 ```ts doc-test=run
 import { asyncMode } from '@migaia/middleware-pipeline/async'
-import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
 const pipeline = createPipeline<number>({ mode: asyncMode })
@@ -89,11 +88,11 @@ import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
 const pipeline = createPipeline<string>({ mode: asyncMode })
-const trim = pipeline.lift((value, next) => {
+const trim = pipeline.lift((value: string, next: (value: string) => void) => {
   console.log('sync before next')
   next(value.trim())
   console.log('sync after next')
-}, syncMode)
+}, MiddlewarePipelineMode.sync)
 await pipeline.run(
   [
     trim,

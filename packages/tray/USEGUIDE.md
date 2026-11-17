@@ -178,12 +178,15 @@ blocked 时没有启动服务，显式重试才重新采样；failed 保留同�
 `create` 返回唯一 AppHost；原 PluginHost 的 `execution.mutationTimeoutMs` / `pipelineDrainTimeoutMs` 本例都显式设 `false`，不设相应期限。createHost 的 `create`、`plugins`、`mutationAdmissionMs`、`quiescenceMs`、`shutdown` 均必填无默认；两个预算本例为 `1000` 毫秒，`shutdown.mode: 'strict-drain'` 等实际清理，另一个可选值为 `'bounded'`。`provider.getFeature('value')` 默认必需引用，Feature 依赖映射的 `config` 键为回调依赖名；它不等于任意按插件名查找。`report` 未传，默认无自定义诊断回调。
 
 ```ts doc-test=run
-import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
+import { PluginHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature, featuresModule } from '@migaia/plugin-host/features'
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
 import { createHost } from '@migaia/tray/host'
 
 class AppHost extends PluginHost<Record<string, never>, string> {}
 const create = () =>
   new AppHost({
+    modules: [featuresModule, featureDependenciesModule],
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
 const events: string[] = []

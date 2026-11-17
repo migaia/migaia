@@ -178,12 +178,15 @@ Declare the dependency with a Feature reference. createHost retains the blocked 
 Create returns the sole AppHost. Its PluginHost execution.mutationTimeoutMs and pipelineDrainTimeoutMs are explicitly false, disabling those deadlines. CreateHost requires create, plugins, mutationAdmissionMs, quiescenceMs and shutdown without defaults. Both budgets are 1000 milliseconds here. Strict-drain awaits physical cleanup; bounded is the other mode. Provider.getFeature('value') is required by default, and config in the Feature dependency map names that dependency. Report is omitted, with no custom diagnostic callback.
 
 ```ts doc-test=run
-import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
+import { PluginHost, definePlugin } from '@migaia/plugin-host'
+import { defineFeature, featuresModule } from '@migaia/plugin-host/features'
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
 import { createHost } from '@migaia/tray/host'
 
 class AppHost extends PluginHost<Record<string, never>, string> {}
 const create = () =>
   new AppHost({
+    modules: [featuresModule, featureDependenciesModule],
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
 const events: string[] = []

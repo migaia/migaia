@@ -140,6 +140,10 @@ An existing `defineHost` owner obtains `domainCore` from `rpcHostPipelines(getHo
 
 ```ts doc-test=check
 import { defineHost } from '@migaia/plugin-host'
+import { featuresModule } from '@migaia/plugin-host/features'
+import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
+import { namedPipelinesModule } from '@migaia/plugin-host/named-pipelines'
+import { asyncPipelineModule } from '@migaia/plugin-host/pipeline-modes/async'
 import {
   rpcHostPipelines,
   defineFlowPlugin,
@@ -155,6 +159,7 @@ const rpc = rpcHostPipelines(
 )
 /** One native owner supplies both stage registration and execution. */
 export const host = defineHost({
+  modules: [featuresModule, featureDependenciesModule, namedPipelinesModule, asyncPipelineModule],
   domainCore: rpc.domainCore,
   host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
 })

@@ -43,7 +43,6 @@ pipeline.run([(value, next) => next(value + 1), (value, next) => next(value * 2)
 
 ```ts doc-test=run
 import { asyncMode } from '@migaia/middleware-pipeline/async'
-import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
 const pipeline = createPipeline<number>({ mode: asyncMode })
@@ -89,11 +88,11 @@ import { syncMode } from '@migaia/middleware-pipeline/sync'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
 const pipeline = createPipeline<string>({ mode: asyncMode })
-const trim = pipeline.lift((value, next) => {
+const trim = pipeline.lift((value: string, next: (value: string) => void) => {
   console.log('同步步骤调用 next 前')
   next(value.trim())
   console.log('同步步骤调用 next 后')
-}, syncMode)
+}, MiddlewarePipelineMode.sync)
 await pipeline.run(
   [
     trim,
