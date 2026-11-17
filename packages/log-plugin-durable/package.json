@@ -1,6 +1,6 @@
 {
   "name": "@migaia/log-plugin-durable",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "private": true,
   "description": "Borrowed durable binlog, write-ahead and undo log stores.",
   "files": [
