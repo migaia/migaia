@@ -70,7 +70,9 @@ await categorized.shutdown('manual');`
   expect(manifest.exports['./file'].browser.default).toBe('./dist/file.browser.js')
   expect(manifest.dependencies).not.toHaveProperty('@migaia/storage-contract')
   expect(manifest.dependencies).not.toHaveProperty('fs-ext')
-  expect(manifest.peerDependencies).toEqual({ '@migaia/log-host': manifest.version })
+  // The workspace range publishes as a caret range of the current log-host version; on 0.0.x that
+  // admits exactly that version, and it stays correct when log-host is released first.
+  expect(manifest.peerDependencies).toEqual({ '@migaia/log-host': 'workspace:^' })
 }
 
 it('names every real relative source file with its TypeScript extension', sourceSpecifiers)

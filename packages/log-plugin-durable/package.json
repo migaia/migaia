@@ -56,11 +56,11 @@
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
-    "@migaia/log-host": "workspace:*",
+    "@migaia/log-host": "workspace:^",
     "@types/node": "24.13.2"
   },
   "peerDependencies": {
-    "@migaia/log-host": "0.0.11"
+    "@migaia/log-host": "workspace:^"
   },
   "engines": {
     "node": ">=18"
