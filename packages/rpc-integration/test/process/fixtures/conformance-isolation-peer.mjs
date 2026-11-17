@@ -6,7 +6,7 @@ import { createServer } from 'node:net'
 import { once } from 'node:events'
 import { serializeRpcError, isRpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { PluginHost, definePlugin } from '@migaia/plugin-host'
-import { defineFeature } from '@migaia/plugin-host/features'
+import { defineFeature, featuresModule } from '@migaia/plugin-host/features'
 import { createRpcHost } from '@migaia/rpc-host'
 import { authFeature } from '@migaia/rpc-host/features/auth'
 import { idempotencyFeature } from '@migaia/rpc-host/features/idempotency'
@@ -88,7 +88,10 @@ class IsolationTarget {
    */
   #instanceId = randomUUID()
   /** Actual native replacement/disposal stays with this original PluginHost. */
-  host = new PluginHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
+  host = new PluginHost({
+    modules: [featuresModule],
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  })
   /** Output is captured only when the real Feature install occurs, never from a candidate DTO. */
   #output
   /** Return the currently installed business object after native Feature construction. */

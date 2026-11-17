@@ -825,31 +825,31 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
     ],
   'packages/web-rpc/test/internal/async-control.test.ts::async control settles on timeout and ignores late operation completion':
     [
-      'packages/utils/test/promise.test.ts::retains the deadline terminal after the original operation fulfills late'
+      'packages/utils/test/promise-retry.test.ts::retains the deadline terminal after the original operation fulfills late'
     ],
   'packages/web-rpc/test/internal/async-control.test.ts::async control does not start a lazy operation after pre-cancellation':
     [
-      'packages/utils/test/promise.test.ts::does not start a direct abort race after native pre-cancellation'
+      'packages/utils/test/promise-timeout.test.ts::does not start a direct abort race after native pre-cancellation'
     ],
   'packages/web-rpc/test/internal/async-control.test.ts::async control does not start an operation after synchronous signal cancellation':
     [
-      'packages/utils/test/promise.test.ts::promise primitives stops signal admission after synchronous cancellation in raceWithAbort'
+      'packages/utils/test/promise-signal.test.ts::promise primitives stops signal admission after synchronous cancellation in raceWithAbort'
     ],
   'packages/web-rpc/test/internal/async-control.test.ts::async control does not register later signals after an earlier synchronous abort':
     [
-      'packages/utils/test/promise.test.ts::promise primitives stops signal admission after synchronous cancellation in raceWithAbort'
+      'packages/utils/test/promise-signal.test.ts::promise primitives stops signal admission after synchronous cancellation in raceWithAbort'
     ],
   'packages/web-rpc/test/internal/async-control.test.ts::async control starts the operation only after control checks':
     [
-      'packages/utils/test/promise.test.ts::does not start a direct abort race after native pre-cancellation'
+      'packages/utils/test/promise-timeout.test.ts::does not start a direct abort race after native pre-cancellation'
     ],
   'packages/web-rpc/test/internal/async-control.test.ts::async control rolls back earlier signal listeners when a later registration fails':
     [
-      'packages/utils/test/promise.test.ts::removes the earlier race listener once when a later signal registration fails'
+      'packages/utils/test/promise-race.test.ts::removes the earlier race listener once when a later signal registration fails'
     ],
   'packages/web-rpc/test/internal/async-control.test.ts::async control observes race listener cleanup failures without replacing the result':
     [
-      'packages/utils/test/promise.test.ts::retains the race result and exact host diagnostic when its cleanup reporter throws'
+      'packages/utils/test/promise-race.test.ts::retains the race result and exact host diagnostic when its cleanup reporter throws'
     ],
   // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts owns provider feature disposal once on success and rollback':
