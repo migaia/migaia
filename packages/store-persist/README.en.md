@@ -18,6 +18,8 @@ Connect Store, collection, or keyed snapshots to storage while coordinating star
 - **Round-trip collection entries with the default codec.** Rather than silently turning a Map into an empty JSON object, the example restores book quantity in a new collection and removes a stale key in [the scenario](./USEGUIDE.en.md#restore-a-map-without-losing-its-entries).
 - **Release persistence independently for each key.** Instead of coupling every user through a family-wide switch, the example stops one key while the other keeps saving and business memory remains usable in [the scenario](./USEGUIDE.en.md#stop-saving-one-key-while-another-keeps-working).
 
+When you do not need it: if you read once at startup and save once at exit, nothing modifies the state while it starts, and the saved shape never changes, reading and writing the storage directly is enough.
+
 ## Start here
 
 Save overview.ts in an ESM project and run it with Node 24; this real in-memory backend retains data only for its own lifetime:

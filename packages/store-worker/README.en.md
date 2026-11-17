@@ -18,6 +18,8 @@ Connect computation or serialization parsers to a real Worker while keeping Prom
 - **Use an existing state and cache model for results.** workerComputed connects input selection and requests to Resource, and [Use Resource state and cache for Worker results](./USEGUIDE.en.md#use-resource-state-and-cache-for-worker-results) demonstrates lazy work, fresh-cache reuse and explicit refresh.
 - **Keep the application's existing registry calls.** workerPlugin registers the remote parser as a standard plugin, and [Run an existing JSON parser through a Worker registry plugin](./USEGUIDE.en.md#run-an-existing-json-parser-through-a-worker-registry-plugin) round-trips data with the same encode/decode interface.
 
+When you do not need it: if the computation is short enough not to block the interface, or the data to parse is small, calling it on the main thread is enough.
+
 ## Start here
 
 Save this as a separate ESM TypeScript file and run it with Node 24. The child reloads the same file, so avoid interactive standard input. Install this package first:

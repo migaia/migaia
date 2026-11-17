@@ -20,6 +20,8 @@
 - **A failure does not erase successful parallel results.** Handling only an aggregate rejection can lose successful replies; `invokeParallelSettled` returns each value or failure in registration order. The [example](./USEGUIDE.en.md#keep-successful-results-when-another-listener-fails) retains the successful value 6.
 - **Ambiguous command targets are rejected before execution.** Broadcasting or picking the first match can duplicate a write or hide duplicate registration; `invokeTask` requires exactly one match. The [example](./USEGUIDE.en.md#reject-duplicate-command-targets-before-doing-any-work) performs no second save.
 
+When you do not need it: with one publisher and a few fixed listeners that never publish again or change subscriptions from inside a listener, the native `EventTarget` or a plain array of callbacks is enough.
+
 ## Start here
 
 Run this directly with Node 24. The first listener publishes value 2 while handling value 1; queued delivery lets the second listener see 1 before 2.

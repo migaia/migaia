@@ -18,6 +18,8 @@ Start and release resources by dependency while giving plugin installation, load
 - **Transfer loaded-resource cleanup according to commitment.** loadIntoHost provisionally owns the artifact until committed, and [Transfer loaded artifact cleanup only when admission commits](./USEGUIDE.en.md#transfer-loaded-artifact-cleanup-only-when-admission-commits) checks delayed release after success and rollback after conversion failure.
 - **Keep resources leased until cancelled callbacks actually settle.** Runtime retains the current installation's usage lease, and [Keep a cancelled callback alive until it really settles](./USEGUIDE.en.md#keep-a-cancelled-callback-alive-until-it-really-settles) observes one active run after cancellation and zero only after callback settlement.
 
+When you do not need it: with two or three resources, a fixed start order and no plugins loaded or removed at runtime, creating and releasing them by hand in order is enough.
+
 ## Start here
 
 Install the package and run this in an ESM TypeScript file with Node 24. It composes one same-realm static value and prints 42:

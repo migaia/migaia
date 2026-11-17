@@ -20,6 +20,8 @@
 - **Generators can explicitly stop the entire chain.** Returning a rejected business value can still trigger saving; `GENERATOR_HALT` is a separate control signal. The [short-circuit example](./USEGUIDE.en.md#stop-a-generator-pipeline-before-a-rejected-value-is-saved) runs neither saving nor done.
 - **An empty value differs from ending the chain.** Ordinary return undefined halts a generator; `GENERATOR_UNDEFINED` intentionally delivers undefined. The [empty-value example](./USEGUIDE.en.md#deliver-undefined-instead-of-accidentally-halting) still reaches the final callback.
 
+When you do not need it: when the steps are fixed and synchronous, and none of them has to wrap the steps after it or stop the chain early, calling the functions one after another is enough.
+
 ## Start here
 
 Run directly with Node 24. Input 2 is incremented, then doubled, and the final callback receives 6. A stage uses next to commit a value for the following stages.

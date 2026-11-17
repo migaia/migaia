@@ -18,6 +18,8 @@ Use PostgreSQL through one storage API when text, records, expiry and applicatio
 - **Know when history is no longer safe to resume.** Notifications may be lost; logical replication supplies checkpoints and rejects unprovable gaps. See [Follow committed changes](./USEGUIDE.en.md#follow-committed-changes).
 - **Keep batch semantics clear.** Reads retain input order and duplicates, while writes reject equivalent duplicate keys. Array parameters avoid issuing one query per key; no speed comparison is claimed.
 
+When you do not need it: if the application only runs its own SQL and uses none of the host's standard storage methods (key-value, records, organization isolation), the PostgreSQL driver alone is enough.
+
 ## Start here
 
 Provide a PostgreSQL database through `DATABASE_URL`. Installation creates the storage tables, so the database role needs permission in the selected schema. This example writes a value and reads it back.

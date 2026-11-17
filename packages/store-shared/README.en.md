@@ -20,6 +20,8 @@ Share fixed-size int32 state through SharedArrayBuffer and Atomics, then track a
 - **A failed callback does not leave a user-held lock behind.** Computing under a lock lets a throw block future writes. update computes outside the lock, attempts CAS, and preserves the original error identity or cause. [Runnable proof](./USEGUIDE.en.md#keep-the-cell-usable-after-an-updater-fails).
 - **Export a copy that does not alias live storage.** Another view over the same buffer still shares bytes. snapshot allocates an ordinary Int32Array and reads each cell consistently, separating edits on either side. [Runnable proof](./USEGUIDE.en.md#copy-values-without-exposing-shared-storage).
 
+When you do not need it: if the state is read and written on one thread, or threads only pass a result now and then, copying it with `postMessage` is enough.
+
 ## Start here
 
 Attach to the same integer from two independent Runtimes, then distinguish reading bytes from synchronizing a cursor:

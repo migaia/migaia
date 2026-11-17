@@ -18,6 +18,8 @@ Bring memory, database and file backends into one storage host, select each thro
 - `org(id)` keeps one organization fixed when passed to entities or composed plugins. [Organization data](./USEGUIDE.en.md#separate-organization-data)
 - `dispose()` waits for work already started and releases installed resources. Organization views cannot close the whole host. [Shutdown](./USEGUIDE.en.md#handle-errors-and-finish-work)
 
+When you do not need it: with a single data source, no organization isolation and no need to finish work in one place, using that database's own client directly is enough.
+
 ## Start here
 
 Write an order status to memory, then read it from the same backend. This example uses a TypeScript environment with top-level `await`.

@@ -18,6 +18,8 @@ Store numeric, boolean, fixed-capacity text, array, and record fields in real WA
 - **Read batch input completely before changing field bytes.** setRange materializes every number first and preserves the original failure and old contents as shown in [Reject unreadable range input before changing array bytes](./USEGUIDE.en.md#reject-unreadable-range-input-before-changing-array-bytes).
 - **Observe each numeric property of a fixed record independently.** record gives each key its own Source, so editing y leaves an x-only observer alone as shown in [Observe one named coordinate without tracking its siblings](./USEGUIDE.en.md#observe-one-named-coordinate-without-tracking-its-siblings).
 
+When you do not need it: if only JavaScript reads and writes the state and no WASM module has to access the same memory, a plain Store is simpler.
+
 ## Start here
 
 ```ts doc-test=run

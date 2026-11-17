@@ -18,6 +18,8 @@ Use Redis or Valkey through one storage API that handles organization keys, expi
 - **Choose live hints or retained history deliberately.** Pub/Sub serves online listeners; the change Stream can resume from a cursor. See [Resume change history](./USEGUIDE.en.md#resume-change-history).
 - **Use capabilities the server actually has.** Vector selection checks the Search module and binary driver ports instead of silently replacing native search with local computation. No performance comparison is claimed.
 
+When you do not need it: for a few simple reads and writes with no organization isolation, record indexes or replayable change history, a Redis client alone is enough.
+
 ## Start here
 
 Run Redis 7.2+ or Valkey 7.2.5+ and set `REDIS_URL`. This program writes a value and reads it back.

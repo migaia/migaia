@@ -16,6 +16,8 @@ Store vectors and their payloads in a real Qdrant service, then use query chains
 - Native reranking supports two-row all-integer multivectors. Float JSON tokens avoid ambiguous sparse-tuple decoding. See [Multivector reranking](./USEGUIDE.en.md#multivector-reranking).
 - Deletion makes preliminary counting and paged ID collection explicit choices. See [Expiry and deletion](./USEGUIDE.en.md#expiry-and-deletion).
 
+When you do not need it: with one collection, no organization isolation or expiry conditions, and no objection to writing native requests, the Qdrant client alone is enough.
+
 ## Start here
 
 Start Qdrant first. The default URL is `http://127.0.0.1:6333`; set `QDRANT_URL` for another service address. This writes one vector and reads its nearest-neighbor ID.

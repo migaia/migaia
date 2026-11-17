@@ -18,6 +18,8 @@ Add action and state observation, synchronous write permission, and removable di
 - **Continue cleanup after a failure and retain the failed value.** Binding disposers run in reverse order before plugin cleanup, sharing one disposal Promise as shown in [Release bindings in reverse order and retain cleanup failures](./USEGUIDE.en.md#release-bindings-in-reverse-order-and-retain-cleanup-failures).
 - **Choose independent data or shared references explicitly.** The three ClonePolicy choices distinguish strict copying, the original value, and best-effort diagnostic copying as shown in [Choose strict independence or explicit reference sharing](./USEGUIDE.en.md#choose-strict-independence-or-explicit-reference-sharing).
 
+When you do not need it: if you only want to watch state changes during development and need neither write permission checks nor diagnostics plugins that can be added and removed, subscribing to the Store's change notifications is enough.
+
 ## Start here
 
 ```ts doc-test=run

@@ -16,6 +16,8 @@ Move rarely read records out of the storage used for everyday updates and into b
 - Progress includes only certainly committed records and segments. See [Observe committed progress](./USEGUIDE.en.md#observe-committed-progress).
 - Explicit sweep removes only this plugin's unreferenced archive objects. See [Read restore and clean up](./USEGUIDE.en.md#read-restore-and-clean-up).
 
+When you do not need it: if the hot store stays small, or old records can simply be deleted, archiving is unnecessary; an expiry or a delete does the job.
+
 ## Start here
 
 Use real in-memory records and blobs to demonstrate the whole flow. Choose persistent backends for production data.

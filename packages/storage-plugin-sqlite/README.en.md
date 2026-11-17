@@ -18,6 +18,8 @@ When local settings, offline records and caches must be saved together, this pac
 - **Keep connection cleanup explicit.** Your application creates the connection; release the host before releasing it. Node and Bun use built-in modules, with no npm native addon.
 - **Understand concurrency limits.** File WAL mode coordinates logical locks across connections. Non-WAL mode coordinates only within the current process. See [Concurrency and cancellation](./USEGUIDE.en.md#concurrency-and-cancellation). No speed claim is made.
 
+When you do not need it: if the application only runs its own SQL and uses none of the host's key-value, record and expiry methods, the runtime's built-in SQLite module alone is enough.
+
 ## Start here
 
 This writes to a real SQLite in-memory database. Replace `:memory:` with a filename to persist data. Node 24 or later is required.

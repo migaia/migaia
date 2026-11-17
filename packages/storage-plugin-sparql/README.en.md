@@ -16,6 +16,8 @@ Write RDF to a remote SPARQL endpoint or local Oxigraph store and use query chai
 - Graph documents use a real RDF parser/writer, with separate blank-node identities for separate imports. See [Graph documents and ontology](./USEGUIDE.en.md#graph-documents-and-ontology).
 - Unknown writes are not replayed automatically. Explicit rejection, read failure and unknown commit have distinct errors. See [Failures and disposal](./USEGUIDE.en.md#failures-and-disposal).
 
+When you do not need it: if you only send hand-written SPARQL text to one endpoint and need no conditional commit, sending the request with `fetch` is enough.
+
 ## Start here
 
 Use a real Oxigraph Store to write a name quad and read back its count by subject.

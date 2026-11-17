@@ -17,6 +17,8 @@ Register Stores and Resources for a server render, capture state for hydration, 
 - **Give embedded JSON one place to handle HTML-sensitive characters.** Serialization escapes five character classes without changing the parsed value, as shown in [Embed JSON without letting data close its script element](./USEGUIDE.en.md#embed-json-without-letting-data-close-its-script-element).
 - **Build consistent state elements with validated identifiers.** The helper fixes the JSON MIME type and rejects ids that can break the attribute boundary, as shown in [Reject identifiers that can break the state element attribute](./USEGUIDE.en.md#reject-identifiers-that-can-break-the-state-element-attribute).
 
+When you do not need it: it is unnecessary if the application renders only in the browser, or if server rendering reads no Store or Resource.
+
 ## Start here
 
 Install the package and the Store used directly below:

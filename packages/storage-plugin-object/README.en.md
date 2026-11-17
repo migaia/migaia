@@ -18,6 +18,8 @@ Save attachments, exports and other binary content in a dedicated directory or S
 - S3 distinguishes failed writes, unknown commits and failures reading metadata after a write, helping recovery decisions. [S3](./USEGUIDE.en.md#use-s3)
 - Organization views separate logical keys, and page cursors are tied to organization and prefix. [Organizations and pages](./USEGUIDE.en.md#organizations-and-pagination)
 
+When you do not need it: if one place reads and writes local files, you need neither organization isolation nor range reads, and you will not switch between files and S3, `node:fs` or the S3 SDK alone is enough.
+
 ## Start here
 
 Use a directory dedicated to this plugin. This example writes `hello` and reads it from the actual filesystem.

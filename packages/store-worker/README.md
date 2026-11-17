@@ -18,6 +18,8 @@
 - **计算结果直接使用已有状态与缓存模型。** `workerComputed` 把输入选择和请求接入 Resource，[用 Resource 管理 Worker 结果与缓存](./USEGUIDE.md#用-resource-管理-worker-结果与缓存) 展示了按需取值、新鲜缓存复用和显式刷新。
 - **保留应用原有的注册表调用。** `workerPlugin` 以标准插件接入 Worker 中的 parser，[把现有 JSON 解析器接入 Worker 注册表插件](./USEGUIDE.md#把现有-json-解析器接入-worker-注册表插件) 通过原有 encode / decode 完成往返。
 
+什么时候不需要它：计算很短、不会卡住界面，或者要解析的数据很小时，直接在主线程调用就够了。
+
 ## 从这里开始
 
 在 Node 24 中把下面代码保存为独立的 ESM TypeScript 文件执行；子线程会重新加载当前文件，不能放进交互式标准输入。先安装本包：

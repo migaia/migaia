@@ -20,6 +20,8 @@ Give a runtime-neutral Host ownership of plugin installation, dependencies, conf
 - **Declared capability dependencies determine installation order.** Discovery order can place a consumer first; Feature references start its provider first and inject the exact output object. [Runnable proof](./USEGUIDE.en.md#start-providers-before-consumers-regardless-of-argument-order).
 - **Missing requirements fail before installers start.** Looking up services during installation can fail after resource acquisition; Feature preflight rejects missing providers before entering installers. [Runnable proof](./USEGUIDE.en.md#reject-a-missing-provider-before-installers-run).
 
+When you do not need it: with one or two extensions that start with the application, are never removed and do not depend on each other, importing them and calling their setup functions is enough.
+
 ## Start here
 
 A greeting feature is already serving. Then a new batch ships: the cache plugin opens its connection, but the translator plugin fails to install. The Host undoes the whole batch: the cache connection is released, and greeting keeps answering.

@@ -19,6 +19,8 @@
 - **A broken concatenation fails explicitly.** The converters enforce one document rather than silently discarding a second; the [trailing document example](./USEGUIDE.en.md#reject-a-second-document-instead-of-silently-dropping-it) returns zero output with an operation-specific failure.
 - **The boundary carries bytes throughout.** The JSON reader writes directly to the MessagePack writer without building a `serde_json::Value` tree first; the [interleaving example](./USEGUIDE.en.md#retain-two-conversions-without-a-shared-last-result-slot) passes JSON bytes to the converter and retains each operation’s own output. This explains the mechanism, without claiming a speed advantage over native JSON operations.
 
+When you do not need it: if the data is small, or no bytes have to be handed to a WASM module, JavaScript's JSON methods are enough.
+
 ## Start here
 
 Install the package, save this example as a `.ts` file, and run it with Node 24. It reads the bundled WASM file explicitly, so initialization does not depend on fetching a local file URL.

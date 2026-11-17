@@ -18,6 +18,8 @@ Connect existing reactive state to React read hooks, with separate registrations
 - **Honor readiness fallback on the first server render.** Fulfilled input still passes through normalized barrier tracking, leaving the example's children unread as shown in [Show readiness fallback on the first server render](./USEGUIDE.en.md#show-readiness-fallback-on-the-first-server-render).
 - **Reuse preloaded data across explicit server renders.** Two reads share one Resource and the example's fetcher runs only once as shown in [Render a preloaded Resource without creating another request](./USEGUIDE.en.md#render-a-preloaded-resource-without-creating-another-request).
 
+When you do not need it: it is unnecessary without React. If the application runs only in the browser with one global copy of its state, the reading hooks are all you need; skip the Provider and the registry.
+
 ## Start here
 
 ```ts doc-test=run

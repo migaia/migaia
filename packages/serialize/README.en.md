@@ -20,6 +20,8 @@ Separate format selection, value validation, framed encoding and parser cleanup 
 - **Configuration getters are rejected before reading.** Copying or stringify invokes accessors; emitOutput checks descriptors first, leaving the rejected getter’s read count at zero. [Run the example](./USEGUIDE.en.md#reject-an-accessor-without-evaluating-it).
 - **Array slices arrive as independent encoded frames.** Whole-array encoding waits for a complete result; encodeStream produces slices with bounded in-flight requests for incremental receivers. [Run the example](./USEGUIDE.en.md#process-independent-array-slices-without-joining-json-documents).
 
+When you do not need it: if you read and write a single JSON format of your own, the data holds no non-finite numbers or accessor properties, and nothing has to be sent in slices, the native `JSON.stringify` and `JSON.parse` are enough.
+
 ## Start here
 
 Register the JSON plugin, encode settings and read them through the same registry:

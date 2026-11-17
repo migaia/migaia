@@ -18,6 +18,8 @@ Observe object fields, array positions, and Map/Set members through explicit met
 - **Distinguish value edits from insertion-order changes.** Map separates key structure from value iteration and compares replacement order as shown in [Observe key order separately from changing values](./USEGUIDE.en.md#observe-key-order-separately-from-changing-values).
 - **Observe one member and end its collection independently.** Set.has tracks membership per value and collection disposal releases its own signals without destroying the borrowed Runtime as shown in [Watch one selected member and release the collection independently](./USEGUIDE.en.md#watch-one-selected-member-and-release-the-collection-independently).
 
+When you do not need it: if the state has only a few fields and it is acceptable for every observer to recompute after each whole-value replacement, a plain whole-value state is enough; tracking by field, index or member is unnecessary.
+
 ## Start here
 
 ```ts doc-test=run
