@@ -1,4 +1,9 @@
 {
   "package": "log-plugin-console",
-  "codes": {}
+  "codes": {
+    "INVALID_OPTION": {
+      "source": "logging.console",
+      "scenario": "Reading a `consolePlugin` or `prettyFeature` option threw (a throwing getter or Proxy trap)."
+    }
+  }
 }

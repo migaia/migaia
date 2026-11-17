@@ -37,6 +37,10 @@
       "source": "plugin.host",
       "scenario": "Reported when one disposer exceeds its wait limit without settling."
     },
+    "DUPLICATE_HOST_MODULE": {
+      "source": "plugin.host",
+      "scenario": "A module key is installed twice; remove its duplicate."
+    },
     "EXTENSION_DUPLICATE": {
       "source": "plugin.host",
       "scenario": "Thrown when an extension returned by `install()` conflicts with an existing host property."
@@ -57,6 +61,10 @@
       "source": "plugin.host",
       "scenario": "`definition.getFeature(name)` or `handle.getFeature(name)` named a Feature the plugin does not declare."
     },
+    "FEATURE_ROLE_CONFLICT": {
+      "source": "plugin.host",
+      "scenario": "A global/default contribution or transport-local call-policy record duplicates a singular role, including different aliases of one token, or a repeatable role reserves the same global alias twice, or one owner contributes or consumes twice on the same overlay."
+    },
     "HOST_DISPOSED": {
       "source": "plugin.host",
       "scenario": "Thrown when a mutation or registration targets a host after disposal completes."
@@ -65,6 +73,10 @@
       "source": "plugin.host",
       "scenario": "Thrown when a mutation targets a closing host after `dispose()` starts but before the terminal state."
     },
+    "HOST_MODULE_MISSING": {
+      "source": "plugin.host",
+      "scenario": "A definition or selected module requires an absent module; install the module named in detail."
+    },
     "INSTALL_RESULT_THENABLE": {
       "source": "plugin.host",
       "scenario": "Plugin install returned an own `then` key, which is never a publishable extension result."
@@ -72,6 +84,10 @@
     "INVALID_CONFIG_VALUE": {
       "source": "plugin.host",
       "scenario": "Config value violates the admitted plain-data grammar; caller must supply an allowed value."
+    },
+    "INVALID_HOST_MODULE": {
+      "source": "plugin.host",
+      "scenario": "A host option contains an unregistered module identity, or the module requirements form a cycle."
     },
     "INVALID_OPTION": {
       "source": "plugin.host",
@@ -112,6 +128,10 @@
     "PIPELINE_MODE_MISMATCH": {
       "source": "plugin.host",
       "scenario": "Thrown when a registered stage is incompatible with the host's pipeline mode."
+    },
+    "PIPELINE_MODE_NOT_INSTALLED": {
+      "source": "plugin.host",
+      "scenario": "The requested mode is absent; install its mode module."
     },
     "PIPELINE_NEXT_DUPLICATE": {
       "source": "plugin.host",

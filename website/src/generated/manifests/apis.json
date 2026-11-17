@@ -203924,7 +203924,7 @@
         {
           "name": "StorageError",
           "kind": "class",
-          "signature": "export declare class StorageError<\n  TCode extends string = IStorageHostErrorCode,\n> extends Error {\n  /** Canonical storage-host diagnostic source. */ readonly source: string;\n  /** Semantic failure scenario; branch on this rather than message text. */ readonly code: TCode;\n  /** Backend associated with this operation. */ readonly backend?: string;\n  /** Logical key associated with this operation. */ readonly key?:\n    | string\n    | IStorageKey;\n  /** Channel already occupying the conflicting key. */ readonly existingChannel?: IStorageChannel;\n  /** Channel the rejected write attempted to use. */ readonly attemptedChannel?: IStorageChannel;\n  /** Extension phase responsible for this failure. */ readonly extensionStage?: IExtensionStage;\n  /** Operation name attached by its owning boundary. */ readonly operation?: string;\n  /** Name of the plugin whose Feature factory failed; present only on such install failures. */ readonly plugin?: string;\n  /** Root key of the Feature whose factory failed; present only on such install failures. */ readonly feature?: string;\n  /** Internal repository stage used to apply invalid-record policy. */ readonly stage?:\n    | 'decode'\n    | 'migrate'\n    | 'validate';\n  /** Capture diagnostic details once and freeze this error without replacing its original cause. */ constructor(\n    code: TCode,\n    details?: IStorageErrorDetails,\n    message?: string,\n    stage?: 'decode' | 'migrate' | 'validate',\n    /** Owning error domain; backend module that reuse this class pass their own registered domain. */ source?: string,\n  );\n}",
+          "signature": "export declare class StorageError<\n  TCode extends string = IStorageHostErrorCode,\n> extends Error {\n  /** Canonical storage-host diagnostic source. */ readonly source: string;\n  /** Semantic failure scenario; branch on this rather than message text. */ readonly code: TCode;\n  /** Backend associated with this operation. */ readonly backend?: string;\n  /** Logical key associated with this operation. */ readonly key?:\n    | string\n    | IStorageKey;\n  /** Channel already occupying the conflicting key. */ readonly existingChannel?: IStorageChannel;\n  /** Channel the rejected write attempted to use. */ readonly attemptedChannel?: IStorageChannel;\n  /** Extension phase responsible for this failure. */ readonly extensionStage?: IExtensionStage;\n  /** Operation name attached by its owning boundary. */ readonly operation?: string;\n  /** Name of the plugin whose Feature factory failed; undefined except on such install failures. */ readonly plugin?: string;\n  /** Root key of the Feature whose factory failed; undefined except on such install failures. */ readonly feature?: string;\n  /** Internal repository stage used to apply invalid-record policy. */ readonly stage?:\n    | 'decode'\n    | 'migrate'\n    | 'validate';\n  /** Capture diagnostic details once and freeze this error without replacing its original cause. */ constructor(\n    code: TCode,\n    details?: IStorageErrorDetails,\n    message?: string,\n    stage?: 'decode' | 'migrate' | 'validate',\n    /** Owning error domain; backend module that reuse this class pass their own registered domain. */ source?: string,\n  );\n}",
           "declarationLine": 71,
           "source": "packages/storage-host/dist/errors.d.ts",
           "purpose": "Construct a frozen native Error with host source/code and exact diagnostic references; original failures remain on cause.",
@@ -204046,7 +204046,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly plugin?: string;",
-              "description": "Name of the plugin whose Feature factory failed; present only on such install failures.",
+              "description": "Name of the plugin whose Feature factory failed; undefined except on such install failures.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -204055,7 +204055,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly feature?: string;",
-              "description": "Root key of the Feature whose factory failed; present only on such install failures.",
+              "description": "Root key of the Feature whose factory failed; undefined except on such install failures.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -204073,7 +204073,7 @@
           "aliasOf": "StorageError",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class StorageError<TCode extends string = IStorageHostErrorCode> extends Error { /** Canonical storage-host diagnostic source. */ readonly source: string; /** Semantic failure scenario; branch on this rather than message text. */ readonly code: TCode; /** Backend associated with this operation. */ readonly backend?: string; /** Logical key associated with this operation. */ readonly key?: string | IStorageKey; /** Channel already occupying the conflicting key. */ readonly existingChannel?: IStorageChannel; /** Channel the rejected write attempted to use. */ readonly attemptedChannel?: IStorageChannel; /** Extension phase responsible for this failure. */ readonly extensionStage?: IExtensionStage; /** Operation name attached by its owning boundary. */ readonly operation?: string; /** Name of the plugin whose Feature factory failed; present only on such install failures. */ readonly plugin?: string; /** Root key of the Feature whose factory failed; present only on such install failures. */ readonly feature?: string; /** Internal repository stage used to apply invalid-record policy. */ readonly stage?: 'decode' | 'migrate' | 'validate'; /** Capture diagnostic details once and freeze this error without replacing its original cause. */ constructor(code: TCode, details?: IStorageErrorDetails, message?: string, stage?: 'decode' | 'migrate' | 'validate', /** Owning error domain; backend module that reuse this class pass their own registered domain. */ source?: string); }"
+            "export declare class StorageError<TCode extends string = IStorageHostErrorCode> extends Error { /** Canonical storage-host diagnostic source. */ readonly source: string; /** Semantic failure scenario; branch on this rather than message text. */ readonly code: TCode; /** Backend associated with this operation. */ readonly backend?: string; /** Logical key associated with this operation. */ readonly key?: string | IStorageKey; /** Channel already occupying the conflicting key. */ readonly existingChannel?: IStorageChannel; /** Channel the rejected write attempted to use. */ readonly attemptedChannel?: IStorageChannel; /** Extension phase responsible for this failure. */ readonly extensionStage?: IExtensionStage; /** Operation name attached by its owning boundary. */ readonly operation?: string; /** Name of the plugin whose Feature factory failed; undefined except on such install failures. */ readonly plugin?: string; /** Root key of the Feature whose factory failed; undefined except on such install failures. */ readonly feature?: string; /** Internal repository stage used to apply invalid-record policy. */ readonly stage?: 'decode' | 'migrate' | 'validate'; /** Capture diagnostic details once and freeze this error without replacing its original cause. */ constructor(code: TCode, details?: IStorageErrorDetails, message?: string, stage?: 'decode' | 'migrate' | 'validate', /** Owning error domain; backend module that reuse this class pass their own registered domain. */ source?: string); }"
           ],
           "overloadParameterDetails": [
             [
@@ -204140,7 +204140,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-host/dist/errors.d.ts:StorageError:export declare class StorageError<TCode extends string = IStorageHostErrorCode> extends Error { /** Canonical storage-host diagnostic source. */ readonly source: string; /** Semantic failure scenario; branch on this rather than message text. */ readonly code: TCode; /** Backend associated with this operation. */ readonly backend?: string; /** Logical key associated with this operation. */ readonly key?: string | IStorageKey; /** Channel already occupying the conflicting key. */ readonly existingChannel?: IStorageChannel; /** Channel the rejected write attempted to use. */ readonly attemptedChannel?: IStorageChannel; /** Extension phase responsible for this failure. */ readonly extensionStage?: IExtensionStage; /** Operation name attached by its owning boundary. */ readonly operation?: string; /** Name of the plugin whose Feature factory failed; present only on such install failures. */ readonly plugin?: string; /** Root key of the Feature whose factory failed; present only on such install failures. */ readonly feature?: string; /** Internal repository stage used to apply invalid-record policy. */ readonly stage?: 'decode' | 'migrate' | 'validate'; /** Capture diagnostic details once and freeze this error without replacing its original cause. */ constructor(code: TCode, details?: IStorageErrorDetails, message?: string, stage?: 'decode' | 'migrate' | 'validate', /** Owning error domain; backend packages that reuse this class pass their own registered domain. */ source?: string); }",
+          "identity": "packages/storage-host/dist/errors.d.ts:StorageError:export declare class StorageError<TCode extends string = IStorageHostErrorCode> extends Error { /** Canonical storage-host diagnostic source. */ readonly source: string; /** Semantic failure scenario; branch on this rather than message text. */ readonly code: TCode; /** Backend associated with this operation. */ readonly backend?: string; /** Logical key associated with this operation. */ readonly key?: string | IStorageKey; /** Channel already occupying the conflicting key. */ readonly existingChannel?: IStorageChannel; /** Channel the rejected write attempted to use. */ readonly attemptedChannel?: IStorageChannel; /** Extension phase responsible for this failure. */ readonly extensionStage?: IExtensionStage; /** Operation name attached by its owning boundary. */ readonly operation?: string; /** Name of the plugin whose Feature factory failed; undefined except on such install failures. */ readonly plugin?: string; /** Root key of the Feature whose factory failed; undefined except on such install failures. */ readonly feature?: string; /** Internal repository stage used to apply invalid-record policy. */ readonly stage?: 'decode' | 'migrate' | 'validate'; /** Capture diagnostic details once and freeze this error without replacing its original cause. */ constructor(code: TCode, details?: IStorageErrorDetails, message?: string, stage?: 'decode' | 'migrate' | 'validate', /** Owning error domain; backend packages that reuse this class pass their own registered domain. */ source?: string); }",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -222719,7 +222719,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly plugin?: string;",
-              "description": "Name of the plugin whose Feature factory failed; present only on such install failures.",
+              "description": "Name of the plugin whose Feature factory failed; undefined except on such install failures.",
               "parameterDetails": [],
               "returns": "string"
             },
@@ -222728,7 +222728,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly feature?: string;",
-              "description": "Root key of the Feature whose factory failed; present only on such install failures.",
+              "description": "Root key of the Feature whose factory failed; undefined except on such install failures.",
               "parameterDetails": [],
               "returns": "string"
             },
