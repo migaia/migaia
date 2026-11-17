@@ -164,9 +164,12 @@ const isBuildInput = (directory, path) => {
  *
  * @param {readonly string[]} directories Absolute package directories
  * @param {string} [root]
+ * @param {(path: string, absolute: string) => Buffer | string | null} [readInput] Content one
+ *   package-relative file contributes; `null` leaves the file out. Build freshness uses the raw
+ *   bytes; coverage custody passes its own reader.
  * @returns {Map<string, string>} Absolute directory → hex digest
  */
-export const inputDigests = (directories, root = repositoryRoot) => {
+export const inputDigests = (directories, root = repositoryRoot, readInput = readRawInput) => {
   /** One git listing for all requested packages keeps closure assertions cheap. */
   const listed = execFileSync(
     'git',
@@ -202,12 +205,11 @@ export const inputDigests = (directories, root = repositoryRoot) => {
     // A tracked file deleted in the worktree is simply absent from the input: its absence changes
     // the digest exactly as a content edit would.
     if (!existsSync(absolute)) continue
+    /** Content this file contributes, or null when the reader leaves it out. */
+    const content = readInput(path, absolute)
+    if (content === null) continue
     /** Digest of this file's package-relative path and content. */
-    const digest = createHash('sha256')
-      .update(path)
-      .update('\0')
-      .update(readFileSync(absolute))
-      .digest('hex')
+    const digest = createHash('sha256').update(path).update('\0').update(content).digest('hex')
     const entry = sums.get(owner)
     entry.count += 1
     entry.sum = (entry.sum + BigInt('0x' + digest)) & DIGEST_MASK
@@ -221,6 +223,15 @@ export const inputDigests = (directories, root = repositoryRoot) => {
     ])
   )
 }
+
+/**
+ * Default digest reader: every build input contributes its exact bytes.
+ *
+ * @param {string} _path Package-relative path (unused)
+ * @param {string} absolute Absolute file path
+ * @returns {Buffer} File bytes
+ */
+const readRawInput = (_path, absolute) => readFileSync(absolute)
 
 /** 256-bit mask for the order-independent per-package digest sum. */
 const DIGEST_MASK = (1n << 256n) - 1n

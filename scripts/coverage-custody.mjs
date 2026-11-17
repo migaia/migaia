@@ -462,6 +462,76 @@ const SHARED_COVERAGE_INPUTS = Object.freeze([
 ])
 
 /**
+ * Package-root guides. Their text cannot change coverage numbers, so editing them keeps every
+ * owner's signed numbers.
+ */
+const COVERAGE_IRRELEVANT_DOCUMENTS = new Set([
+  'README.md',
+  'README.en.md',
+  'USEGUIDE.md',
+  'USEGUIDE.en.md'
+])
+
+/** Package-relative path of a package manifest. */
+const PACKAGE_MANIFEST = 'package.json'
+
+/**
+ * A package manifest without its `version`. Release bumps change only that field, which no test
+ * reads, so it stays out of coverage digests and out of the version-only push check.
+ *
+ * @param {string} text Manifest JSON text
+ * @returns {string} Canonical JSON of every other field
+ */
+export const manifestWithoutVersion = (text) => {
+  const manifest = JSON.parse(text)
+  delete manifest.version
+  return JSON.stringify(manifest)
+}
+
+/**
+ * Content one package file contributes to a coverage digest: package-root guides are left out and
+ * the manifest is read without its version; every other file contributes its bytes.
+ *
+ * @param {string} path Package-relative, forward-slash path
+ * @param {string} absolute Absolute file path
+ * @returns {Buffer | string | null} Digest content, or null to leave the file out
+ */
+export const coverageInputContent = (path, absolute) => {
+  if (COVERAGE_IRRELEVANT_DOCUMENTS.has(path)) return null
+  if (path === PACKAGE_MANIFEST) return manifestWithoutVersion(readFileSync(absolute, 'utf8'))
+  return readFileSync(absolute)
+}
+
+/** Repository path of a file inside one package: `packages/<directory>/<path>`. */
+const PACKAGE_FILE = /^packages\/[^/]+\/(.+)$/
+
+/**
+ * Whether every change between two commits is a package manifest whose fields other than `version`
+ * are unchanged, as in the release loop's patch commits. Such a push changes no coverage input, so
+ * pre-push may skip custody. Added, deleted or renamed files never qualify.
+ *
+ * @param {string} from Commit already on the remote
+ * @param {string} to Commit being pushed
+ * @returns {boolean} True when only package versions differ
+ */
+export const isVersionOnlyChange = (from, to) => {
+  /** `<status>\t<path>` rows of every changed file. */
+  const rows = run('git', ['diff', '--name-status', '--no-renames', from, to])
+    .split('\n')
+    .filter(Boolean)
+  for (const row of rows) {
+    const [status, name] = row.split('\t')
+    if (status !== 'M' || PACKAGE_FILE.exec(name)?.[1] !== PACKAGE_MANIFEST) return false
+    if (
+      manifestWithoutVersion(run('git', ['show', `${from}:${name}`])) !==
+      manifestWithoutVersion(run('git', ['show', `${to}:${name}`]))
+    )
+      return false
+  }
+  return true
+}
+
+/**
  * Package directory names whose sources and tests form one coverage owner.
  *
  * @param {string} packageName Actual package or the declared RPC family unit.
@@ -547,7 +617,15 @@ const hashRepositoryPaths = (paths) => {
     /** A tracked file deleted in the worktree is absent from the input, changing the digest. */
     const absolute = join(repositoryRoot, name)
     if (!existsSync(absolute)) continue
-    hash.update(name).update('\0').update(readFileSync(absolute)).update('\0')
+    /** Path inside its package; root inputs have none and contribute their exact bytes. */
+    const packagePath = PACKAGE_FILE.exec(name)?.[1]
+    /** Content this file contributes, or null when it is left out. */
+    const content =
+      packagePath === undefined
+        ? readFileSync(absolute)
+        : coverageInputContent(packagePath, absolute)
+    if (content === null) continue
+    hash.update(name).update('\0').update(content).update('\0')
   }
   return hash.digest('hex')
 }
@@ -568,7 +646,11 @@ export const ownerInputDigests = (coveragePackages) => {
   for (const packageName of coveragePackages) {
     const directories = ownerDirectories(packageName)
     /** Build-input digests of every package the owner's tests load through `dist/`. */
-    const dependencies = inputDigests(ownersDistClosure(directories))
+    const dependencies = inputDigests(
+      ownersDistClosure(directories),
+      repositoryRoot,
+      coverageInputContent
+    )
     const hash = createHash('sha256')
       .update(shared)
       .update('\0')
@@ -929,4 +1011,12 @@ export const main = () => {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
+/** Flag that asks only whether the push from the given remote commit changes package versions. */
+const VERSION_ONLY_SINCE = '--version-only-since'
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  /** Position of the version-only flag; its operand is the remote commit. */
+  const since = process.argv.indexOf(VERSION_ONLY_SINCE)
+  if (since === -1) main()
+  else process.exitCode = isVersionOnlyChange(process.argv[since + 1], 'HEAD') ? 0 : 1
+}

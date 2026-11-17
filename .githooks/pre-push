@@ -6,10 +6,12 @@ set -eu
 
 zero=0000000000000000000000000000000000000000
 main_push=false
+main_remote=$zero
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$remote_ref" = refs/heads/main ] || continue
   [ "$local_sha" = "$zero" ] && continue
   main_push=true
+  main_remote=$remote_sha
   if [ "$local_sha" != "$(git rev-parse HEAD)" ]; then
     echo "pre-push: push main from a checkout of the pushed commit so custody measures it" >&2
     exit 1
@@ -23,6 +25,15 @@ if [ -n "$(git status --porcelain -- packages scripts)" ]; then
 fi
 
 cd "$(git rev-parse --show-toplevel)"
+
+# The release loop pushes once per package, each push only bumping one manifest version. Such a
+# push changes no coverage input, so it skips custody; anything else in the push runs it.
+if [ "$main_remote" != "$zero" ] && git cat-file -e "$main_remote^{commit}" 2>/dev/null &&
+  node scripts/coverage-custody.mjs --version-only-since "$main_remote"; then
+  echo "pre-push: only package versions changed; coverage custody skipped"
+  exit 0
+fi
+
 window="$(git rev-parse --path-format=absolute --git-common-dir)/../scripts/exclusive-window.mjs"
 exec node "$window" run --window pre-push-custody --wait 2700 -- \
   node scripts/storage-services.mts run -- node scripts/coverage-custody.mjs
