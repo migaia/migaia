@@ -48,21 +48,26 @@ async function openFrame(): Promise<HTMLIFrameElement> {
 
 /**
  * Transfer the actual SharedWorker port after the dedicated worker installs its configuration
- * listener.
+ * listener. The worker channel is exclusive to RPC once the worker plugin attaches, so the caller
+ * awaits this exchange first; a late setup notice would otherwise reach the RPC session as a
+ * frame.
  */
-function connectSharedLeaf(worker: Worker): void {
+function connectSharedLeaf(worker: Worker): Promise<void> {
   /** Each page owns an independent leaf so counters cannot leak between topology cases. */
   const shared = new SharedWorker(new URL('./topology-shared-leaf.ts', import.meta.url), {
     type: 'module',
     name: `forward-topology-leaf-${crypto.randomUUID()}`
   })
-  /** Only this dedicated worker's configuration notice can trigger its one native port transfer. */
-  const transfer = (event: MessageEvent<Record<string, unknown>>) => {
-    if (event.data?.[BrowserTopology.requestSharedPort] !== true) return
-    worker.removeEventListener('message', transfer)
-    worker.postMessage({ [BrowserTopology.sharedPort]: shared.port }, [shared.port])
-  }
-  worker.addEventListener('message', transfer)
+  return new Promise((resolve) => {
+    /** Only this dedicated worker's configuration notice can trigger its one native port transfer. */
+    const transfer = (event: MessageEvent<Record<string, unknown>>) => {
+      if (event.data?.[BrowserTopology.requestSharedPort] !== true) return
+      worker.removeEventListener('message', transfer)
+      worker.postMessage({ [BrowserTopology.sharedPort]: shared.port }, [shared.port])
+      resolve()
+    }
+    worker.addEventListener('message', transfer)
+  })
 }
 
 /** Open the forwarding window host over the iframe and the worker. */
@@ -72,7 +77,7 @@ async function openTop(): Promise<IRpcHost> {
     type: 'module',
     name: JSON.stringify({ hopAuth, nested })
   })
-  if (nested) connectSharedLeaf(worker)
+  if (nested) await connectSharedLeaf(worker)
   /** The iframe whose calls this window forwards. */
   const frame = await openFrame()
   /** The forwarding host; providers read it after it opens. */
