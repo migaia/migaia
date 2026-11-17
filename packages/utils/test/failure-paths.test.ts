@@ -190,4 +190,3 @@ describe('hasErrorIdentity', () => {
     expect(hasErrorIdentity(null)).toBe(false)
   })
 })
-
