@@ -48,8 +48,8 @@ export type IStorageDefinitionMetadata = {
 export type IStorageFeatureFailure = {
   /** Name of the plugin whose registration ran the factory. */
   readonly plugin: string
-  /** Key under which that plugin lists the Feature; absent for a dependency-only Feature. */
-  readonly feature?: string
+  /** Key under which that plugin lists the Feature; undefined for a dependency-only Feature. */
+  readonly feature: string | undefined
 }
 /** What the factory wrapper knows when a Feature factory throws. */
 type IStorageFeatureFailureRecord = {
@@ -87,16 +87,17 @@ function recordStorageFeatureFailure(
   holder: IStorageFeatureHolder,
   core: unknown
 ): void {
-  if ((typeof error !== 'object' && typeof error !== 'function') || error === null) return
-  if (featureFailures.has(error)) return
-  /** Every storage registration exposes its plugin name to its Features under this key. */
-  const readPluginName = (core as { featureExpose?: { getBackendId?: unknown } } | null)
-    ?.featureExpose?.getBackendId
-  if (typeof readPluginName !== 'function') return
-  /** The registration's own name; no user code runs in this read. */
-  const plugin: unknown = readPluginName()
-  if (typeof plugin !== 'string') return
-  featureFailures.set(error, { plugin, definition: holder.feature })
+  /** Primitives cannot be WeakMap keys, so a thrown primitive carries no attribution. */
+  if (Object(error) !== error || featureFailures.has(error as object)) return
+  /**
+   * Every storage registration exposes its plugin name to its Features as `getBackendId`; the read
+   * runs no user code. A core without it (not a storage registration) records nothing.
+   */
+  const plugin = (
+    core as { featureExpose?: { getBackendId?(): string } } | null
+  )?.featureExpose?.getBackendId?.()
+  if (plugin !== undefined)
+    featureFailures.set(error as object, { plugin, definition: holder.feature })
 }
 
 /**
@@ -110,14 +111,10 @@ export function readStorageFeatureFailure(
   plugins: readonly object[]
 ): IStorageFeatureFailure | undefined {
   for (const candidate of walkErrorCauses(error)) {
-    if ((typeof candidate !== 'object' && typeof candidate !== 'function') || candidate === null)
-      continue
-    /** Recorded only for values thrown by a storage Feature factory. */
-    const record = featureFailures.get(candidate)
+    /** Recorded only for objects thrown by a storage Feature factory; a primitive finds nothing. */
+    const record = featureFailures.get(candidate as object)
     if (record === undefined) continue
-    /** Key under which the failing plugin lists the failed definition. */
-    const feature = findStorageFeatureRootKey(record, plugins)
-    return feature === undefined ? { plugin: record.plugin } : { plugin: record.plugin, feature }
+    return { plugin: record.plugin, feature: findStorageFeatureRootKey(record, plugins) }
   }
   return undefined
 }
