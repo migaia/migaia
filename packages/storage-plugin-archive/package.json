@@ -1,6 +1,6 @@
 {
   "name": "@migaia/storage-plugin-archive",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Explicit record archival over borrowed transactional hot and blob cold storage",
   "repository": {
