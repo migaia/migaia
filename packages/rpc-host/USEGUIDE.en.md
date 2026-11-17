@@ -136,7 +136,7 @@ Capabilities such as auth, chunk, and batch negotiate through the handshake and 
 
 ## Install RPC in an existing host
 
-An existing `defineHost` owner obtains `domainCore` from `rpcHostPipelines(getHost, pipeline)`. Creating the helper calls neither callback and creates no host or resource. Installation reads the real owner and passes the current native construction request back to that owner's `pipeline(name, request)`. Each transport declares its own seven short pipeline names, created on installation and deleted on removal. There is no advance namespace list or `rpc.pipelines` output. Do not copy declarations or borrow another host's execution authority.
+An existing `defineHost` owner obtains `domainCore` from `rpcHostPipelines(getHost, pipeline)`. Creating the helper calls neither callback and creates no host or resource. Installation reads the real owner and passes the current native construction request back to that owner's `pipeline(name, request)`. Each transport declares its own seven short pipeline names, created on installation and deleted on removal. There is no advance namespace list. Do not copy declarations or borrow another host's execution authority.
 
 ```ts doc-test=check
 import { defineHost } from '@migaia/plugin-host'
@@ -230,7 +230,7 @@ Local codec capture accumulates a constant-time JSON byte lower bound per node d
 
 A carrier may implement `reserveWrite(options)` by borrowing its existing flow-control owner and returning a receipt with `release()`. Session reserves once per logical write after encoding and releases when that frame pipeline actually settles. Chunk fragments share the same receipt; a batch retains each member's receipt and borrows a surviving member's receipt for its coalesced physical write. `write` still completes at actual physical acceptance, without counting fragments or batches as new logical calls. Receipts never enter wire data.
 
-The same `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, and `schemaFeature` factories support host `plugins` and transport `features`; transport placement overrides only its namespace. Host `limitsFeature` shares quotas; transport `limitsFeature` owns separate quotas. `probe`, `typegen`, and Devtools are host-only. Remove the former `namespaces` scope option and place the feature on its transport.
+The same `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, and `schemaFeature` factories support host `plugins` and transport `features`; transport placement overrides only its namespace. Host `limitsFeature` shares quotas; transport `limitsFeature` owns separate quotas. `probe`, `typegen`, and Devtools are host-only. To scope a feature to one transport, place it in that transport's `features`.
 
 ## Authentication, signing, and duplicate requests
 
@@ -392,23 +392,18 @@ Readonly warning subscriptions may be installed later; native removal or rollbac
 
 A launched child with actual native parent facts (process, thread, coroutine, dedicated worker, or pool member) prefers the parent-supplied name and instanceId. Without a parent name, an explicit child `self.name` remains; without either name, the default follows the parent's instanceId. Address the name returned in the child's handshake. Overriding an explicit child name or instanceId does not fail construction; it emits one `RpcWarningCode.selfIgnored` (`SELF_IGNORED`) warning. `warning.data` includes only the overridden items: `parentName`/`ignoredName` for a name conflict and `parentInstanceId`/`ignoredInstanceId` for an identity conflict. An instanceId-only conflict also warns. Conflicting sets of parent startup facts still reject with `INVALID_CONFIG`.
 
-## Migrate entries
+## Entries
 
-| Retired usage                                               | Replacement                                                             |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Root `host.request/send/notify/stream/dispatch/group`       | The corresponding `host.<ns>` call                                      |
-| `@migaia/rpc-host/plugin`                                   | `@migaia/rpc-host/sdk`                                                  |
-| Contract error classes, predicates, and types from the root | `@migaia/rpc-host/contract`                                             |
-| `/probe` plus `defineFeaturePlugin`                         | `probe` / `defineProbe` from `/plugins/probe`                           |
-| `authFeature/chunkFeature/typegenFeature`                   | `auth/chunk/typegen` from `/plugins`                                    |
-| Root `defaultTimeoutMs` or numeric call timeout             | Plugin `features` and complete timeout instances                        |
-| `poolPlugin` or pool assembler                              | Transport `features: { workers: pool({ size }) }`                       |
-| Endpoint, RuntimePeer, v1, JSON-RPC profile                 | One Host call owner and one new protocol, without compatibility entries |
-| Root `outcome` or idempotency store                         | Install `/features/idempotency`; query its namespace extension          |
+| Entry                              | Contents                                                                                                                                                                                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@migaia/rpc-host`                 | `createRpcHost`, `RpcWarningCode`, `defaultRpcReporter`                                                                                                                                                                                           |
+| `@migaia/rpc-host/contract`        | Error classes and predicates (`RpcLifecycleError`, `RpcConstructionError`, `RpcAbortError`, `isRpcError`, `isRpcErrorInstance`, `isRpcRemoteError`, `isRpcTimeoutError`), `RPC_CORE_ERROR_SOURCE`, `normalizeRpcPortable` and `IRpcPortableValue` |
+| `@migaia/rpc-host/features`        | Built-in Features: `timeoutFeature`, `retryFeature`, `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, `schemaFeature`, plus `createRpcIdempotencyStore`                                   |
+| `@migaia/rpc-host/features/<name>` | One Feature as the default export                                                                                                                                                                                                                 |
+| `@migaia/rpc-host/plugins`         | Host-level observation `probe`, `defineProbe` and type generation `typegen`; also importable from `/plugins/probe` and `/plugins/typegen`                                                                                                         |
+| `@migaia/rpc-host/sdk`             | Plugin and carrier authoring tools: `defineTransportPlugin`, `defineFlowPlugin`, `defineFlowFeature`, `rpcHostPipelines` and more                                                                                                                 |
 
-`remote.host.use`, `remote.host.unUse` and `remote.host.inspect` are removed. RPC no longer provides a protocol for managing a remote host's plugins; local native host installation and disposal keep their own contracts.
-
-Aggregate and individual default subpaths support tree-shaking. Import codes from `@migaia/rpc-contract/error-code`; import application error classes, predicates, and types from `@migaia/rpc-host/contract`. The root no longer forwards those symbols. `RpcConstructionError` and `RpcAbortError` are runtime classes at this entry, suitable for `instanceof`, and are the same objects as direct contract imports. The entry also supplies `normalizeRpcPortable` and `IRpcPortableValue` for strict own-data normalization with negotiated native values. It neither copies nor installs another contract package. Existing SDK and limits type exports for plugin authors are unchanged. Transport authors supply native carriers and codecs; Host owns handshake, Sessions, pending calls, and provider execution.
+Import error codes from `@migaia/rpc-contract/error-code`. The classes re-exported by `/contract` are the same objects as the application-provided contract, so `instanceof` agrees across entries; `RpcConstructionError` and `RpcAbortError` are runtime classes usable with `instanceof`. `normalizeRpcPortable` strictly normalizes negotiated native values as own data, without copying or installing another contract. Transport authors supply only the native carrier and codecs; the host owns the handshake, sessions, the pending table and provider execution.
 
 ## Close and retain errors
 
@@ -420,27 +415,21 @@ Branch on `source/code`; preserve native classes, stack, cause, and errors. Time
 
 Promise-returning calls such as `send` and `request` reject invalid `idempotencyKey` values, rejected transfer admission, or a closed namespace, preserving each entry's existing `source/code` and `cause`; invalid keys still use `CONTRACT_INVALID`. Handle failures with `await` or `Promise.catch`. `dispatch` still returns `void` and reports failures, while `stream` and `streamTo` still return lazy async iterators.
 
-## Public behavior and migration
+## Behavior details
 
-Unhandled provider exceptions use `INTERNAL` and retain the native exception in the error graph. Scalar calls reject with the restored remote Error directly, without an extra `RpcRemoteError`; callers must inspect the actual error's `source/code`. A coroutine provider receives the original abort reason through `context.signal.reason`, without an invented cancellation code. `stream.return(value)` returns the runtime's actual terminal result rather than echoing the caller's `value`.
+Unclassified provider exceptions use `INTERNAL` and keep the native exception in the error graph. Scalar calls reject with the restored remote Error directly; inspect the actual error's `source/code`. A coroutine provider's `context.signal.reason` is the original abort reason, with no invented cancellation code. `stream.return(value)` returns the runtime's actual terminal result rather than echoing the caller's `value`.
 
-Untargeted calls select the sessions accepted at call time. Functions saved from `peers` remain bound to their original generation and reject after departure rather than switching to a replacement. Immediate process startup failure has one `PROCESS_CHANNEL_CLOSED` boundary with native EPIPE reachable through its cause graph. A thread closure with no native error does not invent a message-port cause.
+Untargeted calls select the sessions accepted at call time. Functions saved from `peers` stay bound to their original connection generation and reject after the peer leaves, rather than switching to a replacement. An immediate child-process startup failure has one `PROCESS_CHANNEL_CLOSED` boundary with the native EPIPE reachable through its cause graph. A thread closure with no native error does not invent a message-port cause.
 
-An independently constructed native host retains its native `dispose()` cleanup summary and shared Promise without an additional RPC cleanup shell. Original failure leaves, errors order, cause reachability and once-only disposal remain intact. The `host.close()` returned by `createRpcHost` retains its own public close semantics.
+An independently constructed native host keeps its native `dispose()` cleanup summary and shared Promise; original failures, errors order, cause reachability and once-only cleanup are preserved. The `host.close()` returned by `createRpcHost` has its own public close semantics.
 
-Idempotency fingerprints follow the object's own key order. Changing key order creates a different request; reuse of the same key conflicts with `CONTRACT_INVALID`. The store's string fingerprint ABI is unchanged.
+Idempotency fingerprints follow the object's own key order. Changing the key order makes a different request; reusing the same key with a different body conflicts with `CONTRACT_INVALID`.
 
-Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection.
+Auth passes an object to `sign/verify` by default. Normalize it yourself or set `encodedType: 'string'` when callbacks need text. Completed request IDs are released immediately by default; set `retain` (for example `310_000` ms) to keep them for a while. Local verifier and credential-resolver errors keep their original `cause`; redaction for the peer is controlled by the synchronous `errorMapFeature`. With `sign/verify` configured, auth exchanges and validates a fresh challenge per source inside the signed handshake; application callbacks must still sign and verify the complete input they receive.
 
-Auth passes an object to sign/verify by default. Normalize it explicitly or select `encodedType: 'string'` for callbacks requiring text. Completed request IDs release immediately by default; set `retain: 310_000` for the former duration. Local verifier/resolver errors retain their original causes; use synchronous `errorMapFeature` for remote redaction.
+`verifyCredentials` may return `{ principalId: nonEmptyString }` to hand the authenticated principal to the current session; throwing or rejecting refuses authentication. Returning `void`, a string or any other value grants no principal.
 
-With sign/verify configured, auth exchanges and validates a fresh source challenge inside the existing signed handshake. Application callbacks must still sign and verify the complete input they receive. No public discovery or handshake option is added.
-
-verifyCredentials may return { principalId: nonemptyString } to lend the authenticated principal to the current Session. Throwing or rejection still refuses authentication. Void, string, and other formerly ignored results do not grant a principal.
-
-The six former `/features/{auth,batch,chunk,idempotency,limits,schema}` entries are removed; import their factories from `/plugins/*` or `/plugins`. `rpcHostPipelines` removes its third argument and `pipelines` output; pass the construction request to `domainCore(request)`. Transports declare their own pipelines. The following unused error codes are removed without replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`.
-
-Overridden identity fields in `onWarning` are under `data`, including only the name or instanceId items that actually conflict. Small signed buffers may be inline only without explicit `transfer`; explicit transfer still hands over and detaches the original buffer. Carrier implementations must adopt the [current manifest format](../rpc-contract/USEGUIDE.en.md#carriers-binary-and-stage-order).
+`rpcHostPipelines(getHost, pipeline)` passes the construction request to `domainCore(request)`; each transport declares its own pipelines. Overridden identity fields given to `onWarning` are under `data`, including only the name or instanceId items that actually conflict. Small signed buffers may be inlined only without an explicit `transfer`; an explicit transfer still hands over and detaches the original buffer. Carrier implementations use the [current manifest format](../rpc-contract/USEGUIDE.en.md#carriers-binary-and-stage-order).
 
 ## Default-policy installation boundary
 
@@ -448,4 +437,4 @@ A `defineFlowPlugin` with `features` belongs in the construction `plugins`, inst
 
 ## Duplicate call-policy roles
 
-Timeout/retry roles are singular, independently of caller aliases. A duplicate in transport-local declarations or global/default policy admission rejects with `source: plugin.host`, `code: FEATURE_ROLE_CONFLICT` through the shared rule owner. Flow and transport-native role conflicts retain `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`; alias/configuration conflicts keep their existing RPC identity. No compatibility error alias is provided.
+Timeout/retry roles are singular, independently of caller aliases. A duplicate in transport-local declarations or global/default policy admission rejects with `source: plugin.host`, `code: FEATURE_ROLE_CONFLICT` through the shared rule owner. Flow and transport-native role conflicts retain `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`; alias or configuration conflicts keep their RPC error identity.

@@ -2,7 +2,7 @@
 
 [English](./USEGUIDE.en.md) · [包概览](./README.md) · [统一调用规则](../rpc-host/USEGUIDE.md)
 
-应用取得真实原生资源，每个 Host 通常选择一种传输。根对象管理身份、provider 与关闭；调用进入对应 namespace。以下完整模块按公开 dist 类型检查，不把静态通过当作真实 realm、认证或整体迁移验收。
+应用取得真实原生资源，每个 Host 通常选择一种传输。根对象管理身份、provider 与关闭；调用进入对应 namespace。以下示例只做类型检查；真实的跨页面来源和认证需要在浏览器里验证。
 
 ## Dedicated Worker
 

@@ -2,7 +2,7 @@
 
 [中文](./USEGUIDE.md) · [Overview](./README.en.md) · [Shared call rules](../rpc-host/USEGUIDE.en.md)
 
-Applications supply actual native resources and normally select one transport per Host. The root owns identity, providers and closure; calls use the corresponding namespace. These complete modules are typechecked against public dist, not proof of native realms, authentication or full migration acceptance.
+Applications supply actual native resources and normally select one transport per Host. The root owns identity, providers and closure; calls use the corresponding namespace. The examples below are only typechecked; real cross-page origins and authentication must be verified in a browser.
 
 ## Dedicated Worker
 

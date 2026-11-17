@@ -123,4 +123,4 @@ export async function installAndRelease(entry: URL) {
 
 当前同名准入的公开错误呈现也有保留的失败用例；不能把通用启动包装错误当作已完成原错误契约。为应用使用唯一身份，不用注册名推断远端 identity。按 `source/code/cause/errors` 保留错误链和原生类型；不要把未知结果当作从未执行，也不要从连接恢复推出幂等重放或持久 outcome 已建立。
 
-`@migaia/rpc-contract` 只负责纯数据、类型、错误与协议准入；业务 schema 和策略归实际 plugin/feature，原生资源归 Process，调用生命周期归 Host。完整迁移验收尚未闭合。
+`@migaia/rpc-contract` 只负责纯数据、类型、错误与协议准入；业务 schema 和策略归实际 plugin/feature，原生资源归 Process，调用生命周期归 Host。

@@ -1,10 +1,15 @@
-# `@migaia/rpc-plugin-browser`
-
-将真实 Window、Worker、BroadcastChannel、可靠 RTCDataChannel 或 WebTransport 接入 RPC。应用创建原生对象；Browser owner 负责原生来源和 I/O，Host 负责会话、目录与业务调用。
+# @migaia/rpc-plugin-browser
 
 [English](./README.en.md) · [使用指南](./USEGUIDE.md)
 
-## 开始使用
+在浏览器里的页面、iframe、Worker、SharedWorker、BroadcastChannel、可靠有序的 WebRTC DataChannel 和 WebTransport 之间，像调用本地函数一样调用对方。这是 [`@migaia/rpc-host`](../rpc-host/README.md) 的传输插件：原生对象由应用创建，本包负责收发和来源校验，host 负责调用、超时、取消和错误还原。
+
+## 你可能遇到过
+
+- **`postMessage` 收到了不该处理的消息**：iframe 或其他窗口发来的消息没有校验来源就执行了。根因是来源检查散落在每个 `onmessage` 里。
+- **页面和 Worker 之间的调用各写一套协议**：Worker、iframe、SharedWorker 各自一套请求 ID 和错误格式。根因是调用逻辑和通道绑在了一起。
+
+## 从这里开始
 
 ```bash
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-browser
@@ -82,4 +87,4 @@ Window 绑定实际 `event.source` 和显式 origin；`'*'` 还需 `allowUnsafeT
 
 原生来源过滤不等于认证 principal 或跨重连 session/scope 已建立。自动 auth/source freshness、部分 outcome/幂等流程及 observer 诊断兼容性仍有未闭合项；不承诺通过频道名或 native source 自动取得这些保证。通用 Host close/drain 与重启 downtime 的行为差异也不能编成浏览器保证。
 
-错误可能来自 `rpc.transport.browser` 或通用 RPC owner；保留 `source/code/cause/errors` 和原生 stack，不用消息文本或单一 code 猜执行结果。完整迁移验收仍 pending，详见[使用指南](./USEGUIDE.md)。
+错误可能来自 `rpc.transport.browser` 或通用 RPC owner；保留 `source/code/cause/errors` 和原生 stack，不用消息文本或单一 code 猜执行结果。详见[使用指南](./USEGUIDE.md)。

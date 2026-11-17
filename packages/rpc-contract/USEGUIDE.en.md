@@ -6,7 +6,7 @@ Contract owns data, interfaces, and pure shape checks. Host owns RPC sessions an
 
 ## Version and input boundary
 
-Every semantic message uses profile `migaia.rpc/2`. The only protocol version is `{ major: 2, minor: 0 }`, without legacy v1 or JSON-RPC fallback. Decode through the actual carrier, then check shapes with `/protocol` normalizers. A TypeScript assertion on received data is not admission.
+Every semantic message uses profile `migaia.rpc/2`. The only protocol version is `{ major: 2, minor: 0 }`. Decode through the actual carrier, then check shapes with `/protocol` normalizers. A TypeScript assertion on received data is not admission.
 
 Protocol normalizers first require a non-array object, then read known fields directly and check their types, ranges, and kind. Missing or invalid known fields retain their public error codes, with a pointer to the first invalid field. Admission retains the original object, ignores unknown fields, and does not inspect prototypes, getters, or non-enumerable properties. Business portability rules remain unchanged; the schema plugin owns method-schema execution.
 
@@ -149,7 +149,7 @@ Use published `schema/protocol.schema.json` and `schema/wire-error.schema.json` 
 
 RpcWireLimit fixes identifiers at128 characters, traces256, idempotency keys128, relative duration2147483647ms, handshake65536bytes, and at most8versions/16codecs/64extensions. Directories contain at most4096methods. Public constants/normalizers define stream/error/portable bounds.
 
-Old `/v1`, `/runtime`, `/framing`, `/binary`, `/remote`, JSON-RPC bridge conversion, and Content-Length profiles are removed. Applications use Host, carrier authors use its SDK, and contract contains no independent connection or policy executor.
+Applications use Host, carrier authors use its SDK, and contract contains no independent connection or policy executor.
 
 `RpcWireLimit.maxForwardHops` is 16. `forwardRoute` and serialized error routes accept at most `RpcWireLimit.maxForwardRouteNodes` (17) node IDs, including the origin. A host’s default forwarding ceiling remains 3; protocol capacity does not override its local policy.
 

@@ -1,12 +1,15 @@
-# `@migaia/rpc-plugin-coroutines`
-
-让 RPC 在同一事件循环中的真实协作任务之间运行。
-
-Contract 定义纯协议与接口；Host 拥有会话、目录、provider、调用结算与取消。本包是通过真实 MessageChannel 获取并监管任务的 transport plugin。auth、chunk、batch、probe 等 flow plugin 处理消息流；timeout、retry、pool 等完整 feature 安装在所属 plugin 上。
+# @migaia/rpc-plugin-coroutines
 
 [English](./README.en.md) · [使用指南](./USEGUIDE.md)
 
-## 开始使用
+在同一个事件循环里，用 RPC 的方式调用一组协作任务。没有线程或进程隔离，但调用、超时、取消和错误还原与 Worker、子进程完全一样。适合测试、先在单进程里搭好结构再换成真正的 Worker，或者在不支持 Worker 的环境里运行。这是 [`@migaia/rpc-host`](../rpc-host/README.md) 的传输插件。
+
+## 你可能遇到过
+
+- **为了测 Worker 通信，测试里要真的起线程**：测试又慢又难调试。根因是调用代码和真实通道绑在了一起。
+- **单进程原型改成多线程时，调用代码要重写一遍**：根因是两种写法的接口不一样。
+
+## 从这里开始
 
 ```bash
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
@@ -64,7 +67,7 @@ try {
 | `spawn: task`                    | 创建一个受监管的协作任务                                                |
 | `connectToParent: connect`       | 使用该次任务收到的准确 opaque 句柄，不是布尔值                          |
 | `name` / `namespace`             | 原生注册名与调用命名空间；默认 `coroutine`                              |
-| `features`                       | `{ localName: nativeFeature }`，接收 timeout、retry 或 pool                                     |
+| `features`                       | `{ localName: nativeFeature }`，接收 timeout、retry 或 pool             |
 | `supervisor`                     | 原生 restart/terminalPolicy/startupTimeoutMs/stop/budget/heartbeat 策略 |
 | `context.signal` / `heartbeat()` | 整代任务停止信号与原监管活性上报                                        |
 | `host.coroutine.members`         | 实际成员 list/get/stop/kill/restart/replace/on/watch                    |

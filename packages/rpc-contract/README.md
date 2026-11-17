@@ -1,10 +1,14 @@
-# `@migaia/rpc-contract`
-
-contract 定义唯一线上协议、host/plugin/feature 接口、可移植值规则和 RPC 家族错误契约。host 负责会话、握手、调用、provider、转发与取消；传输 plugin 负责原生连接、代际、编解码与分帧；信息流 plugin 和依附于 plugin 的 feature 自带可选能力。
-
-本包不持有会话、连接、待决表、计时器或 IO。通常为每个 host 选择一种传输；虽然 host 支持多个命名空间，也不建议混用多种传输。
+# @migaia/rpc-contract
 
 [English](./README.en.md) · [协议与使用指南](./USEGUIDE.md)
+
+RPC 家族共用的协议定义：线上消息的格式、host 与插件之间的接口、哪些值可以跨边界传递，以及所有 RPC 错误码。它只有数据、类型和纯校验，不持有连接、会话、计时器或 IO。
+
+**大多数应用不需要直接使用它**——调用 Worker、子进程或其他页面时从 [`@migaia/rpc-host`](../rpc-host/README.md) 开始，错误类和判断函数也从 `@migaia/rpc-host/contract` 导入。下面这些情况才需要直接依赖本包：
+
+- 自己实现一个传输载体（例如接入新的消息通道），需要 `/interfaces` 里的载体接口。
+- 用其他语言实现对端，需要按 `/schema/protocol` 校验线上消息。
+- 只想按错误码分支，又不想把协议和编解码代码打进包里：只导入 `/error-code`。
 
 ## 安装与入口
 
@@ -72,7 +76,7 @@ console.log('portable snapshot preserved')
 
 ## 一套协议
 
-profile 为 `migaia.rpc/2`，协议版本为2.0，方法目录 schemaVersion 为3。握手直接交换身份、代际、方法 mode/schema，以及真实可用的 codec/扩展。业务帧共用一份 id、route 与 task，不保留 v1、旧 runtime carrier selector 或独立 JSON-RPC profile。
+profile 为 `migaia.rpc/2`，协议版本为2.0，方法目录 schemaVersion 为3。握手直接交换身份、代际、方法 mode/schema，以及真实可用的 codec/扩展。业务帧共用一份 id、route 与 task。
 
 支持 `handshake`、`call`、`group`、`result`、`error`、`cancel`、`stream`、`outcome`、`control`、`directory`。`notify` 也有调用 id，以便写出之后传播取消；不为它增加业务确认或回执。`group` 是顺序业务步骤，不是物理合帧。
 
@@ -82,12 +86,10 @@ profile 为 `migaia.rpc/2`，协议版本为2.0，方法目录 schemaVersion 为
 
 ## 错误契约
 
-`/error-code` 维护全 RPC 家族的 source/code；其它包不再复制错误码表。语义身份不是授权。复制或从远端恢复的错误不因此获得本地重试、退场或控制权限。
+`/error-code` 是全 RPC 家族 source/code 的唯一来源。语义身份不是授权。复制或从远端恢复的错误不因此获得本地重试、退场或控制权限。
 
-新协议传递 `{ root, nodes }` flat error graph；节点保留 source、code、name、message、stack、cause/errors索引及可选诊断数据。恢复保留支持的原生类和发送方 stack，不以接收端新 stack 覆盖它。`/errors` 的旧独立错误树工具仍用于纯投影边界，不是另一套业务协议。
+新协议传递 `{ root, nodes }` flat error graph；节点保留 source、code、name、message、stack、cause/errors索引及可选诊断数据。恢复保留支持的原生类和发送方 stack，不以接收端新 stack 覆盖它。`/errors` 的递归错误树工具只用于纯投影边界，不是另一套业务协议。
 
-线上错误最多包含 1024 个节点，1025 个节点以 `INVALID_WIRE_ERROR` 拒绝，不再按旧错误树的 64 层深度拒绝。接收端迭代还原引用；同一图内的别名指向同一个错误对象，环也保留原有引用关系。
+线上错误最多包含 1024 个节点，超过时以 `INVALID_WIRE_ERROR` 拒绝。接收端迭代还原引用；同一图内的别名指向同一个错误对象，环也保留原有引用关系。
 
-业务应用从 [rpc-host](../rpc-host/README.md) 的 `createRpcHost` 开始；载体作者使用 `@migaia/rpc-host/sdk`。旧 `/v1`、`/runtime`、`/framing`、`/binary`、`/remote` 入口及其 profile 已删除，没有兼容别名。
-
-已删除的无抛出点错误码（无替代码）：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。
+业务应用从 [rpc-host](../rpc-host/README.md) 的 `createRpcHost` 开始；载体作者使用 `@migaia/rpc-host/sdk`。

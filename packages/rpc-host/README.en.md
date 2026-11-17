@@ -1,36 +1,65 @@
-# `@migaia/rpc-host`
-
-`contract` defines protocol, interfaces, portable values, and errors. `host` owns RPC calls, sessions, handshake, providers, forwarding, and cancellation. Transport plugins own native connections, generations, codecs, framing, and transfer. Flow plugins and plugin-owned features implement their optional behavior.
-
-A host can install multiple transports with calls isolated under `host.<ns>`. Mixing transport kinds in one host is not recommended; normally choose one kind per host.
+# @migaia/rpc-host
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
 
+Once computation moves into a Worker, a child process or another page, the code that calls it is often harder to get right than the computation: after a timeout the other side keeps running, errors arrive as a bare string, and calls are still waiting when everything shuts down. `@migaia/rpc-host` lets you call functions on the other side like local functions, and carries timeouts, cancellation, errors and shutdown across the boundary: when the caller times out, the other side receives a cancellation signal at once; an error thrown there comes back with its original `source`, `code`, stack and `cause`; closing the host settles every waiting call.
+
+A transport plugin decides the channel: coroutines (same event loop), Worker threads, child processes, browser windows and iframes each have a package, and calls look the same on all of them.
+
+## Problems you may have seen
+
+- **After a timeout, the other side keeps computing**: the caller gives up after 5 seconds, but the Worker finishes the computation anyway and holds the CPU for nothing. The cause is that the timeout exists only on the caller's side and is never sent across as cancellation.
+- **Errors are unrecognizable after crossing the boundary**: an error thrown in a child process reaches the main process as a `message` only, without `code` or `cause`, so you can only compare strings. The cause is that the error was serialized into a plain object.
+- **Calls hang forever at shutdown**: the Worker is terminated and the Promises waiting for results never settle. The cause is that nobody settles pending calls on shutdown.
+- **Switching channels means rewriting the call code**: moving from a Worker to a child process means rewriting request IDs, message formats and timeout logic. The cause is that call logic is tied to the channel.
+
+## Why choose it
+
+The common approach is `postMessage` plus a "request ID → Promise" map, or a proxy that turns method calls into messages. It handles the happy path but breaks in these places:
+
+- **Timeouts and cancellation reach the other side.** When the caller times out or calls `signal.abort()`, the provider's `context.signal` aborts too, so it can stop its work. [Example](./USEGUIDE.en.md#install-complete-policies)
+- **Errors come back as the original errors.** Remote errors are restored as native Errors with `source`, `code`, `stack`, `cause` and `AggregateError.errors`, so you can branch on `source/code`. [Example](./USEGUIDE.en.md#close-and-retain-errors)
+- **One call API; switching channels means switching plugins.** `request`, `notify`, `stream` and `group` work the same over coroutines, threads, child processes and browser channels; only the transport plugin changes. [Example](./USEGUIDE.en.md#select-targets-and-consume-streams)
+- **Shutdown is ordered.** `host.close()` first settles every waiting call with `ENDPOINT_DISPOSED`, then closes the underlying connections; repeated calls share one Promise. [Example](./USEGUIDE.en.md#close-and-retain-errors)
+- **Authentication, limits and deduplication are optional Features.** `authFeature`, `limitsFeature`, `idempotencyFeature` and others are separate Features; what you do not install is not bundled. [Example](./USEGUIDE.en.md#authentication-signing-and-duplicate-requests)
+
+If you only call a few functions inside one module, or send data to a Worker once without needing a result or cancellation, plain `postMessage` is simpler.
+
 ## Start here
 
-```bash
-pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
-```
-
-`@migaia/rpc-contract` is an exact lockstep peer dependency. Install the same version alongside the host and transport plugins. They share the application's single contract installation; explicitly installed duplicate copies are unsupported.
-
-Import error classes, error predicates, and portable values from `@migaia/rpc-host/contract`. It forwards the named values `RpcLifecycleError`, `RpcConstructionError`, `RpcAbortError`, `isRpcError`, `isRpcErrorInstance`, `isRpcRemoteError`, `isRpcTimeoutError`, `RPC_CORE_ERROR_SOURCE`, and `normalizeRpcPortable`, plus error types such as `RpcError` and the portable-value type `IRpcPortableValue`. These exports retain the application's contract object identities and consistent cross-entry `instanceof` results. All contract values and types formerly exported at the root have moved here without compatibility exports; import `createRpcHost` from the root as before.
-
-This creates two real hosts in one event loop. The parent installs its timeout feature on the coroutine plugin. The child receives the generation-local connect handle. It prints `42` and releases native resources in finally.
+The example uses the coroutine channel in one process: the other side provides two methods, and `slowReport` takes 1 second while the caller's timeout is 100 ms. Run it directly with Node 24.
 
 ```ts doc-test=run
 import { createRpcHost } from '@migaia/rpc-host'
-import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
 import { timeoutFeature } from '@migaia/rpc-host/features'
+import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
 
-const host = await createRpcHost<{ double(value: number): number }>({
+type IReportService = {
+  double(value: number): number
+  slowReport(): Promise<string>
+}
+
+const host = await createRpcHost<IReportService>({
   plugins: [
     coroutinePlugin({
-      features: { timeout: timeoutFeature({ ms: 1500 }) },
+      features: { timeout: timeoutFeature({ ms: 100 }) }, // each call waits at most 100 ms
+      // The other side: in a real project it runs in a Worker or child process;
+      // here it stays in the same process so the example can run as is
       spawn: async ({ connect, signal }) => {
-        const child = await createRpcHost({
+        const worker = await createRpcHost({
           plugins: [coroutinePlugin({ connectToParent: connect })],
-          provide: { double: (value: number) => value * 2 }
+          provide: {
+            double: (value: number) => value * 2,
+            slowReport: (_input: undefined, context: { signal: AbortSignal }) =>
+              new Promise<string>((resolve, reject) => {
+                const timer = setTimeout(() => resolve('report'), 1000)
+                context.signal.addEventListener('abort', () => {
+                  clearTimeout(timer)
+                  console.log('the other side was cancelled and stopped the report')
+                  reject(context.signal.reason)
+                })
+              })
+          }
         })
         try {
           if (!signal.aborted)
@@ -38,7 +67,7 @@ const host = await createRpcHost<{ double(value: number): number }>({
               signal.addEventListener('abort', () => resolve(), { once: true })
             )
         } finally {
-          await child.close()
+          await worker.close()
         }
       }
     })
@@ -46,51 +75,138 @@ const host = await createRpcHost<{ double(value: number): number }>({
 })
 try {
   console.log(await host.coroutine.request('double', 21))
+  await host.coroutine.request('slowReport')
+} catch (error) {
+  const { source, code } = error as { source: string; code: string }
+  console.log(`call failed: ${source} / ${code}`)
 } finally {
   await host.close()
 }
 ```
 
-Coroutines do not provide Worker isolation. Choose the [process](../rpc-plugin-process/README.en.md), [thread](../rpc-plugin-thread/README.en.md), or [browser](../rpc-plugin-browser/README.en.md) transport for those native environments.
+Output:
 
-## Initialization and custom hosts
+```text
+42
+call failed: rpc.endpoint / DEADLINE_EXCEEDED
+the other side was cancelled and stopped the report
+```
 
-`createRpcHost` first commits host-level flow plugins and their features, then installs transport plugins and their features on the same native plugin-host. Stages such as auth are available before transport handshake begins. The same lifecycle owner rolls back and releases acquired resources if a later installation fails.
+`double` returns `42`. After 100 ms, `slowReport` fails on the caller's side with `DEADLINE_EXCEEDED`, and the other side's `context.signal` aborts, so the report stops instead of running the full second in the background. Calls are written `host.coroutine.request(...)`: `coroutine` is the namespace of this transport plugin; with Worker threads it would be `host.thread.request(...)`.
 
-After construction, `const extended = await host.use(transport)` installs another transport and returns the same frozen native host with an added namespace in the return type. Each `use` commits or rolls back independently; the construction batch succeeds or fails together. Host Features that change message flow must be configured in the construction `plugins`; adding them later rejects with `INVALID_CONFIG`. Later transports borrow them, and their own `features` install with the transport and override only its namespace. Readonly observer plugins, including warning subscriptions, may be installed later.
+Next: to move computation into a Worker, see [`@migaia/rpc-plugin-thread`](../rpc-plugin-thread/README.en.md); into a child process, see [`@migaia/rpc-plugin-process`](../rpc-plugin-process/README.en.md); to give every call a default timeout and retry, see [Install complete policies](./USEGUIDE.en.md#install-complete-policies).
 
-An existing `defineHost` or class owner obtains `domainCore` from SDK `rpcHostPipelines(getHost, pipeline)` and forwards the native construction request to `pipeline(name, request)`. Each transport declares its own pipelines, without an advance namespace list. Ordinary native hosts install shared flow Features through `defineFlowPlugin({ name, features })` before transports. See the [usage guide](./USEGUIDE.en.md#install-rpc-in-an-existing-host).
+## Pitfalls when writing it yourself
 
-## Calls and ownership
+Here is a common hand-written Worker call. It works, but it has three hidden problems (for illustration only; no need to run it):
 
-| Entry                                                      | Completion                                                                             |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `host.<ns>.request(method, payload?, options?)`            | Business result                                                                        |
-| `host.<ns>.notify(method, payload?, options?)`             | Physical send, without business acknowledgement; `targetId` selects one direct target  |
-| `host.<ns>.stream(method, payload?, options?)`             | Lazy iterator; independent consumption for multiple targets                            |
-| `host.<ns>.streamTo(targetId, method, payload?, options?)` | One lazy iterator for one direct target                                                |
-| `host.<ns>.group(steps, options?)`                         | Ordered `{ method, payload }` steps per target, without a cross-target transaction     |
-| `host.<ns>.send(targetId, method, payload?, options?)`     | Scalar result from one direct target                                                   |
-| `host.<ns>.dispatch(targetId, method, payload?, options?)` | Synchronous `void`; asynchronous failures reach the reporter                           |
-| `host.provide(definition)`                                 | Adds local methods; duplicate names reject                                             |
-| `host.<ns>.peers`                                          | Accepted direct capabilities; held functions bind to the original generation           |
-| `host.close()`                                             | Closes the host; repeated calls share the original Promise                             |
-| `host.use(...plugins)`                                     | Independent installation transaction; returns the same host with added namespace types |
-| `host.unUse(name)`                                         | Native removal result; active flow restrictions reject with a lifecycle error          |
+```ts doc-test=check
+declare const worker: {
+  postMessage(message: unknown): void
+  onmessage: ((event: { data: { id: number; result: unknown } }) => void) | null
+}
 
-Untargeted calls select only within their namespace: zero targets return empty `fulfilled/rejected` maps, one returns a scalar, and multiple return maps indexed by instance identity. Stream iterators cancel independently. Root call methods such as `host.request` are removed.
+const pending = new Map<number, (value: unknown) => void>()
+let nextId = 0
 
-Use `streamTo` for a directed stream, with the target as its first argument. `stream` options no longer accept `targetId`. Both methods share the same backpressure, cancellation, and generation isolation.
+worker.onmessage = (event) => {
+  pending.get(event.data.id)?.(event.data.result)
+  pending.delete(event.data.id)
+}
 
-`remote.host.use`, `remote.host.unUse` and `remote.host.inspect` are removed. RPC no longer provides a protocol for managing a remote host's plugins; local native host installation and disposal keep their own contracts.
+function call(method: string, payload: unknown): Promise<unknown> {
+  const id = nextId++
+  worker.postMessage({ id, method, payload })
+  // Problem 1: the timeout only stops waiting; the Worker still finishes and holds the CPU
+  return Promise.race([
+    new Promise((resolve) => pending.set(id, resolve)),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+  ])
+}
 
-`host.<ns>.send('b', 'c.render', value)` first reaches direct peer b, which reads its current directory and forwards to c. A held `host.<ns>.peers.c.render` does not retarget a later generation. Forwarding can cross namespaces and cannot extend an upstream deadline.
+// Problem 2: errors thrown in the Worker must be serialized by hand; code, cause and stack usually get lost
+// Problem 3: after worker.terminate(), the Promises in pending never settle
+void call('render', { page: 1 })
+```
 
-Configure each forwarding host with `forward: { maxHops: 3 }` in `createRpcHost`. The default is 3; integers 1–16 are supported and other values reject with `INVALID_CONFIG`. Each host checks its own forwarding ordinal; loops reject before the hop limit.
+With rpc-host, the timeout reaches the other side as cancellation, errors are restored as they were, and `close()` settles every waiting call.
 
-## Optional capabilities
+## The three-minute model
 
-The same `authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, and `schemaFeature` factories are imported from `@migaia/rpc-host/features` and return native tokens. Put host-wide tokens in `defineFlowPlugin({ name, features: { alias: feature } })`, then pass that plugin in host `plugins`; transport `features` uses the same named record. Host placement supplies every namespace; transport placement overrides that capability only in its namespace. Each namespace has one implementation of each capability. Host `limitsFeature` shares quotas across namespaces; transport `limitsFeature` owns separate quotas. `probe`, `typegen`, and Devtools are host-only plugins. The former `namespaces` scope option is removed; select a transport with `features`.
+| Concept          | In one sentence                                                                                                                         |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| host             | The object returned by `createRpcHost`; it owns connections, pending calls and shutdown                                                 |
+| Transport plugin | Decides the channel, such as `coroutinePlugin`, `threadPlugin` or `processPlugin`; each transport has one namespace                     |
+| Namespace        | The call entry `host.<namespace>.request(...)`; a host usually installs one transport                                                   |
+| provider         | A method registered for the other side through the `provide` option or `host.provide()`; its second argument is a context with `signal` |
+| Feature          | One optional capability, such as `timeoutFeature`, `retryFeature` or `authFeature`, placed in a transport or flow plugin's `features`   |
+| Flow plugin      | `defineFlowPlugin({ name, features })` installs default capabilities for every namespace; only at construction                          |
+
+Call kinds:
+
+| Call                                              | What completion means                                           |
+| ------------------------------------------------- | --------------------------------------------------------------- |
+| `request(method, payload?, options?)`             | The business result arrived                                     |
+| `notify(method, payload?, options?)`              | The message was sent; the other side's handling is not awaited  |
+| `stream(method, payload?, options?)`              | An async iterator over values produced by the other side        |
+| `group(steps, options?)`                          | A few steps in order per target; not a cross-target transaction |
+| `send(targetId, ...)` / `streamTo(targetId, ...)` | Call one chosen target                                          |
+| `dispatch(targetId, ...)`                         | Returns synchronously; failures go to the reporter              |
+
+## Common scenarios
+
+| Scenario                                                            | How to combine                                          | Details                                                                                                           |
+| ------------------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Move heavy computation into a Worker                                | `threadPlugin`                                          | [rpc-plugin-thread](../rpc-plugin-thread/README.en.md)                                                            |
+| Run isolated work in child processes and restart them after crashes | `processPlugin`                                         | [rpc-plugin-process](../rpc-plugin-process/README.en.md)                                                          |
+| Call between browser windows, iframes and SharedWorkers             | The `rpc-plugin-browser` factories                      | [rpc-plugin-browser](../rpc-plugin-browser/README.en.md)                                                          |
+| Spread calls over a group of Workers or child processes             | The transport's `features: { workers: pool({ size }) }` | [rpc-plugin-pool](../rpc-plugin-pool/README.en.md)                                                                |
+| Default timeout and retry for every call                            | `defineFlowPlugin` + `timeoutFeature` / `retryFeature`  | [Install complete policies](./USEGUIDE.en.md#install-complete-policies)                                           |
+| Signed authentication and duplicate rejection                       | `authFeature` + `idempotencyFeature`                    | [Authentication, signing, and duplicate requests](./USEGUIDE.en.md#authentication-signing-and-duplicate-requests) |
+| Control the error details sent to the other side                    | `errorMapFeature`                                       | [Map errors sent to the peer](./USEGUIDE.en.md#map-errors-sent-to-the-peer)                                       |
+| Observe calls and generate types                                    | `probe` / `typegen` (`@migaia/rpc-host/plugins`)        | [Observe and generate types](./USEGUIDE.en.md#observe-and-generate-types)                                         |
+| See the timeline of several hosts                                   | `@migaia/rpc-plugin-devtools`                           | [rpc-plugin-devtools](../rpc-plugin-devtools/README.en.md)                                                        |
+
+## Install
+
+```bash
+pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
+```
+
+`@migaia/rpc-contract` is a peer dependency that must have the same version; the host and every transport plugin share the one copy provided by the application, and installing your own duplicate copy is not supported. Choose transport plugins by scenario.
+
+## Common APIs
+
+| API                                                          | Purpose                                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `createRpcHost({ plugins, provide?, forward?, onWarning? })` | Create a host                                                                   |
+| `host.<ns>.request` / `notify` / `stream` / `group`          | Call the other side                                                             |
+| `host.provide(definition)`                                   | Register local methods; duplicate names are rejected                            |
+| `host.use(...plugins)` / `host.unUse(name)`                  | Install or remove transports after construction                                 |
+| `host.close()`                                               | Close the whole host; repeated calls share one Promise                          |
+| `defineFlowPlugin({ name, features })`                       | Declare default capabilities shared by every namespace (`@migaia/rpc-host/sdk`) |
+
+Import built-in Features from `@migaia/rpc-host/features`, or one by one from `@migaia/rpc-host/features/<name>`; import error classes and predicates from `@migaia/rpc-host/contract`. See [Entries](./USEGUIDE.en.md#entries) for all entries.
+
+## Contract details
+
+### Construction and later installation
+
+`createRpcHost` commits flow plugins and their Features on one native plugin-host before installing transport plugins and their Features, so capabilities such as authentication are in place when a transport starts its handshake. If a later installation fails, resources already acquired are rolled back and released by the same lifecycle.
+
+After construction, `const extended = await host.use(transport)` installs another transport and returns the same host, typed with the new namespace. Each `use` commits or rolls back on its own; the construction batch succeeds or fails as a whole. Flow plugins that change the message flow can only be configured in the construction `plugins`; installing one later is rejected with `INVALID_CONFIG` (message `RPC flow hooks cannot be installed after transport startup`). Later transports use them automatically, and a transport's own `features` apply only to its namespace. Read-only observation plugins can be installed later.
+
+Existing `defineHost` or class hosts obtain `domainCore` from `rpcHostPipelines(getHost, pipeline)` in `@migaia/rpc-host/sdk`; see [Install RPC in an existing host](./USEGUIDE.en.md#install-rpc-in-an-existing-host).
+
+### Target selection and forwarding
+
+Untargeted calls choose targets only within their namespace: with no target they return empty `fulfilled/rejected`, with one target a scalar, and with several targets `fulfilled/rejected` keyed by instance identity. Each iterator in a stream collection is cancelled independently. `host.<ns>.peers` lists accepted direct peers; functions saved from `peers` stay bound to that connection and do not follow a reconnected peer.
+
+`host.<ns>.send('b', 'c.render', value)` reaches the direct peer b first, and b forwards to c using its current directory. Forwarding can cross namespaces but cannot extend the upstream deadline. `forward: { maxHops }` defaults to 3 and accepts integers 1–16; each host checks for cycles first, then the hop count.
+
+### Optional capabilities
+
+`authFeature`, `chunkFeature`, `batchFeature`, `idempotencyFeature`, `limitsFeature`, `errorMapFeature`, `schemaFeature`, `timeoutFeature` and `retryFeature` all come from `@migaia/rpc-host/features`. Put them into `defineFlowPlugin({ name, features })` (every namespace) or a transport's `features` (overrides the same capability for that namespace only). Each namespace enables one implementation per capability. A host-level `limitsFeature` shares quotas across namespaces; transport-level ones have their own. `probe`, `typegen` and Devtools are host-level only.
 
 ```ts doc-test=check
 import { timeoutFeature, retryFeature, limitsFeature } from '@migaia/rpc-host/features'
@@ -111,66 +227,26 @@ export const deadlineFeature = timeoutFromSubpath({ ms: 100 })
 export const perCallDeadline = { ms: 100 }
 ```
 
-Aggregate and default subpath imports support tree-shaking. Installing `limitsFeature` is recommended; omitting it enables no such quotas. `host.<ns>.outcome(key)` exists only with `idempotencyFeature` installed. Auth passes the signing binding object to `sign/verify` by default; text and byte modes encode one binding layer. Its request-ID deduplication releases completed IDs immediately by default, with signed-window or millisecond `retain` alternatives. `maxReplayEntriesPerPeer` bounds only numeric retention mode, and `onRejected` receives capacity refusal reasons. See [authentication](./USEGUIDE.en.md#authentication-signing-and-duplicate-requests) for configuration and HMAC examples.
+The aggregate entry and single subpaths both tree-shake. Without `limitsFeature` there are no quotas; `host.<ns>.outcome(key)` exists only with `idempotencyFeature`. Auth passes the signing binding object to `sign/verify` by default; completed request IDs are released immediately unless you `retain` them for the signing window or a number of milliseconds. See [authentication](./USEGUIDE.en.md#authentication-signing-and-duplicate-requests) for configuration and an HMAC example.
 
-`errorMapFeature` synchronously controls the error information a peer receives without changing local originals, reports, warnings, or log observation. A throw, returned Promise, or unserializable result reports the mapping failure and sends the original error under the rules used without a mapper. Without a mapper, handshake refusals still hide details from unauthenticated peers. See [error mapping](./USEGUIDE.en.md#map-errors-sent-to-the-peer).
+`errorMapFeature` decides synchronously what error information the other side can see, without changing the local original error, reporting or observation. If the callback throws, returns a Promise or produces something that cannot be serialized, the mapping failure is reported and the error is sent under the unmapped rules. Without a mapping, handshake failures of unauthenticated peers hide details by default.
 
-A custom flow returns `stages` from `defineFlowFeature` setup; place the feature in a `defineFlowPlugin` `features` record or in one transport's `features` record. Each stage receives its pipeline payload and native `next(payload)`; readonly events belong in the separate `observe` field. Frame pipelines allow independent submissions: after catching and reporting one member's failure, a stage can submit another. Ignoring a failed `next()` Promise rejects the pipeline. The original call settles a cancelled batch member with `CANCELLED` and its original reason on `cause`; other members complete normally.
+The outbound order is fixed: plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound is the reverse. Key names and their order in `features` do not decide execution order. Third-party Features are defined with `defineFlowFeature` and must declare an integer `phase` from 0 to 65535; `dependencies` decide installation order and `phase` decides execution order. Auth protects the whole message before chunk splits it into physical frames; the receiver reassembles first, then verifies.
 
-Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound reverses the direction. Record keys and insertion order do not determine execution order. Custom features require an integer `phase` from 0 through 65535; duplicate phases at the same stage point and layer reject. Native `dependencies` order installation; `phase` orders execution. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly.
+Flow capabilities in use by a session cannot be removed while running; removing their registration is rejected with `LIFECYCLE_MUTATION`, so close the affected namespace first. Capabilities that change the wire format, such as auth, chunk and batch, only guarantee communication when both sides install them.
 
-`authFeature` protects each complete message before `chunkFeature` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
+### Deadlines, cancellation and errors
 
-A custom carrier may implement optional `reserveWrite` by borrowing its existing flow-control capacity. Reserve once per logical write: chunk fragments share its receipt, while a batch retains each member's receipt until completion. `write` still completes at actual physical acceptance, and `close` must settle carrier-owned queued writes.
+Timeout and retry take their value in this order: the call's `options.timeout` / `options.retry`, the transport's Feature, then the flow plugin's default. A call accepts `{ ms }`, a retry configuration object or `false`. `timeout: false` disables the timeout, but an inherited upstream deadline still counts down; `retry: false` disables retries. Only the caller's scalar calls and groups retry; streams never replay, and forwarding does not restart the budget.
 
-When the carrier supports native binary, an ArrayBuffer explicitly listed in `transfer` always transfers natively and the original buffer detaches on handoff; signing also calculates and verifies its digest. Small buffers without an explicit transfer may be inline when signed, leaving the original usable. Without signing, binary digests are not calculated. Views sharing a buffer retain their aliases and offsets. See [binary integrity](./USEGUIDE.en.md#binary-integrity-and-transfer).
+A call whose remaining deadline has run out before it reaches the provider is rejected with `DEADLINE_EXCEEDED`, and the provider does not run. Every call kind accepts `signal`, and a one-way call can still pass cancellation downstream after it is sent; providers read their own `context.signal`. Cancellation does not kill a process or undo business side effects that already happened.
 
-Shared or local flow Features used by open Sessions cannot be hot-unloaded: removal of their native registration rejects with `LIFECYCLE_MUTATION`. Close affected namespace Sessions before cold removal. Capabilities such as auth, chunk, and batch change the wire format; only two-sided installation guarantees establishment. One-sided configuration has no compatibility guarantee and is not proactively prohibited. See [later installation and removal](./USEGUIDE.en.md#install-and-remove-transports-after-construction).
+Branch on `source/code`. Unclassified provider exceptions are `INTERNAL`, with the original error kept in the error graph; scalar calls reject with the restored remote Error. A timeout or disconnect does not prove the business work did not run; reconcile before retrying non-idempotent operations. Calls that return a Promise reject on an invalid `idempotencyKey` (`CONTRACT_INVALID`), a rejected transfer or a closed namespace; `dispatch` returns synchronously and hands failures to the reporter. A failed provider registration rejects with `INVALID_CONFIG` and the original error in `cause`. After shutdown, waiting calls settle with `ENDPOINT_DISPOSED`.
 
-[Pool](../rpc-plugin-pool/README.en.md) is the transport's `pool({ size })` feature. Members use one carrier kind and expose one logical peer. Pool owns member acquisition, scheduling, and closure; the transport contributes native `host.<ns>.members` controls.
+### Child names and warnings
 
-## Deadlines, cancellation, and errors
+A child started by a parent prefers the name and instanceId chosen by the parent; when the parent gives no name, the child keeps its own `self.name`. When an explicit child name or instanceId is overridden by the parent, one `RpcWarningCode.selfIgnored` (`SELF_IGNORED`) warning is emitted, and `data` holds only the items actually ignored. Warnings go to `onWarning` first, then to host-level subscription plugins, and only fall back to `console.warn` when nobody receives them; warnings are not reported. See [warning subscriptions](./USEGUIDE.en.md#warnings-and-child-names).
 
-`FeatureScope` alone selects call `options.timeout/retry`, then the transport's installed feature, then the default from a host-level flow plugin. Call values accept timeout `{ ms }`, retry options, or `false`. Feature tokens, execution methods, and numbers are rejected. `timeout: false` waits for the response without a feature timeout; an upstream remaining deadline still decreases. `retry: false` disables retry. Only the origin retries scalar calls and groups; streams never replay and use timeout only; forwarding does not restart the budget.
+### Duplicate call policies
 
-A call whose remaining deadline has expired before provider entry rejects with `DEADLINE_EXCEEDED` without executing the provider. `before-start` cancellation keeps its existing semantics.
-
-Every call kind supports `signal`, including cancellation propagated after a one-way physical send. Providers receive their own `context.signal`. Cancellation neither kills a process nor rolls back side effects.
-
-Branch on `source/code`; preserve native classes, `stack`, `cause`, and `AggregateError.errors`. Timeout or disconnection does not prove that business work never executed. Reconcile uncertain non-idempotent work before retrying.
-
-Promise-returning calls such as `send` and `request` reject invalid `idempotencyKey` values, rejected transfer admission, or a closed namespace, preserving each entry's existing `source/code` and `cause`; invalid keys still use `CONTRACT_INVALID`. Handle failures with `await` or `Promise.catch`. `dispatch` still returns `void` and reports failures, while `stream` and `streamTo` still return lazy async iterators.
-
-Public provider registration rejects with `INVALID_CONFIG` and retains the exact registration failure directly on `cause`; diagnostic text does not invoke the thrown value's string conversion. Closing settles pending calls with `ENDPOINT_DISPOSED`, and actual carrier closure rejects held writes. Closing does not force an arbitrary business Promise to finish.
-
-Plugin authors start at `@migaia/rpc-host/sdk`; observation lives under `/plugins/probe`. Old `/plugin`, `/probe`, endpoint, per-session Peer, and v1/JSON-RPC profile entries are removed. RPC packages can depend directly on `@migaia/rpc-contract`. Import only `/error-code` when only codes are needed, without retaining protocol or codec execution code.
-
-## Public behavior and migration
-
-Unhandled provider exceptions use `INTERNAL` and retain the native exception in the error graph. Scalar calls reject with the restored remote Error directly, without an extra `RpcRemoteError`; callers must inspect the actual error's `source/code`. A coroutine provider receives the original abort reason through `context.signal.reason`, without an invented cancellation code. `stream.return(value)` returns the runtime's actual terminal result rather than echoing the caller's `value`.
-
-Untargeted calls select the sessions accepted at call time. Functions saved from `peers` remain bound to their original generation and reject after departure rather than switching to a replacement. Immediate process startup failure has one `PROCESS_CHANNEL_CLOSED` boundary with native EPIPE reachable through its cause graph. A thread closure with no native error does not invent a message-port cause.
-
-An independently constructed native host retains its native `dispose()` cleanup summary and shared Promise without an additional RPC cleanup shell. Original failure leaves, errors order, cause reachability and once-only disposal remain intact. The `host.close()` returned by `createRpcHost` retains its own public close semantics.
-
-Idempotency fingerprints follow the object's own key order. Changing key order creates a different request; reuse of the same key conflicts with `CONTRACT_INVALID`. The store's string fingerprint ABI is unchanged.
-
-Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection.
-
-Auth changes its default signing input from text to an object. Normalize it in callbacks or set `encodedType: 'string'` when text is required. Completed request IDs release immediately by default; set `retain: 310_000` for the former behavior. Local verifier and credential resolver errors retain their original causes; synchronous `errorMapFeature` controls remote redaction.
-
-With sign/verify configured, auth exchanges and validates a fresh source challenge inside the existing signed handshake. Application callbacks must still sign and verify the complete input they receive. No public discovery or handshake option is added.
-
-verifyCredentials may return { principalId: nonemptyString } to lend the authenticated principal to the current Session. Throwing or rejection still refuses authentication. Void, string, and other formerly ignored results do not grant a principal.
-
-The six former `/features/{auth,batch,chunk,idempotency,limits,schema}` entries are removed; import their factories from `/plugins/*` or `/plugins`. `rpcHostPipelines` removes its third argument and `pipelines` output: forward the actual construction request instead, and let transports declare pipelines. The following unused error codes are removed without replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`.
-
-Launched children prefer the actual parent-supplied name and instanceId. Without a parent name, an explicit child `self.name` remains; without either name, the default follows the parent's instanceId. Address the name reported in the child's handshake. Overriding an explicit child name or instanceId emits one `RpcWarningCode.selfIgnored` (`SELF_IGNORED`) warning. Warnings have `{ code, message, data }`; `data` includes only the overridden pairs: `parentName`/`ignoredName` and `parentInstanceId`/`ignoredInstanceId`. Delivery goes first to the `onWarning` option, then host-level SDK subscribers, with `console.warn` only when no recipient exists. The warning itself is not reported; recipient failures report their originals and delivery continues. Conflicting parent startup facts still reject with `INVALID_CONFIG`. See [warning subscriptions](./USEGUIDE.en.md#warnings-and-child-names).
-
-## Default-policy installation boundary
-
-A `defineFlowPlugin` with `features` belongs in the construction `plugins`, installed before the first transport starts. Installing it later through `host.use(...)` rejects with existing `INVALID_CONFIG` and `RPC flow hooks cannot be installed after transport startup`; rejection leaves compiled call policies unchanged. Per-call timeout/retry options and `false` overrides remain supported. Installation-rollback fixtures must install policies before startup. Native withdrawal and cleanup retain their existing lifecycle receipts.
-
-## Duplicate call-policy roles
-
-Timeout/retry roles are singular, independently of caller aliases. A duplicate in transport-local declarations or global/default policy admission rejects with `source: plugin.host`, `code: FEATURE_ROLE_CONFLICT` through the shared rule owner. Flow and transport-native role conflicts retain `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`; alias/configuration conflicts keep their existing RPC identity. No compatibility error alias is provided.
+Timeout and retry are singleton roles regardless of their names. Declaring the same role twice in a transport or flow plugin is rejected with `plugin.host / FEATURE_ROLE_CONFLICT`; a flow plugin that conflicts with a transport's built-in capability is rejected with `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`.

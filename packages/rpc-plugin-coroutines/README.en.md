@@ -1,10 +1,13 @@
-# `@migaia/rpc-plugin-coroutines`
-
-Run RPC between real cooperative tasks on the same event loop.
-
-Contract defines pure protocol rules and interfaces. Host owns sessions, directories, providers, call settlement, and cancellation. This transport plugin acquires and supervises tasks over real MessageChannels. Flow plugins such as auth, chunk, batch, and probe process messages; complete timeout, retry, and pool features attach to their owning plugin.
+# @migaia/rpc-plugin-coroutines
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
+
+Call a set of cooperative tasks through RPC within one event loop. There is no thread or process isolation, but calls, timeouts, cancellation and error restoration work exactly as with Workers and child processes. Use it in tests, to build the structure in one process before switching to real Workers, or where Workers are unavailable. This is a transport plugin for [`@migaia/rpc-host`](../rpc-host/README.en.md).
+
+## Problems you may have seen
+
+- **Testing Worker communication means starting real threads**: tests become slow and hard to debug. The cause is call code tied to the real channel.
+- **Turning a single-process prototype into threads means rewriting the call code**: the cause is that the two styles have different interfaces.
 
 ## Start here
 
@@ -64,7 +67,7 @@ One current direct task returns `42`. Task settlement ends that generation's rea
 | `spawn: task`                    | Create a supervised cooperative task                                            |
 | `connectToParent: connect`       | Use this task's exact opaque handle, not a boolean                              |
 | `name` / `namespace`             | Native registration name and call namespace; default `coroutine`                |
-| `features`                       | `{ localName: nativeFeature }` for timeout, retry, or pool                                       |
+| `features`                       | `{ localName: nativeFeature }` for timeout, retry, or pool                      |
 | `supervisor`                     | Original restart/terminalPolicy/startupTimeoutMs/stop/budget/heartbeat policies |
 | `context.signal` / `heartbeat()` | Whole-generation stop signal and native liveness report                         |
 | `host.coroutine.members`         | Actual member list/get/stop/kill/restart/replace/on/watch                       |

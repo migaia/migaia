@@ -1,10 +1,13 @@
-# `@migaia/rpc-plugin-thread`
-
-Run RPC on real Node, Bun, or Deno Workers.
-
-`rpc-contract` defines pure protocol rules and interfaces. `rpc-host` owns sessions, directories, providers, call settlement, and cancellation. This transport plugin acquires, supervises, and releases native Workers. Flow plugins such as auth, chunk, batch, and probe process message flow; features such as timeout, retry, and pool attach to their owning plugin.
+# @migaia/rpc-plugin-thread
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
+
+Move heavy computation into Worker threads (Node, Bun, Deno) and call it like a local function. This is a transport plugin for [`@migaia/rpc-host`](../rpc-host/README.en.md): the host handles calls, timeouts, cancellation and error restoration, and this package creates the Worker, restarts it under a policy when it crashes, and terminates it on shutdown.
+
+## Problems you may have seen
+
+- **One heavy computation stalls the whole service**: CPU-bound parsing or rendering runs on the main thread and every other request queues behind it. The cause is that computation and request handling share one thread.
+- **After a Worker crashes, callers wait forever**: the Worker exits on an uncaught exception, and the Promises waiting on the main thread never settle. The cause is that nobody supervises the Worker's lifetime and settles pending calls.
 
 ## Start here
 

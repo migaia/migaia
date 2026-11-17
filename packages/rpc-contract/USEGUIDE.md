@@ -6,7 +6,7 @@ contract 只定义数据、接口和纯形状检查；host 负责 RPC 会话与�
 
 ## 版本与接收边界
 
-所有语义消息的 `profile` 固定为 `migaia.rpc/2`。唯一协议版本为 `{ major: 2, minor: 0 }`，没有旧 v1 或 JSON-RPC 协商回退。先由载体解码，再使用 `/protocol` 的纯 normalizer检查形状；不能把收到的对象类型断言当作接纳。
+所有语义消息的 `profile` 固定为 `migaia.rpc/2`。唯一协议版本为 `{ major: 2, minor: 0 }`。先由载体解码，再使用 `/protocol` 的纯 normalizer检查形状；不能把收到的对象类型断言当作接纳。
 
 协议 normalizer 先判断非数组对象，再直接读取已知字段并检查类型、范围和 kind；缺少必需字段或字段非法时仍以原错误码拒绝，pointer 指向首个不合格字段。通过后使用原对象，忽略未知字段，不检查原型、getter 或不可枚举属性。业务载荷的可移植值规则不变，方法 schema 由 schema plugin 执行。
 
@@ -149,7 +149,7 @@ console.log('native error graph preserved')
 
 `RpcWireLimit`固定标识128字符、trace256字符、idempotencyKey128字符、相对期限上限2147483647ms、握手65536字节、最多8版本/16codec/64扩展。方法目录最多4096方法；具体stream/error/portable预算由相应公开常量和normalizer维护。
 
-旧`/v1`、`/runtime`、`/framing`、`/binary`、`/remote`入口、JSON-RPC桥转换和Content-Length profile已删除。只需要RPC调用时使用host；编写载体时使用host SDK；contract内没有独立的连接或策略执行器。
+只需要RPC调用时使用host；编写载体时使用host SDK；contract内没有独立的连接或策略执行器。
 
 `RpcWireLimit.maxForwardHops` 为 16；`forwardRoute` 与序列化错误路由最多接受 `RpcWireLimit.maxForwardRouteNodes`（17）个节点 id，包含发起节点。Host 默认跳数仍为 3，协议容量不覆盖 host 自身配置。
 

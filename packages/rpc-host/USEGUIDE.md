@@ -136,7 +136,7 @@ auth、chunk、batch 等通过握手协商并改变线上格式的能力，只�
 
 ## 在已有宿主中安装 RPC
 
-已有 `defineHost` 宿主使用 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`。helper 构造时不调用回调、不创建宿主或资源；安装时才读取真实宿主，并把本次原生构造请求交还给这个宿主的 `pipeline(name, request)`。传输插件自己声明七条短名管道，安装时创建、卸载时删除，不需要预先列出命名空间，也不再有 `rpc.pipelines`。不要复制声明，或借用另一个宿主的执行权。
+已有 `defineHost` 宿主使用 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`。helper 构造时不调用回调、不创建宿主或资源；安装时才读取真实宿主，并把本次原生构造请求交还给这个宿主的 `pipeline(name, request)`。传输插件自己声明七条短名管道，安装时创建、卸载时删除，不需要预先列出命名空间。不要复制声明，或借用另一个宿主的执行权。
 
 ```ts doc-test=check
 import { defineHost } from '@migaia/plugin-host'
@@ -230,7 +230,7 @@ frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当
 
 载体可选实现 `reserveWrite(options)`，借用原有流控 owner，返回带 `release()` 的容量凭据。Session 在编码之后为一次逻辑写出预留一次，等这次 frame 管道实际结算后释放；chunk 的所有分片借用同一凭据，batch 各成员保留各自凭据，合并的物理写出借用仍存活成员的凭据。载体的 `write` 仍在实际物理接纳后完成，不应再把分片或 batch 重复计为新的逻辑调用。凭据不进入线上数据。
 
-同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂支持 host 的 `plugins` 与传输的 `features`；传输配置只覆盖本命名空间。host 级 `limitsFeature` 共用额度，传输级各自独立。`probe`、`typegen`、Devtools 只装在 host 级。删除原 `namespaces` 作用范围选项，改为把 feature 放在对应传输上。
+同一组 `authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature` 工厂支持 host 的 `plugins` 与传输的 `features`；传输配置只覆盖本命名空间。host 级 `limitsFeature` 共用额度，传输级各自独立。`probe`、`typegen`、Devtools 只装在 host 级。只想作用于某个传输时，把 Feature 放进该传输的 `features`。
 
 ## 认证、签名与重复请求
 
@@ -392,23 +392,18 @@ export const host = await createRpcHost({
 
 被父端拉起并收到真实原生启动事实的子节点（process、thread、coroutine、dedicated worker 或 pool 成员）优先使用父端指定名，`instanceId` 也以父端事实为准。父端未命名时，保留子节点显式的 `self.name`；子节点也未命名时，默认名随父端的 instanceId 更新。用子节点握手报回的名字寻址。显式子节点名字或 instanceId 被父端覆盖时，构造成功，只发出一次 `RpcWarningCode.selfIgnored`（`SELF_IGNORED`）警告。`warning.data` 只含实际被忽略的项：名字冲突带 `parentName`/`ignoredName`，身份冲突带 `parentInstanceId`/`ignoredInstanceId`；只有 instanceId 不同也会警告。两份冲突的父端启动事实仍以 `INVALID_CONFIG` 拒绝。
 
-## 迁移入口
+## 入口一览
 
-| 旧用法                                                | 新用法                                          |
-| ----------------------------------------------------- | ----------------------------------------------- |
-| 根级 `host.request/send/notify/stream/dispatch/group` | `host.<ns>` 下的同名调用                        |
-| `@migaia/rpc-host/plugin`                             | `@migaia/rpc-host/sdk`                          |
-| 根入口的 contract 错误类、判断函数和错误类型          | `@migaia/rpc-host/contract`                     |
-| `/probe` + `defineFeaturePlugin`                      | `/plugins/probe` 的 `probe` / `defineProbe`     |
-| `authFeature/chunkFeature/typegenFeature`             | `/plugins` 的 `auth/chunk/typegen`              |
-| 根 `defaultTimeoutMs` / 单次数字 timeout              | plugin 的 `features` record 与单次 timeout 配置 |
-| `poolPlugin`、pool assembler                          | 传输 `features: { workers: pool({ size }) }`    |
-| endpoint、RuntimePeer、v1、JSON-RPC profile           | 单一 Host 调用 owner 与新协议，无兼容入口       |
-| 根级 `outcome` / 幂等 store                           | 安装 `/features/idempotency`，在命名空间查询    |
+| 入口                               | 内容                                                                                                                                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@migaia/rpc-host`                 | `createRpcHost`、`RpcWarningCode`、`defaultRpcReporter`                                                                                                                                                                               |
+| `@migaia/rpc-host/contract`        | 错误类与判断函数（`RpcLifecycleError`、`RpcConstructionError`、`RpcAbortError`、`isRpcError`、`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`）、`RPC_CORE_ERROR_SOURCE`、`normalizeRpcPortable` 与 `IRpcPortableValue` |
+| `@migaia/rpc-host/features`        | 内置 Feature：`timeoutFeature`、`retryFeature`、`authFeature`、`chunkFeature`、`batchFeature`、`idempotencyFeature`、`limitsFeature`、`errorMapFeature`、`schemaFeature`，以及 `createRpcIdempotencyStore`                            |
+| `@migaia/rpc-host/features/<名称>` | 单个 Feature 的默认导出                                                                                                                                                                                                               |
+| `@migaia/rpc-host/plugins`         | host 级观察插件 `probe`、`defineProbe` 与类型生成 `typegen`；也可从 `/plugins/probe`、`/plugins/typegen` 单独导入                                                                                                                     |
+| `@migaia/rpc-host/sdk`             | 插件和载体作者工具：`defineTransportPlugin`、`defineFlowPlugin`、`defineFlowFeature`、`rpcHostPipelines` 等                                                                                                                           |
 
-`remote.host.use`、`remote.host.unUse` 和 `remote.host.inspect` 已移除，不再提供通过 RPC 管理远端宿主插件的协议；本地原生宿主的安装与释放 API 保持各自契约。
-
-汇总入口和各单项默认子路径均可 tree-shake。错误码从 `@migaia/rpc-contract/error-code` 引入；应用使用的错误类、错误判断和类型改从 `@migaia/rpc-host/contract` 引入，根入口不再提供这些转出。`RpcConstructionError` 与 `RpcAbortError` 在此为运行时类，可以用于 `instanceof`；它们与直接 contract 导入保持同一对象。该入口同时提供 `normalizeRpcPortable` 与类型 `IRpcPortableValue`，可用于已协商 native 值的严格 own-data 域规范化；不为调用者复制或安装另一份 contract。SDK 和 limits 面向插件作者的原有类型转出保持不变。传输作者只提交原生载体与编解码能力，host 负责握手、Session、待决表与 provider 执行。
+错误码从 `@migaia/rpc-contract/error-code` 导入。`/contract` 转出的类与应用提供的 contract 是同一个对象，跨入口 `instanceof` 一致；`RpcConstructionError` 与 `RpcAbortError` 是运行时类，可以用于 `instanceof`。`normalizeRpcPortable` 用于对已协商的原生值做严格的自有数据规范化，不复制或安装另一份 contract。传输作者只提供原生载体与编解码能力，host 负责握手、会话、待决表与 provider 执行。
 
 ## 关闭与错误
 
@@ -420,27 +415,21 @@ export const host = await createRpcHost({
 
 `send`、`request` 等返回 Promise 的调用通过拒绝传播非法 `idempotencyKey`、transfer 准入被拒绝或命名空间已关闭的错误，保留各入口原有的 `source/code` 和 `cause`；非法 key 仍为 `CONTRACT_INVALID`。使用 `await` 或 `Promise.catch` 处理失败。`dispatch` 仍同步返回 `void` 并向 reporter 交付失败，`stream` 与 `streamTo` 仍返回延迟启动的异步迭代器。
 
-## 公开行为与迁移
+## 行为细节
 
-未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝；不再增加 `RpcRemoteError` 外壳，调用方须改用真实错误的 `source/code`。协程远端 `context.signal.reason` 接收原 abort reason，不合成取消码；`stream.return(value)` 返回 runtime 的真实结束结果，不回传调用者传入的 `value`。
+未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝，按真实错误的 `source/code` 判断。协程对端的 `context.signal.reason` 是原始的中止原因，不合成取消码；`stream.return(value)` 返回运行时真实的结束结果，不回传调用者传入的 `value`。
 
-无目标调用按调用时已接受的会话选择；从 `peers` 保存的函数绑定原代次，退场后拒绝且不转向替代连接。即时 process 启动失败只保留一层 `PROCESS_CHANNEL_CLOSED`，原生 EPIPE 在 cause 图中；没有真实原生错误的 thread 关闭诊断不合成 message-port cause。
+不指定目标的调用按调用时已接受的会话选择；从 `peers` 保存的函数绑定原连接代次，对端退出后拒绝，不转向替代连接。子进程立即启动失败时只有一层 `PROCESS_CHANNEL_CLOSED`，原生 EPIPE 在 cause 图中；没有真实原生错误的线程关闭不会合成 message-port 原因。
 
-自行构造的原生宿主保留 `dispose()` 的原生 cleanup summary 与共享 Promise，不再附加 RPC 清理外壳。原失败叶对象、errors 顺序、cause 可达性和 disposer 一次执行保持；`createRpcHost` 返回的 `host.close()` 则保持自己的公开关闭语义。
+自行构造的原生宿主保留 `dispose()` 的原生清理摘要与共享 Promise；原失败对象、errors 顺序、cause 可达性和清理只执行一次的保证都保持。`createRpcHost` 返回的 `host.close()` 有自己的公开关闭语义。
 
-幂等指纹使用对象自身的键序；同一 body 改变键序后是不同请求，同键冲突以 `CONTRACT_INVALID` 拒绝，原 store 的字符串指纹 ABI 保持不变。
+幂等指纹使用对象自身的键序；同一 body 改变键序后是不同的请求，同一个键冲突时以 `CONTRACT_INVALID` 拒绝。
 
-原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。
+auth 默认把对象交给 `sign/verify`；回调需要文本时自行规范化，或设置 `encodedType: 'string'`。完成的请求 ID 默认立即释放，需要保留一段时间时设置 `retain`（例如 `310_000` 毫秒）。本地 verifier 与凭据解析器的原始错误保留在 `cause` 上，发给对端的脱敏由同步的 `errorMapFeature` 控制。配置 `sign/verify` 时，auth 在签名握手中交换并验证每个来源的新挑战；应用回调仍须签名和验证收到的完整输入。
 
-auth 默认以对象交给 sign/verify；依赖旧文本输入时自行规范化或选择 `encodedType: 'string'`。完成的请求 ID 默认立即释放，需要旧保留时长时设置 `retain: 310_000`。本地 verifier/凭据解析错误保留原 cause，对端脱敏改用同步 `errorMapFeature`。
+`verifyCredentials` 可以返回 `{ principalId: 非空字符串 }`，把认证主体交给当前会话；抛出或拒绝表示认证失败。返回 `void`、字符串或其他值都不会授予主体身份。
 
-配置 sign/verify 时，auth 在既有签名握手中交换并验证每个来源的新挑战；应用回调仍须签名和验证收到的完整输入。此过程不增加公开 discovery 或握手配置。
-
-verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证主体交给当前 Session；抛出或拒绝仍拒绝认证。void、字符串及其他原先被忽略的结果不会授予主体身份。
-
-原六个 `/features/{auth,batch,chunk,idempotency,limits,schema}` 入口已删除，改从 `/plugins/*` 或 `/plugins` 导入。`rpcHostPipelines` 删除第三参数和 `pipelines` 输出，构造请求必须传给 `domainCore(request)`；传输自己声明管道。以下无抛出点错误码已删除，不提供替代码：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。
-
-`onWarning` 的被忽略身份项放在 `data`，只包含实际发生冲突的名字或 instanceId。签名的小 buffer 只有未显式 `transfer` 时才可能内联；显式转移仍移交并 detach 原 buffer。载体实现须同步采用[当前清单格式](../rpc-contract/USEGUIDE.md#载体二进制与收发顺序)。
+`rpcHostPipelines(getHost, pipeline)` 把构造请求转交给 `domainCore(request)`；管道由各传输自己声明。`onWarning` 收到的被忽略身份项放在 `data` 里，只含实际冲突的名字或 instanceId。签名的小 buffer 只在没有显式 `transfer` 时才可能内联；显式转移仍会移交并 detach 原 buffer。载体实现使用[当前清单格式](../rpc-contract/USEGUIDE.md#载体二进制与收发顺序)。
 
 ## 默认策略的安装边界
 
@@ -448,4 +437,4 @@ verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证�
 
 ## 重复调用策略角色
 
-timeout/retry 角色为单例，与调用方别名无关。transport 本地声明或全局默认策略准入中的重复角色，由共享规则 owner 以 `source: plugin.host`、`code: FEATURE_ROLE_CONFLICT` 拒绝。flow 与 transport-native 角色冲突保留 `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`；别名/配置冲突保留原 RPC 错误身份。不提供旧错误别名兼容。
+timeout/retry 角色为单例，与调用方别名无关。transport 本地声明或全局默认策略准入中的重复角色，由共享规则 owner 以 `source: plugin.host`、`code: FEATURE_ROLE_CONFLICT` 拒绝。flow 与 transport-native 角色冲突保留 `rpc.endpoint / FEATURE_COMBINATION_CONFLICT`；别名或配置冲突保留原来的 RPC 错误身份。

@@ -123,4 +123,4 @@ Startup failures retain the actual channel-close, connection-failure or native `
 
 Same-name admission diagnostics retain a failing oracle; a generic startup wrapper does not satisfy the original error contract. Use unique application identities rather than deriving remote identity from a registration name. Retain `source/code/cause/errors`, native types and stacks. An unknown result does not prove non-execution; recovery does not establish idempotent replay or persistent outcomes.
 
-`@migaia/rpc-contract` owns pure data, types, errors and protocol admission. Actual plugins/features own business schema and policy, Process owns native resources, and Host owns call lifetime. Full migration acceptance remains pending.
+`@migaia/rpc-contract` owns pure data, types, errors and protocol admission. Actual plugins/features own business schema and policy, Process owns native resources, and Host owns call lifetime.

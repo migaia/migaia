@@ -1,10 +1,13 @@
-# `@migaia/rpc-plugin-pool`
-
-Present several real members of one transport as a single logical peer named `pool`.
-
-`rpc-contract` defines pure protocol rules and interfaces. `rpc-host` owns sessions, providers, call settlement, and cancellation; transport plugins acquire and supervise native resources. Flow plugins such as auth, chunk, batch, and probe process message flow. The `pool` transport feature owns member selection, bounded FIFO, resize, and drain. Timeout and retry are also complete features.
+# @migaia/rpc-plugin-pool
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
+
+Group several Workers or child processes of one transport into a pool that callers see as one logical peer, `pool`. This package is a Feature installed on a transport plugin: it hands calls to idle members, queues them in a bounded first-in-first-out queue when every member is busy, scales the member count, and drains on shutdown.
+
+## Problems you may have seen
+
+- **One Worker is not enough, and several Workers mean distributing work by hand**: hand-written round-robin does not know which member is busy, so slow tasks pile up on one member. The cause is scheduling without regard to idleness.
+- **Requests pile up without limit at peak**: when every member is busy, new requests queue in memory longer and longer. The cause is an unbounded queue.
 
 ## Start here
 

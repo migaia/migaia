@@ -1,8 +1,13 @@
-# `@migaia/rpc-plugin-browser`
-
-Connect actual Windows, Workers, BroadcastChannels, reliable RTCDataChannels or WebTransport to RPC. Applications create native objects; Browser owns native sources/I/O, and Host owns sessions, directories and calls.
+# @migaia/rpc-plugin-browser
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
+
+Call across pages, iframes, Workers, SharedWorkers, BroadcastChannel, reliable ordered WebRTC DataChannels and WebTransport in the browser as if calling local functions. This is a transport plugin for [`@migaia/rpc-host`](../rpc-host/README.en.md): the application creates the native objects, this package handles sending, receiving and source checks, and the host handles calls, timeouts, cancellation and error restoration.
+
+## Problems you may have seen
+
+- **`postMessage` handles messages it should not**: a message from an iframe or another window runs without its origin being checked. The cause is origin checks scattered across every `onmessage`.
+- **Every channel between a page and its Workers has its own protocol**: Workers, iframes and SharedWorkers each get their own request IDs and error formats. The cause is call logic tied to the channel.
 
 ## Start here
 
@@ -82,4 +87,4 @@ Native structured clone and explicit ownership transfer are separate capabilitie
 
 Native source filtering does not establish an authenticated principal or session/scope across reconnects. Automatic auth/source freshness, parts of outcome/idempotency and observer diagnostic compatibility remain unresolved. Neither a channel name nor a native source automatically supplies those guarantees. Generic Host close/drain and restart downtime differences are not browser guarantees either.
 
-Failures may originate from `rpc.transport.browser` or shared RPC owners. Retain `source/code/cause/errors` and native stacks; text or one code alone does not establish execution outcome. Full migration acceptance remains pending. See the [usage guide](./USEGUIDE.en.md).
+Failures may originate from `rpc.transport.browser` or shared RPC owners. Retain `source/code/cause/errors` and native stacks; text or one code alone does not establish execution outcome. See the [usage guide](./USEGUIDE.en.md).

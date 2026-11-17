@@ -1,10 +1,13 @@
-# `@migaia/rpc-plugin-devtools`
-
-Retain real RPC observations as bounded events, cumulative statistics, watches, and independent recordings.
-
-Contract defines pure protocol rules and interfaces. Host owns sessions, providers, and call settlement; transports acquire real carriers. Devtools is a flow plugin consuming readonly observation through the canonical probe implementation, without a business connection. Features such as timeout and retry attach to their owning plugin and execute call policies.
+# @migaia/rpc-plugin-devtools
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
+
+Keep observations of RPC calls: a bounded event record, cumulative statistics, live subscriptions and separate recordings. It is a read-only observation plugin for [`@migaia/rpc-host`](../rpc-host/README.en.md): it only consumes the host's observation events, opens no business connection and does not change calls.
+
+## Problems you may have seen
+
+- **Occasional slow calls in production cannot be reproduced**: there is one line saying "timed out", with no idea which peer or which step was slow. The cause is no record of the call to look back at.
+- **Calls across several hosts are hard to follow**: the main process, Workers and child processes each have logs that do not form one timeline. The cause is observation data that is not collected in one place.
 
 ## Collector basics
 

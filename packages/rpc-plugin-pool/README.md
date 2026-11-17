@@ -1,12 +1,15 @@
-# `@migaia/rpc-plugin-pool`
-
-把同一种 transport 的多个真实成员呈现为一个逻辑对端 `pool`。
-
-`rpc-contract` 定义纯协议与接口，`rpc-host` 拥有会话、provider、调用结算与取消；transport plugin 获取并监管原生资源。auth、chunk、batch、probe 等 flow plugin 处理消息流。`pool` 是安装在 transport 上的 feature，负责成员选择、有限 FIFO、扩缩容和排空；timeout、retry 也是完整 feature。
+# @migaia/rpc-plugin-pool
 
 [English](./README.en.md) · [使用指南](./USEGUIDE.md)
 
-## 开始使用
+把同一种传输的多个 Worker 或子进程组成一个池，对调用方只呈现一个逻辑对端 `pool`。本包是装在传输插件上的 Feature：负责把调用分给空闲成员、在都忙时用有上限的先进先出队列排队、扩缩成员数量，以及关闭时排空。
+
+## 你可能遇到过
+
+- **一个 Worker 不够用，多个 Worker 又要自己分配任务**：手写的轮询分配不知道哪个成员忙，慢任务堆在一个成员上。根因是没有按空闲程度调度。
+- **高峰时请求无限堆积**：所有成员都忙时，新请求在内存里越排越长。根因是排队没有上限。
+
+## 从这里开始
 
 下面使用 Node 24 的真实 Worker。保存为独立 ESM TypeScript 入口，或先编译为 ESM。仅父端安装 pool，子端连接实际父端。
 

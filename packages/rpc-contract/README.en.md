@@ -1,10 +1,14 @@
-# `@migaia/rpc-contract`
-
-Contract defines one wire protocol, host/plugin/feature interfaces, portable values, and RPC-family errors. Host owns sessions, handshake, calls, providers, forwarding, and cancellation. Transport plugins own native connections, generations, codecs, and framing. Flow plugins and plugin-owned features implement optional capabilities.
-
-This package owns no sessions, connections, pending tables, timers, or IO. Normally choose one transport kind per host; multiple namespaces are supported, but mixing transport kinds is not recommended.
+# @migaia/rpc-contract
 
 [中文](./README.md) · [Protocol and usage guide](./USEGUIDE.en.md)
+
+The protocol definition shared by the RPC family: the wire message format, the interfaces between the host and plugins, which values may cross a boundary, and every RPC error code. It holds only data, types and pure validation, with no connections, sessions, timers or IO.
+
+**Most applications do not use it directly**: to call Workers, child processes or other pages, start with [`@migaia/rpc-host`](../rpc-host/README.en.md), and import error classes and predicates from `@migaia/rpc-host/contract`. Depend on this package directly only when you:
+
+- implement your own transport carrier (for example a new message channel) and need the carrier interfaces in `/interfaces`;
+- implement a peer in another language and validate wire messages against `/schema/protocol`;
+- want to branch on error codes without bundling protocol and codec code: import only `/error-code`.
 
 ## Installation and entries
 
@@ -72,7 +76,7 @@ Protocol records read known fields directly, ignore unknown fields, and retain t
 
 ## One protocol
 
-The profile is `migaia.rpc/2`, protocol version2.0, and directory schemaVersion3. Handshake directly exchanges identity, generations, method modes/schemas, and actual codec/extension availability. Operational frames share id, route, and task; v1, the old runtime carrier selector, and the separate JSON-RPC profile are removed.
+The profile is `migaia.rpc/2`, protocol version2.0, and directory schemaVersion3. Handshake directly exchanges identity, generations, method modes/schemas, and actual codec/extension availability. Operational frames share id, route, and task.
 
 Kinds are `handshake`, `call`, `group`, `result`, `error`, `cancel`, `stream`, `outcome`, `control`, and `directory`. Notifications also have call IDs so cancellation can propagate after physical sending, without adding business acknowledgement or receipts. Groups contain ordered business steps rather than physical batches.
 
@@ -82,12 +86,10 @@ See the [protocol guide](./USEGUIDE.en.md) for fields, stage ordering, binary, a
 
 ## Errors
 
-`/error-code` owns every RPC source/code; other packages no longer duplicate those tables. Diagnostic identity grants no authority. Copies and remotely restored errors do not gain local retry, retirement, or control rights.
+`/error-code` is the single source of every RPC source/code. Diagnostic identity grants no authority. Copies and remotely restored errors do not gain local retry, retirement, or control rights.
 
 The protocol carries a `{ root, nodes }` flat error graph. Nodes retain source, code, name, message, stack, cause/errors indices, and optional diagnostics. Restoration preserves supported native classes and sender stacks without replacing them with receiver stacks. Standalone tree utilities under `/errors` remain pure projection helpers, not another business protocol.
 
-Wire errors allow at most 1024 nodes; a 1025-node graph is rejected with `INVALID_WIRE_ERROR`. The old 64-level error-tree rule does not apply to flat graph edges. Iterative restoration preserves aliases as the same error object within the restored graph, including cycles.
+Wire errors allow at most 1024 nodes; larger graphs are rejected with `INVALID_WIRE_ERROR`. Iterative restoration preserves aliases as the same error object within the restored graph, including cycles.
 
-Applications start with [rpc-host](../rpc-host/README.en.md) and `createRpcHost`; carrier authors use `@migaia/rpc-host/sdk`. Old `/v1`, `/runtime`, `/framing`, `/binary`, and `/remote` entries and profiles are removed without compatibility aliases.
-
-Removed unused codes, with no replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。
+Applications start with [rpc-host](../rpc-host/README.en.md) and `createRpcHost`; carrier authors use `@migaia/rpc-host/sdk`.

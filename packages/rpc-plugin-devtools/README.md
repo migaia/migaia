@@ -1,10 +1,13 @@
-# `@migaia/rpc-plugin-devtools`
-
-把真实 RPC 观察保存为有界事件、累计统计、watch 和独立录制。
-
-Contract 定义纯协议与接口，Host 拥有会话、provider 和调用结算，transport 获取真实载体。Devtools 是借统一 probe 的 flow plugin，只读消费观察，不创建业务连接。timeout、retry 等 feature 则安装在所属 plugin 上，拥有调用策略。
+# @migaia/rpc-plugin-devtools
 
 [English](./README.en.md) · [使用指南](./USEGUIDE.md)
+
+把 RPC 调用的观察结果保存下来：有上限的事件记录、累计统计、实时订阅和独立的录制。它是 [`@migaia/rpc-host`](../rpc-host/README.md) 的只读观察插件，只消费 host 的观察事件，不建立业务连接，也不改变调用。
+
+## 你可能遇到过
+
+- **线上偶发的慢调用没法复现**：只有一行“超时了”，不知道是哪个对端、在哪一步慢。根因是调用过程没有可以回看的记录。
+- **多个 host 之间的调用链看不清**：主进程、Worker、子进程各有日志，拼不成一条时间线。根因是观察数据没有统一收集。
 
 ## Collector 入门
 

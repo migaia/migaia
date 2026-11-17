@@ -1,8 +1,13 @@
-# `@migaia/rpc-plugin-process`
-
-Connect real child processes, local connections and listeners to RPC. Process owns native launch, byte/message I/O, supervision and resource release; Host owns sessions, method directories and calls.
+# @migaia/rpc-plugin-process
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
+
+Run work that needs isolation in a child process and call it like a local function; you can also connect to an existing local service process or listen for local connections. This is a transport plugin for [`@migaia/rpc-host`](../rpc-host/README.en.md): the host handles calls, timeouts, cancellation and error restoration, and this package starts the child process, supervises it, restarts it under a policy after crashes, and reclaims it on shutdown.
+
+## Problems you may have seen
+
+- **One task's memory leak or crash brings down the main process**: a third-party parser fails inside the main process and the whole service restarts. The cause is that untrusted or unstable code has no process-level isolation.
+- **A crashed child restarts in a loop, or is left behind as an orphan**: restarts without backoff saturate the machine, and children keep running after the parent exits. The cause is no unified supervision and reclamation.
 
 ## Start here
 
@@ -68,4 +73,4 @@ A native token/bootstrap does not establish completed automatic verification, pr
 
 A startup channel may directly report `PROCESS_CHANNEL_CLOSED` at the actual close phase. Native failures such as `EPIPE` remain reachable without requiring two nested wrappers carrying the same code. Business `timeout: false` disables the selected business deadline and adds no Process call cap.
 
-Inspect `source/code/cause` and retain native causes. Full migration acceptance remains pending; these differences are not implementation guarantees. See the [usage guide](./USEGUIDE.en.md).
+Inspect `source/code/cause` and retain native causes. See the [usage guide](./USEGUIDE.en.md).

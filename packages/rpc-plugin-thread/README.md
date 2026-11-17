@@ -1,12 +1,15 @@
-# `@migaia/rpc-plugin-thread`
-
-在 Node、Bun 或 Deno 的真实 Worker 上运行 RPC。
-
-`rpc-contract` 定义纯协议与接口；`rpc-host` 拥有会话、目录、provider、调用结算与取消；本包是负责原生 Worker 建立、监管和释放的 transport plugin。auth、chunk、batch、probe 等 flow plugin 处理消息流；timeout、retry、pool 等 feature 安装在所属 plugin 上。
+# @migaia/rpc-plugin-thread
 
 [English](./README.en.md) · [使用指南](./USEGUIDE.md)
 
-## 开始使用
+把重计算放进 Worker 线程（Node、Bun、Deno），像调用本地函数一样调用它。这是 [`@migaia/rpc-host`](../rpc-host/README.md) 的传输插件：host 负责调用、超时、取消和错误还原，本包负责创建 Worker、在它崩溃时按策略重启、关闭时终止它。
+
+## 你可能遇到过
+
+- **一次重计算卡住了整个服务**：CPU 密集的解析或渲染跑在主线程上，其他请求全部排队。根因是计算和请求处理共用一个线程。
+- **Worker 崩溃后调用方一直在等**：Worker 抛出未捕获异常退出了，主线程里等结果的 Promise 永远不结束。根因是没人监管 Worker 的生命周期并结算待决调用。
+
+## 从这里开始
 
 ```bash
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-thread

@@ -1,10 +1,15 @@
-# `@migaia/rpc-plugin-process`
-
-将真实子进程、本机连接与监听器接入 RPC。Process owner 负责原生启动、字节/消息 I/O、监督与资源释放；Host 负责会话、方法目录和业务调用。
+# @migaia/rpc-plugin-process
 
 [English](./README.en.md) · [使用指南](./USEGUIDE.md)
 
-## 开始使用
+在子进程里运行需要隔离的任务，并像调用本地函数一样调用它；也可以连接本机已有的服务进程或监听本机连接。这是 [`@migaia/rpc-host`](../rpc-host/README.md) 的传输插件：host 负责调用、超时、取消和错误还原，本包负责启动子进程、监管它、在崩溃后按策略重启，并在关闭时回收。
+
+## 你可能遇到过
+
+- **一个任务的内存泄漏或崩溃拖垮了主进程**：第三方解析库在主进程里出问题，整个服务一起重启。根因是不可信或不稳定的代码没有进程级隔离。
+- **子进程崩溃后反复重启，或者成了孤儿进程**：没有退避的重启把机器打满，父进程退出后子进程还在跑。根因是没有统一的监管和回收。
+
+## 从这里开始
 
 ```bash
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-process
@@ -68,4 +73,4 @@ if (await isProcessChild()) {
 
 启动通道在实际关闭阶段可直接报告 `PROCESS_CHANNEL_CLOSED`；真实 `EPIPE` 等原生错误仍在错误图可达，不要求重复嵌套两个同码包装。业务 `timeout: false` 关闭选中的业务期限，不自动添加 Process 调用硬上限。
 
-按 `source/code/cause` 处理错误并保留原生原因。完整迁移验收尚未完成；上述差异不作为已实现保证。详细配置见[使用指南](./USEGUIDE.md)。
+按 `source/code/cause` 处理错误并保留原生原因。详细配置见[使用指南](./USEGUIDE.md)。
