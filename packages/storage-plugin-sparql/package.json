@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "description": "Native RDF and SPARQL protocol storage backend",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/storage-plugin-sparql"
+  },
   "files": [
     "dist",
     "README.md",
@@ -34,6 +39,9 @@
       "default": "./dist/features/ontology.js"
     }
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "fmt": "oxfmt src test README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
     "lint": "oxlint src test",
@@ -41,7 +49,10 @@
     "typecheck:test": "bun check -p tsconfig.test.json",
     "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
     "test": "vitest run",
-    "test:packed": "node test/packed.mts"
+    "test:packed": "node test/packed.mts",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
     "@migaia/lifecycle": "workspace:^",
