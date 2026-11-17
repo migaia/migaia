@@ -98,3 +98,26 @@ async function nonPrettyText(): Promise<void> {
   }
 }
 it('sends only record.text for JSON, plain and third-party format descriptors', nonPrettyText)
+
+/** An Error passed as a log argument is the entry's error; pretty output shows it once. */
+async function errorArgumentOnce(): Promise<void> {
+  /** The same Error instance is both the argument and the host-projected entry error. */
+  const error = new Error('card declined')
+  /** A fake console captures the native argument list. */
+  const console = new MemoryConsole()
+  const host = createLogHost({
+    plugins: [
+      consolePlugin({
+        console,
+        stdout: new MemoryStdout(),
+        features: { format: prettyFeature({ color: 'never', timestamp: false }) }
+      })
+    ]
+  })
+  host.log('error', 'payment failed', error)
+  await host.flush()
+  expect(console.errors).toHaveLength(1)
+  expect(console.errors[0]!.filter((argument) => argument === error)).toHaveLength(1)
+  await host.shutdown('manual')
+}
+it('passes an Error argument to the console once in pretty output', errorArgumentOnce)

@@ -58,7 +58,8 @@ export class PrettyRenderer {
     /** Original native payloads never pass through string conversion while the host formats text. */
     const parts: unknown[] = [this.#prefix(entry, isTTY), ...entry.args]
     if (entry.meta && !entry.args.includes(entry.meta)) parts.push(entry.meta)
-    if (entry.error) parts.push(entry.error.raw)
+    // An Error passed as an argument is also the entry's error; show the same instance only once.
+    if (entry.error && !entry.args.includes(entry.error.raw)) parts.push(entry.error.raw)
     return parts
   }
 
