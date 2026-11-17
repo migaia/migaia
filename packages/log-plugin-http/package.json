@@ -1,6 +1,6 @@
 {
   "name": "@migaia/log-plugin-http",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "private": true,
   "description": "Composable http logging plugin.",
   "files": [
