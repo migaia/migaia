@@ -227,3 +227,43 @@ describe('onInstall', () => {
     await host.dispose()
   })
 })
+
+describe('incremental argument validation', () => {
+  it('keeps unaffected argument issues and revalidates patched nodes', async () => {
+    /** Host with the modifier. */
+    const host = await createPartHost({
+      plugins: [base, definePartPlugin({ name: 'mods', modifiers: [debounce] })]
+    })
+    /** Blueprint whose page has a bad argument and whose text child is unrelated. */
+    const blueprint = {
+      id: 'inc',
+      version: 1,
+      root: {
+        tag: 'page@1',
+        id: 'p',
+        facets: {
+          events: {
+            click: { handler: 'noop@1', modifiers: [{ id: 'debounce@1', args: { ms: 'x' } }] }
+          }
+        },
+        children: [{ tag: 'text@1', id: 't', facets: { props: { text: 'a' } } }]
+      }
+    }
+    expect((await host.blueprint.load(blueprint)).issues.map((issue) => issue.rule)).toEqual([
+      'event.modifier-args'
+    ])
+    /** Patch of the unrelated child. */
+    const unrelated = await host.blueprint.patch('inc', [
+      { op: 'replace', path: '/root/children/0/facets/props/text', value: 'b' }
+    ])
+    expect(unrelated.issues.map((issue) => `${issue.rule} ${issue.address}`)).toEqual([
+      'event.modifier-args p'
+    ])
+    /** Patch fixing the argument. */
+    const fixed = await host.blueprint.patch('inc', [
+      { op: 'replace', path: '/root/facets/events/click/modifiers/0/args/ms', value: 5 }
+    ])
+    expect(fixed.issues).toEqual([])
+    await host.dispose()
+  })
+})

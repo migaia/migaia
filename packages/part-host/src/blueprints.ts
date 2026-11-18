@@ -10,6 +10,8 @@ import {
   tagSegmentName,
   validateArgs,
   type IFragmentUsage,
+  type IIndexedNode,
+  type IModifierRef,
   type IStandardSchemaInput,
   type IAddressIndex,
   type IBehavior,
@@ -25,6 +27,7 @@ import { applyEnhancers, orderEnhancers } from './enhance.ts'
 import { PartHostErrorCode } from './error-code.ts'
 import { PartHostErrorText } from './error-text.ts'
 import { createPartHostError } from './errors.ts'
+import { HostIssueRule } from './issue-rules.ts'
 import { affectedAddresses, applyPatch } from './patch.ts'
 import { isStateBinding, type ScopeState } from './state.ts'
 import type {
@@ -49,6 +52,8 @@ type ILoaded = {
   readonly parsed: IBlueprint
   readonly authoredIndex: IAddressIndex
   readonly index: IAddressIndex
+  /** Argument issues of this version, kept so an incremental pass revalidates only what changed. */
+  readonly argumentIssues: readonly IIssue[]
   readonly enhanced: ReadonlyMap<string, IPartFacets>
   readonly tree: IResolvedTree | undefined
 }
@@ -167,7 +172,7 @@ export class BlueprintStore {
     /** Pass seen by enhancement with the widened affected set. */
     const widened: IPass = { ...pass, affected: affectedAll }
     /** Fragment parameter and modifier argument issues. */
-    const argumentIssues = await this.#argumentIssues(expansion.usages, index)
+    const argumentIssues = await this.#argumentIssues(expansion.usages, index, affectedAll, pass)
     /** Engine over built-in and plugin rules. */
     const engine = createRuleEngine({
       rules: [...builtinRules, ...this.#catalog.rules()],
@@ -200,7 +205,15 @@ export class BlueprintStore {
     const tree = issues.some((issue) => issue.severity === 'error')
       ? undefined
       : { blueprintId: parsed.id, root: this.#resolve(parsed.root, addresses, enhanced) }
-    this.#loaded.set(parsed.id, { raw: pass.raw, parsed, authoredIndex, index, enhanced, tree })
+    this.#loaded.set(parsed.id, {
+      raw: pass.raw,
+      parsed,
+      authoredIndex,
+      index,
+      argumentIssues,
+      enhanced,
+      tree
+    })
     if (pass.previous !== undefined && tree !== undefined)
       this.#sink(changeSet(tree, pass.previous, index, affectedAll))
     return { blueprintId: parsed.id, tree, issues }
@@ -209,41 +222,68 @@ export class BlueprintStore {
   /**
    * Validates fragment parameters and modifier arguments against their Standard Schemas. A string
    * modifier reference is validated with `undefined`, so a schema that requires arguments reports
-   * it. Validations run concurrently; issues keep usage order, then document order.
+   * it. An incremental pass keeps the previous issues of unaffected addresses that still exist and
+   * validates only affected addresses. Validations run concurrently.
    */
   async #argumentIssues(
     usages: readonly IFragmentUsage[],
-    index: IAddressIndex
+    index: IAddressIndex,
+    affected: ReadonlySet<string> | undefined,
+    pass: IPass
   ): Promise<readonly IIssue[]> {
+    /** Issues carried over from the previous version. */
+    const kept =
+      affected === undefined || pass.previous === undefined
+        ? []
+        : pass.previous.argumentIssues.filter(
+            (issue) => !affected.has(issue.address) && index.get(issue.address) !== undefined
+          )
     /** Pending validations. */
     const checks: Promise<IIssue | undefined>[] = []
-    for (const usage of usages) {
-      /** Schema of the fragment, if it declares one. */
-      const schema = (this.#catalog.get(usage.fragmentId) as IFragmentDefinition<unknown>)
-        ?.argsSchema
-      if (schema !== undefined)
-        checks.push(argumentIssue(schema, usage.props, usage.address, 'props', '', 'fragment.args'))
-    }
-    for (const entry of index.entries())
-      for (const event of eventEntries(entry.node.facets?.events))
-        (event.subscription.modifiers ?? []).forEach((ref, position) => {
-          /** Modifier definition, when available. */
-          const definition = this.#catalog.get(modifierId(ref)) as IModifierDefinition<unknown>
-          if (definition?.argsSchema === undefined) return
-          checks.push(
-            argumentIssue(
-              definition.argsSchema,
-              modifierArgs(ref),
-              entry.address,
-              'events',
-              `${event.key}/modifiers/${position}`,
-              'event.modifier-args'
-            )
-          )
-        })
+    for (const usage of usages)
+      if (affected === undefined || affected.has(usage.address)) this.#checkUsage(usage, checks)
+    /** Entries whose modifier references are validated. */
+    const entries =
+      affected === undefined ? index.entries() : [...affected].map((address) => index.get(address))
+    for (const entry of entries) if (entry !== undefined) this.#checkModifiers(entry, checks)
     /** Settled results. */
     const results = await Promise.all(checks)
-    return results.filter((issue): issue is IIssue => issue !== undefined)
+    return [...kept, ...results.filter((issue): issue is IIssue => issue !== undefined)]
+  }
+
+  /** Queues the parameter validation of one fragment usage, when its fragment declares a schema. */
+  #checkUsage(usage: IFragmentUsage, checks: Promise<IIssue | undefined>[]): void {
+    /** Schema of the fragment, if it declares one. */
+    const schema = (this.#catalog.get(usage.fragmentId) as IFragmentDefinition<unknown>)?.argsSchema
+    if (schema !== undefined)
+      checks.push(
+        argumentIssue(schema, usage.props, usage.address, 'props', '', HostIssueRule.fragmentArgs)
+      )
+  }
+
+  /** Queues the argument validation of every modifier reference of one node. */
+  #checkModifiers(entry: IIndexedNode, checks: Promise<IIssue | undefined>[]): void {
+    for (const event of eventEntries(entry.node.facets?.events)) {
+      /** References of the subscription. */
+      const refs = event.subscription.modifiers ?? []
+      for (let position = 0; position < refs.length; position += 1) {
+        /** Reference at the position. */
+        const ref = refs[position] as IModifierRef
+        /** Modifier definition, when available. */
+        const definition = this.#catalog.get(modifierId(ref)) as IModifierDefinition<unknown>
+        if (definition?.argsSchema === undefined) continue
+        checks.push(
+          argumentIssue(
+            definition.argsSchema,
+            modifierArgs(ref),
+            entry.address,
+            'events',
+            `${event.key}/modifiers/${position}`,
+            HostIssueRule.modifierArgs
+          )
+        )
+      }
+    }
   }
 
   /** Enhances every node, reusing cached results for unaffected addresses. */
