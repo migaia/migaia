@@ -1,0 +1,13 @@
+{
+  "id": "good",
+  "version": 1,
+  "root": {
+    "tag": "page@1",
+    "id": "p",
+    "children": [
+      { "tag": "trigger@1", "id": "t", "facets": { "props": { "label": "Open" } } },
+      { "tag": "combobox@1", "id": "fruit", "facets": { "props": { "label": "Fruit" } } },
+      { "tag": "restoring-overlay@1", "id": "panel" }
+    ]
+  }
+}

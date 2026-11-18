@@ -1,0 +1,13 @@
+{
+  "id": "app",
+  "version": 1,
+  "root": {
+    "tag": "page@1",
+    "id": "p",
+    "children": [
+      { "tag": "combobox@1", "id": "fruit", "facets": { "props": { "label": "Fruit" } } },
+      { "tag": "dialog@1", "id": "settings", "facets": { "props": { "title": "Settings" } } },
+      { "tag": "tabs@1", "id": "sections", "facets": { "props": { "label": "Settings" } } }
+    ]
+  }
+}

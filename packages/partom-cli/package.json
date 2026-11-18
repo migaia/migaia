@@ -1,0 +1,53 @@
+{
+  "name": "@migaia/partom-cli",
+  "version": "0.0.1",
+  "private": true,
+  "description": "partom command: doctor and extract for part-based UI projects, compiled to a single executable with Bun.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "bin": {
+    "partom": "./src/cli.ts"
+  },
+  "files": [
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "node -e \"process.exit(0)\"",
+    "build:exe": "bun build --compile src/entry/darwin-arm64.ts --external 'chromium-bidi/*' --outfile dist/partom",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "vitest run test"
+  },
+  "dependencies": {
+    "oxc-parser": "0.154.0",
+    "playwright-core": "1.62.1"
+  },
+  "optionalDependencies": {
+    "@oxc-parser/binding-darwin-arm64": "0.154.0",
+    "@oxc-parser/binding-darwin-x64": "0.154.0",
+    "@oxc-parser/binding-linux-arm64-gnu": "0.154.0",
+    "@oxc-parser/binding-linux-x64-gnu": "0.154.0",
+    "@oxc-parser/binding-win32-x64-msvc": "0.154.0"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.3",
+    "@migaia/part-contract": "workspace:^",
+    "@migaia/part-host": "workspace:^",
+    "@migaia/part-plugin-dom": "workspace:^",
+    "@migaia/part-plugin-react": "workspace:^",
+    "@radix-ui/react-dialog": "^1.1.0",
+    "@types/react": "^19.0.0",
+    "@ui-sdk/core": "0.1.0-beta.7",
+    "class-variance-authority": "^0.7.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "4.1.10"
+  }
+}
