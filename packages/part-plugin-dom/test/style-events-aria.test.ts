@@ -66,7 +66,7 @@ describe('events', () => {
     const link = element<HTMLAnchorElement>('a', button, { href: '#x' })
     dom.events.subscribe('b', link, 'click', {
       handler: 'click@1',
-      modifiers: ['prevent'],
+      modifiers: ['prevent@1'],
       once: true
     })
     const first = new MouseEvent('click', { bubbles: true, cancelable: true })
@@ -81,7 +81,7 @@ describe('events', () => {
     const outsideTarget = element<HTMLSpanElement>('span', stopper)
     const removeOutside = dom.events.subscribe('b', button, 'click', {
       handler: 'click@1',
-      modifiers: ['outside']
+      modifiers: ['outside@1']
     })
     link.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     outsideTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }))

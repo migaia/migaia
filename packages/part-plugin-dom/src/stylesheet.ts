@@ -28,8 +28,8 @@ function selectorOf(address: string): string {
  * through CSSOM; removal empties rules and compacts when more than half are empty.
  */
 export class StyleSheetWriter {
-  /** The host's sheet. */
-  readonly #sheet: CSSStyleSheet
+  /** The host's sheet, created on first use so installing the plugin touches no DOM global. */
+  #created: CSSStyleSheet | undefined
   /** Rules by layer and address. */
   readonly #entries = new Map<string, IRuleEntry>()
   /** Number of emptied entries awaiting compaction. */
@@ -37,10 +37,14 @@ export class StyleSheetWriter {
   /** Whether the sheet is attached to the document. */
   #attached = false
 
-  /** Creates the sheet with the fixed layer order. */
-  constructor() {
+  /**
+   * The sheet, created with the fixed layer order on first use. Throws `STYLESHEET_UNSUPPORTED`
+   * when the environment has no constructable style sheets.
+   */
+  get #sheet(): CSSStyleSheet {
+    if (this.#created !== undefined) return this.#created
     try {
-      this.#sheet = new CSSStyleSheet()
+      this.#created = new CSSStyleSheet()
     } catch (cause) {
       throw createPartDomError(
         PartDomErrorCode.stylesheetUnsupported,
@@ -48,7 +52,8 @@ export class StyleSheetWriter {
         cause
       )
     }
-    this.#sheet.replaceSync(`@layer ${STYLE_LAYERS.join(', ')};`)
+    this.#created.replaceSync(`@layer ${STYLE_LAYERS.join(', ')};`)
+    return this.#created
   }
 
   /** Replaces the declarations of each rule's (layer, address). */
@@ -69,9 +74,9 @@ export class StyleSheetWriter {
   /** Detaches the sheet from the document. */
   detach(): void {
     if (!this.#attached) return
-    document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
-      (sheet) => sheet !== this.#sheet
-    )
+    /** Sheet being detached; attached implies created. */
+    const own = this.#created
+    document.adoptedStyleSheets = document.adoptedStyleSheets.filter((sheet) => sheet !== own)
     this.#attached = false
   }
 

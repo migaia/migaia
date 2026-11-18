@@ -11,7 +11,7 @@ See the [README](./README.en.md) for what the package is for. Applications rarel
 | Focus returns to the trigger after a dialog closes           | `focus.restore`                  | [Focus restore](#focus-restore)            |
 | A dropdown inside a modal still shows on top                 | `behavior.layer`                 | [Layers](#layers)                          |
 | Close a dropdown on a click outside it                       | `dismiss.outside`                | [Close on outside click](#close-on-outside-click) |
-| Learn about outside clicks even after an outer `stopPropagation` | subscription modifier `outside` | [Outside subscriptions](#outside-subscriptions) |
+| Outside clicks, key filters, debounce, long press, swipe, drag | subscription modifiers, `click.once.stop` keys | [Modifiers and shorthand event keys](#modifiers-and-shorthand-event-keys) |
 | Receive an event in the capture phase                        | subscription option `capture: true` | [Capture phase](#capture-phase)         |
 | A thousand-row list without a thousand listeners             | `events.delegate`                | [List event delegation](#list-event-delegation) |
 | Change a theme colour in one place                           | `styleHooks`, `stylesheet`       | [Styles](#styles)                          |
@@ -41,13 +41,41 @@ definePart({
 
 A pointer press (`pointerdown`, capture phase) outside the topmost part closes only that part, like Escape. The click is not blocked and still reaches its target. A click on a modal dialog's `::backdrop` targets the dialog itself, so for modals the dialog's box decides whether the press was outside. Parts that manage their own layering (`managedBy: 'component'`, such as Radix) do not pass through here; the component handles it.
 
-## Outside subscriptions
+## Modifiers and shorthand event keys
+
+A subscription can carry a modifier chain. Modifiers run in array order and each can stop the event; the effect is dispatched only after all of them pass. A modifier is written `name@major`, or as an object when it takes arguments:
 
 ```json
-{ "events": { "click": { "handler": "close-panel@1", "modifiers": ["outside"] } } }
+{ "events": { "click": { "handler": "save@1", "modifiers": ["stop@1", { "id": "debounce@1", "args": { "ms": 200 } }] } } }
 ```
 
-`outside` installs the listener on the document in the capture phase and fires only when the event path does not contain the part element. Because it runs in the capture phase, an outer `stopPropagation` cannot hide the event. It applies to DOM events only; rule `event.outside-dom` reports it on `custom` or `component` events.
+An event key may also use dot shorthand: the first segment is the event name, `once`, `capture`, `passive` and `native` are listener options, and every other segment is a modifier (`@1` when the major is omitted). These two are equivalent:
+
+```json
+{ "events": { "click.once.stop.outside": { "handler": "close@1" } } }
+{ "events": { "click": { "handler": "close@1", "once": true, "modifiers": ["stop@1", "outside@1"] } } }
+```
+
+`native` applies to component events: instead of the component callback, it listens for the native event of the same name on the part's root element (for example `click.native`).
+
+Built-in modifiers registered by this plugin:
+
+| Modifier | Effect |
+|---|---|
+| `stop`, `prevent`, `self` | Stop propagation; cancel the default action; continue only when the target is the part element itself |
+| `outside` | Listens on the document in the capture phase and continues only for clicks outside the part, so an outer `stopPropagation` cannot hide them; DOM events only, not on template rows |
+| `enter`, `esc`, `tab`, `space`, `up`, `down`, `delete` | Continue only for that key (`delete` accepts Delete and Backspace) |
+| `left`, `right`, `middle` | Arrow key for keyboard events, mouse button for mouse events |
+| `key` | `{ keys: [...] }`, filters by `KeyboardEvent.key` |
+| `ctrl`, `shift`, `alt`, `meta`, `exact` | Require that system key; `exact` requires exactly the system keys written in the subscription |
+| `debounce`, `throttle` | `{ ms }`, default 300; debounce passes only the last event, throttle the first of each window |
+| `longpress` | On `pointerdown`; `{ ms, tolerance }`, dispatches `{ x, y, duration }` after a still hold |
+| `swipe` | On `pointerdown`; `{ distance, direction }`, dispatches `{ direction, dx, dy }` at release |
+| `drag` | On `pointerdown`; `{ threshold }`, captures the pointer and dispatches `{ phase: 'start' \| 'move' \| 'end', x, y, dx, dy }` |
+
+Double click, touch, scroll and drag-and-drop are native events (`dblclick`, `touchstart`, `scroll`, `dragstart`, ...): subscribe to them directly and add modifiers as needed, for example `scroll.passive.throttle`.
+
+Custom modifiers are defined with part-host's `defineModifier` and registered through `definePartPlugin({ modifiers })`. When a modifier is missing at runtime the subscription installs no listener and `MODIFIER_UNAVAILABLE` is reported through diagnostics; a throwing modifier reports `MODIFIER_FAILED` with the original error on `cause`. These errors carry `address`, `event` and `modifier`.
 
 ## Capture phase
 

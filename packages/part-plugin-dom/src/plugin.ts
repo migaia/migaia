@@ -1,16 +1,20 @@
 import type { IEventDeclaration, IEventSubscription } from '@migaia/part-contract'
 import {
+  definePartPlugin,
   partCorePlugin,
+  type IDefinition,
+  type IGenerationSignal,
+  type IModifierDefinition,
   type IPartPlugin,
   type IResolvedNode,
   type IStyleRule
 } from '@migaia/part-host'
-import { definePlugin } from '@migaia/plugin-host'
 import { defineFeature } from '@migaia/plugin-host/features'
 import { AriaWriter } from './aria.ts'
 import { EventAdapter } from './events.ts'
 import { FocusManager } from './focus.ts'
 import { LayerManager } from './layer.ts'
+import { BUILTIN_MODIFIERS } from './modifiers.ts'
 import { StyleSheetWriter } from './stylesheet.ts'
 
 /**
@@ -43,14 +47,14 @@ export type IDomFeatures = {
     subscribe(
       address: string,
       target: EventTarget,
-      name: string,
+      key: string,
       subscription: IEventSubscription,
       declaration?: IEventDeclaration
     ): () => void
     delegate(
       templateAddress: string,
       host: EventTarget,
-      name: string,
+      key: string,
       subscription: IEventSubscription,
       declaration?: IEventDeclaration
     ): () => void
@@ -71,6 +75,19 @@ export type IDomFeatures = {
 type ICoreServices = {
   readonly effect: { dispatch(address: string, event: string, detail: unknown): Promise<void> }
   readonly diagnostics: { report(error: unknown): void }
+  readonly catalog: { get(id: string): IDefinition | undefined }
+}
+
+/** Modifier definition registered under an id, or undefined when absent or another kind. */
+function modifierOf(
+  catalog: ICoreServices['catalog'],
+  id: string
+): IModifierDefinition<unknown> | undefined {
+  /** Definition under the id. */
+  const definition = catalog.get(id)
+  return definition?.descriptor.kind === 'modifier'
+    ? (definition as IModifierDefinition<unknown>)
+    : undefined
 }
 
 /** All DOM services of one host, created together so they share the style sheet. */
@@ -90,7 +107,8 @@ class DomServices {
   constructor(core: ICoreServices) {
     this.events = new EventAdapter({
       dispatch: (address, event, detail) => core.effect.dispatch(address, event, detail),
-      report: (error) => core.diagnostics.report(error)
+      report: (error) => core.diagnostics.report(error),
+      modifier: (id) => modifierOf(core.catalog, id)
     })
   }
 
@@ -123,7 +141,8 @@ class DomServices {
 /** Root Feature creating the services of one host. */
 const servicesFeature = defineFeature((_core, deps: ICoreServices) => new DomServices(deps), {
   effect: partCorePlugin.getFeature('effect'),
-  diagnostics: partCorePlugin.getFeature('diagnostics')
+  diagnostics: partCorePlugin.getFeature('diagnostics'),
+  catalog: partCorePlugin.getFeature('catalog')
 } as never)
 
 /** Features of the DOM plugin, each a facet of the shared services. */
@@ -153,24 +172,23 @@ export type IDomFeatureName = keyof typeof domFeatures
 /** Public view of the DOM plugin: a part plugin whose Features renderer plugins reference. */
 export type IDomPlugin = IPartPlugin & { getFeature(name: IDomFeatureName): unknown }
 
-/** DOM plugin; install it once per host before a renderer plugin. */
-export const domPlugin: IDomPlugin = definePlugin({
-  name: 'part-dom',
-  features: domFeatures,
-  install: (core: IDomInstallCore) => {
-    core.lifecycle.signal.addEventListener('abort', () => core.features.services.release(), {
-      once: true
-    })
-    return {}
-  }
-}) as unknown as IDomPlugin
-
-/** The part of the PH install core the DOM plugin uses. */
-type IDomInstallCore = {
-  readonly features: { readonly services: DomServices }
-  readonly lifecycle: {
-    readonly signal: {
-      addEventListener(type: 'abort', listener: () => void, options: { readonly once: true }): void
-    }
-  }
+/** Releases the host's DOM services when the plugin generation ends. */
+function releaseOnAbort(
+  features: Readonly<Record<string, unknown>>,
+  signal: IGenerationSignal
+): void {
+  /** Services of this generation. */
+  const services = features.services as DomServices
+  signal.addEventListener('abort', () => services.release(), { once: true })
 }
+
+/**
+ * DOM plugin; install it once per host before a renderer plugin. It registers the built-in
+ * modifiers. Installing it touches no DOM global; DOM work starts when a Feature method is called.
+ */
+export const domPlugin: IDomPlugin = definePartPlugin({
+  name: 'part-dom',
+  modifiers: BUILTIN_MODIFIERS as never,
+  features: domFeatures as never,
+  onInstall: releaseOnAbort
+}) as unknown as IDomPlugin

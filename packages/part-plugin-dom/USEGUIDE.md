@@ -11,7 +11,7 @@
 | 关闭弹窗后焦点回到触发按钮                     | `focus.restore`                           | [焦点恢复](#焦点恢复)                            |
 | 下拉框在模态框里也要显示在最上面               | `behavior.layer`                          | [层级](#层级)                                    |
 | 点击下拉框外部时关闭它                         | `dismiss.outside`                         | [点击外部关闭](#点击外部关闭)                    |
-| 外层 `stopPropagation` 后仍要知道发生了外部点击 | 订阅修饰符 `outside`                      | [外部事件订阅](#外部事件订阅)                    |
+| 外部点击、按键过滤、防抖、长按、滑动、拖拽 | 订阅修饰符、`click.once.stop` 写法 | [修饰符与事件键简写](#修饰符与事件键简写) |
 | 在捕获阶段先拿到事件                           | 订阅选项 `capture: true`                  | [捕获阶段](#捕获阶段)                            |
 | 一千行列表不要一千个监听器                     | `events.delegate`                         | [列表事件委托](#列表事件委托)                    |
 | 主题色只改一处                                 | `styleHooks`、`stylesheet`                | [样式](#样式)                                    |
@@ -41,13 +41,41 @@ definePart({
 
 在最上层 part 外部按下指针（`pointerdown`，捕获阶段）时，只关闭最上层，与 Esc 一致。这次点击不会被拦截，照常到达目标。模态对话框点在 `::backdrop` 上时，事件目标是对话框本身，此时按对话框的矩形判断是否在外部。由组件自己管理层级的 part（`managedBy: 'component'`，如 Radix）不经过这里，由组件自己处理。
 
-## 外部事件订阅
+## 修饰符与事件键简写
+
+订阅可以带修饰符链，修饰符按数组顺序执行，每个都可以拦下事件；全部通过后才派发 effect。修饰符写成 `名称@主版本`，带参数时写成对象：
 
 ```json
-{ "events": { "click": { "handler": "close-panel@1", "modifiers": ["outside"] } } }
+{ "events": { "click": { "handler": "save@1", "modifiers": ["stop@1", { "id": "debounce@1", "args": { "ms": 200 } }] } } }
 ```
 
-`outside` 把监听挂到文档的捕获阶段，只在事件路径不包含 part 元素时触发。因为在捕获阶段，外层的 `stopPropagation` 挡不住它。它只用于 DOM 事件，规则 `event.outside-dom` 会报告用在 `custom` 或 `component` 事件上的情况。
+事件键也可以用点号简写：第一段是事件名，`once`、`capture`、`passive`、`native` 是监听选项，其余每段是一个修饰符（省略主版本时取 `@1`）。下面两种写法等价：
+
+```json
+{ "events": { "click.once.stop.outside": { "handler": "close@1" } } }
+{ "events": { "click": { "handler": "close@1", "once": true, "modifiers": ["stop@1", "outside@1"] } } }
+```
+
+`native` 用于组件事件：不走组件回调，而是在 part 的根元素上监听同名原生事件（例如 `click.native`）。
+
+本插件登记的内置修饰符：
+
+| 修饰符 | 作用 |
+|---|---|
+| `stop`、`prevent`、`self` | 停止冒泡；取消默认行为；只在事件目标是 part 元素本身时继续 |
+| `outside` | 监听挂到文档的捕获阶段，只在点击发生在 part 之外时继续；外层的 `stopPropagation` 挡不住它；只用于 DOM 事件，不能用在模板行上 |
+| `enter`、`esc`、`tab`、`space`、`up`、`down`、`delete` | 只在按下对应键时继续（`delete` 同时接受 Delete 与 Backspace） |
+| `left`、`right`、`middle` | 键盘事件为方向键，鼠标事件为对应按键 |
+| `key` | `{ keys: [...] }`，按 `KeyboardEvent.key` 过滤 |
+| `ctrl`、`shift`、`alt`、`meta`、`exact` | 要求按住对应系统键；`exact` 要求只按住订阅里写出的系统键 |
+| `debounce`、`throttle` | `{ ms }`，默认 300；防抖只让最后一次通过，节流每个窗口只让第一次通过 |
+| `longpress` | 用于 `pointerdown`；`{ ms, tolerance }`，按住足够久且没有移动时派发 `{ x, y, duration }` |
+| `swipe` | 用于 `pointerdown`；`{ distance, direction }`，松开时位移足够且方向符合则派发 `{ direction, dx, dy }` |
+| `drag` | 用于 `pointerdown`；`{ threshold }`，捕获指针并依次派发 `{ phase: 'start' \| 'move' \| 'end', x, y, dx, dy }` |
+
+双击、触摸、滚动、拖放本身是原生事件（`dblclick`、`touchstart`、`scroll`、`dragstart` 等），直接订阅即可，再按需加修饰符，例如 `scroll.passive.throttle`。
+
+自定义修饰符用 part-host 的 `defineModifier` 定义，经 `definePartPlugin({ modifiers })` 登记。运行时找不到修饰符时，订阅不挂监听，并经 diagnostics 报告 `MODIFIER_UNAVAILABLE`；修饰符代码抛错时报告 `MODIFIER_FAILED`，原错误在 `cause`；这些错误都带 `address`、`event`、`modifier` 字段，便于定位。
 
 ## 捕获阶段
 
