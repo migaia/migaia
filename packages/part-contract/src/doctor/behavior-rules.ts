@@ -58,12 +58,18 @@ function checkDeclared(context: IRuleContext<unknown>): void {
       reportEvent(context, view.key, 'event.declared')
 }
 
-/** Component events have no capture phase and no passive listeners. */
+/**
+ * Component events are callbacks, not DOM listeners: they have no capture phase, no passive
+ * listeners and no `once` option. Component callbacks dispatch by event name, so a key carrying
+ * such options would never be found either.
+ */
 function checkComponentCapture(context: IRuleContext<unknown>): void {
   for (const view of subscriptionsOf(context))
     if (
       view.declaration?.kind === 'component' &&
-      (view.subscription.capture === true || view.subscription.passive === true)
+      (view.subscription.capture === true ||
+        view.subscription.passive === true ||
+        view.subscription.once === true)
     )
       reportEvent(context, view.key, 'event.component-no-capture')
 }

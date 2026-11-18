@@ -141,3 +141,14 @@ describe('modifier rules', () => {
     ).toBe('x@1')
   })
 })
+
+describe('component event options', () => {
+  it('reports once on a component event, whose callback has no once', () => {
+    expect(issuesOf('valueChange.once', { handler: 'eff@1' })).toEqual([
+      'event.component-no-capture valueChange.once'
+    ])
+    expect(issuesOf('valueChange', { handler: 'eff@1', once: true })).toEqual([
+      'event.component-no-capture valueChange'
+    ])
+  })
+})
