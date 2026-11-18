@@ -36,4 +36,4 @@ It parses shadcn-style components with oxc: exported components, props, `cva` va
 pnpm --filter @migaia/partom-cli run build:exe
 ```
 
-`build:exe` first bundles doctor into one file, `dist/doctor-runner.js`, and embeds it in the executable. Bun's compiled mode cannot resolve scoped, symlinked project packages (`@migaia/*`, `@ui-sdk/*`), so for `doctor` the executable writes the runner to the system temp directory and starts itself with `BUN_BE_BUN=1` to run it as plain Bun. No separate Bun install is needed, and exit codes match a source run. `extract --probe` and `--verify` are not yet verified in the executable.
+`build:exe` first bundles doctor into one file, `dist/doctor-runner.js`, and embeds it in the executable. Bun's compiled mode cannot resolve scoped, symlinked project packages (`@migaia/*`, `@ui-sdk/*`), so for `doctor` the executable writes the runner to the system temp directory and starts itself with `BUN_BE_BUN=1` to run it as plain Bun. No separate Bun install is needed, and exit codes match a source run. `extract --probe` and `--verify` bundle their check page with `Bun.build` and run directly in the executable.

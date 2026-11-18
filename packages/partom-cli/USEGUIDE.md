@@ -90,10 +90,10 @@ pnpm --filter @migaia/partom-cli run build:exe
 
 Bun 编译模式解析不到项目里带作用域的符号链接包（pnpm 的 `@migaia/*`、`@ui-sdk/*`），Bun `1.4.4` 仍是如此。因此 `build:exe` 先把 doctor 单独打包成 `dist/doctor-runner.js` 并嵌入可执行文件；运行 `doctor` 时，可执行文件把它写到系统临时目录的 `partom/doctor-runner-<版本>.js`（内容相同时不重写），再以环境变量 `BUN_BE_BUN=1` 启动自己，作为普通 Bun 执行它。用户机器不需要另装 Bun，输出和退出码与源码运行相同。
 
-`extract --probe` 与 `--verify` 同样需要加载项目包，在可执行文件中尚未验证；需要时用源码运行：
+`extract --probe` 与 `--verify` 用 `Bun.build` 打包检查页，打包时由自带的解析插件找到项目包，因此可执行文件可以直接运行它们：
 
 ```bash
-bun packages/partom-cli/src/cli.ts extract src/components/ui/button.tsx --out drafts --verify
+partom extract src/components/ui/button.tsx --out drafts --verify
 ```
 
 ## 退出码

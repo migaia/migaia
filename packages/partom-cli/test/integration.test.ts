@@ -63,6 +63,19 @@ describe('stage-1 integration with the compiled executable', () => {
     )
   })
 
+  it('probes and verifies with the compiled executable', () => {
+    const out = mkdtempSync(join(tmpdir(), 'partom-int-probe-'))
+    expect(run('extract', ['extract', 'button.tsx', '--out', out, '--probe']).code).toBe(0)
+    expect(JSON.parse(readFileSync(join(out, 'probe.json'), 'utf8')).probes.length).toBeGreaterThan(
+      0
+    )
+    const verified = run('extract', ['extract', 'button.tsx', '--out', out, '--verify'])
+    expect(verified.code).toBe(0)
+    expect(JSON.parse(verified.stdout.trim().split('\n').pop() as string)).toEqual({
+      differences: []
+    })
+  })
+
   it('reports no error for the combobox, dialog and tabs application in a real browser (source CLI)', () => {
     const result = partom('shadcn-app', ['doctor', '--rendered', '--json'], [exe])
     expect(result.code).toBe(0)

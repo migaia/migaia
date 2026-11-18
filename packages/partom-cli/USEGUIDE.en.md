@@ -90,10 +90,10 @@ The compiled `dist/partom` runs `doctor`, `extract` and `--version` directly.
 
 Bun's compiled mode cannot resolve scoped, symlinked project packages (pnpm's `@migaia/*`, `@ui-sdk/*`), still true in Bun `1.4.4`. So `build:exe` first bundles doctor alone into `dist/doctor-runner.js` and embeds it. For `doctor`, the executable writes it to `partom/doctor-runner-<version>.js` in the system temp directory (not rewritten when the content is the same) and starts itself with `BUN_BE_BUN=1` to run it as plain Bun. No separate Bun install is needed; output and exit codes match a source run.
 
-`extract --probe` and `--verify` also load project packages and are not yet verified in the executable; run them from source when needed:
+`extract --probe` and `--verify` bundle the check page with `Bun.build`, whose bundled resolver plugin finds project packages, so the executable runs them directly:
 
 ```bash
-bun packages/partom-cli/src/cli.ts extract src/components/ui/button.tsx --out drafts --verify
+partom extract src/components/ui/button.tsx --out drafts --verify
 ```
 
 ## Exit codes
