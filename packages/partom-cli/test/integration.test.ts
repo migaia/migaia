@@ -1,0 +1,106 @@
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { BUN, FIXTURES, partom } from './run.ts'
+
+/** Package root. */
+const ROOT = join(import.meta.dirname, '..')
+/** Compiled executable path, built once. */
+let exe = ''
+
+/** Runs the compiled executable in a fixture directory. */
+function run(
+  fixture: string,
+  args: readonly string[]
+): { readonly code: number; readonly stdout: string } {
+  /** Child result. */
+  const result = spawnSync(exe, args, {
+    cwd: join(FIXTURES, fixture),
+    encoding: 'utf8',
+    timeout: 240000
+  })
+  return { code: result.status ?? -1, stdout: result.stdout }
+}
+
+beforeAll(() => {
+  /** Build result of the package's executable script (doctor runner plus executable). */
+  const build = spawnSync(BUN, ['run', 'build:exe'], { cwd: ROOT, encoding: 'utf8' })
+  expect(build.status).toBe(0)
+  exe = join(ROOT, 'dist', 'partom')
+})
+
+describe('stage-1 integration with the compiled executable', () => {
+  it('extracts shadcn-style components with variants and pattern guesses', () => {
+    const out = mkdtempSync(join(tmpdir(), 'partom-int-extract-'))
+    expect(
+      run('extract', [
+        'extract',
+        'button.tsx',
+        'dialog.tsx',
+        'tabs.tsx',
+        'combobox.tsx',
+        '--out',
+        out
+      ]).code
+    ).toBe(0)
+    const report = JSON.parse(readFileSync(join(out, 'report.json'), 'utf8')).components as {
+      component: string
+      pattern?: string
+      variants: Record<string, string[]>
+    }[]
+    expect(
+      Object.fromEntries(report.map((entry) => [entry.component, entry.pattern ?? null]))
+    ).toEqual({
+      Button: null,
+      Dialog: 'dialog',
+      Tabs: 'tabs',
+      Combobox: 'combobox'
+    })
+    expect(report.find((entry) => entry.component === 'Button')?.variants.variant).toContain(
+      'destructive'
+    )
+  })
+
+  it('probes and verifies with the compiled executable', () => {
+    const out = mkdtempSync(join(tmpdir(), 'partom-int-probe-'))
+    expect(run('extract', ['extract', 'button.tsx', '--out', out, '--probe']).code).toBe(0)
+    expect(JSON.parse(readFileSync(join(out, 'probe.json'), 'utf8')).probes.length).toBeGreaterThan(
+      0
+    )
+    const verified = run('extract', ['extract', 'button.tsx', '--out', out, '--verify'])
+    expect(verified.code).toBe(0)
+    expect(JSON.parse(verified.stdout.trim().split('\n').pop() as string)).toEqual({
+      differences: []
+    })
+  })
+
+  it('reports no error for the combobox, dialog and tabs application in a real browser (source CLI)', () => {
+    const result = partom('shadcn-app', ['doctor', '--rendered', '--json'], [exe])
+    expect(result.code).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual({
+      issues: [],
+      rendered: [{ blueprintId: 'app', status: 'checked' }]
+    })
+  })
+
+  it('detects a combobox implementation that breaks APG while the blueprint stays valid', () => {
+    const result = partom('shadcn-app-broken', ['doctor', '--rendered', '--json'], [exe])
+    expect(result.code).toBe(1)
+    const issues = JSON.parse(result.stdout).issues as {
+      address: string
+      basis: string
+      rule: string
+    }[]
+    expect(issues.length).toBeGreaterThan(0)
+    expect(
+      issues.every(
+        (issue) =>
+          issue.rule === 'rendered.pattern' &&
+          issue.address === 'p/fruit' &&
+          issue.basis === 'APG combobox'
+      )
+    ).toBe(true)
+  })
+})

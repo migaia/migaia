@@ -1,0 +1,12 @@
+{
+  "id": "bad",
+  "version": 1,
+  "root": {
+    "tag": "page@1",
+    "id": "p",
+    "children": [
+      { "tag": "trigger@1", "id": "t", "facets": { "attrs": { "tabindex": 3 } } },
+      { "tag": "trigger@1", "id": "u", "facets": { "aria": { "controls": "p/missing" } } }
+    ]
+  }
+}

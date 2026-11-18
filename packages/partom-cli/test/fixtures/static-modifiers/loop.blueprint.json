@@ -1,0 +1,5 @@
+{
+  "id": "loop",
+  "version": 1,
+  "root": { "tag": "page@1", "id": "p", "children": [{ "tag": "loop@1" }] }
+}

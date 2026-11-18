@@ -1,0 +1,56 @@
+import { ERROR_SOURCE, type IPartCliErrorCode } from './error-code.ts'
+
+/** Stable messages of `part.cli` errors and usage text. */
+export const PartCliText = {
+  /** Usage printed for invalid arguments. */
+  usage:
+    'usage: partom doctor [--rendered] [--only <address>] [--browser <path>] [--json] [--config <path>]\n' +
+    '       partom extract <files...> --out <dir> [--probe] [--verify] [--browser <path>]\n' +
+    '       partom browser install\n' +
+    '       partom --version',
+  /** Missing config. */
+  configNotFound: (dir: string): string => `no partom.config.ts in ${dir}; pass --config <path>`,
+  /** Invalid config. */
+  configInvalid: 'partom.config.ts must export default { plugins: [...], blueprints: [...] }',
+  /** Missing project dependency. */
+  projectDependencyMissing: (name: string): string =>
+    `the project cannot resolve ${name}; install it in the project`,
+  /** No browser. */
+  browserNotFound: 'no browser found; pass --browser <path> or run: partom browser install',
+  /** Harness failure. */
+  harnessFailed: 'the check page failed to build or run',
+  /** Parse failure. */
+  parseFailed: (file: string): string => `failed to parse ${file}`,
+  /** Unknown command. */
+  usageInvalid: 'invalid arguments'
+} as const
+
+/** Error carrying `(source, code)` without replacing the native error. */
+export type IPartCliError = Error & { readonly source: string; readonly code: IPartCliErrorCode }
+
+/** Creates a tagged error; the original failure, when any, stays on `cause`. */
+export function createPartCliError(
+  code: IPartCliErrorCode,
+  message: string,
+  cause?: unknown
+): IPartCliError {
+  /** One construction keeps stack and cause intact. */
+  const error = cause === undefined ? new Error(message) : new Error(message, { cause })
+  Object.defineProperty(error, 'source', { value: ERROR_SOURCE, enumerable: true })
+  Object.defineProperty(error, 'code', { value: code, enumerable: true })
+  return error as IPartCliError
+}
+
+/** Serializes an error for output with only name, message, source and code; never the stack. */
+export function serializeCause(cause: unknown): Record<string, unknown> | undefined {
+  if (cause === undefined) return undefined
+  if (typeof cause !== 'object' || cause === null) return { name: 'Error', message: String(cause) }
+  /** Error-like view of the cause. */
+  const value = cause as { name?: unknown; message?: unknown; source?: unknown; code?: unknown }
+  return {
+    name: typeof value.name === 'string' ? value.name : 'Error',
+    message: typeof value.message === 'string' ? value.message : '',
+    ...(typeof value.source === 'string' ? { source: value.source } : {}),
+    ...(typeof value.code === 'string' ? { code: value.code } : {})
+  }
+}

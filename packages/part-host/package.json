@@ -1,0 +1,43 @@
+{
+  "name": "@migaia/part-host",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Runtime-neutral host that assembles part plugins, loads blueprints and runs enhancement, state, derive and effects.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "vitest run test"
+  },
+  "dependencies": {
+    "@migaia/part-contract": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/reactive": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "4.1.10",
+    "zod": "^4.2.0"
+  }
+}

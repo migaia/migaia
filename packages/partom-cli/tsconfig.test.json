@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "rootDir": ".", "types": ["bun", "node", "vitest/globals"] },
+  "include": ["src", "test"],
+  "exclude": ["test/fixtures/extract/tabs.tsx", "test/fixtures/extract/combobox.tsx"]
+}

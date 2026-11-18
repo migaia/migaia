@@ -1,0 +1,29 @@
+/** Stable error domain owned by this code table; it names the part command-line tool. */
+export const ERROR_SOURCE = 'part.cli'
+
+/** The single declaration site for `part.cli` error codes. Code values are public API. */
+export const PartCliErrorCode = {
+  /** The project directory has no `partom.config.ts` and no `--config` was given. Exit code 2. */
+  configNotFound: 'CONFIG_NOT_FOUND',
+  /** The config does not export `{ plugins, blueprints }`; the original error is on `cause`. Exit 2. */
+  configInvalid: 'CONFIG_INVALID',
+  /**
+   * A package the tool loads from the project (part packages, React, ui-sdk testing) cannot be
+   * resolved from the project directory. Install it in the project. Exit code 2.
+   */
+  projectDependencyMissing: 'PROJECT_DEPENDENCY_MISSING',
+  /**
+   * No browser was found at the explicit path or by automatic lookup. Exit code 2; nothing is
+   * downloaded.
+   */
+  browserNotFound: 'BROWSER_NOT_FOUND',
+  /** Building or running the check page failed; the original error is on `cause`. Exit code 2. */
+  harnessFailed: 'HARNESS_FAILED',
+  /** A source file failed to parse; it is skipped and the run exits 1. */
+  parseFailed: 'PARSE_FAILED',
+  /** Command-line usage is invalid. Exit code 2. */
+  usageInvalid: 'USAGE_INVALID'
+} as const
+
+/** Value union of every `part.cli` error code. */
+export type IPartCliErrorCode = (typeof PartCliErrorCode)[keyof typeof PartCliErrorCode]

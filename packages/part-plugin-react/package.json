@@ -1,0 +1,58 @@
+{
+  "name": "@migaia/part-plugin-react",
+  "version": "0.0.1",
+  "private": true,
+  "description": "React renderer plugin for part hosts: renders resolved trees and wraps existing React components as parts.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "vitest run test"
+  },
+  "dependencies": {
+    "@migaia/part-contract": "workspace:^",
+    "@migaia/part-host": "workspace:^",
+    "@migaia/part-plugin-dom": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/reactive": "workspace:^",
+    "@migaia/store-react": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "react-dom": ">=19"
+  },
+  "devDependencies": {
+    "@radix-ui/react-dialog": "^1.1.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/browser": "4.1.10",
+    "@vitest/browser-playwright": "4.1.10",
+    "class-variance-authority": "^0.7.0",
+    "playwright": "1.62.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "4.1.10"
+  }
+}

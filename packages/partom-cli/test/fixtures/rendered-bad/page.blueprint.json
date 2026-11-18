@@ -1,0 +1,12 @@
+{
+  "id": "broken",
+  "version": 1,
+  "root": {
+    "tag": "page@1",
+    "id": "p",
+    "children": [
+      { "tag": "broken-combobox@1", "id": "fruit", "facets": { "props": { "label": "Fruit" } } },
+      { "tag": "combobox@1", "id": "other", "facets": { "props": { "label": "Other" } } }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "lost",
+  "version": 1,
+  "root": {
+    "tag": "page@1",
+    "id": "p",
+    "children": [
+      { "tag": "trigger@1", "id": "t", "facets": { "props": { "label": "Open" } } },
+      { "tag": "overlay@1", "id": "panel" }
+    ]
+  }
+}

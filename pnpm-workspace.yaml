@@ -3,6 +3,7 @@ packages:
   - packages/*
 
 allowBuilds:
+  bun: true
   cbor-extract: true
   esbuild: true
   fsevents: true
