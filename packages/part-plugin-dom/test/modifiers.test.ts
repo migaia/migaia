@@ -96,6 +96,7 @@ const KEYS = [
   'click.native',
   'click.once.stop',
   'keydown.enter',
+  'keydown.enter.once',
   'keydown.ctrl.exact',
   'click.debounce',
   'pointerdown.longpress',
@@ -262,6 +263,46 @@ describe('modifier chain', () => {
     await settle()
     expect(elements).toEqual([rows[1]])
     expect(runs.map((run) => run.address)).toEqual(['b/row@row:2'])
+    await host.dispose()
+  })
+})
+
+describe('once and delegated rows', () => {
+  it('keeps a once subscription until an event passes the chain, then disposes it', async () => {
+    const { host, dom } = await harness([])
+    const box = element<HTMLDivElement>('div', document.body)
+    dom.events.subscribe('b', box, 'keydown.enter.once', { handler: 'run@1' })
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+    const button = element<HTMLButtonElement>('button', document.body)
+    dom.events.subscribe('b', button, 'click', {
+      handler: 'run@1',
+      modifiers: ['log@1'],
+      once: true
+    })
+    button.dispatchEvent(new MouseEvent('click'))
+    button.dispatchEvent(new MouseEvent('click'))
+    await settle()
+    expect(runs.map((run) => run.name)).toEqual(['keydown.enter.once', 'click'])
+    expect(record).toEqual(['log', 'dispose:log'])
+    await host.dispose()
+  })
+
+  it('gives each row its own stateful modifier instance', async () => {
+    const { host, dom } = await harness([])
+    const list = element<HTMLUListElement>('ul', document.body)
+    const rows = ['1', '2'].map((key) =>
+      element<HTMLLIElement>('li', list, { 'data-part-address': `b/row@row:${key}` })
+    )
+    dom.events.delegate('b/row', list, 'click', {
+      handler: 'run@1',
+      modifiers: [{ id: 'debounce@1', args: { ms: 10 } }]
+    })
+    rows[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    rows[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settle(30)
+    expect(runs.map((run) => run.address).sort()).toEqual(['b/row@row:1', 'b/row@row:2'])
     await host.dispose()
   })
 })

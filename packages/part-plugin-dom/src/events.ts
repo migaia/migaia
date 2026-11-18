@@ -84,51 +84,61 @@ function modifierError(
 /** One step of a chain: the modifier id and its instance for this subscription. */
 type IStep = { readonly id: string; readonly instance: IModifierInstance }
 
+/** A subscription resolved against the catalog, ready to install. */
+type IPlan = {
+  readonly name: string
+  readonly subscription: IEventSubscription
+  readonly refs: readonly IModifierRef[]
+  readonly ids: readonly string[]
+  readonly definitions: readonly IModifierDefinition<unknown>[]
+}
+
 /**
- * One pass of an event through a chain from a starting step. Each step's `next` takes effect once;
- * later calls and calls after the subscription was removed do nothing.
+ * Modifier instances of one part element. A plain subscription has one group; a delegated
+ * subscription has one group per row instance, so stateful modifiers (debounce, long press) keep
+ * separate state per row. `element` is refreshed on every event because a row may re-render.
+ */
+type IStepGroup = { readonly address: string; element: unknown; readonly steps: readonly IStep[] }
+
+/**
+ * One pass of an event through a group's steps from a starting index. Each step's `next` takes
+ * effect once; later calls and calls after the subscription was removed do nothing.
  */
 class ChainPass {
   /** Chain the pass runs through. */
   readonly #chain: ListenerChain
+  /** Group whose steps run. */
+  readonly #group: IStepGroup
   /** Event of the pass. */
   readonly #event: unknown
-  /** Part element of the event: the subscribed element or the row instance. */
-  readonly #element: unknown
-  /** Address the effect receives. */
-  readonly #address: string
   /** Detail the effect receives; `next(detail)` replaces it. */
   #detail: unknown
   /** Steps whose `next` was already used in this pass. */
   readonly #advanced = new Set<number>()
 
   /** Captures the pass inputs. */
-  constructor(
-    chain: ListenerChain,
-    event: unknown,
-    element: unknown,
-    address: string,
-    detail: unknown
-  ) {
+  constructor(chain: ListenerChain, group: IStepGroup, event: unknown, detail: unknown) {
     this.#chain = chain
+    this.#group = group
     this.#event = event
-    this.#element = element
-    this.#address = address
     this.#detail = detail
   }
 
-  /** Runs step `index`, or dispatches when the chain is exhausted. */
+  /** Runs step `index`, or dispatches when the steps are exhausted. */
   run(index: number): void {
     if (this.#chain.removed) return
     /** Step at the index, if any. */
-    const step = this.#chain.step(index)
+    const step = this.#group.steps[index]
     if (step === undefined) {
-      this.#chain.dispatch(this.#address, this.#detail)
+      this.#chain.dispatch(this.#group.address, this.#detail)
       return
     }
-    this.#chain.remember(index, this.#element, this.#address)
     try {
-      step.instance.handle(this.#event, (detail) => this.#advance(index, detail), this.#element)
+      step.instance.handle(
+        this.#event,
+        (detail) => this.#advance(index, detail),
+        this.#group.element
+      )
     } catch (cause) {
       this.#chain.fail(step.id, cause)
     }
@@ -144,24 +154,27 @@ class ChainPass {
 }
 
 /**
- * Listener of one subscription: the modifier chain followed by host dispatch. Used as the native
- * listener object, so no closure is kept per subscription.
+ * Listener of one subscription: per-element modifier steps followed by host dispatch. Used as the
+ * native listener object. `once` is enforced here, after a dispatch, rather than as a native
+ * listener option, so an event a modifier stops does not consume it.
  */
 class ListenerChain {
   /** Address of the subscribed part, or the static template-node address when delegated. */
   readonly #address: string
   /** Events record key; the host looks the subscription up by it. */
   readonly #key: string
+  /** Resolved modifiers of the subscription. */
+  readonly #plan: IPlan
   /** Host services. */
   readonly #services: IEventServices
   /** Whether the chain delegates for template-row instances on the template host. */
   readonly #delegated: boolean
-  /** Element of the subscription (the template host when delegated). */
-  readonly #element: Element | EventTarget
-  /** Steps in subscription order, filled after creation. */
-  #steps: readonly IStep[] = []
-  /** Element and address the latest pass presented at each step, for `emit`. */
-  readonly #seen = new Map<number, { readonly element: unknown; readonly address: string }>()
+  /** Subscribed element (the template host when delegated); placement may listen elsewhere. */
+  readonly #target: EventTarget
+  /** Step groups by part address; a delegated chain adds one per row, a failed creation is null. */
+  readonly #groups = new Map<string, IStepGroup | null>()
+  /** Native registration, removed after the first dispatch when the subscription is `once`. */
+  #registration: NativeRegistration | undefined
   /** Whether the subscription was removed. */
   removed = false
 
@@ -169,30 +182,66 @@ class ListenerChain {
   constructor(
     address: string,
     key: string,
-    element: EventTarget,
+    target: EventTarget,
+    plan: IPlan,
     services: IEventServices,
     delegated: boolean
   ) {
+    this.#target = target
     this.#address = address
     this.#key = key
-    this.#element = element
+    this.#plan = plan
     this.#services = services
     this.#delegated = delegated
   }
 
-  /** Installs the created steps. */
-  setSteps(steps: readonly IStep[]): void {
-    this.#steps = steps
+  /** Records the native registration so `once` can remove it. */
+  attach(registration: NativeRegistration): void {
+    this.#registration = registration
   }
 
-  /** Step at an index. */
-  step(index: number): IStep | undefined {
-    return this.#steps[index]
+  /**
+   * Returns the step group of a part element, creating its modifier instances on first use. A
+   * creation failure is reported once and the element's events are ignored afterwards.
+   */
+  group(address: string, element: unknown): IStepGroup | undefined {
+    /** Existing group, null after a failed creation. */
+    const existing = this.#groups.get(address)
+    if (existing === null) return undefined
+    if (existing !== undefined) {
+      existing.element = element
+      return existing
+    }
+    /** Created group, or null on failure. */
+    const created = this.#create(address, element)
+    this.#groups.set(address, created)
+    return created ?? undefined
   }
 
-  /** Records what a pass presented at a step. */
-  remember(index: number, element: unknown, address: string): void {
-    this.#seen.set(index, { element, address })
+  /** Creates the modifier instances of one element in subscription order. */
+  #create(address: string, element: unknown): IStepGroup | null {
+    /** Instances created so far, disposed again if a later creation fails. */
+    const steps: IStep[] = []
+    /** Group under construction; steps are filled in place. */
+    const group: IStepGroup = { address, element, steps }
+    for (let position = 0; position < this.#plan.refs.length; position += 1) {
+      /** Id of the step. */
+      const id = this.#plan.ids[position] as string
+      try {
+        steps.push({
+          id,
+          instance: (this.#plan.definitions[position] as IModifierDefinition<unknown>).create(
+            modifierArgs(this.#plan.refs[position] as IModifierRef),
+            modifierContext(this, group, position, this.#plan.ids)
+          )
+        })
+      } catch (cause) {
+        this.#disposeSteps(steps)
+        this.fail(id, cause)
+        return null
+      }
+    }
+    return group
   }
 
   /** Native listener entry: resolves the row instance when delegated and starts a pass. */
@@ -202,24 +251,22 @@ class ListenerChain {
       ? rowInstanceOf(event, this.#address, event.currentTarget as Element)
       : undefined
     if (this.#delegated && instance === undefined) return
-    new ChainPass(
-      this,
-      event,
-      instance?.element ?? this.#element,
-      instance?.address ?? this.#address,
-      event instanceof CustomEvent ? event.detail : undefined
-    ).run(0)
+    /** Steps of the element the event belongs to. */
+    const group = this.group(instance?.address ?? this.#address, instance?.element ?? this.#target)
+    if (group === undefined) return
+    new ChainPass(this, group, event, event instanceof CustomEvent ? event.detail : undefined).run(
+      0
+    )
   }
 
-  /** Runs the steps after `index` for an event a gesture produced. */
-  emit(index: number, event: unknown, detail: unknown): void {
-    /** Element and address of the pass that reached the emitting step. */
-    const seen = this.#seen.get(index) ?? { element: this.#element, address: this.#address }
-    new ChainPass(this, event, seen.element, seen.address, detail).run(index + 1)
+  /** Runs a group's steps after `index` for an event a gesture produced. */
+  emit(group: IStepGroup, index: number, event: unknown, detail: unknown): void {
+    new ChainPass(this, group, event, detail).run(index + 1)
   }
 
-  /** Hands the event to the host; a failure the host did not report is reported here. */
+  /** Hands the event to the host; a `once` subscription is removed first. */
   dispatch(address: string, detail: unknown): void {
+    if (this.#plan.subscription.once === true) this.#registration?.remove()
     this.#services
       .dispatch(address, this.#key, detail)
       .catch((error: unknown) => this.#rejected(error))
@@ -237,12 +284,18 @@ class ListenerChain {
     )
   }
 
-  /** Marks the chain removed and disposes instances in reverse creation order. */
+  /** Marks the chain removed and disposes every group's instances in reverse creation order. */
   dispose(): void {
+    if (this.removed) return
     this.removed = true
-    for (let position = this.#steps.length - 1; position >= 0; position -= 1) {
+    for (const group of this.#groups.values()) if (group !== null) this.#disposeSteps(group.steps)
+  }
+
+  /** Disposes steps in reverse order; a throwing disposal is reported and the rest continue. */
+  #disposeSteps(steps: readonly IStep[]): void {
+    for (let position = steps.length - 1; position >= 0; position -= 1) {
       /** Step being disposed. */
-      const step = this.#steps[position] as IStep
+      const step = steps[position] as IStep
       try {
         step.instance.dispose?.()
       } catch (cause) {
@@ -258,28 +311,52 @@ class ListenerChain {
   }
 }
 
-/** Context handed to the modifier at `index`; `emit` forwards to the chain. */
-function modifierContext(
-  chain: ListenerChain,
-  index: number,
-  address: string,
-  element: EventTarget,
-  siblings: readonly string[]
-): IModifierContext {
-  return {
-    address,
-    element,
-    siblings,
-    emit: (event, detail) => chain.emit(index, event, detail)
+/** Native listener registration of one chain; `remove` is idempotent. */
+class NativeRegistration {
+  /** Object holding the native listener. */
+  readonly #target: EventTarget
+  /** Native event name. */
+  readonly #name: string
+  /** Chain registered as the listener. */
+  readonly #chain: ListenerChain
+  /** Options used for both registration and removal. */
+  readonly #options: AddEventListenerOptions
+
+  /** Registers the chain. */
+  constructor(
+    target: EventTarget,
+    name: string,
+    chain: ListenerChain,
+    options: AddEventListenerOptions
+  ) {
+    this.#target = target
+    this.#name = name
+    this.#chain = chain
+    this.#options = options
+    target.addEventListener(name, chain, options)
+  }
+
+  /** Removes the listener and disposes the chain's modifier instances. */
+  remove(): void {
+    if (this.#chain.removed) return
+    this.#target.removeEventListener(this.#name, this.#chain, this.#options)
+    this.#chain.dispose()
   }
 }
 
-/** A subscription resolved against the catalog, ready to install. */
-type IPlan = {
-  readonly name: string
-  readonly subscription: IEventSubscription
-  readonly refs: readonly IModifierRef[]
-  readonly definitions: readonly IModifierDefinition<unknown>[]
+/** Context handed to the modifier at `index` of a group; `emit` forwards to the chain. */
+function modifierContext(
+  chain: ListenerChain,
+  group: IStepGroup,
+  index: number,
+  siblings: readonly string[]
+): IModifierContext {
+  return {
+    address: group.address,
+    element: group.element,
+    siblings,
+    emit: (event, detail) => chain.emit(group, index, event, detail)
+  }
 }
 
 /** No-op removal returned for subscriptions that install no listener. */
@@ -315,7 +392,8 @@ export class EventAdapter {
   /**
    * Subscribes one event of a template node once on its template host and returns the removal. Each
    * event is routed to the row instance (`…@row:<key>`) that contains its target; events outside
-   * any row are ignored. Placement modifiers are not allowed here.
+   * any row are ignored. Each row gets its own modifier instances. Placement modifiers are not
+   * allowed here.
    */
   delegate(
     templateAddress: string,
@@ -362,45 +440,43 @@ export class EventAdapter {
     const plan = this.#plan(address, key, raw, declaration, delegated)
     if (plan === undefined) return noop
     /** Listener chain of the subscription. */
-    const chain = new ListenerChain(address, key, target, this.#services, delegated)
-    /** Ids of every modifier, in order. */
-    const ids = plan.refs.map(modifierId)
-    /** Instances created so far, disposed again if a later creation fails. */
-    const steps: IStep[] = []
-    /** Placement chosen by a placement modifier. */
-    let placement: IModifierPlacement | undefined
+    const chain = new ListenerChain(address, key, target, plan, this.#services, delegated)
+    /** Placement chosen by a placement modifier, or a failure already reported. */
+    const placement = this.#placement(chain, plan, target)
+    if (placement === null) return noop
+    if (!delegated && chain.group(address, target) === undefined) return noop
+    /** Native registration; `once` is enforced by the chain, not by the native option. */
+    const registration = new NativeRegistration(
+      (placement?.target as EventTarget | undefined) ?? target,
+      plan.name,
+      chain,
+      {
+        capture: placement?.capture ?? plan.subscription.capture === true,
+        passive: plan.subscription.passive === true
+      }
+    )
+    chain.attach(registration)
+    return () => registration.remove()
+  }
+
+  /** Listener position from the placement modifier, if any; null after a reported failure. */
+  #placement(
+    chain: ListenerChain,
+    plan: IPlan,
+    target: EventTarget
+  ): IModifierPlacement | undefined | null {
     for (let position = 0; position < plan.refs.length; position += 1) {
-      /** Definition and arguments of this step. */
+      /** Definition of the step. */
       const definition = plan.definitions[position] as IModifierDefinition<unknown>
-      /** Arguments of the reference. */
-      const args = modifierArgs(plan.refs[position] as IModifierRef)
+      if (definition.place === undefined) continue
       try {
-        if (definition.place !== undefined) placement = definition.place(target, args)
-        steps.push({
-          id: ids[position] as string,
-          instance: definition.create(args, modifierContext(chain, position, address, target, ids))
-        })
+        return definition.place(target, modifierArgs(plan.refs[position] as IModifierRef))
       } catch (cause) {
-        chain.setSteps(steps)
-        chain.dispose()
-        chain.fail(ids[position] as string, cause)
-        return noop
+        chain.fail(plan.ids[position] as string, cause)
+        return null
       }
     }
-    chain.setSteps(steps)
-    /** Object receiving the native listener. */
-    const listenTarget = (placement?.target as EventTarget | undefined) ?? target
-    /** Native listener options. */
-    const options: AddEventListenerOptions = {
-      capture: placement?.capture ?? plan.subscription.capture === true,
-      once: plan.subscription.once === true,
-      passive: plan.subscription.passive === true
-    }
-    listenTarget.addEventListener(plan.name, chain, options)
-    return () => {
-      listenTarget.removeEventListener(plan.name, chain, options)
-      chain.dispose()
-    }
+    return undefined
   }
 
   /**
@@ -445,6 +521,6 @@ export class EventAdapter {
       }
       definitions.push(definition)
     }
-    return { name, subscription, refs, definitions }
+    return { name, subscription, refs, ids: refs.map(modifierId), definitions }
   }
 }
