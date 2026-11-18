@@ -1,0 +1,45 @@
+{
+  "name": "@migaia/part-plugin-dom",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Framework-free DOM plugin for part hosts: focus, layers, adopted style sheets, events and aria.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "vitest run test"
+  },
+  "dependencies": {
+    "@migaia/part-contract": "workspace:^",
+    "@migaia/part-host": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@vitest/browser": "4.1.10",
+    "@vitest/browser-playwright": "4.1.10",
+    "playwright": "1.62.1",
+    "typescript": "^7.0.2",
+    "vitest": "4.1.10"
+  }
+}
