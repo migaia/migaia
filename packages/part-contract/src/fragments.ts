@@ -145,7 +145,7 @@ class FragmentExpander {
   readonly #catalog: ICatalogView
   /** Usages met, in expansion order. */
   readonly pending: IPendingUsage[] = []
-  /** Nodes produced so far; checked against the node limit on every node. */
+  /** Nodes produced inside fragment bodies so far; checked against the node limit. */
   #count = 0
 
   /** Binds the expander to a catalog view. */
@@ -158,7 +158,9 @@ class FragmentExpander {
    * fragment ids on the current expansion path (at most sixteen), so the cycle check is bounded.
    */
   expand(node: IPartNode, stack: readonly string[]): IPartNode {
-    this.#count += 1
+    // Only nodes produced inside a fragment count; authored nodes outside any usage are the
+    // document's own size, which the expansion does not multiply.
+    if (stack.length > 0) this.#count += 1
     if (this.#count > FRAGMENT_MAX_NODES)
       throw createPartContractError(
         PartContractErrorCode.fragmentTooLarge,

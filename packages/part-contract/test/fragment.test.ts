@@ -173,7 +173,8 @@ describe('expandFragments', () => {
     expect(() => expandFragments(blueprintOf([{ tag: 'w0@1' }]), counting)).toThrow(
       expect.objectContaining({ code: 'FRAGMENT_TOO_LARGE' })
     )
-    expect(lookups).toBeLessThanOrEqual(10001)
+    // Two authored nodes (root and usage) plus at most 10000 nodes produced by fragments.
+    expect(lookups).toBeLessThanOrEqual(10002)
   })
 
   it('rejects usages with other content and malformed fragment bodies', () => {
@@ -187,5 +188,15 @@ describe('expandFragments', () => {
         fragment: { node: { tag: 'box@1', id: { $param: 'x' } } }
       })
     ).toThrow(expect.objectContaining({ code: 'DESCRIPTOR_INVALID' }))
+  })
+})
+
+describe('expansion limits', () => {
+  it('does not count authored nodes outside fragments', () => {
+    /** Ten thousand and one plain children, no fragment usage. */
+    const children: IPartNode[] = Array.from({ length: 10001 }, () => ({ tag: 'chip@1' }))
+    expect(
+      expandFragments(blueprintOf(children), catalogWith(card)).index.get('root')
+    ).toBeDefined()
   })
 })
