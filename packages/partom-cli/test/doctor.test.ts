@@ -32,6 +32,19 @@ describe('doctor static checks', () => {
     ])
   })
 
+  it('resolves built-in modifiers without a configured DOM plugin and survives load errors', () => {
+    const run = partom('static-modifiers', ['doctor', '--json'])
+    expect(run.code).toBe(1)
+    const output = json<IOutput>(run)
+    expect(output.issues).toMatchObject([
+      { rule: 'doctor.load', address: 'loop', cause: { code: 'FRAGMENT_CYCLE' } }
+    ])
+    expect(output.issues).toHaveLength(1)
+    expect(output.rendered).toEqual([
+      expect.objectContaining({ blueprintId: 'loop', status: 'skipped' })
+    ])
+  })
+
   it('rejects an invalid config with exit code 2', () => {
     const run = partom('config-bad', ['doctor', '--json'])
     expect(run.code).toBe(2)

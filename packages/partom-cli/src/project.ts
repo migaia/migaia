@@ -144,20 +144,26 @@ export class Project {
    * holds one copy of plugin-host, so the config's plugin definitions are trusted by that factory,
    * and bundling resolves project packages even where the compiled runtime cannot.
    */
-  async bundle(
-    explicit: string | undefined
-  ): Promise<{ readonly config: IPartomConfig; readonly createPartHost: unknown }> {
+  async bundle(explicit: string | undefined): Promise<{
+    readonly config: IPartomConfig
+    readonly createPartHost: unknown
+    readonly domPlugin: unknown
+  }> {
     /** Config file path. */
     const path = this.configPath(explicit)
     /** Bundle directory inside the project. */
     const dir = join(this.dir, '.partom-config')
     /** Imported bundle. */
-    let loaded: { readonly config?: unknown; readonly createPartHost?: unknown }
+    let loaded: {
+      readonly config?: unknown
+      readonly createPartHost?: unknown
+      readonly domPlugin?: unknown
+    }
     try {
       mkdirSync(dir, { recursive: true })
       writeFileSync(
         join(dir, 'entry.ts'),
-        `export { default as config } from ${JSON.stringify(path)}\nexport { createPartHost } from '@migaia/part-host'\n`
+        `export { default as config } from ${JSON.stringify(path)}\nexport { createPartHost } from '@migaia/part-host'\nexport { domPlugin } from '@migaia/part-plugin-dom'\n`
       )
       /** Bundle result. */
       const result = await Bun.build({
@@ -183,7 +189,11 @@ export class Project {
         PartCliText.configInvalid,
         new TypeError(PartCliText.configInvalid)
       )
-    return { config: config as IPartomConfig, createPartHost: loaded.createPartHost }
+    return {
+      config: config as IPartomConfig,
+      createPartHost: loaded.createPartHost,
+      domPlugin: loaded.domPlugin
+    }
   }
 
   /** Blueprint files matched by the config globs, relative to the project. */

@@ -5,6 +5,15 @@ import { serializeCause } from './errors.ts'
 import { Harness } from './harness.ts'
 import type { Project } from './project.ts'
 
+/** Rule id of the issue recorded when loading one blueprint throws (parse or expansion error). */
+const LOAD_RULE = 'doctor.load'
+/** Code used when a load error carries no code of its own. */
+const LOAD_FALLBACK_CODE = 'LOAD_FAILED'
+/** Skip reason of a blueprint with static errors. */
+const STATIC_ERRORS = 'static errors'
+/** Skip reason of a blueprint whose load threw. */
+const LOAD_ERROR = 'load error'
+
 /** Options of one doctor run. */
 export type IDoctorOptions = {
   readonly config: string | undefined
@@ -72,9 +81,15 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
   const config = bundle.config
   /** Host factory sharing the config's plugin-host copy. */
   const createPartHost = bundle.createPartHost as (options: IPartHostOptions) => Promise<IPartHost>
+  /** Configured plugins. */
+  const configured = config.plugins as NonNullable<IPartHostOptions['plugins']>
+  /** The project's DOM plugin, added when the config omits it so built-in modifiers exist. */
+  const dom = bundle.domPlugin as NonNullable<IPartHostOptions['plugins']>[number]
   /** Host without a renderer for static checks. */
   const host = await createPartHost({
-    plugins: config.plugins as IPartHostOptions['plugins'],
+    plugins: configured.some((plugin) => plugin.name === dom.name)
+      ? configured
+      : [dom, ...configured],
     onError: () => undefined
   })
   /** All issues. */
@@ -83,17 +98,24 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
   const rendered: IRenderedStatus[] = []
   /** Blueprints without errors, eligible for rendered checks. */
   const clean: unknown[] = []
-  for (const file of project.blueprintFiles(config)) {
-    /** Blueprint document. */
-    const document = JSON.parse(readFileSync(file, 'utf8')) as { readonly id: string }
-    /** Static result. */
-    const result = await host.blueprint.load(document)
-    issues.push(...result.issues)
-    if (result.tree === undefined)
-      rendered.push({ blueprintId: document.id, status: 'skipped', reason: 'static errors' })
-    else clean.push(document)
+  try {
+    for (const file of project.blueprintFiles(config)) {
+      /** Blueprint document. */
+      const document = JSON.parse(readFileSync(file, 'utf8')) as { readonly id: string }
+      /** Static result, or the issue recorded for a load that threw. */
+      const result = await loadOrIssue(host, document)
+      issues.push(...result.issues)
+      if (result.tree === undefined)
+        rendered.push({
+          blueprintId: document.id,
+          status: 'skipped',
+          reason: result.threw ? LOAD_ERROR : STATIC_ERRORS
+        })
+      else clean.push(document)
+    }
+  } finally {
+    await host.dispose()
   }
-  await host.dispose()
   if (options.rendered && clean.length > 0) {
     /** Check page. */
     const harness = await Harness.open(project, project.configPath(options.config), options.browser)
@@ -107,6 +129,44 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
     }
   }
   return { issues, rendered }
+}
+
+/**
+ * Loads one blueprint. A thrown parse or expansion error becomes one `doctor.load` error issue with
+ * the error on `cause`, so the remaining blueprints are still checked.
+ */
+async function loadOrIssue(
+  host: IPartHost,
+  document: { readonly id: string }
+): Promise<{
+  readonly issues: readonly IIssue[]
+  readonly tree: unknown
+  readonly threw: boolean
+}> {
+  try {
+    /** Load result. */
+    const result = await host.blueprint.load(document)
+    return { issues: result.issues, tree: result.tree, threw: false }
+  } catch (cause) {
+    /** Code of the thrown error. */
+    const code = (cause as { code?: unknown } | undefined)?.code
+    return {
+      tree: undefined,
+      threw: true,
+      issues: [
+        {
+          address: document.id,
+          facet: '',
+          path: '',
+          code: typeof code === 'string' ? code : LOAD_FALLBACK_CODE,
+          rule: LOAD_RULE,
+          messageKey: LOAD_RULE,
+          severity: 'error',
+          cause
+        }
+      ]
+    }
+  }
 }
 
 /** Mounts one blueprint in the page, runs pattern checks and layer invariants. */

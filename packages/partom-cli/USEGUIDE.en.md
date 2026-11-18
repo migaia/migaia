@@ -33,7 +33,7 @@ export default { plugins: [appPlugin], blueprints: ['blueprints/*.blueprint.json
 bunx partom doctor
 ```
 
-Runs every rule of the authored and resolved phases (26 built-in rules plus plugin rules) on each blueprint, with the same result as host loading. Errors exit with code 1.
+Runs every rule of the authored and resolved phases (29 built-in rules plus plugin rules; the project's `domPlugin` is added when the config omits it, so built-in modifiers resolve) on each blueprint, with the same result as host loading. Errors exit with code 1.
 
 ## Rendered checks
 

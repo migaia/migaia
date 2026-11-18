@@ -33,7 +33,7 @@ export default { plugins: [appPlugin], blueprints: ['blueprints/*.blueprint.json
 bunx partom doctor
 ```
 
-对每份蓝图运行 authored 与 resolved 两个阶段的全部规则（26 条内置规则加上插件规则），与宿主装载时的结果一致。有 error 时退出码为 1。
+对每份蓝图运行 authored 与 resolved 两个阶段的全部规则（29 条内置规则加上插件规则；配置里没有 `domPlugin` 时会自动加入项目里的那一份，内置修饰符因此可用），与宿主装载时的结果一致。有 error 时退出码为 1。
 
 ## 渲染检查
 

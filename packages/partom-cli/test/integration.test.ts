@@ -25,22 +25,10 @@ function run(
 }
 
 beforeAll(() => {
-  exe = join(mkdtempSync(join(tmpdir(), 'partom-int-')), 'partom')
-  /** Compile result. */
-  const build = spawnSync(
-    BUN,
-    [
-      'build',
-      '--compile',
-      'src/entry/darwin-arm64.ts',
-      '--external',
-      'chromium-bidi/*',
-      '--outfile',
-      exe
-    ],
-    { cwd: ROOT, encoding: 'utf8' }
-  )
+  /** Build result of the package's executable script (doctor runner plus executable). */
+  const build = spawnSync(BUN, ['run', 'build:exe'], { cwd: ROOT, encoding: 'utf8' })
   expect(build.status).toBe(0)
+  exe = join(ROOT, 'dist', 'partom')
 })
 
 describe('stage-1 integration with the compiled executable', () => {
@@ -76,7 +64,7 @@ describe('stage-1 integration with the compiled executable', () => {
   })
 
   it('reports no error for the combobox, dialog and tabs application in a real browser (source CLI)', () => {
-    const result = partom('shadcn-app', ['doctor', '--rendered', '--json'])
+    const result = partom('shadcn-app', ['doctor', '--rendered', '--json'], [exe])
     expect(result.code).toBe(0)
     expect(JSON.parse(result.stdout)).toEqual({
       issues: [],
@@ -85,7 +73,7 @@ describe('stage-1 integration with the compiled executable', () => {
   })
 
   it('detects a combobox implementation that breaks APG while the blueprint stays valid', () => {
-    const result = partom('shadcn-app-broken', ['doctor', '--rendered', '--json'])
+    const result = partom('shadcn-app-broken', ['doctor', '--rendered', '--json'], [exe])
     expect(result.code).toBe(1)
     const issues = JSON.parse(result.stdout).issues as {
       address: string

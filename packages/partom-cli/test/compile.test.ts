@@ -9,25 +9,24 @@ import { BUN, FIXTURES } from './run.ts'
 /** Package root. */
 const ROOT = join(import.meta.dirname, '..')
 
+/**
+ * Environment of a run outside any project: the package manager's `NODE_PATH` (set for test
+ * processes) is removed, since Bun would otherwise resolve the repository's packages from it.
+ */
+function bareEnv(): NodeJS.ProcessEnv {
+  /** Copy of the environment. */
+  const env = { ...process.env }
+  delete env.NODE_PATH
+  return env
+}
+
 describe('single executable', () => {
   it('runs without node_modules and still loads project packages from the project', () => {
     const dir = mkdtempSync(join(tmpdir(), 'partom-exe-'))
-    const build = spawnSync(
-      BUN,
-      [
-        'build',
-        '--compile',
-        'src/entry/darwin-arm64.ts',
-        '--external',
-        'chromium-bidi/*',
-        '--outfile',
-        join(dir, 'partom-build')
-      ],
-      { cwd: ROOT, encoding: 'utf8' }
-    )
+    const build = spawnSync(BUN, ['run', 'build:exe'], { cwd: ROOT, encoding: 'utf8' })
     expect(build.status).toBe(0)
     const exe = join(dir, 'partom')
-    copyFileSync(join(dir, 'partom-build'), exe)
+    copyFileSync(join(ROOT, 'dist', 'partom'), exe)
     expect(spawnSync(exe, ['--version'], { cwd: dir, encoding: 'utf8' }).stdout.trim()).toBe(
       '0.0.1'
     )
@@ -41,7 +40,7 @@ describe('single executable', () => {
     const draft = readFileSync(join(out, 'button.part.ts'), 'utf8')
     for (const value of ['default', 'destructive', 'outline', 'ghost', 'sm', 'lg', 'icon'])
       expect(draft).toContain(JSON.stringify(value))
-    const doctor = spawnSync(exe, ['doctor'], { cwd: dir, encoding: 'utf8' })
+    const doctor = spawnSync(exe, ['doctor'], { cwd: dir, encoding: 'utf8', env: bareEnv() })
     expect(doctor.status).toBe(2)
     expect(JSON.parse(doctor.stderr.trim()).error.code).toBe('PROJECT_DEPENDENCY_MISSING')
   })
