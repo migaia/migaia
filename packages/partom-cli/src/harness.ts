@@ -51,6 +51,26 @@ window.__partom = { config, createPartHost, domPlugin, reactPlugin, checkPattern
 }
 
 /**
+ * Bundles a generated browser entry from the project directory: writes `entry.tsx` into `dir` and
+ * builds it into `outDir`, so project packages resolve from the project. Doctor's check page and
+ * `partom preview` share this. Throws an `AggregateError` of the build logs on failure.
+ */
+export async function bundleEntry(dir: string, outDir: string, source: string): Promise<void> {
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'entry.tsx'), source)
+  /** Bundle result. */
+  const result = await Bun.build({
+    entrypoints: [join(dir, 'entry.tsx')],
+    outdir: outDir,
+    target: 'browser',
+    sourcemap: 'linked',
+    plugins: [scopedResolverPlugin],
+    define: { 'process.env.NODE_ENV': '"development"' }
+  })
+  if (!result.success) throw new AggregateError(result.logs, PartCliText.harnessFailed)
+}
+
+/**
  * Check page: an entry bundled by Bun from the project directory, served on loopback, and opened in
  * a headless browser. Resources close in reverse order: browser, server, temporary directory.
  */
@@ -90,16 +110,7 @@ export class Harness {
     const dir = join(project.dir, '.partom-check')
     mkdirSync(dir, { recursive: true })
     try {
-      writeFileSync(join(dir, 'entry.tsx'), entrySource(configPath, extraImports))
-      /** Bundle result. */
-      const result = await Bun.build({
-        entrypoints: [join(dir, 'entry.tsx')],
-        outdir: join(dir, 'out'),
-        target: 'browser',
-        plugins: [scopedResolverPlugin],
-        define: { 'process.env.NODE_ENV': '"development"' }
-      })
-      if (!result.success) throw new AggregateError(result.logs, PartCliText.harnessFailed)
+      await bundleEntry(dir, join(dir, 'out'), entrySource(configPath, extraImports))
       writeFileSync(
         join(dir, 'out', 'index.html'),
         '<!doctype html><html><body><script type="module" src="./entry.js"></script></body></html>'

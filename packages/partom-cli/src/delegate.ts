@@ -45,6 +45,25 @@ async function materializeRunner(embedded: string): Promise<string> {
 }
 
 /**
+ * Command line and environment that run `partom doctor <args>` in a fresh child process: the
+ * materialized runner under `BUN_BE_BUN` in the executable, or `bun src/cli.ts` from source. Each
+ * child loads the current config and part definitions with no module cache.
+ */
+export async function doctorChildCommand(
+  args: readonly string[]
+): Promise<{ readonly cmd: readonly string[]; readonly env: Record<string, string | undefined> }> {
+  if (embeddedRunner === undefined)
+    return {
+      cmd: [process.execPath, join(import.meta.dir, 'cli.ts'), 'doctor', ...args],
+      env: { ...process.env }
+    }
+  return {
+    cmd: [process.execPath, await materializeRunner(embeddedRunner), 'doctor', ...args],
+    env: { ...process.env, [BE_BUN_VARIABLE]: '1' }
+  }
+}
+
+/**
  * Runs doctor in a child process: the executable itself in `BUN_BE_BUN` mode, executing the
  * materialized runner in the current directory with inherited stdio. Resolves with the child's exit
  * code, so exit codes match an in-process run.

@@ -1,9 +1,10 @@
 # @migaia/partom-cli
 
-`partom` 命令：检查 part 项目（`doctor`），从现有组件提取 part 定义草稿（`extract`）。用 Bun 编写。
+`partom` 命令：检查 part 项目（`doctor`），在本机预览蓝图（`preview`），从现有组件提取 part 定义草稿（`extract`）。用 Bun 编写。
 
 ```text
-partom doctor [--rendered] [--only <address>] [--browser <path>] [--json] [--config <path>]
+partom doctor [--rendered] [--only <address>] [--browser <path>] [--json [--blueprints]] [--config <path>]
+partom preview [<id|file>] [--port <n>] [--config <path>]
 partom extract <files...> --out <dir> [--probe] [--verify] [--browser <path>]
 partom browser install
 partom --version
@@ -24,7 +25,11 @@ export default { plugins: [appPlugin], blueprints: ['*.blueprint.json'] }
 
 - 默认运行 authored 与 resolved 两个阶段的全部规则。
 - `--rendered` 在真实无头浏览器中挂载没有静态错误的蓝图：对声明了 `pattern` 的 part 运行 ui-sdk 的 `checkPattern`，对有层级的 part 打开再按 Esc 关闭，检查焦点没有落到 `body` 或 `inert` 区域、id 引用有效。浏览器依次取 `--browser`、`PARTOM_BROWSER`、本机 Chrome、`partom browser install` 安装的 Chromium；显式路径不存在时直接报错，从不静默下载。
-- `--json` 输出 `{ issues, rendered }`，问题的 `cause` 只保留 name、message、source、code。
+- `--json` 输出 `{ issues, rendered }`，问题的 `cause` 只保留 name、message、source、code；加 `--blueprints` 时再输出每份蓝图的 `{ id, file, issues }`。
+
+## preview
+
+在 `127.0.0.1` 起一个只读服务（默认从 4400 端口起找空闲端口，`--port` 指定），首页列出配置里的全部蓝图，`/b/<id>` 用项目自己的插件挂载一份；给出 id 或文件路径时额外打印它的地址。文件变化后自动重新检查、重新打包并刷新页面；蓝图的 doctor 问题显示在页面右下角的浮层里，有 error 时不挂载。按 Ctrl+C 结束。
 
 ## extract
 

@@ -3,7 +3,8 @@
 The `partom` command checks part projects (`doctor`) and drafts part definitions from existing components (`extract`). It is written for Bun.
 
 ```text
-partom doctor [--rendered] [--only <address>] [--browser <path>] [--json] [--config <path>]
+partom doctor [--rendered] [--only <address>] [--browser <path>] [--json [--blueprints]] [--config <path>]
+partom preview [<id|file>] [--port <n>] [--config <path>]
 partom extract <files...> --out <dir> [--probe] [--verify] [--browser <path>]
 partom browser install
 partom --version
@@ -24,7 +25,11 @@ export default { plugins: [appPlugin], blueprints: ['*.blueprint.json'] }
 
 - By default it runs every rule in the authored and resolved phases.
 - `--rendered` mounts blueprints without static errors in a real headless browser: parts claiming a `pattern` go through ui-sdk's `checkPattern`; layered parts are opened and closed with Escape while focus (not on `body`, not in `inert` content) and id references are checked. The browser comes from `--browser`, then `PARTOM_BROWSER`, then local Chrome, then the Chromium installed by `partom browser install`; an explicit path that does not exist fails without fallback, and nothing is downloaded silently.
-- `--json` prints `{ issues, rendered }`; an issue's `cause` keeps only name, message, source and code.
+- `--json` prints `{ issues, rendered }`; an issue's `cause` keeps only name, message, source and code. With `--blueprints` it also prints `{ id, file, issues }` for each blueprint.
+
+## preview
+
+Starts a read-only server on `127.0.0.1` (the first free port from 4400, or `--port`). The home page lists every blueprint of the config, and `/b/<id>` mounts one with the project's own plugins; given an id or file path, the command also prints that blueprint's URL. File changes re-run the checks, rebuild the page and reload it; the blueprint's doctor issues appear in an overlay at the bottom right, and a blueprint with errors is not mounted. Stop it with Ctrl+C.
 
 ## extract
 

@@ -16,6 +16,10 @@ export async function doctorCommand(args: IArgs): Promise<number> {
     only: flag(args, '--only'),
     browser: flag(args, '--browser')
   })
-  console.log(args.flags.has('--json') ? formatJson(result) : formatText(result))
+  console.log(
+    args.flags.has('--json')
+      ? formatJson(result, args.flags.has('--blueprints'))
+      : formatText(result)
+  )
   return result.issues.some((issue) => issue.severity === 'error') ? ExitCode.problems : ExitCode.ok
 }

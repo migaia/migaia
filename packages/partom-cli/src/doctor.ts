@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { relative } from 'node:path'
 import type { IIssue } from '@migaia/part-contract'
 import type { IPartHost, IPartHostOptions, IResolvedNode } from '@migaia/part-host'
 import { DoctorText } from './doctor-text.ts'
@@ -21,10 +22,19 @@ export type IRenderedStatus = {
   readonly reason?: string
 }
 
+/** One blueprint of the config with its own static issues, in config match order. */
+export type IBlueprintEntry = {
+  readonly id: string
+  /** Path relative to the project directory. */
+  readonly file: string
+  readonly issues: readonly IIssue[]
+}
+
 /** Result of a doctor run. */
 export type IDoctorResult = {
   readonly issues: readonly IIssue[]
   readonly rendered: readonly IRenderedStatus[]
+  readonly blueprints: readonly IBlueprintEntry[]
 }
 
 /** Targets of the rendered check found in one mounted blueprint. */
@@ -90,6 +100,8 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
   const rendered: IRenderedStatus[] = []
   /** Blueprints without errors, eligible for rendered checks. */
   const clean: unknown[] = []
+  /** Every blueprint with its own static issues. */
+  const blueprints: IBlueprintEntry[] = []
   try {
     for (const file of project.blueprintFiles(config)) {
       /** Blueprint document. */
@@ -97,6 +109,7 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
       /** Static result, or the issue recorded for a load that threw. */
       const result = await loadOrIssue(host, document)
       issues.push(...result.issues)
+      blueprints.push({ id: document.id, file: relative(project.dir, file), issues: result.issues })
       if (result.tree === undefined)
         rendered.push({
           blueprintId: document.id,
@@ -120,7 +133,7 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
       await harness.close()
     }
   }
-  return { issues, rendered }
+  return { issues, rendered, blueprints }
 }
 
 /**
@@ -314,12 +327,26 @@ export function formatText(result: IDoctorResult): string {
   return lines.join('\n')
 }
 
-/** Formats a doctor result as JSON with causes reduced to four fields. */
-export function formatJson(result: IDoctorResult): string {
+/** An issue with its cause reduced to four fields for output. */
+function outputIssue(issue: IIssue): IIssue {
+  return issue.cause === undefined ? issue : { ...issue, cause: serializeCause(issue.cause) }
+}
+
+/**
+ * Formats a doctor result as JSON with causes reduced to four fields. `withBlueprints` adds the
+ * per-blueprint list that `partom preview` reads.
+ */
+export function formatJson(result: IDoctorResult, withBlueprints = false): string {
   return JSON.stringify({
-    issues: result.issues.map((issue) =>
-      issue.cause === undefined ? issue : { ...issue, cause: serializeCause(issue.cause) }
-    ),
-    rendered: result.rendered
+    issues: result.issues.map(outputIssue),
+    rendered: result.rendered,
+    ...(withBlueprints
+      ? {
+          blueprints: result.blueprints.map((entry) => ({
+            ...entry,
+            issues: entry.issues.map(outputIssue)
+          }))
+        }
+      : {})
   })
 }

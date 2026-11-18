@@ -18,7 +18,8 @@ const VALUE_FLAGS: ReadonlySet<string> = new Set([
   '--browser',
   '--config',
   '--out',
-  '--project'
+  '--project',
+  '--port'
 ])
 
 /** Parses argv into positional arguments and flags. */

@@ -591,6 +591,9 @@ importers:
       '@migaia/part-host':
         specifier: workspace:^
         version: link:../part-host
+      '@migaia/part-layouts':
+        specifier: workspace:^
+        version: link:../part-layouts
       '@migaia/part-plugin-dom':
         specifier: workspace:^
         version: link:../part-plugin-dom

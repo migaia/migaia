@@ -1,0 +1,19 @@
+{
+  "id": "shell",
+  "version": 1,
+  "root": {
+    "tag": "nav-tree-content@1",
+    "id": "shell",
+    "facets": {
+      "slots": {
+        "nav": [{ "tag": "trigger@1", "id": "menu", "facets": { "props": { "label": "Menu" } } }],
+        "tree": [
+          { "tag": "trigger@1", "id": "toc", "facets": { "props": { "label": "Contents" } } }
+        ],
+        "content": [
+          { "tag": "trigger@1", "id": "body", "facets": { "props": { "label": "Body" } } }
+        ]
+      }
+    }
+  }
+}

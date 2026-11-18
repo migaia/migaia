@@ -1,0 +1,13 @@
+{
+  "id": "plain",
+  "version": 1,
+  "root": {
+    "tag": "single@1",
+    "id": "plain",
+    "facets": {
+      "slots": {
+        "content": [{ "tag": "trigger@1", "id": "go", "facets": { "props": { "label": "Go" } } }]
+      }
+    }
+  }
+}

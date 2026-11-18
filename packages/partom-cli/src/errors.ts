@@ -4,7 +4,8 @@ import { ERROR_SOURCE, type IPartCliErrorCode } from './error-code.ts'
 export const PartCliText = {
   /** Usage printed for invalid arguments. */
   usage:
-    'usage: partom doctor [--rendered] [--only <address>] [--browser <path>] [--json] [--config <path>]\n' +
+    'usage: partom doctor [--rendered] [--only <address>] [--browser <path>] [--json [--blueprints]] [--config <path>]\n' +
+    '       partom preview [<id|file>] [--port <n>] [--config <path>]\n' +
     '       partom extract <files...> --out <dir> [--probe] [--verify] [--browser <path>]\n' +
     '       partom browser install\n' +
     '       partom --version',
@@ -21,6 +22,13 @@ export const PartCliText = {
   harnessFailed: 'the check page failed to build or run',
   /** Parse failure. */
   parseFailed: (file: string): string => `failed to parse ${file}`,
+  /** No free preview port. */
+  portInUse: (ports: string): string =>
+    `no free port for partom preview (tried ${ports}); pass --port <n>`,
+  /** Preview target not in the config. */
+  blueprintNotFound: (target: string): string => `no blueprint of the config matches "${target}"`,
+  /** Doctor child process ended without a result. */
+  doctorChildFailed: 'partom doctor ended without a result',
   /** Unknown command. */
   usageInvalid: 'invalid arguments'
 } as const

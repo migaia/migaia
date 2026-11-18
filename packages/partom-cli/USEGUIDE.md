@@ -14,6 +14,7 @@
 | 把检查结果交给 CI 或编辑器                       | `partom doctor --json`                    | [机器可读输出](#机器可读输出)                    |
 | 把现有 shadcn 组件批量转成 part                  | `partom extract`                          | [从现有组件提取](#从现有组件提取)                |
 | 确认提取出的 part 渲染和原组件一致               | `partom extract --verify`                 | [核对提取结果](#核对提取结果)                    |
+| 边改蓝图边在浏览器里看效果 | `partom preview` | [本地预览](#本地预览) |
 
 ## 项目配置
 
@@ -62,7 +63,7 @@ bunx partom doctor --rendered --only orders/filter/combobox
 bunx partom doctor --json > doctor.json
 ```
 
-输出 `{ issues, rendered }`。问题的 `cause` 只保留 name、message、source、code，不带堆栈。
+输出 `{ issues, rendered }`。问题的 `cause` 只保留 name、message、source、code，不带堆栈。加 `--blueprints` 时再输出 `blueprints: { id, file, issues }[]`，按配置匹配顺序列出每份蓝图和它自己的问题，其他字段与退出码不变。
 
 ## 从现有组件提取
 
@@ -80,13 +81,28 @@ bunx partom extract src/components/ui/button.tsx --out src/parts/drafts --verify
 
 `--verify` 分别渲染原组件和经 part 宿主渲染的草稿，比较 DOM；有差异时退出码为 1。
 
+## 本地预览
+
+```bash
+bunx partom preview            # 打印 {"url":"http://127.0.0.1:4400/"}
+bunx partom preview orders     # 再打印 {"url":"http://127.0.0.1:4400/b/orders"}
+```
+
+`partom preview` 只监听 `127.0.0.1`，没有写入接口。默认从 4400 到 4419 找第一个空闲端口，`--port <n>` 指定端口；端口都被占用时以退出码 2 结束（`PORT_IN_USE`）。参数可以是蓝图 id 或蓝图文件路径，配置里找不到时以退出码 2 结束（`BLUEPRINT_NOT_FOUND`）。
+
+- 首页列出配置匹配到的每份蓝图及其 error、warning 数；`/b/<id>` 用配置里的插件（再加上项目的 `domPlugin`、`reactPlugin`）挂载这份蓝图。
+- 改动蓝图、组件或配置后，100 毫秒内的改动合并成一次重建：重新运行 doctor、重新打包页面，成功后页面整页刷新。重建串行进行，重建中途的改动在它结束后再合并重建一次。
+- 打包或配置出错时页面保留上一次的内容，右下角浮层显示错误；修好后下一次改动自动恢复。
+- 浮层列出这份蓝图的 doctor 问题，点一条会给对应元素加轮廓并滚动过去。有 error 时不挂载，与 doctor 跳过渲染检查的规则一致。浮层在 Shadow DOM 里，不受页面样式影响，也不参与 F6 区域切换。
+- 预览只写项目里的 `.partom-preview/` 目录，启动时清空、退出时删除；同时运行 `partom doctor` 互不影响。按 Ctrl+C 结束，退出码 0。
+
 ## 单文件可执行
 
 ```bash
 pnpm --filter @migaia/partom-cli run build:exe
 ```
 
-编译后的 `dist/partom` 可直接运行 `doctor`、`extract` 和 `--version`。
+编译后的 `dist/partom` 可直接运行 `doctor`、`preview`、`extract` 和 `--version`。`build:exe` 还把预览页的浏览器端代码打成 `dist/preview-runtime.js` 嵌进可执行文件；`preview` 的服务进程不导入项目模块，每次重新检查都启动一个新的 doctor 子进程。
 
 Bun 编译模式解析不到项目里带作用域的符号链接包（pnpm 的 `@migaia/*`、`@ui-sdk/*`），Bun `1.4.4` 仍是如此。因此 `build:exe` 先把 doctor 单独打包成 `dist/doctor-runner.js` 并嵌入可执行文件；运行 `doctor` 时，可执行文件把它写到系统临时目录的 `partom/doctor-runner-<版本>.js`（内容相同时不重写），再以环境变量 `BUN_BE_BUN=1` 启动自己，作为普通 Bun 执行它。用户机器不需要另装 Bun，输出和退出码与源码运行相同。
 

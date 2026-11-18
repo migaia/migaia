@@ -21,6 +21,16 @@ export const PartCliErrorCode = {
   harnessFailed: 'HARNESS_FAILED',
   /** A source file failed to parse; it is skipped and the run exits 1. */
   parseFailed: 'PARSE_FAILED',
+  /**
+   * `partom preview` could not listen: the `--port` port, or every port from 4400 to 4419 when no
+   * port was given, is taken. Exit code 2; pass a free `--port`.
+   */
+  portInUse: 'PORT_IN_USE',
+  /**
+   * The `partom preview` target (a blueprint id or file) matches no blueprint of the config. Exit
+   * code 2; check the id or the config's `blueprints` globs.
+   */
+  blueprintNotFound: 'BLUEPRINT_NOT_FOUND',
   /** Command-line usage is invalid. Exit code 2. */
   usageInvalid: 'USAGE_INVALID'
 } as const
