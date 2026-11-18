@@ -5,6 +5,8 @@ import { join } from 'node:path'
 export const FIXTURES = join(import.meta.dirname, 'fixtures')
 /** CLI source entry run through Bun. */
 const CLI = join(import.meta.dirname, '..', 'src', 'cli.ts')
+/** Bun pinned by this package (1.4.4). */
+export const BUN = join(import.meta.dirname, '..', 'node_modules', '.bin', 'bun')
 
 /** Result of one CLI run. */
 export type IRun = { readonly code: number; readonly stdout: string; readonly stderr: string }
@@ -13,7 +15,7 @@ export type IRun = { readonly code: number; readonly stdout: string; readonly st
 export function partom(
   fixture: string,
   args: readonly string[],
-  command: readonly string[] = ['bun', CLI]
+  command: readonly string[] = [BUN, CLI]
 ): IRun {
   /** Child result. */
   const result = spawnSync(command[0] as string, [...command.slice(1), ...args], {

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import manifest from '../package.json' with { type: 'json' }
-import { FIXTURES } from './run.ts'
+import { BUN, FIXTURES } from './run.ts'
 
 /** Package root. */
 const ROOT = join(import.meta.dirname, '..')
@@ -13,7 +13,7 @@ describe('single executable', () => {
   it('runs without node_modules and still loads project packages from the project', () => {
     const dir = mkdtempSync(join(tmpdir(), 'partom-exe-'))
     const build = spawnSync(
-      'bun',
+      BUN,
       [
         'build',
         '--compile',

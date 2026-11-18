@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { FIXTURES, partom } from './run.ts'
+import { BUN, FIXTURES, partom } from './run.ts'
 
 /** Package root. */
 const ROOT = join(import.meta.dirname, '..')
@@ -28,7 +28,7 @@ beforeAll(() => {
   exe = join(mkdtempSync(join(tmpdir(), 'partom-int-')), 'partom')
   /** Compile result. */
   const build = spawnSync(
-    'bun',
+    BUN,
     [
       'build',
       '--compile',
