@@ -54,6 +54,7 @@ export function nodeOf(
     behavior,
     config: {},
     derivedAria: {},
+    ariaStates: {},
     styleRules: [],
     children: [],
     slots: {},

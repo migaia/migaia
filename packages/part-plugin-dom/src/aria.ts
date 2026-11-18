@@ -42,4 +42,15 @@ export class AriaWriter {
     }
     if (node.tabIndex !== undefined) element.setAttribute('tabindex', String(node.tabIndex))
   }
+
+  /**
+   * Writes state-derived aria values (`ariaStates` of a resolved node, read by the renderer) as
+   * `aria-<name>`. `undefined` and `null` remove the attribute; other values are stringified, so
+   * booleans become `"true"` / `"false"`.
+   */
+  applyStates(element: Element, values: Readonly<Record<string, unknown>>): void {
+    for (const [name, value] of Object.entries(values))
+      if (value === undefined || value === null) element.removeAttribute(`aria-${name}`)
+      else element.setAttribute(`aria-${name}`, String(value))
+  }
 }

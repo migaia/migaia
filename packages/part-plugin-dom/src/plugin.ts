@@ -47,6 +47,13 @@ export type IDomFeatures = {
       subscription: IEventSubscription,
       declaration?: IEventDeclaration
     ): () => void
+    delegate(
+      templateAddress: string,
+      host: EventTarget,
+      name: string,
+      subscription: IEventSubscription,
+      declaration?: IEventDeclaration
+    ): () => void
     dispatchCustom(
       target: EventTarget,
       name: string,
@@ -54,7 +61,10 @@ export type IDomFeatures = {
       detail: unknown
     ): boolean
   }
-  readonly aria: { apply(element: Element, node: IResolvedNode): void }
+  readonly aria: {
+    apply(element: Element, node: IResolvedNode): void
+    applyStates(element: Element, values: Readonly<Record<string, unknown>>): void
+  }
 }
 
 /** Core services the DOM plugin depends on. */

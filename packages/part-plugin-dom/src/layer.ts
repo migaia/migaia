@@ -27,7 +27,7 @@ export class LayerManager {
   readonly #stack: ILayerEntry[] = []
   /** Style writer used for stacked z-index rules. */
   readonly #styles: StyleSheetWriter
-  /** Whether the document listener is installed. */
+  /** Whether the document listeners (Escape keydown, outside pointerdown) are installed. */
   #listening = false
 
   /** Binds the manager to the host style writer. */
@@ -85,18 +85,39 @@ export class LayerManager {
   closeAll(): void {
     while (this.#stack.length > 0)
       this.close((this.#stack[this.#stack.length - 1] as ILayerEntry).address)
-    if (this.#listening) document.removeEventListener('keydown', this, true)
+    if (this.#listening) {
+      document.removeEventListener('keydown', this, true)
+      document.removeEventListener('pointerdown', this, true)
+    }
     this.#listening = false
   }
 
-  /** Handles Escape keydown and the native dialog cancel event. */
+  /** Handles Escape keydown, outside pointerdown and the native dialog cancel event. */
   handleEvent(event: Event): void {
+    if (event.type === 'pointerdown') {
+      this.#dismissOutside(event as PointerEvent)
+      return
+    }
     if (event.type === 'keydown' && (event as KeyboardEvent).key !== 'Escape') return
     /** Top entry. */
     const top = this.#stack[this.#stack.length - 1]
     if (top === undefined || top.behavior.dismiss?.escape === false) return
     event.preventDefault()
     event.stopPropagation()
+    this.close(top.address)
+    top.onDismiss(top.address)
+  }
+
+  /**
+   * Closes the top part when `dismiss.outside` is set and the pointer went down outside it. Only
+   * the top closes, like Escape. The event is not cancelled, so the outside click still reaches its
+   * target.
+   */
+  #dismissOutside(event: PointerEvent): void {
+    /** Top entry. */
+    const top = this.#stack[this.#stack.length - 1]
+    if (top === undefined || top.behavior.dismiss?.outside !== true) return
+    if (!isOutside(top, event)) return
     this.close(top.address)
     top.onDismiss(top.address)
   }
@@ -113,6 +134,24 @@ export class LayerManager {
   #listen(): void {
     if (this.#listening) return
     document.addEventListener('keydown', this, true)
+    document.addEventListener('pointerdown', this, true)
     this.#listening = true
   }
+}
+
+/**
+ * Whether a pointer event lies outside an open part. A modal dialog receives clicks on its own
+ * `::backdrop`, so for modal entries a hit on the dialog itself is tested against its box.
+ */
+function isOutside(entry: ILayerEntry, event: PointerEvent): boolean {
+  if (!event.composedPath().includes(entry.element)) return true
+  if (entry.mode !== LayerMode.modal || event.target !== entry.element) return false
+  /** Box of the dialog. */
+  const box = entry.element.getBoundingClientRect()
+  return (
+    event.clientX < box.left ||
+    event.clientX > box.right ||
+    event.clientY < box.top ||
+    event.clientY > box.bottom
+  )
 }

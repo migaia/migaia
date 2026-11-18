@@ -75,4 +75,37 @@ describe('layers', () => {
     expect(getComputedStyle(menu).zIndex).toBe('auto')
     await host.dispose()
   })
+
+  it('closes only the top part on an outside pointerdown when dismiss.outside is set', async () => {
+    const { host, dom } = await createDomHarness()
+    const dismissed: string[] = []
+    const outside = element<HTMLButtonElement>('button', document.body)
+    outside.textContent = 'outside'
+    const menu = element<HTMLDivElement>('div', document.body, { 'data-part-address': 'menu' })
+    const item = element<HTMLButtonElement>('button', menu)
+    item.textContent = 'item'
+    const sticky = element<HTMLDivElement>('div', document.body, { 'data-part-address': 'sticky' })
+    sticky.textContent = 'sticky'
+    dom.layer.open('sticky', sticky, nodeOf('sticky', { layer: 'dropdown' }), (address) =>
+      dismissed.push(address)
+    )
+    dom.layer.open(
+      'menu',
+      menu,
+      nodeOf('menu', { layer: 'dropdown', dismiss: { outside: true } }),
+      (address) => dismissed.push(address)
+    )
+    await userEvent.click(item)
+    expect(dismissed).toEqual([])
+    let outsideClicked = false
+    outside.addEventListener('click', () => (outsideClicked = true))
+    await userEvent.click(outside)
+    expect(dismissed).toEqual(['menu'])
+    expect(outsideClicked).toBe(true)
+    await userEvent.click(outside)
+    expect(dismissed).toEqual(['menu'])
+    expect(dom.layer.top()).toBe('sticky')
+    dom.layer.close('sticky')
+    await host.dispose()
+  })
 })

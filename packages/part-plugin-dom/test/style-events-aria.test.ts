@@ -76,6 +76,22 @@ describe('events', () => {
     expect(first.defaultPrevented).toBe(true)
     expect(clicks).toEqual(['click'])
 
+    const stopper = element<HTMLDivElement>('div', document.body)
+    stopper.addEventListener('click', (event) => event.stopPropagation())
+    const outsideTarget = element<HTMLSpanElement>('span', stopper)
+    const removeOutside = dom.events.subscribe('b', button, 'click', {
+      handler: 'click@1',
+      modifiers: ['outside']
+    })
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    outsideTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(clicks).toEqual(['click', 'click'])
+    removeOutside()
+    outsideTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(clicks).toEqual(['click', 'click'])
+
     let reached = false
     button.addEventListener('orders:row-expand', () => (reached = true))
     dom.events.dispatchCustom(

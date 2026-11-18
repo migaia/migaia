@@ -1,3 +1,4 @@
+import { formatAddress } from '@migaia/part-contract'
 import type { IStyleRule } from '@migaia/part-host'
 import { PartDomErrorCode } from './error-code.ts'
 import { PartDomErrorText } from './error-text.ts'
@@ -12,9 +13,14 @@ type IRuleEntry = {
   readonly address: string
 }
 
-/** Selector of one address, escaped for attribute values. */
+/**
+ * Selector of one address, escaped for attribute values. It also matches every template-row
+ * instance of the address (`<address>@row:<key>`), so one rule styles all rows.
+ */
 function selectorOf(address: string): string {
-  return `[${ADDRESS_ATTRIBUTE}="${CSS.escape(address)}"]`
+  /** Row-instance prefix of the address: the address followed by the empty-key row marker. */
+  const rowPrefix = formatAddress({ segments: address.split('/'), rowKey: '' })
+  return `[${ADDRESS_ATTRIBUTE}="${CSS.escape(address)}"], [${ADDRESS_ATTRIBUTE}^="${CSS.escape(rowPrefix)}"]`
 }
 
 /**
