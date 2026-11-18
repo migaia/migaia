@@ -1,4 +1,5 @@
 import { PartContractErrorCode } from './error-code.ts'
+import { isRecord } from './record.ts'
 import { PartContractErrorText } from './error-text.ts'
 import { createPartContractError } from './errors.ts'
 import type { IDescriptor, IKindSchema } from './types.ts'
@@ -20,11 +21,6 @@ const MODIFIER_EVENT_KINDS: ReadonlySet<string> = new Set(['dom', 'custom'])
 const ID_PATTERN = /^[A-Za-z0-9_.:/-]+@\d+$/
 /** Namespaced meta key grammar: at least one dot between non-empty parts. */
 const META_KEY_PATTERN = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$/
-
-/** True for a non-null, non-array object. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 /** Throws `DESCRIPTOR_INVALID` with the problem message. */
 function invalid(message: string): never {

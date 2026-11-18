@@ -1,14 +1,10 @@
 import { isValidName } from './address.ts'
+import { isRecord } from './record.ts'
 import { eventKeyProblem, isModifierRef } from './event-key.ts'
 import { PartContractErrorCode } from './error-code.ts'
 import { PartContractErrorText } from './error-text.ts'
 import { createPartContractError } from './errors.ts'
 import type { IBlueprint, IPartNode } from './types.ts'
-
-/** True for a non-null, non-array object. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 /** Throws `BLUEPRINT_INVALID` with the structural problem as cause. */
 function invalid(problem: string): never {

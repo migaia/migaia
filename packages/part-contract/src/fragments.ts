@@ -1,4 +1,5 @@
 import { createAddressIndex, type IAddressIndex } from './address.ts'
+import { isRecord } from './record.ts'
 import { PartContractErrorCode } from './error-code.ts'
 import { PartContractErrorText } from './error-text.ts'
 import { createPartContractError } from './errors.ts'
@@ -51,11 +52,6 @@ type IPendingUsage = {
   readonly descriptor: IDescriptor
   readonly props: Readonly<Record<string, unknown>>
   readonly filled: readonly string[]
-}
-
-/** True for a non-null, non-array object. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Replaces `{ $param }` placeholders in a facet value with the usage's parameters. */
