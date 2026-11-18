@@ -82,4 +82,55 @@ describe('binding', () => {
     expect(container.querySelector('input')).not.toBeNull()
     await host.dispose()
   })
+
+  it('renders one instance per template row and routes delegated events to the row instance', async () => {
+    const errors: unknown[] = []
+    received.length = 0
+    const { host, container } = await mountBlueprint(
+      {
+        tag: 'list@1',
+        id: 'rows',
+        template: {
+          rowKey: 'id',
+          rows: { $state: 'page.rows' },
+          node: {
+            tag: 'item@1',
+            id: 'item',
+            facets: {
+              props: { label: { $row: 'name' } },
+              events: { click: { handler: 'record@1' } },
+              style: { '--part-item-accent': '#ff0000' }
+            }
+          }
+        }
+      },
+      errors
+    )
+    host.state.write('page.rows', [
+      { id: 1, name: 'one' },
+      { id: 'a/b', name: 'two' }
+    ])
+    await settle()
+    const items = [...container.querySelectorAll('li')]
+    expect(items.map((item) => item.textContent)).toEqual(['one', 'two'])
+    expect(items.map((item) => item.getAttribute('data-part-address'))).toEqual([
+      'rows/item@row:1',
+      'rows/item@row:a%2Fb'
+    ])
+    expect(getComputedStyle(items[1] as HTMLLIElement).getPropertyValue('--part-item-accent')).toBe(
+      '#ff0000'
+    )
+
+    await userEvent.click(items[1]?.querySelector('span') as HTMLSpanElement)
+    await settle()
+    expect(received).toEqual([
+      { address: 'rows/item@row:a%2Fb', name: 'click', detail: undefined, rowKey: 'a/b' }
+    ])
+
+    host.state.write('page.rows', [{ id: 3, name: 'three' }])
+    await settle()
+    expect([...container.querySelectorAll('li')].map((item) => item.textContent)).toEqual(['three'])
+    expect(errors).toEqual([])
+    await host.dispose()
+  })
 })

@@ -29,6 +29,8 @@ The `mapping` of `bindReactComponent(part, Component, mapping)` declares part-to
 
 - One React root per mount; a state change re-renders only the nodes that read it (using `useTracked` from `@migaia/store-react`).
 - During commit the DOM plugin applies aria, styles, events, focus and layers.
+- For a part declaring `aria: { expanded: { fromState: 'expanded' } }`, the renderer reads the state path tracked, and a state change updates only that attribute.
+- A template host renders its template node once per entry of `rows`. Every node inside a row has a `@row:<key>` address, and `$row` bindings read the current row. Row instances install no listeners: the host element delegates the template node's events and also writes and removes its style rules.
 - For component-managed parts (`managedBy: 'component'`), when the component reports an open-state change (`states.openChange`), the renderer writes it back to host state before dispatching the event.
 - Every node has an error boundary: an unbound part reports `BINDING_MISSING`, a render failure reports `RENDER_FAILED`, and only that node is affected.
 

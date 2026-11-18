@@ -7,7 +7,7 @@ import {
 } from '@migaia/part-host'
 import { domPlugin } from '@migaia/part-plugin-dom'
 import { bindReactComponent, reactPlugin } from '../../src/index.ts'
-import { Button, Combobox, NativeDialog, RadixDialog } from './components.tsx'
+import { Button, Combobox, Item, List, NativeDialog, RadixDialog } from './components.tsx'
 
 /** Values received by the recording effect. */
 export const received: {
@@ -37,6 +37,12 @@ export const parts = {
       states: { names: ['open'], openState: 'open' }
     }
   }),
+  disclosure: definePart({
+    id: 'disclosure@1',
+    behavior: { states: { names: ['expanded'] }, aria: { expanded: { fromState: 'expanded' } } }
+  }),
+  list: definePart({ id: 'list@1' }),
+  item: definePart({ id: 'item@1', styleHooks: { '--part-item-accent': 'color' } }),
   unbound: definePart({ id: 'unbound@1' })
 }
 
@@ -52,7 +58,10 @@ export const fixturePlugin = definePartPlugin({
       events: { openChange: 'onOpenChange' },
       element: 'query'
     }),
-    bindReactComponent(parts.native, NativeDialog)
+    bindReactComponent(parts.native, NativeDialog),
+    bindReactComponent(parts.disclosure, Button),
+    bindReactComponent(parts.list, List),
+    bindReactComponent(parts.item, Item)
   ],
   effects: [
     defineEffect({ id: 'record@1', run: (event) => void received.push(event) }),

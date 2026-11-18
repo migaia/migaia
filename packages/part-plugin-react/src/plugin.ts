@@ -23,7 +23,7 @@ type IRendererDeps = IDomFeatures & {
     readonly runtime: IRuntime
     read(path: string): unknown
     write(path: string, value: unknown): void
-    resolve(node: IResolvedNode, value: unknown): unknown
+    resolve(node: IResolvedNode, value: unknown, row?: Readonly<Record<string, unknown>>): unknown
   }
   readonly catalog: { implementation(renderer: string, partId: string): unknown }
   readonly effect: { dispatch(address: string, event: string, detail: unknown): Promise<void> }

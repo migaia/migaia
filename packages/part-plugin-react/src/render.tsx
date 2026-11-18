@@ -6,6 +6,7 @@ import type {
   IRendererMount,
   IPartRendererFactory
 } from '@migaia/part-host'
+import { formatAddress, parseAddress } from '@migaia/part-contract'
 import type { IDomFeatures } from '@migaia/part-plugin-dom'
 import type { IRuntime } from '@migaia/reactive'
 import { useTracked } from '@migaia/store-react'
@@ -35,7 +36,7 @@ export type IMountServices = {
   readonly state: {
     read(path: string): unknown
     write(path: string, value: unknown): void
-    resolve(node: IResolvedNode, value: unknown): unknown
+    resolve(node: IResolvedNode, value: unknown, row?: Readonly<Record<string, unknown>>): unknown
   }
   readonly dispatch: (address: string, event: string, detail: unknown) => Promise<void>
   readonly report: (error: unknown) => void
@@ -44,8 +45,38 @@ export type IMountServices = {
 /** Context carrying the mount services to node components. */
 const MountContext = createContext<IMountServices | undefined>(undefined)
 
+/** Template row a subtree renders for: its key and row object. */
+type IRowScope = { readonly key: string; readonly row: Readonly<Record<string, unknown>> }
+
+/**
+ * Context carrying the current template row. Every node under a row renders as the instance address
+ * `<static address>@row:<key>` and resolves `$row` bindings against the row.
+ */
+const RowContext = createContext<IRowScope | undefined>(undefined)
+
 /** Error code the host uses for failures it has already reported. */
 const ALREADY_REPORTED = 'EFFECT_FAILED'
+
+/**
+ * Prefix of bound entries that are not component props. A NUL character cannot appear in an
+ * authored prop name, so these keys never collide with props.
+ */
+const INTERNAL_KEY = '\u0000'
+/** Bound entry holding the rows of a template host. */
+const ROWS_KEY = `${INTERNAL_KEY}rows`
+/** Bound entry holding the current open value. */
+const OPEN_KEY = `${INTERNAL_KEY}open`
+/** Prefix of bound entries holding state-derived aria values, followed by the attribute name. */
+const ARIA_KEY = `${INTERNAL_KEY}aria:`
+
+/** State-derived aria values taken out of a bound record. */
+function ariaValues(bound: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  /** Collected values by attribute name. */
+  const values: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(bound))
+    if (key.startsWith(ARIA_KEY)) values[key.slice(ARIA_KEY.length)] = value
+  return values
+}
 
 /** Shallow equality of two prop records. */
 function shallowEqual(
@@ -59,17 +90,24 @@ function shallowEqual(
   return true
 }
 
-/** Resolves bound props and the open value of a node; reads are tracked by the caller. */
+/**
+ * Resolves bound props, template rows, the open value and state-derived aria of a node; reads are
+ * tracked by the caller. `row` is the enclosing template row, used by `$row` bindings.
+ */
 function readBound(
   services: IMountServices,
-  node: IResolvedNode
+  node: IResolvedNode,
+  row: IRowScope | undefined
 ): Readonly<Record<string, unknown>> {
   /** Resolved prop values. */
   const resolved: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(node.config.props ?? {}))
-    resolved[key] = services.state.resolve(node, value)
-  if (node.openStatePath !== undefined)
-    resolved['\u0000open'] = services.state.read(node.openStatePath)
+    resolved[key] = services.state.resolve(node, value, row?.row)
+  if (node.template !== undefined)
+    resolved[ROWS_KEY] = services.state.resolve(node, node.template.rows, row?.row)
+  if (node.openStatePath !== undefined) resolved[OPEN_KEY] = services.state.read(node.openStatePath)
+  for (const [name, path] of Object.entries(node.ariaStates))
+    resolved[`${ARIA_KEY}${name}`] = services.state.read(path)
   return resolved
 }
 
@@ -124,7 +162,7 @@ function componentProps(
   /** Mapping of the binding. */
   const mapping = binding.mapping
   for (const [key, value] of Object.entries(bound))
-    if (key !== '\u0000open') props[String(mapping.props?.[key] ?? key)] = value
+    if (!key.startsWith(INTERNAL_KEY)) props[String(mapping.props?.[key] ?? key)] = value
   for (const [name, target] of Object.entries(mapping.events ?? {}))
     props[String(target)] = new EventBridge(services, node, name).handle
   /** Child nodes rendered as React children unless a slot maps to `children`. */
@@ -141,9 +179,41 @@ function componentProps(
     if (target === 'children') children.push(...rendered)
     else props[String(target)] = rendered
   }
+  if (node.template !== undefined) children.push(...rowElements(node.template, bound[ROWS_KEY]))
   if (children.length > 0) props.children = children
   if (mapping.element !== 'query') props.ref = setElement
   return props
+}
+
+/**
+ * One rendered template node per row. Rows that are not objects are skipped; the key is the string
+ * value of the row's `rowKey` field.
+ */
+function rowElements(template: NonNullable<IResolvedNode['template']>, rows: unknown): ReactNode[] {
+  /** Rendered rows. */
+  const rendered: ReactNode[] = []
+  if (!Array.isArray(rows)) return rendered
+  for (const row of rows as unknown[]) {
+    if (typeof row !== 'object' || row === null) continue
+    /** Instance key of the row. */
+    const key = String((row as Record<string, unknown>)[template.rowKey])
+    rendered.push(
+      <RowContext.Provider key={key} value={{ key, row: row as Readonly<Record<string, unknown>> }}>
+        <PartNode address={template.node.address} />
+      </RowContext.Provider>
+    )
+  }
+  return rendered
+}
+
+/** The node as rendered for a template row: same node, row-instance address. */
+function instanceOf(node: IResolvedNode, row: IRowScope | undefined): IResolvedNode {
+  return row === undefined
+    ? node
+    : {
+        ...node,
+        address: formatAddress({ segments: parseAddress(node.address).segments, rowKey: row.key })
+      }
 }
 
 /** Renders one node from the store; subscribes only to its own address. */
@@ -155,6 +225,15 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
     (listener) => services.store.subscribe(address, listener),
     () => services.store.get(address)
   )
+  /** Enclosing template row, if any. */
+  const row = useContext(RowContext)
+  /** Node as rendered here: the row-instance address inside a template row. */
+  const instance = useMemo(
+    () => (node === undefined ? undefined : instanceOf(node, row)),
+    [node, row]
+  )
+  /** Whether this view renders a template-row instance. */
+  const inRow = row !== undefined
   /** Root element of the component after commit. */
   const [element, setElement] = useState<HTMLElement | null>(null)
   /** Commit helper living as long as this component. */
@@ -162,33 +241,36 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
     () =>
       new NodeCommit({
         dom: services.dom,
-        write: (path, value) => services.state.write(path, value)
+        write: (path, value) => services.state.write(path, value),
+        rowInstance: inRow
       }),
-    [services]
+    [services, inRow]
   )
   /** Resolved bound values; reads are tracked on the host runtime. */
   const bound = useTracked(
-    () => (node === undefined ? {} : readBound(services, node)),
+    () => (instance === undefined ? {} : readBound(services, instance, row)),
     shallowEqual,
     services.runtime
   )
   useLayoutEffect(() => commit.release, [commit])
   useLayoutEffect(() => {
-    if (node !== undefined) commit.apply(node, element, bound['\u0000open'] === true)
-  }, [commit, node, element, bound])
-  if (node === undefined) return null
+    if (instance !== undefined)
+      commit.apply(instance, element, bound[OPEN_KEY] === true, ariaValues(bound))
+  }, [commit, instance, element, bound])
+  if (instance === undefined) return null
   /** React binding of the part. */
-  const binding = services.catalog.implementation(REACT_RENDERER, node.definition.descriptor.id) as
-    | IReactBinding
-    | undefined
+  const binding = services.catalog.implementation(
+    REACT_RENDERER,
+    instance.definition.descriptor.id
+  ) as IReactBinding | undefined
   if (binding === undefined)
     throw createPartReactError(
       PartReactErrorCode.bindingMissing,
-      PartReactErrorText.bindingMissing(node.definition.descriptor.id, address)
+      PartReactErrorText.bindingMissing(instance.definition.descriptor.id, instance.address)
     )
   /** Component of the binding. */
   const Bound = binding.component
-  return <Bound {...componentProps(services, node, binding, bound, setElement)} />
+  return <Bound {...componentProps(services, instance, binding, bound, setElement)} />
 }
 
 /** Error boundary isolating one node; reports the failure once and renders nothing. */

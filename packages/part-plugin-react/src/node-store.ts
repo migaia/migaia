@@ -6,6 +6,7 @@ function collect(node: IResolvedNode, into: Map<string, IResolvedNode>): void {
   for (const child of node.children) collect(child, into)
   for (const members of Object.values(node.slots))
     for (const member of members) collect(member, into)
+  if (node.template !== undefined) collect(node.template.node, into)
 }
 
 /**

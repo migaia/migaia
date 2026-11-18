@@ -82,3 +82,23 @@ export function NativeDialog(props: {
     </dialog>
   )
 }
+
+/** List container for template rows. */
+export function List(props: {
+  readonly ref?: Ref<HTMLUListElement>
+  readonly children?: ReactNode
+}): ReactNode {
+  return <ul ref={props.ref}>{props.children}</ul>
+}
+
+/** One list row showing its label. */
+export function Item(props: {
+  readonly label?: string
+  readonly ref?: Ref<HTMLLIElement>
+}): ReactNode {
+  return (
+    <li ref={props.ref}>
+      <span>{props.label}</span>
+    </li>
+  )
+}

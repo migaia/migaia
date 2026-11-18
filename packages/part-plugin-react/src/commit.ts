@@ -5,6 +5,11 @@ import type { IDomFeatures } from '@migaia/part-plugin-dom'
 export type ICommitServices = {
   readonly dom: IDomFeatures
   readonly write: (path: string, value: unknown) => void
+  /**
+   * Whether the node renders a template-row instance. Its DOM events are delegated by the template
+   * host and its style rules are owned by the host, so the instance installs neither.
+   */
+  readonly rowInstance?: boolean
 }
 
 /**
@@ -28,10 +33,15 @@ export class NodeCommit {
   readonly release = (): void => this.#release()
 
   /**
-   * Applies DOM work for the node's current element and open value. Re-applies keep an open layer
-   * open; only `release` (on unmount) closes it.
+   * Applies DOM work for the node's current element, open value and state-derived aria values.
+   * Re-applies keep an open layer open; only `release` (on unmount) closes it.
    */
-  apply(node: IResolvedNode, element: HTMLElement | null, open: boolean): void {
+  apply(
+    node: IResolvedNode,
+    element: HTMLElement | null,
+    open: boolean,
+    ariaStates: Readonly<Record<string, unknown>> = {}
+  ): void {
     /** Previous open value, carried across re-applies. */
     const wasOpen = this.#applied?.open === true && this.#applied.node.address === node.address
     this.#detach()
@@ -40,15 +50,35 @@ export class NodeCommit {
     /** DOM services. */
     const dom = this.#services.dom
     dom.aria.apply(element, node)
-    dom.stylesheet.apply(node.styleRules)
-    /** Event declarations of the part. */
-    const declarations = node.definition.descriptor.events ?? {}
-    for (const [name, subscription] of Object.entries(node.config.events ?? {}))
-      this.#unsubscribers.push(
-        dom.events.subscribe(node.address, element, name, subscription, declarations[name])
-      )
+    dom.aria.applyStates(element, ariaStates)
+    if (this.#services.rowInstance !== true) {
+      dom.stylesheet.apply(node.styleRules)
+      /** Event declarations of the part. */
+      const declarations = node.definition.descriptor.events ?? {}
+      for (const [name, subscription] of Object.entries(node.config.events ?? {}))
+        this.#unsubscribers.push(
+          dom.events.subscribe(node.address, element, name, subscription, declarations[name])
+        )
+    }
+    if (node.template !== undefined) this.#delegate(node.template.node, element)
     if (node.behavior.managedBy !== 'component' && node.openStatePath !== undefined)
       this.#transition(node, element, wasOpen, open)
+  }
+
+  /**
+   * Installs the template node's style rules and one delegated listener per template-node event on
+   * the template host element, instead of one listener per row.
+   */
+  #delegate(template: IResolvedNode, element: HTMLElement): void {
+    /** DOM services. */
+    const dom = this.#services.dom
+    dom.stylesheet.apply(template.styleRules)
+    /** Event declarations of the template part. */
+    const declarations = template.definition.descriptor.events ?? {}
+    for (const [name, subscription] of Object.entries(template.config.events ?? {}))
+      this.#unsubscribers.push(
+        dom.events.delegate(template.address, element, name, subscription, declarations[name])
+      )
   }
 
   /** Runs focus and layer transitions for a host-managed open state. */
@@ -84,7 +114,10 @@ export class NodeCommit {
     /** Last applied state. */
     const applied = this.#applied
     if (applied === undefined) return
-    this.#services.dom.stylesheet.remove(applied.node.address)
+    if (this.#services.rowInstance !== true)
+      this.#services.dom.stylesheet.remove(applied.node.address)
+    if (applied.node.template !== undefined)
+      this.#services.dom.stylesheet.remove(applied.node.template.node.address)
     if (applied.open && applied.node.behavior.managedBy !== 'component') {
       this.#services.dom.layer.close(applied.node.address)
       this.#services.dom.focus.close(applied.node.address)

@@ -31,6 +31,21 @@ describe('commit-phase collaboration', () => {
     await host.dispose()
   })
 
+  it('writes state-derived aria from the state path and follows state changes', async () => {
+    const errors: unknown[] = []
+    const { host, container } = await mountBlueprint(
+      { tag: 'disclosure@1', id: 'd', facets: { props: { label: 'More' } } },
+      errors
+    )
+    const button = container.querySelector('button') as HTMLButtonElement
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+    host.state.write('part.d.expanded', true)
+    await settle()
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    expect(errors).toEqual([])
+    await host.dispose()
+  })
+
   it('manages a native dialog through the DOM plugin and restores focus to its trigger', async () => {
     const errors: unknown[] = []
     const { host, container } = await mountBlueprint(
