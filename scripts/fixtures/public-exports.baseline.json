@@ -384,6 +384,7 @@
         "ADDRESS_ATTRIBUTE",
         "ERROR_SOURCE",
         "LAYER_Z_INDEX",
+        "LayoutAttribute",
         "PartDomErrorCode",
         "domPlugin",
         "idForAddress",

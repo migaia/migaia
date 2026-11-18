@@ -40,7 +40,8 @@ function createFactory(deps: IRendererDeps): ReactRendererFactory {
       layer: deps.layer,
       stylesheet: deps.stylesheet,
       events: deps.events,
-      aria: deps.aria
+      aria: deps.aria,
+      layout: deps.layout
     },
     catalog: deps.catalog,
     state: deps.state,
@@ -64,7 +65,8 @@ const rendererFeature = defineFeature(
     layer: domPlugin.getFeature('layer'),
     stylesheet: domPlugin.getFeature('stylesheet'),
     events: domPlugin.getFeature('events'),
-    aria: domPlugin.getFeature('aria')
+    aria: domPlugin.getFeature('aria'),
+    layout: domPlugin.getFeature('layout')
   } as never
 )
 

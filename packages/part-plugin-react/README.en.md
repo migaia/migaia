@@ -32,7 +32,8 @@ The `mapping` of `bindReactComponent(part, Component, mapping)` declares part-to
 - For a part declaring `aria: { expanded: { fromState: 'expanded' } }`, the renderer reads the state path tracked, and a state change updates only that attribute.
 - A template host renders its template node once per entry of `rows`. Every node inside a row has a `@row:<key>` address, and `$row` bindings read the current row. Row instances install no listeners: the host element delegates the template node's events and also writes and removes its style rules.
 - For component-managed parts (`managedBy: 'component'`), when the component reports an open-state change (`states.openChange`), the renderer writes it back to host state before dispatching the event.
-- Every node has an error boundary: an unbound part reports `BINDING_MISSING`, a render failure reports `RENDER_FAILED`, and only that node is affected.
+- A layout part (with `behavior.layout`) and no binding is rendered by this package: landmark region elements, separators, collapse toggles and a skip-to-main link, with behaviour from the DOM plugin's `layout.attach`.
+- Every node has an error boundary: an unbound ordinary part reports `BINDING_MISSING`, a render failure reports `RENDER_FAILED`, and only that node is affected.
 
 ## Error codes (source `part.react`)
 

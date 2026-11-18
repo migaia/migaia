@@ -20,11 +20,14 @@ export class NodeStore {
   readonly #listeners = new Map<string, Set<() => void>>()
   /** Root address. */
   readonly rootAddress: string
+  /** Id of the mounted blueprint; layouts key saved region widths by it. */
+  readonly blueprintId: string
 
   /** Seeds the store from a tree. */
   constructor(tree: IResolvedTree) {
     collect(tree.root, this.#nodes)
     this.rootAddress = tree.root.address
+    this.blueprintId = tree.blueprintId
   }
 
   /** Node at an address. */

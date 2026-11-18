@@ -92,6 +92,17 @@ definePart({
 
 part 声明 `aria: { expanded: { fromState: 'expanded' } }` 后，渲染器追踪读取对应状态路径。状态变化时只有这个节点重渲，并在提交期改写它的 `aria-expanded`。
 
+## 布局
+
+安装 `@migaia/part-layouts` 的 `layoutsPlugin` 后，蓝图根可以直接写 `nav-content@1` 等布局。布局 part 没有 React 绑定时由本包渲染：
+
+- 布局根是一个 `div`，每个区域按地标渲染成 `header`、`nav`、`main`、`aside`、`footer` 或 `section`，里面是该区域插槽的内容。
+- 可调区域旁边有一个分隔条，可折叠区域有一个以区域标签为文字的开关按钮（未折叠时隐藏）。
+- 最外层布局的第一个子元素是“跳到主内容”链接，文字取蓝图 `props.skipLabel`，默认 `Skip to main content`；按下后焦点移到 `main`。
+- 嵌在另一个布局区域里的布局是内层布局：它的 `main` 区域渲染成 `div`，也不渲染跳转链接，所以整页只有一个 `main` 地标。
+
+拖动、折叠、F6 等行为都由 DOM 插件完成。如果给布局 part 绑定了自己的组件，它就按普通 part 渲染，布局行为由那个组件负责。
+
 ## 故障隔离
 
 每个节点包在错误边界里。未绑定的 part 报 `BINDING_MISSING`，渲染抛错报 `RENDER_FAILED`（原错误在 `cause`），都经宿主 `onError` 报告一次，只影响该节点及其子树。

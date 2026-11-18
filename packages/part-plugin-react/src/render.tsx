@@ -25,6 +25,7 @@ import { REACT_RENDERER, type IReactBinding } from './bind.ts'
 import { NodeCommit } from './commit.ts'
 import { PartReactErrorCode } from './error-code.ts'
 import { createPartReactError, PartReactErrorText } from './errors.ts'
+import { LayoutView } from './layout.tsx'
 import { NodeStore } from './node-store.ts'
 
 /** Services shared by every node of one mount. */
@@ -169,11 +170,7 @@ function componentProps(
   const children: ReactNode[] = node.children.map((child) => (
     <PartNode key={child.address} address={child.address} />
   ))
-  for (const [slot, members] of Object.entries(node.slots)) {
-    /** Rendered slot members. */
-    const rendered = members.map((member) => (
-      <PartNode key={member.address} address={member.address} />
-    ))
+  for (const [slot, rendered] of Object.entries(slotContent(node))) {
     /** Target prop of the slot. */
     const target = mapping.slots?.[slot] ?? 'children'
     if (target === 'children') children.push(...rendered)
@@ -204,6 +201,17 @@ function rowElements(template: NonNullable<IResolvedNode['template']>, rows: unk
     )
   }
   return rendered
+}
+
+/** Rendered members of every slot of a node, by slot name. */
+function slotContent(node: IResolvedNode): Record<string, ReactNode[]> {
+  /** Rendered members by slot. */
+  const content: Record<string, ReactNode[]> = {}
+  for (const [slot, members] of Object.entries(node.slots))
+    content[slot] = members.map((member) => (
+      <PartNode key={member.address} address={member.address} />
+    ))
+  return content
 }
 
 /** The node as rendered for a template row: same node, row-instance address. */
@@ -263,6 +271,18 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
     REACT_RENDERER,
     instance.definition.descriptor.id
   ) as IReactBinding | undefined
+  if (binding === undefined && instance.behavior.layout !== undefined)
+    return (
+      <LayoutView
+        node={instance}
+        layout={instance.behavior.layout}
+        blueprintId={services.store.blueprintId}
+        dom={services.dom}
+        bound={bound}
+        content={slotContent(instance)}
+        setElement={setElement}
+      />
+    )
   if (binding === undefined)
     throw createPartReactError(
       PartReactErrorCode.bindingMissing,

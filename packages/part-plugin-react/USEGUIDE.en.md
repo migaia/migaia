@@ -92,6 +92,17 @@ Limit: if the template node declares an open state, all rows share one state pat
 
 For a part declaring `aria: { expanded: { fromState: 'expanded' } }`, the renderer reads the state path tracked. A state change re-renders only that node, and the commit rewrites its `aria-expanded`.
 
+## Layouts
+
+With `layoutsPlugin` from `@migaia/part-layouts` installed, a blueprint root can name a layout such as `nav-content@1`. A layout part without a React binding is rendered by this package:
+
+- The layout root is a `div`; each region renders as `header`, `nav`, `main`, `aside`, `footer` or `section` by its landmark and holds that region's slot content.
+- A resizable region gets a separator next to it; a collapsible region gets a toggle button labelled with the region label (hidden until the region collapses).
+- The outermost layout's first child is a skip-to-main link with the blueprint's `props.skipLabel` as text, `Skip to main content` by default; activating it moves focus to `main`.
+- A layout inside another layout's region is an inner layout: its `main` region renders as a `div` and it renders no skip link, so the page keeps one `main` landmark.
+
+Dragging, collapsing, F6 and the rest come from the DOM plugin. A layout part bound to your own component renders as an ordinary part, and that component is responsible for layout behaviour.
+
 ## Failure isolation
 
 Every node sits inside an error boundary. An unbound part reports `BINDING_MISSING`, and a render failure reports `RENDER_FAILED` with the original on `cause`. Each is reported once through the host's `onError` and affects only that node and its subtree.
