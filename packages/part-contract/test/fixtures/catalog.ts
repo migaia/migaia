@@ -43,6 +43,24 @@ export const ruleDescriptors: readonly IDescriptor[] = [
     }
   },
   { kind: 'part', id: 'chip@1', behavior: { semantics: { element: 'span' } } },
+  {
+    kind: 'part',
+    id: 'shell@1',
+    behavior: {
+      layout: {
+        direction: 'row',
+        regions: [
+          {
+            name: 'nav',
+            landmark: 'navigation',
+            resizable: true,
+            size: { default: 240, min: 160, max: 480 }
+          },
+          { name: 'content', landmark: 'main' }
+        ]
+      }
+    }
+  },
   { kind: 'part', id: 'btn@1', behavior: { semantics: { element: 'button', role: 'button' } } },
   {
     kind: 'part',

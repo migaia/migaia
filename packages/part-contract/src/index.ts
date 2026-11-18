@@ -47,8 +47,12 @@ export {
   validateArgs,
   type IStandardSchemaInput
 } from './schema.ts'
+export { LandmarkElement, LayoutProp, type ILayoutProps } from './layout.ts'
 export { LayerLevel } from './types.ts'
 export type {
+  ILandmark,
+  ILayoutBehavior,
+  ILayoutRegion,
   IApgPattern,
   IAriaDerivation,
   IBehavior,

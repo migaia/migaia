@@ -81,9 +81,49 @@ export type IApgPattern =
 /** How one aria attribute is derived: from a state name, or as a relation to another address. */
 export type IAriaDerivation = { readonly fromState: string } | { readonly relation: IPartAddress }
 
+/** Landmark a layout region renders as; `LandmarkElement` maps each to its HTML element. */
+export type ILandmark =
+  | 'banner'
+  | 'navigation'
+  | 'main'
+  | 'complementary'
+  | 'contentinfo'
+  | 'region'
+
+/**
+ * One region of a layout, which is also a slot of the layout part. `size.default` is a pixel
+ * number, `auto` or `<n>fr`; `min` and `max` are pixels. A resizable region needs a pixel default
+ * inside `[min, max]`. `collapseBelow` is the layout container width in pixels under which the
+ * region collapses into a drawer; it needs a `label` and is not allowed on `main`. `scroll`
+ * defaults to true.
+ */
+export type ILayoutRegion = {
+  readonly name: string
+  readonly landmark: ILandmark
+  readonly label?: string
+  readonly size?: {
+    readonly default: string | number
+    readonly min?: number
+    readonly max?: number
+  }
+  readonly resizable?: boolean
+  readonly collapseBelow?: number
+  readonly scroll?: boolean
+}
+
+/**
+ * Layout behaviour group: regions in display order along `direction`. Exactly one region is `main`.
+ * `skipLink` (default true) asks the outermost layout to render a skip-to-main link.
+ */
+export type ILayoutBehavior = {
+  readonly direction: 'row' | 'column'
+  readonly regions: readonly ILayoutRegion[]
+  readonly skipLink?: boolean
+}
+
 /**
  * Behaviour groups of a part definition: semantics, aria, focus, keyboard, states, dismissal,
- * layer.
+ * layer, layout.
  */
 export type IBehavior = {
   readonly semantics?: {
@@ -113,6 +153,7 @@ export type IBehavior = {
   }
   readonly layer?: 'top' | LayerLevel
   readonly managedBy?: 'host' | 'component'
+  readonly layout?: ILayoutBehavior
 }
 
 /** Declaration of an event a part emits. */

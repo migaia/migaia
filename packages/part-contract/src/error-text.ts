@@ -18,6 +18,11 @@ export const PartContractErrorText = {
   descriptorId: (id: string): string => `descriptor id "${id}" must have the form name@major`,
   /** A meta key lacks a namespace. */
   descriptorMeta: (key: string): string => `meta key "${key}" must be namespaced as ns.name`,
+  /** A layout behaviour group breaks a structural rule; `reason` comes from `LayoutInvalidReason`. */
+  layoutInvalid: (region: string, reason: string): string =>
+    region === ''
+      ? `layout is invalid: ${reason}`
+      : `layout region "${region}" is invalid: ${reason}`,
   /** A descriptor kind is not known. */
   descriptorKind: (kind: string): string => `descriptor kind "${kind}" is not registered`,
   /** A schema yields no JSON Schema. */
@@ -47,4 +52,37 @@ export const PartContractErrorText = {
   /** Fragment expansion produced too many nodes. */
   fragmentTooLarge: (limit: number): string =>
     `fragment expansion produced more than ${limit} nodes`
+} as const
+
+/**
+ * Reasons appended to `PartContractErrorText.layoutInvalid`. They are contract text: tests and
+ * tooling match them to tell layout structure problems apart.
+ */
+export const LayoutInvalidReason = {
+  /** The group is not `{ direction, regions }` with at least one region. */
+  shape: 'layout needs direction row or column and at least one region',
+  /** A region is not an object with a valid name and a known landmark. */
+  region: 'region needs a name in the address alphabet and a known landmark',
+  /** `label` is not a string, or `resizable` / `scroll` are not booleans. */
+  fieldType: 'label must be a string; resizable and scroll must be booleans',
+  /** `collapseBelow` is not a number. */
+  collapseBelow: 'collapseBelow must be a number of pixels',
+  /** Two regions share a name. */
+  duplicate: 'region name is used twice',
+  /** The layout has no main region or more than one. */
+  mainCount: 'layout needs exactly one main region',
+  /** `size.default` is not a pixel number, `auto` or `<n>fr`, or min/max are not numbers. */
+  size: 'size default must be pixels, auto or <n>fr; min and max must be numbers',
+  /** A resizable region lacks a pixel default or min/max. */
+  resizable: 'resizable region needs a pixel default with min and max',
+  /** `min` is greater than `max`. */
+  range: 'min is greater than max',
+  /** The pixel default lies outside `[min, max]`. */
+  defaultRange: 'default lies outside min and max',
+  /** The main region declares `collapseBelow`. */
+  mainCollapse: 'the main region cannot collapse',
+  /** A collapsible region has no label for its toggle. */
+  collapseLabel: 'a collapsible region needs a label',
+  /** A landmark appears more than once and this region has no label. */
+  landmarkLabel: 'a repeated landmark needs a label on each region'
 } as const

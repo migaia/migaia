@@ -2,6 +2,7 @@ import { PartContractErrorCode } from './error-code.ts'
 import { isRecord } from './record.ts'
 import { PartContractErrorText } from './error-text.ts'
 import { createPartContractError } from './errors.ts'
+import { checkLayoutBehavior } from './layout.ts'
 import type { IDescriptor, IKindSchema } from './types.ts'
 
 /** Built-in kinds; this list has a fixed size of eight, so membership checks are constant time. */
@@ -69,6 +70,12 @@ export function validateDescriptor(
   }
   if (descriptor.kind === 'modifier') checkModifier(descriptor)
   if (descriptor.kind === 'fragment') checkFragment(descriptor)
+  if (
+    descriptor.kind === 'part' &&
+    isRecord(descriptor.behavior) &&
+    descriptor.behavior.layout !== undefined
+  )
+    checkLayoutBehavior(descriptor.behavior.layout)
   return descriptor as unknown as IDescriptor
 }
 

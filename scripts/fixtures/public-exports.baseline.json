@@ -316,7 +316,9 @@
         "ERROR_SOURCE",
         "FRAGMENT_MAX_DEPTH",
         "FRAGMENT_MAX_NODES",
+        "LandmarkElement",
         "LayerLevel",
+        "LayoutProp",
         "PartContractErrorCode",
         "assertNoTransform",
         "createAddressIndex",
@@ -345,6 +347,7 @@
       "./doctor": [
         "behaviorRules",
         "builtinRules",
+        "layoutRules",
         "structureRules"
       ]
     },

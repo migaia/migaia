@@ -81,11 +81,33 @@ const cases: readonly (readonly [string, IPartNode, string])[] = [
   ['behavior.tabindex', rootWith({ attrs: { tabindex: 3 } }), 'root'],
   ['behavior.no-aria-override', rootWith({ aria: { expanded: true } }), 'root'],
   ['behavior.no-zindex', rootWith({ style: { 'z-index': 5 } }), 'root'],
-  ['behavior.open-state-binding', rootWith({ props: { open: { $derive: 'drv@1' } } }), 'root']
+  ['behavior.open-state-binding', rootWith({ props: { open: { $derive: 'drv@1' } } }), 'root'],
+  [
+    'layout.single-main',
+    {
+      tag: 'box@1',
+      id: 'root',
+      children: [
+        { tag: 'shell@1', id: 'a' },
+        { tag: 'shell@1', id: 'b' }
+      ]
+    },
+    'root/b'
+  ],
+  [
+    'layout.region-unknown',
+    { tag: 'shell@1', id: 'root', facets: { slots: { footer: [{ tag: 'chip@1' }] } } },
+    'root'
+  ],
+  [
+    'layout.size-range',
+    { tag: 'shell@1', id: 'root', facets: { props: { sizes: { nav: 9 } } } },
+    'root'
+  ]
 ]
 
 describe('built-in rules', () => {
-  it('ships exactly the twenty-nine documented rules', () => {
+  it('ships exactly the thirty-two documented rules', () => {
     expect(builtinRules.map((rule) => rule.id).sort()).toEqual(cases.map(([id]) => id).sort())
   })
 
