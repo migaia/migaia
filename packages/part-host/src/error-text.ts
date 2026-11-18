@@ -18,5 +18,8 @@ export const PartHostErrorText = {
   /** Host disposed. */
   hostDisposed: 'part host has been disposed',
   /** Unknown blueprint. */
-  blueprintUnknown: (id: string): string => `blueprint "${id}" has not been loaded`
+  blueprintUnknown: (id: string): string => `blueprint "${id}" has not been loaded`,
+  /** Placement flag and place function disagree. */
+  modifierPlacementMismatch: (id: string): string =>
+    `modifier "${id}" must provide place exactly when placement is true`
 } as const

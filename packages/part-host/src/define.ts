@@ -10,6 +10,9 @@ import {
   type IStyleHookType
 } from '@migaia/part-contract'
 import { defineFeature } from '@migaia/plugin-host/features'
+import { PartHostErrorCode } from './error-code.ts'
+import { PartHostErrorText } from './error-text.ts'
+import { createPartHostError } from './errors.ts'
 import type {
   IDeriveDefinition,
   IDeriveStateView,
@@ -19,11 +22,16 @@ import type {
   IEnhancerContext,
   IEnhancerDefinition,
   IFeatureRecordLike,
+  IFragmentDefinition,
+  IModifierContext,
+  IModifierDefinition,
+  IModifierInstance,
+  IModifierPlacement,
   IPartDefinition,
   IResourceDefinition,
   ISchemaInput
 } from './types.ts'
-import type { IPartFacets } from '@migaia/part-contract'
+import type { IFragmentBody, IModifierEventKind, IPartFacets } from '@migaia/part-contract'
 
 /** Common optional descriptor fields accepted by every define function. */
 type IDescriptorFields = Pick<
@@ -177,5 +185,68 @@ export function defineResource<TOutput extends object>(
       editor: { result: argsSchema(result, undefined), commands: commandSchemas }
     }),
     feature: defineFeature((() => create()) as never)
+  })
+}
+
+/** Modifier specification; `place` is required exactly when `placement` is true. */
+export type IModifierSpec<TArgs> = IDescriptorFields & {
+  readonly id: string
+  readonly eventKinds: readonly IModifierEventKind[]
+  readonly placement: boolean
+  readonly args?: ISchemaInput
+  readonly argsJsonSchema?: IJsonSchema
+  readonly place?: (element: unknown, args: TArgs) => IModifierPlacement
+  readonly create: (args: TArgs, context: IModifierContext) => IModifierInstance
+}
+
+/**
+ * Defines a modifier: one step of an event subscription's listener chain. Throws
+ * `MODIFIER_PLACEMENT_MISMATCH` when `placement` and `place` disagree.
+ */
+export function defineModifier<TArgs = undefined>(
+  spec: IModifierSpec<TArgs>
+): IModifierDefinition<TArgs> {
+  /** Spec split into descriptor fields and runtime functions. */
+  const { place, create, args, argsJsonSchema, ...fields } = spec
+  if ((place !== undefined) !== spec.placement)
+    throw createPartHostError(
+      PartHostErrorCode.modifierPlacementMismatch,
+      PartHostErrorText.modifierPlacementMismatch(spec.id)
+    )
+  return Object.freeze({
+    descriptor: descriptorOf({
+      ...fields,
+      kind: 'modifier',
+      args: argsSchema(args, argsJsonSchema)
+    }),
+    ...(args === undefined ? {} : { argsSchema: args }),
+    ...(place === undefined ? {} : { place }),
+    create
+  })
+}
+
+/** Fragment specification: a subtree with `{ $param }` and `{ $slot }` placeholders. */
+export type IFragmentSpec = IDescriptorFields & {
+  readonly id: string
+  readonly node: IFragmentBody['node']
+  readonly slots?: readonly string[]
+  readonly args?: ISchemaInput
+  readonly argsJsonSchema?: IJsonSchema
+}
+
+/** Defines a fragment expanded wherever a blueprint node's tag names it. */
+export function defineFragment<TArgs = Record<string, unknown>>(
+  spec: IFragmentSpec
+): IFragmentDefinition<TArgs> {
+  /** Spec split into the body, schemas and descriptor fields. */
+  const { node, slots, args, argsJsonSchema, ...fields } = spec
+  return Object.freeze({
+    descriptor: descriptorOf({
+      ...fields,
+      kind: 'fragment',
+      args: argsSchema(args, argsJsonSchema),
+      fragment: slots === undefined ? { node } : { node, slots }
+    }),
+    ...(args === undefined ? {} : { argsSchema: args })
   })
 }

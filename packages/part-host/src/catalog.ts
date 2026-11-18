@@ -37,7 +37,10 @@ type IEntry<TValue> = {
   available: boolean
 }
 
-/** Listener told which part names a catalog change affects (enhancers changed for those tags). */
+/**
+ * Listener told which part names a catalog change affects: enhancers changed for those tags, or a
+ * fragment of that name changed.
+ */
 export type ICatalogListener = (tags: ReadonlySet<string>) => void
 
 /** Composite key of a renderer implementation. */
@@ -310,6 +313,8 @@ export class PartCatalog implements ICatalog {
       for (const definition of contribution.definitions)
         if (definition.descriptor.kind === 'enhancer')
           for (const target of definition.descriptor.targets ?? []) tags.add(target)
+        else if (definition.descriptor.kind === 'fragment')
+          tags.add(splitDescriptorId(definition.descriptor.id).name)
     for (const listener of this.#listeners) listener(tags)
   }
 }

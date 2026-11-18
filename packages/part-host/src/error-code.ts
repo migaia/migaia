@@ -29,7 +29,12 @@ export const PartHostErrorCode = {
   /** `load`, `patch`, `mount` or `dispatch` was called after `dispose`. Create a new host. */
   hostDisposed: 'HOST_DISPOSED',
   /** `patch` or `mount` named a blueprint id that was never loaded. Load it first. */
-  blueprintUnknown: 'BLUEPRINT_UNKNOWN'
+  blueprintUnknown: 'BLUEPRINT_UNKNOWN',
+  /**
+   * `defineModifier` was given `placement: true` without `place`, or `place` with `placement:
+   * false`. Provide both together or neither.
+   */
+  modifierPlacementMismatch: 'MODIFIER_PLACEMENT_MISMATCH'
 } as const
 
 /** Value union of every `part.host` error code. */

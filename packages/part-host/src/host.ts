@@ -214,7 +214,7 @@ class PartHost implements IPartHost {
   }
 
   /** Runs work after earlier queued work; failures reject only this call. */
-  #serial<T>(work: () => T): Promise<T> {
+  #serial<T>(work: () => T | Promise<T>): Promise<T> {
     if (this.#disposal !== undefined)
       return Promise.reject(
         createPartHostError(PartHostErrorCode.hostDisposed, PartHostErrorText.hostDisposed)

@@ -1,8 +1,16 @@
 import {
   createAddressIndex,
   createRuleEngine,
+  eventEntries,
+  expandFragments,
+  modifierArgs,
+  modifierId,
   parseBlueprint,
+  PartContractErrorCode,
   tagSegmentName,
+  validateArgs,
+  type IFragmentUsage,
+  type IStandardSchemaInput,
   type IAddressIndex,
   type IBehavior,
   type IBlueprint,
@@ -21,7 +29,9 @@ import { affectedAddresses, applyPatch } from './patch.ts'
 import { isStateBinding, type ScopeState } from './state.ts'
 import type {
   IEnhancerDefinition,
+  IFragmentDefinition,
   ILoadResult,
+  IModifierDefinition,
   IPartDefinition,
   IResolvedChanges,
   IResolvedNode,
@@ -29,10 +39,15 @@ import type {
   IStyleRule
 } from './types.ts'
 
-/** State kept per loaded blueprint. */
+/**
+ * State kept per loaded blueprint. `parsed` and `index` describe the blueprint after fragment
+ * expansion; `authoredIndex` describes the document as written, which patches and tag refreshes
+ * address.
+ */
 type ILoaded = {
   readonly raw: unknown
   readonly parsed: IBlueprint
+  readonly authoredIndex: IAddressIndex
   readonly index: IAddressIndex
   readonly enhanced: ReadonlyMap<string, IPartFacets>
   readonly tree: IResolvedTree | undefined
@@ -70,30 +85,34 @@ export class BlueprintStore {
   }
 
   /** Loads a blueprint from scratch. */
-  load(input: unknown): ILoadResult {
+  load(input: unknown): Promise<ILoadResult> {
     return this.#process({ raw: input, previous: undefined, affected: undefined })
   }
 
   /** Applies a JSON Patch to a loaded blueprint and reprocesses only affected nodes. */
-  patch(blueprintId: string, operations: readonly IJsonPatchOperation[]): ILoadResult {
+  patch(blueprintId: string, operations: readonly IJsonPatchOperation[]): Promise<ILoadResult> {
     /** Current state of the blueprint. */
     const previous = this.#require(blueprintId)
     return this.#process({
       raw: applyPatch(previous.raw, operations),
       previous,
-      affected: affectedAddresses(previous.index.entries(), operations)
+      affected: affectedAddresses(previous.authoredIndex.entries(), operations)
     })
   }
 
-  /** Re-enhances nodes whose part names lost or gained enhancers. */
-  refreshTags(tags: ReadonlySet<string>): void {
+  /**
+   * Reprocesses nodes whose part names lost or gained enhancers, and fragment usages whose fragment
+   * changed. Blueprints are reprocessed one after another.
+   */
+  async refreshTags(tags: ReadonlySet<string>): Promise<void> {
     if (tags.size === 0) return
     for (const loaded of this.#loaded.values()) {
-      /** Addresses whose tag is affected. */
+      /** Authored and expanded addresses whose tag is affected. */
       const affected = new Set<string>()
-      for (const entry of loaded.index.entries())
-        if (tags.has(tagSegmentName(entry.node.tag))) affected.add(entry.address)
-      if (affected.size > 0) this.#process({ raw: loaded.raw, previous: loaded, affected })
+      for (const index of [loaded.authoredIndex, loaded.index])
+        for (const entry of index.entries())
+          if (tags.has(tagSegmentName(entry.node.tag))) affected.add(entry.address)
+      if (affected.size > 0) await this.#process({ raw: loaded.raw, previous: loaded, affected })
     }
   }
 
@@ -124,12 +143,31 @@ export class BlueprintStore {
     return loaded
   }
 
-  /** Runs one full or incremental pass. */
-  #process(pass: IPass): ILoadResult {
-    /** Parsed and frozen blueprint. */
-    const parsed = parseBlueprint(pass.raw)
-    /** Address index of this version. */
-    const index = createAddressIndex(parsed)
+  /**
+   * Runs one full or incremental pass: parse, expand fragments, validate fragment and modifier
+   * arguments, authored rules, enhancement, resolved rules, resolved tree. Parse and expansion
+   * errors are thrown.
+   */
+  async #process(pass: IPass): Promise<ILoadResult> {
+    /** Authored document, parsed and frozen. */
+    const authoredDocument = parseBlueprint(pass.raw)
+    /** Index of the authored document, for patches and tag refreshes. */
+    const authoredIndex = createAddressIndex(authoredDocument)
+    /** Fragment expansion of the authored document. */
+    const expansion = expandFragments(authoredDocument, this.#catalog.view())
+    /** Expanded blueprint, frozen in place so the index keeps pointing at its nodes. */
+    const parsed = parseBlueprint(expansion.blueprint)
+    /** Address index of the expanded blueprint. */
+    const index = expansion.index
+    /** Affected addresses widened to whole expanded usages. */
+    const affectedAll =
+      pass.affected === undefined
+        ? undefined
+        : widenAffected(pass.affected, index, expansion.usages)
+    /** Pass seen by enhancement with the widened affected set. */
+    const widened: IPass = { ...pass, affected: affectedAll }
+    /** Fragment parameter and modifier argument issues. */
+    const argumentIssues = await this.#argumentIssues(expansion.usages, index)
     /** Engine over built-in and plugin rules. */
     const engine = createRuleEngine({
       rules: [...builtinRules, ...this.#catalog.rules()],
@@ -137,11 +175,11 @@ export class BlueprintStore {
       kinds: this.#catalog.kinds()
     })
     /** Changed addresses for part-scope rules, when incremental. */
-    const changed = pass.affected === undefined ? undefined : [...pass.affected]
+    const changed = affectedAll === undefined ? undefined : [...affectedAll]
     /** Authored-phase issues. */
     const authored = engine.run('authored', parsed, changed === undefined ? undefined : { changed })
     /** Enhanced configuration per address. */
-    const enhanced = this.#enhance(index, pass)
+    const enhanced = this.#enhance(index, widened)
     /** Node-to-address map shared by the rebuild and the resolve walk. */
     const addresses = addressMap(index)
     /** Blueprint rebuilt with enhanced facets, for resolved-phase rules. */
@@ -151,7 +189,7 @@ export class BlueprintStore {
     }
     /** All issues of the pass; a rule that fires in both phases is reported once. */
     const issues: IIssue[] = mergeIssues(
-      authored,
+      [...expansion.issues, ...argumentIssues, ...authored],
       engine.run(
         'resolved',
         parseBlueprint(enhancedBlueprint),
@@ -162,10 +200,50 @@ export class BlueprintStore {
     const tree = issues.some((issue) => issue.severity === 'error')
       ? undefined
       : { blueprintId: parsed.id, root: this.#resolve(parsed.root, addresses, enhanced) }
-    this.#loaded.set(parsed.id, { raw: pass.raw, parsed, index, enhanced, tree })
+    this.#loaded.set(parsed.id, { raw: pass.raw, parsed, authoredIndex, index, enhanced, tree })
     if (pass.previous !== undefined && tree !== undefined)
-      this.#sink(changeSet(tree, pass.previous, index, pass.affected))
+      this.#sink(changeSet(tree, pass.previous, index, affectedAll))
     return { blueprintId: parsed.id, tree, issues }
+  }
+
+  /**
+   * Validates fragment parameters and modifier arguments against their Standard Schemas. A string
+   * modifier reference is validated with `undefined`, so a schema that requires arguments reports
+   * it. Validations run concurrently; issues keep usage order, then document order.
+   */
+  async #argumentIssues(
+    usages: readonly IFragmentUsage[],
+    index: IAddressIndex
+  ): Promise<readonly IIssue[]> {
+    /** Pending validations. */
+    const checks: Promise<IIssue | undefined>[] = []
+    for (const usage of usages) {
+      /** Schema of the fragment, if it declares one. */
+      const schema = (this.#catalog.get(usage.fragmentId) as IFragmentDefinition<unknown>)
+        ?.argsSchema
+      if (schema !== undefined)
+        checks.push(argumentIssue(schema, usage.props, usage.address, 'props', '', 'fragment.args'))
+    }
+    for (const entry of index.entries())
+      for (const event of eventEntries(entry.node.facets?.events))
+        (event.subscription.modifiers ?? []).forEach((ref, position) => {
+          /** Modifier definition, when available. */
+          const definition = this.#catalog.get(modifierId(ref)) as IModifierDefinition<unknown>
+          if (definition?.argsSchema === undefined) return
+          checks.push(
+            argumentIssue(
+              definition.argsSchema,
+              modifierArgs(ref),
+              entry.address,
+              'events',
+              `${event.key}/modifiers/${position}`,
+              'event.modifier-args'
+            )
+          )
+        })
+    /** Settled results. */
+    const results = await Promise.all(checks)
+    return results.filter((issue): issue is IIssue => issue !== undefined)
   }
 
   /** Enhances every node, reusing cached results for unaffected addresses. */
@@ -282,6 +360,58 @@ export class BlueprintStore {
         result[name] = this.#statePath(address, derivation.fromState, config)
     return result
   }
+}
+
+/**
+ * Validates one argument value; resolves to an `ARGS_INVALID` issue (the rejection on `cause`) or
+ * to `undefined` when the value is valid.
+ */
+function argumentIssue(
+  schema: IStandardSchemaInput,
+  value: unknown,
+  address: string,
+  facet: string,
+  path: string,
+  rule: string
+): Promise<IIssue | undefined> {
+  return validateArgs(schema, value).then(
+    () => undefined,
+    (cause: unknown) => ({
+      address,
+      facet,
+      path,
+      code: PartContractErrorCode.argsInvalid,
+      rule,
+      messageKey: rule,
+      severity: 'error' as const,
+      cause
+    })
+  )
+}
+
+/**
+ * Adds the expanded subtree of every affected fragment usage to the affected set, so a patch on a
+ * usage reprocesses the nodes its fragment produced. Each entry walks its parent chain once.
+ */
+function widenAffected(
+  affected: ReadonlySet<string>,
+  index: IAddressIndex,
+  usages: readonly IFragmentUsage[]
+): ReadonlySet<string> {
+  /** Affected usage addresses. */
+  const roots = new Set(
+    usages.map((usage) => usage.address).filter((address) => affected.has(address))
+  )
+  if (roots.size === 0) return affected
+  /** Widened set. */
+  const widened = new Set(affected)
+  for (const entry of index.entries()) {
+    /** Ancestor on the walk up. */
+    let parent = entry.parent
+    while (parent !== undefined && !roots.has(parent)) parent = index.get(parent)?.parent
+    if (parent !== undefined) widened.add(entry.address)
+  }
+  return widened
 }
 
 /** Address by node object, built once per pass; nodes of one parsed blueprint are unique objects. */

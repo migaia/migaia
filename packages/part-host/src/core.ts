@@ -246,6 +246,8 @@ function contributionOf(
       ...(spec.enhancers ?? []),
       ...(spec.derives ?? []),
       ...(spec.effects ?? []),
+      ...(spec.modifiers ?? []),
+      ...(spec.fragments ?? []),
       ...Object.values(spec.resources ?? {})
     ],
     implementations: spec.implementations ?? [],
@@ -296,6 +298,7 @@ export function definePartPlugin(spec: IPartPluginSpec): IPartPlugin {
         () => output.catalog.withdraw(spec.name, output.contribution.token),
         { once: true }
       )
+      spec.onInstall?.(core.features, core.lifecycle.signal)
       return {}
     }
   }) as unknown as IPartPlugin

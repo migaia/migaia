@@ -109,6 +109,36 @@ definePart({
 })
 ```
 
+## Custom modifiers and fragments
+
+`defineModifier` defines an event modifier; the DOM plugin runs it in the listener in subscription order:
+
+```ts
+const confirm = defineModifier({
+  id: 'confirm@1',
+  eventKinds: ['dom'],
+  placement: false,
+  create: () => ({ handle: (event, next) => { if (window.confirm('Sure?')) next() } })
+})
+```
+
+`handle(event, next, element)` stops the event by not calling `next`; `next` takes effect once per event and may be called later (for example to debounce); `next(detail)` replaces the detail the effect receives. A modifier with `placement: true` must provide `place(element, args)` to choose where the listener sits; a mismatch throws `MODIFIER_PLACEMENT_MISMATCH`. Modifiers with an `args` schema have their arguments validated at load; failures are `event.modifier-args` issues.
+
+`defineFragment` defines a reusable blueprint fragment:
+
+```ts
+const card = defineFragment({
+  id: 'card@1',
+  args: z.object({ title: z.string() }),
+  slots: ['body'],
+  node: { tag: 'box@1', children: [{ tag: 'text@1', id: 'heading', facets: { props: { text: { $param: 'title' } } } }, { $slot: 'body' }] }
+})
+```
+
+A blueprint node with `tag: 'card@1'` is a usage: `facets.props` are its parameters and `facets.slots` fill its slots. Loading expands fragments first, then validates parameters (failures are `fragment.args` issues), then runs rules and enhancers. A patch on a usage recomputes only the nodes that usage expanded into; replacing a fragment definition recomputes only its usages. Cyclic, too deep or too large fragments make `load` throw.
+
+Both register through `definePartPlugin({ modifiers, fragments })` with the same conflict and replacement rules as parts.
+
 ## Replacing and removing plugins
 
 - `host.use(plugin)` installs a plugin; its parts, rules and implementations enter the catalog.

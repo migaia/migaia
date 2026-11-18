@@ -109,6 +109,36 @@ definePart({
 })
 ```
 
+## 自定义修饰符与片段
+
+`defineModifier` 定义事件修饰符，由 DOM 插件在监听函数里按订阅顺序执行：
+
+```ts
+const confirm = defineModifier({
+  id: 'confirm@1',
+  eventKinds: ['dom'],
+  placement: false,
+  create: () => ({ handle: (event, next) => { if (window.confirm('确定？')) next() } })
+})
+```
+
+`handle(event, next, element)` 不调用 `next` 即拦下事件；`next` 每个事件只生效一次，可以晚一些调用（例如防抖）；`next(detail)` 替换 effect 收到的 detail。`placement: true` 的修饰符必须提供 `place(element, args)` 决定监听位置，两者不一致时抛 `MODIFIER_PLACEMENT_MISMATCH`。带 `args` schema 的修饰符在装载时校验参数，失败记为 `event.modifier-args` 问题。
+
+`defineFragment` 定义可复用的蓝图片段：
+
+```ts
+const card = defineFragment({
+  id: 'card@1',
+  args: z.object({ title: z.string() }),
+  slots: ['body'],
+  node: { tag: 'box@1', children: [{ tag: 'text@1', id: 'heading', facets: { props: { text: { $param: 'title' } } } }, { $slot: 'body' }] }
+})
+```
+
+蓝图里 `tag: 'card@1'` 的节点就是使用点，`facets.props` 是参数，`facets.slots` 填插槽。装载时先展开片段，再校验参数（失败记为 `fragment.args` 问题），然后运行规则和增强。补丁落在使用点上时，只重算这个使用点展开出的节点；替换片段定义时，只重算用到它的使用点。片段成环、过深或过大时 `load` 直接抛错。
+
+两者都经 `definePartPlugin({ modifiers, fragments })` 登记，冲突与替换规则与 part 相同。
+
 ## 插件替换与卸载
 
 - `host.use(plugin)` 安装插件；它提供的部件、规则和实现进入目录。

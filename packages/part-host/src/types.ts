@@ -78,6 +78,46 @@ export type IFeatureRecordLike = Readonly<Record<string, unknown>>
 /** Resource: a PH Feature with parameter, result and command schemas plus its descriptor. */
 export type IResourceDefinition = IDefinition & { readonly feature: unknown }
 
+/**
+ * Per-subscription instance of a modifier. `handle` runs synchronously in the listener; calling
+ * `next` passes the event on (once per event; later calls are ignored, calls after the subscription
+ * is removed do nothing). `next(detail)` replaces the detail the effect receives. `element` is the
+ * part element of this event: the subscribed element, or the row instance for a delegated
+ * subscription.
+ */
+export type IModifierInstance = {
+  handle(event: unknown, next: (detail?: unknown) => void, element: unknown): void
+  dispose?(): void
+}
+
+/**
+ * What a modifier instance receives at creation. `emit` runs the rest of the chain after this
+ * modifier for a new event, for gestures that produce several events from one subscription.
+ * `siblings` lists the ids of every modifier of the subscription in order.
+ */
+export type IModifierContext = {
+  readonly address: string
+  readonly element: unknown
+  readonly siblings: readonly string[]
+  emit(event: unknown, detail?: unknown): void
+}
+
+/** Listener position chosen by a placement modifier. */
+export type IModifierPlacement = { readonly target: unknown; readonly capture: boolean }
+
+/** Modifier: a step of an event subscription's listener chain, executed by the DOM plugin. */
+export type IModifierDefinition<TArgs> = IDefinition & {
+  readonly argsSchema?: IStandardSchemaInput
+  readonly place?: (element: unknown, args: TArgs) => IModifierPlacement
+  readonly create: (args: TArgs, context: IModifierContext) => IModifierInstance
+}
+
+/** Fragment: a reusable blueprint subtree expanded at load time. */
+export type IFragmentDefinition<TArgs> = IDefinition & {
+  readonly argsSchema?: IStandardSchemaInput
+  readonly __args?: TArgs
+}
+
 /** Renderer implementation entry stored opaquely by the catalog. */
 export type IPartImplementation = {
   readonly renderer: string
@@ -92,12 +132,27 @@ export type IPartPluginSpec = {
   readonly enhancers?: readonly IEnhancerDefinition<never>[]
   readonly derives?: readonly IDeriveDefinition<never, unknown>[]
   readonly effects?: readonly IEffectDefinition[]
+  readonly modifiers?: readonly IModifierDefinition<never>[]
+  readonly fragments?: readonly IFragmentDefinition<unknown>[]
   readonly resources?: Readonly<Record<string, IResourceDefinition>>
   readonly rules?: readonly IRuleDefinition<unknown>[]
   readonly kinds?: Readonly<Record<string, IKindSchema>>
   readonly implementations?: readonly IPartImplementation[]
   readonly override?: readonly string[]
   readonly features?: IFeatureRecord
+  /**
+   * Runs once per generation after its catalog entries are registered, with this plugin's resolved
+   * Feature outputs and the generation's lifetime signal (aborted on release).
+   */
+  readonly onInstall?: (
+    features: Readonly<Record<string, unknown>>,
+    signal: IGenerationSignal
+  ) => void
+}
+
+/** The part of a generation's lifetime signal handed to `onInstall`. */
+export type IGenerationSignal = {
+  addEventListener(type: 'abort', listener: () => void, options: { readonly once: true }): void
 }
 
 /** One resolved style rule for an address. */
