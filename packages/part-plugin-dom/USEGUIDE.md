@@ -15,6 +15,7 @@
 | 在捕获阶段先拿到事件                           | 订阅选项 `capture: true`                  | [捕获阶段](#捕获阶段)                            |
 | 一千行列表不要一千个监听器                     | `events.delegate`                         | [列表事件委托](#列表事件委托)                    |
 | 主题色只改一处                                 | `styleHooks`、`stylesheet`                | [样式](#样式)                                    |
+| 侧栏可拖动调宽、窄屏折叠、F6 切换区域 | `layout.attach` | [布局](#布局) |
 
 ## 焦点恢复
 
@@ -98,6 +99,18 @@ dom.events.delegate('orders/rows/item', listElement, 'click', subscription, decl
 ## 样式
 
 每个宿主一张构造样式表，按（层，地址）保存规则并原地更新。一条地址规则同时匹配该地址的所有行实例，所以列表行共享一份样式。蓝图只能通过 part 声明的 `styleHooks` 写样式，值按 hook 类型校验。
+
+## 布局
+
+布局 part（带 `behavior.layout`，见 `@migaia/part-layouts`）由渲染插件创建元素，再在提交期调用 `layout.attach({ blueprintId, node, element, regions, separators, toggles, skip })`，卸载前调用返回的撤销函数。区域元素的 id 用 `layoutRegionId(地址, 区域名)` 生成，渲染期就能写出跳转链接的 `href`。
+
+- **网格**：尺寸写在样式表专用的 `layout` 层（层顺序 `tokens, parts, blueprint, local, layout, stacking`），不写 `style` 属性。可调区域与 `main` 之间各有一条 6 像素的分隔条轨道；`main` 不写尺寸时占满剩余空间；区域内容超出时独立滚动。
+- **分隔条**：可用指针拖动，也可聚焦后用方向键调节（每次 10 像素，Shift 50 像素，Home/End 到最小/最大）。朝 `main` 方向移动总是让区域变宽，RTL 页面按视觉方向处理。调整后的宽度保存在 `localStorage`（键 `part-layout:<蓝图 id>:<布局地址>:<区域名>`），下次优先使用；`localStorage` 不可用时只在当前页面内保留，不报错。
+- **折叠**：布局容器宽度小于区域的 `collapseBelow` 时，区域收起成抽屉，布局右上角出现以区域标签命名的开关按钮。抽屉使用浏览器的 Popover API：再按开关、Esc 或点击外部都会关闭，打开时焦点进入抽屉，关闭后回到开关。容器变宽后抽屉自动关闭并恢复原位。
+- **F6**：F6 / Shift+F6 在页面上所有未折叠的区域之间移动焦点（焦点不在任何区域时进入第一个或最后一个区域）。每个文档只注册一个监听，多个宿主共用。注意：部分浏览器把 F6 用作地址栏快捷键，页面挂了布局后这个快捷键在页面内不再生效。
+- **跳到主内容**：跳转链接平时裁剪成 1 像素，获得键盘焦点时显示在布局左上角。
+
+写渲染插件时也可以用 `stylesheet.setLayout(地址, 规则)` 直接写 `layout` 层：规则的 `target` 为 `root`、`region:<名>`、`separator:<名>`、`toggle:<名>` 或 `skip`，可带 `state: 'focus-visible'`，选择器由本包生成。
 
 ## aria
 

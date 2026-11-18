@@ -19,6 +19,7 @@ const host = await createPartHost({ plugins: [domPlugin, reactPlugin, appPlugin]
 - **样式**：每个宿主一张样式表，按（层，地址）保存规则，原地更新。
 - **事件**：`dom` 与 `custom` 事件用 `addEventListener` 注册，修饰符同步执行；`custom` 事件名必须以插件名加冒号开头。`outside` 修饰符把监听挂到文档的捕获阶段，只在事件发生于 part 元素之外时触发，所以外层 `stopPropagation` 挡不住它；它只用于 `dom` 事件。捕获阶段监听用订阅的 `capture: true`。`delegate` 为模板节点的每个事件在模板宿主上只挂一个监听，按事件目标找到所在的行实例，以 `…@row:<键>` 地址派发。
 - **aria**：关联属性中的地址解析为目标元素的 id，并写入 `data-part-address`。`applyStates` 把由状态派生的值写成 `aria-<名称>`，`undefined`/`null` 移除该属性。
+- **布局**：`layout.attach` 给布局 part 加上区域地标属性、可拖动并记住宽度的分隔条、窄屏折叠成抽屉，以及 F6 区域切换；尺寸写在专用的 `layout` 层。
 - **模板行样式**：一条地址规则同时匹配该地址的全部行实例。
 
 由组件自己管理焦点与层级的 part（`managedBy: 'component'`，例如 Radix）不经过焦点与层级管理。

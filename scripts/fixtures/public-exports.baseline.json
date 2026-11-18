@@ -386,7 +386,8 @@
         "LAYER_Z_INDEX",
         "PartDomErrorCode",
         "domPlugin",
-        "idForAddress"
+        "idForAddress",
+        "layoutRegionId"
       ]
     },
     "@migaia/part-plugin-react": {

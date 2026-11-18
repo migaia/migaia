@@ -14,8 +14,9 @@ import { AriaWriter } from './aria.ts'
 import { EventAdapter } from './events.ts'
 import { FocusManager } from './focus.ts'
 import { LayerManager } from './layer.ts'
+import { LayoutManager, type ILayoutHandle } from './layout/attachment.ts'
 import { BUILTIN_MODIFIERS } from './modifiers.ts'
-import { StyleSheetWriter } from './stylesheet.ts'
+import { StyleSheetWriter, type ILayoutRule } from './stylesheet.ts'
 
 /**
  * Features the DOM plugin provides to renderer plugins. When a host-managed part opens, call
@@ -42,6 +43,15 @@ export type IDomFeatures = {
     apply(rules: readonly IStyleRule[]): void
     remove(address: string): void
     setStacking(address: string, zIndex: number | undefined): void
+    setLayout(address: string, rules: readonly ILayoutRule[]): void
+  }
+  /**
+   * Layout behaviour. A renderer calls `attach` at commit time with the layout root, region,
+   * separator, toggle and skip-link elements, and calls the returned function before removing
+   * them.
+   */
+  readonly layout: {
+    attach(handle: ILayoutHandle): () => void
   }
   readonly events: {
     subscribe(
@@ -98,6 +108,8 @@ class DomServices {
   readonly focusManager = new FocusManager()
   /** Layer manager using the shared style writer. */
   readonly layerManager = new LayerManager(this.stylesheet)
+  /** Layout manager using the shared style writer. */
+  readonly layoutManager = new LayoutManager(this.stylesheet)
   /** Aria writer. */
   readonly aria = new AriaWriter()
   /** Event adapter forwarding to the host. */
@@ -131,8 +143,14 @@ class DomServices {
     }
   }
 
-  /** Releases page state: layers, inert values through closes, and the style sheet. */
+  /** Layout surface. */
+  get layout(): IDomFeatures['layout'] {
+    return { attach: (handle) => this.layoutManager.attach(handle) }
+  }
+
+  /** Releases page state: layouts, layers, inert values through closes, and the style sheet. */
   release(): void {
+    this.layoutManager.releaseAll()
     this.layerManager.closeAll()
     this.stylesheet.detach()
   }
@@ -162,6 +180,9 @@ const domFeatures = {
     services: servicesFeature
   } as never),
   aria: defineFeature((_core, deps: { readonly services: DomServices }) => deps.services.aria, {
+    services: servicesFeature
+  } as never),
+  layout: defineFeature((_core, deps: { readonly services: DomServices }) => deps.services.layout, {
     services: servicesFeature
   } as never)
 }

@@ -15,6 +15,7 @@ See the [README](./README.en.md) for what the package is for. Applications rarel
 | Receive an event in the capture phase                        | subscription option `capture: true` | [Capture phase](#capture-phase)         |
 | A thousand-row list without a thousand listeners             | `events.delegate`                | [List event delegation](#list-event-delegation) |
 | Change a theme colour in one place                           | `styleHooks`, `stylesheet`       | [Styles](#styles)                          |
+| Resizable sidebar, narrow-screen collapse, F6 between regions | `layout.attach` | [Layouts](#layouts) |
 
 ## Focus restore
 
@@ -98,6 +99,18 @@ For each event, the listener walks up from the target through elements with `dat
 ## Styles
 
 Each host has one constructed style sheet keeping rules per (layer, address) and updating them in place. A rule for an address also matches every row instance of it, so list rows share one set of rules. Blueprints can style only through the `styleHooks` a part declares, and values are checked against the hook type.
+
+## Layouts
+
+For a layout part (one with `behavior.layout`; see `@migaia/part-layouts`) the renderer creates the elements and calls `layout.attach({ blueprintId, node, element, regions, separators, toggles, skip })` at commit time, then the returned undo function before unmounting. Region element ids come from `layoutRegionId(address, region)`, so the skip link's `href` can be written while rendering.
+
+- **Grid**: sizes go to a dedicated `layout` cascade layer of the style sheet (order `tokens, parts, blueprint, local, layout, stacking`), never a `style` attribute. Each resizable region has a 6-pixel separator track between it and `main`; `main` without a size fills the remaining space; each region scrolls on its own.
+- **Separators**: drag with a pointer, or focus and use the arrow keys (10 pixels per press, 50 with Shift; Home and End go to the minimum and maximum). Moving toward `main` always widens the region; right-to-left pages follow the visual direction. The new width is saved in `localStorage` (key `part-layout:<blueprint id>:<layout address>:<region>`) and preferred next time; without `localStorage` it lasts for the current page only, with no error.
+- **Collapse**: when the layout container is narrower than a region's `collapseBelow`, the region becomes a drawer and a toggle button named by the region label appears at the layout's top end corner. The drawer uses the browser Popover API: the toggle, Escape or an outside click closes it; opening moves focus into the drawer and closing returns it to the toggle. When the container widens again the drawer closes and the region returns to its place.
+- **F6**: F6 and Shift+F6 move focus between every region on the page that is not collapsed (from outside any region they enter the first or last one). One listener per document is shared by all hosts. Some browsers use F6 to focus the address bar; on a page with a layout that shortcut no longer works inside the page.
+- **Skip to main content**: the skip link is clipped to one pixel and appears at the layout's top start corner when it receives keyboard focus.
+
+A renderer may also write the `layout` layer directly with `stylesheet.setLayout(address, rules)`: a rule's `target` is `root`, `region:<name>`, `separator:<name>`, `toggle:<name>` or `skip`, optionally with `state: 'focus-visible'`; this package generates the selectors.
 
 ## Aria
 

@@ -13,8 +13,12 @@ export const LAYER_Z_INDEX: Readonly<Record<LayerLevel, number>> = {
   toast: 1300
 }
 
-/** Cascade layer order of host style sheets; `stacking` holds only layer-manager z-index rules. */
-export const STYLE_LAYERS = ['tokens', 'parts', 'blueprint', 'local', 'stacking'] as const
+/**
+ * Cascade layer order of host style sheets. `layout` holds only layout-attachment rules (grid
+ * tracks, region placement, separators, toggles, skip link); `stacking` holds only layer-manager
+ * z-index rules.
+ */
+export const STYLE_LAYERS = ['tokens', 'parts', 'blueprint', 'local', 'layout', 'stacking'] as const
 
 /** One cascade layer name. */
 export type IStyleLayer = (typeof STYLE_LAYERS)[number]

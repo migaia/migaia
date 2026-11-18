@@ -26,7 +26,8 @@ export async function createDomHarness(options: IPartHostOptions = {}): Promise<
         layer: domPlugin.getFeature('layer'),
         stylesheet: domPlugin.getFeature('stylesheet'),
         events: domPlugin.getFeature('events'),
-        aria: domPlugin.getFeature('aria')
+        aria: domPlugin.getFeature('aria'),
+        layout: domPlugin.getFeature('layout')
       } as never)
     },
     install: (core: { readonly features: { readonly dom: IDomFeatures } }) => {
