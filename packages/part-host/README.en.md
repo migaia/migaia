@@ -19,6 +19,8 @@ const { tree, issues } = await host.blueprint.load(blueprint)
 
 `load` runs authored rules, applies enhancers per tag, then runs resolved rules; with any error `tree` is `undefined`. `patch` takes JSON Patch operations and re-enhances only affected addresses.
 
+Resolved nodes carry `ariaStates` (aria attribute to state path) and, on template hosts, `template: { rowKey, rows, node }`. When `host.dispatch` receives a row-instance address (`…@row:<key>`), it uses the static node's subscription and passes `rowKey` in the effect event.
+
 ## Definitions
 
 - `definePart`: structure, behavior groups, events, slots and style hooks.

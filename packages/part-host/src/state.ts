@@ -8,6 +8,17 @@ import type { IDeriveDefinition, IDeriveStateView, IResolvedNode, IScopeState } 
 type IStateBinding = { readonly $state: string }
 /** Binding object referencing a derive. */
 type IDeriveBinding = { readonly $derive: string }
+/** Binding object reading a field of the current template row. */
+type IRowBinding = { readonly $row: string }
+
+/** True for a `{ $row }` binding. */
+function isRowBinding(value: unknown): value is IRowBinding {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { $row?: unknown }).$row === 'string'
+  )
+}
 
 /** True for a `{ $state }` binding. */
 function isStateBinding(value: unknown): value is IStateBinding {
@@ -113,9 +124,13 @@ export class ScopeState implements IScopeState {
     return computed.value
   }
 
-  /** Resolves a facet value: bindings read state or derives, literals pass through. */
-  resolve(_node: IResolvedNode, value: unknown): unknown {
+  /**
+   * Resolves a facet value: `$state` and `$derive` bindings read state or derives, `$row` reads a
+   * field of the given template row (`undefined` outside a row), literals pass through.
+   */
+  resolve(_node: IResolvedNode, value: unknown, row?: Readonly<Record<string, unknown>>): unknown {
     if (isStateBinding(value)) return this.read(value.$state)
+    if (isRowBinding(value)) return row?.[value.$row]
     if (isDeriveBinding(value)) return this.derived(value.$derive)
     return value
   }

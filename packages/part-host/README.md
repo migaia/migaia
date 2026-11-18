@@ -19,6 +19,8 @@ const { tree, issues } = await host.blueprint.load(blueprint)
 
 `load` 先运行 authored 规则，再按 tag 执行增强器，最后运行 resolved 规则；有 error 时 `tree` 为 `undefined`。`patch` 接收 JSON Patch，只对受影响的地址重新增强。
 
+解析后的节点带 `ariaStates`（aria 属性到状态路径）和模板宿主的 `template: { rowKey, rows, node }`。`host.dispatch` 收到行实例地址（`…@row:<键>`）时使用静态节点的订阅，并把 `rowKey` 放进 effect 事件。
+
 ## 定义
 
 - `definePart`：组件结构、行为配置组、事件、slot、style hooks。

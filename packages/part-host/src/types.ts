@@ -68,6 +68,8 @@ export type IEffectEvent = {
   readonly address: string
   readonly name: string
   readonly detail: unknown
+  /** Row key when the event came from a template-row instance (`…@row:<key>`). */
+  readonly rowKey?: string
 }
 
 /** Feature reference map accepted as effect dependencies. */
@@ -112,8 +114,24 @@ export type IResolvedNode = {
   readonly behavior: IBehavior
   readonly config: IPartFacets
   readonly derivedAria: Readonly<Record<string, string>>
+  /**
+   * State-derived aria: attribute name (without `aria-`) to the state path whose current value the
+   * renderer writes as `aria-<name>`. Renderers read these paths tracked, so a state change updates
+   * the attribute without a re-resolve.
+   */
+  readonly ariaStates: Readonly<Record<string, string>>
   readonly tabIndex?: 0 | -1
   readonly openStatePath?: string
+  /**
+   * Template of a template host: the row key field, the authored rows value (binding or literal)
+   * and the resolved template node. Renderers repeat the node once per row and give each instance
+   * the address `<template node address>@row:<key>`.
+   */
+  readonly template?: {
+    readonly rowKey: string
+    readonly rows: unknown
+    readonly node: IResolvedNode
+  }
   readonly styleRules: readonly IStyleRule[]
   readonly children: readonly IResolvedNode[]
   readonly slots: Readonly<Record<string, readonly IResolvedNode[]>>
@@ -142,7 +160,7 @@ export type IScopeState = {
   readonly runtime: IRuntime
   read(path: string): unknown
   write(path: string, value: unknown): void
-  resolve(node: IResolvedNode, value: unknown): unknown
+  resolve(node: IResolvedNode, value: unknown, row?: Readonly<Record<string, unknown>>): unknown
 }
 
 /** Catalog surface of a host. */

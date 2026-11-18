@@ -125,9 +125,9 @@ class StateFeature {
     this.#core.state().write(path, value)
   }
 
-  /** Resolves a facet value of a node. */
-  resolve(node: IResolvedNode, value: unknown): unknown {
-    return this.#core.state().resolve(node, value)
+  /** Resolves a facet value of a node; `row` feeds `$row` bindings of template-row instances. */
+  resolve(node: IResolvedNode, value: unknown, row?: Readonly<Record<string, unknown>>): unknown {
+    return this.#core.state().resolve(node, value, row)
   }
 }
 

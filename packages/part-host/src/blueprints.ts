@@ -4,6 +4,7 @@ import {
   parseBlueprint,
   tagSegmentName,
   type IAddressIndex,
+  type IBehavior,
   type IBlueprint,
   type IIssue,
   type IJsonPatchOperation,
@@ -212,12 +213,19 @@ export class BlueprintStore {
     /** Open-state prop name, when the part declares one. */
     const openState = behavior.states?.openState
     /** Open-state path, when the part declares one. */
-    const openStatePath = this.#openStatePath(address, openState, enhancedConfig)
-    /** Configuration with the open-state prop bound to its path, so renderers read and write one place. */
+    const openStatePath =
+      openState === undefined ? undefined : this.#statePath(address, openState, enhancedConfig)
+    /**
+     * Configuration with the open-state prop bound to its path, so renderers read and write one
+     * place.
+     */
     const config =
       openState === undefined || openStatePath === undefined
         ? enhancedConfig
-        : { ...enhancedConfig, props: { ...enhancedConfig.props, [openState]: { $state: openStatePath } } }
+        : {
+            ...enhancedConfig,
+            props: { ...enhancedConfig.props, [openState]: { $state: openStatePath } }
+          }
     /** Slot members resolved per slot name. */
     const slots: Record<string, IResolvedNode[]> = {}
     for (const [name, members] of Object.entries(node.facets?.slots ?? {}))
@@ -228,28 +236,51 @@ export class BlueprintStore {
       behavior,
       config,
       derivedAria: derivedAria(behavior.aria),
+      ariaStates: this.#ariaStates(address, behavior, enhancedConfig),
       ...tabIndexOf(config),
       ...(openStatePath === undefined ? {} : { openStatePath }),
       styleRules: styleRules(address, config, definition),
       children: (node.children ?? []).map((child) => this.#resolve(child, index, enhanced)),
-      slots
+      slots,
+      ...(node.template === undefined
+        ? {}
+        : {
+            template: {
+              rowKey: node.template.rowKey,
+              rows: node.template.rows,
+              node: this.#resolve(node.template.node, index, enhanced)
+            }
+          })
     }
   }
 
-  /** Open-state path of a node, seeding the part-scope signal from a literal. */
-  #openStatePath(
-    address: string,
-    openState: string | undefined,
-    config: IPartFacets
-  ): string | undefined {
-    if (openState === undefined) return undefined
-    /** Authored value of the open-state prop. */
-    const value = config.props?.[openState]
+  /**
+   * State path of one declared state of a node. A `$state` binding on the prop of the same name
+   * wins; otherwise the state lives at `part.<address>.<name>`, seeded from the authored literal
+   * (or `false`) so renderers and aria read one place.
+   */
+  #statePath(address: string, name: string, config: IPartFacets): string {
+    /** Authored value of the state prop. */
+    const value = config.props?.[name]
     if (isStateBinding(value)) return value.$state
     /** Part-scope path for literal or absent values. */
-    const path = `part.${address}.${openState}`
+    const path = `part.${address}.${name}`
     this.#state.seed(path, value ?? false)
     return path
+  }
+
+  /** State-derived aria of a node: attribute name to the state path whose value it mirrors. */
+  #ariaStates(
+    address: string,
+    behavior: IBehavior,
+    config: IPartFacets
+  ): Readonly<Record<string, string>> {
+    /** Collected attribute paths. */
+    const result: Record<string, string> = {}
+    for (const [name, derivation] of Object.entries(behavior.aria ?? {}))
+      if ('fromState' in derivation)
+        result[name] = this.#statePath(address, derivation.fromState, config)
+    return result
   }
 }
 

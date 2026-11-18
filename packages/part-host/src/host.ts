@@ -6,6 +6,7 @@ import {
 } from '@migaia/plugin-host'
 import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
 import { featuresModule } from '@migaia/plugin-host/features'
+import { formatAddress, parseAddress } from '@migaia/part-contract'
 import { createRuntime } from '@migaia/reactive'
 import { BlueprintStore } from './blueprints.ts'
 import { CoreRuntime, partCorePlugin } from './core.ts'
@@ -141,13 +142,23 @@ class PartHost implements IPartHost {
     return new MountHandle(mount, (released) => set.delete(released))
   }
 
-  /** Dispatches an event to the subscription of an address. */
+  /**
+   * Dispatches an event to the subscription of an address. A template-row instance address
+   * (`…@row:<key>`) uses the subscription of its static node and passes the row key to the effect.
+   */
   async dispatch(address: string, event: string, detail: unknown): Promise<void> {
     this.#assertOpen()
-    /** Subscription of the event, if any. */
-    const subscription = this.#store.node(address)?.facets?.events?.[event]
+    /** Static address plus the row key of a template-row instance address. */
+    const { segments, rowKey } = parseAddress(address)
+    /** Subscription of the event on the static node, if any. */
+    const subscription = this.#store.node(formatAddress({ segments }))?.facets?.events?.[event]
     if (subscription === undefined || !matchesFilter(subscription.filter, detail)) return
-    await this.#effects.run(subscription.handler, { address, name: event, detail })
+    await this.#effects.run(subscription.handler, {
+      address,
+      name: event,
+      detail,
+      ...(rowKey === undefined ? {} : { rowKey })
+    })
   }
 
   /** Installs a plugin. */
