@@ -1,3 +1,8 @@
+import {
+  normalizeEventEntry,
+  type IEventDeclaration,
+  type IEventSubscription
+} from '@migaia/part-contract'
 import type { IResolvedNode } from '@migaia/part-host'
 import type { IDomFeatures } from '@migaia/part-plugin-dom'
 
@@ -10,6 +15,15 @@ export type ICommitServices = {
    * host and its style rules are owned by the host, so the instance installs neither.
    */
   readonly rowInstance?: boolean
+}
+
+/** Declaration of the event a possibly shorthand key (`click.once`) subscribes to. */
+function declarationOf(
+  declarations: Readonly<Record<string, IEventDeclaration>>,
+  key: string,
+  subscription: IEventSubscription
+): IEventDeclaration | undefined {
+  return declarations[normalizeEventEntry(key, subscription).name]
 }
 
 /**
@@ -55,9 +69,15 @@ export class NodeCommit {
       dom.stylesheet.apply(node.styleRules)
       /** Event declarations of the part. */
       const declarations = node.definition.descriptor.events ?? {}
-      for (const [name, subscription] of Object.entries(node.config.events ?? {}))
+      for (const [key, subscription] of Object.entries(node.config.events ?? {}))
         this.#unsubscribers.push(
-          dom.events.subscribe(node.address, element, name, subscription, declarations[name])
+          dom.events.subscribe(
+            node.address,
+            element,
+            key,
+            subscription,
+            declarationOf(declarations, key, subscription)
+          )
         )
     }
     if (node.template !== undefined) this.#delegate(node.template.node, element)
@@ -75,9 +95,15 @@ export class NodeCommit {
     dom.stylesheet.apply(template.styleRules)
     /** Event declarations of the template part. */
     const declarations = template.definition.descriptor.events ?? {}
-    for (const [name, subscription] of Object.entries(template.config.events ?? {}))
+    for (const [key, subscription] of Object.entries(template.config.events ?? {}))
       this.#unsubscribers.push(
-        dom.events.delegate(template.address, element, name, subscription, declarations[name])
+        dom.events.delegate(
+          template.address,
+          element,
+          key,
+          subscription,
+          declarationOf(declarations, key, subscription)
+        )
       )
   }
 
