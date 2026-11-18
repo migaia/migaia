@@ -27,5 +27,24 @@ export const PartContractErrorText = {
   /** A value failed argument validation. */
   argsInvalid: 'arguments failed schema validation',
   /** A rule threw while checking. */
-  ruleFailed: (rule: string): string => `rule ${rule} threw while checking`
+  ruleFailed: (rule: string): string => `rule ${rule} threw while checking`,
+  /** An events record key has a malformed shorthand segment. */
+  eventKey: (key: string, segment: string): string =>
+    `event key "${key}" has invalid segment "${segment}"`,
+  /** A modifier reference is not `name@major` or `{ id: name@major }`. */
+  modifierRef: (path: string): string =>
+    `modifier at ${path} must be "name@major" or { id: "name@major", args? }`,
+  /** A fragment usage carries children, a template or facets other than props and slots. */
+  fragmentUsage: (path: string): string =>
+    `fragment usage at ${path} may only carry id, props and slots`,
+  /** A fragment descriptor's subtree is malformed. */
+  fragmentBody: (id: string): string =>
+    `fragment ${id} must carry a node; $param may not appear in id, tag or slot names; each $slot once`,
+  /** A fragment expands into itself. */
+  fragmentCycle: (id: string): string => `fragment ${id} expands into itself`,
+  /** Fragment nesting is too deep. */
+  fragmentTooDeep: (limit: number): string => `fragment expansion is nested deeper than ${limit}`,
+  /** Fragment expansion produced too many nodes. */
+  fragmentTooLarge: (limit: number): string =>
+    `fragment expansion produced more than ${limit} nodes`
 } as const

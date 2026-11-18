@@ -41,7 +41,19 @@ export const PartContractErrorCode = {
    * A rule's `check` threw. Reported as an issue, never thrown, so other rules still run; the
    * original error is on the issue's `cause`. Fix the rule.
    */
-  ruleFailed: 'RULE_FAILED'
+  ruleFailed: 'RULE_FAILED',
+  /**
+   * `expandFragments` met a fragment id again on its own expansion path. Remove the self reference
+   * from the fragment definitions; the expansion path is on `cause`.
+   */
+  fragmentCycle: 'FRAGMENT_CYCLE',
+  /** Fragment expansion nested deeper than the fixed limit of 16 levels. Reduce nesting. */
+  fragmentTooDeep: 'FRAGMENT_TOO_DEEP',
+  /**
+   * Fragment expansion produced more than the fixed limit of 10000 nodes; expansion stops as soon
+   * as the limit is passed, so its cost stays bounded. Reduce nesting or repetition.
+   */
+  fragmentTooLarge: 'FRAGMENT_TOO_LARGE'
 } as const
 
 /** Value union of every `part.contract` error code. */

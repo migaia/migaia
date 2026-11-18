@@ -23,7 +23,7 @@ const issues = engine.run('authored', parseBlueprint(input))
 
 ## 规则
 
-`/doctor` 导出 26 条内置规则，分为 html、aria、slot、catalog、style、event、flow、behavior 八组。规则只有 `authored`（原始蓝图）和 `resolved`（增强后）两个阶段；渲染后的检查由 `partom doctor --rendered` 完成。`authored` 阶段会把增强器 `writes` 声明的字段视为会被补上。
+`/doctor` 导出 29 条内置规则，分为 html、aria、slot、catalog、style、event、flow、behavior 八组。规则只有 `authored`（原始蓝图）和 `resolved`（增强后）两个阶段；渲染后的检查由 `partom doctor --rendered` 完成。`authored` 阶段会把增强器 `writes` 声明的字段视为会被补上。
 
 规则抛错时不会中断其他规则，而是产生一条 `RULE_FAILED` 问题，原错误在问题的 `cause` 上。
 

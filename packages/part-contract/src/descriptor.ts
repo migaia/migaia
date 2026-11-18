@@ -3,15 +3,19 @@ import { PartContractErrorText } from './error-text.ts'
 import { createPartContractError } from './errors.ts'
 import type { IDescriptor, IKindSchema } from './types.ts'
 
-/** Built-in kinds; this list has a fixed size of six, so membership checks are constant time. */
+/** Built-in kinds; this list has a fixed size of eight, so membership checks are constant time. */
 const BUILTIN_KINDS: ReadonlySet<string> = new Set([
   'part',
   'enhancer',
   'derive',
   'resource',
   'effect',
-  'rule'
+  'rule',
+  'modifier',
+  'fragment'
 ])
+/** Event kinds a modifier may name; fixed size two. */
+const MODIFIER_EVENT_KINDS: ReadonlySet<string> = new Set(['dom', 'custom'])
 /** Descriptor id grammar: name, `@`, non-negative integer major. */
 const ID_PATTERN = /^[A-Za-z0-9_.:/-]+@\d+$/
 /** Namespaced meta key grammar: at least one dot between non-empty parts. */
@@ -67,5 +71,64 @@ export function validateDescriptor(
     for (const key of Object.keys(descriptor.meta))
       if (!META_KEY_PATTERN.test(key)) invalid(PartContractErrorText.descriptorMeta(key))
   }
+  if (descriptor.kind === 'modifier') checkModifier(descriptor)
+  if (descriptor.kind === 'fragment') checkFragment(descriptor)
   return descriptor as unknown as IDescriptor
+}
+
+/** A modifier declares its event kinds and whether it moves the listener. */
+function checkModifier(descriptor: Record<string, unknown>): void {
+  /** Declared event kinds. */
+  const kinds = descriptor.eventKinds
+  if (
+    !Array.isArray(kinds) ||
+    kinds.length === 0 ||
+    !kinds.every((kind) => MODIFIER_EVENT_KINDS.has(String(kind))) ||
+    typeof descriptor.placement !== 'boolean'
+  )
+    invalid(PartContractErrorText.descriptorShape)
+}
+
+/** True for a `{ $param }` placeholder. */
+function isParam(value: unknown): boolean {
+  return isRecord(value) && typeof value.$param === 'string'
+}
+
+/** True for a `{ $slot }` placeholder. */
+function isSlotPlaceholder(value: unknown): value is { readonly $slot: string } {
+  return isRecord(value) && typeof value.$slot === 'string'
+}
+
+/**
+ * Walks a fragment subtree: ids, tags and slot names must be literal, and each `{ $slot }` name
+ * appears at most once. Recursion depth equals the subtree depth.
+ */
+function checkFragmentNode(id: string, node: unknown, seenSlots: Set<string>): void {
+  if (!isRecord(node) || typeof node.tag !== 'string' || isParam(node.id) || isParam(node.tag))
+    invalid(PartContractErrorText.fragmentBody(id))
+  /** Facet slot groups of the node. */
+  const slots = isRecord(node.facets) ? node.facets.slots : undefined
+  if (isRecord(slots))
+    for (const members of Object.values(slots))
+      for (const member of Array.isArray(members) ? members : [])
+        checkFragmentNode(id, member, seenSlots)
+  for (const child of Array.isArray(node.children) ? node.children : []) {
+    if (!isSlotPlaceholder(child)) {
+      checkFragmentNode(id, child, seenSlots)
+      continue
+    }
+    if (seenSlots.has(child.$slot)) invalid(PartContractErrorText.fragmentBody(id))
+    seenSlots.add(child.$slot)
+  }
+  if (isRecord(node.template)) checkFragmentNode(id, node.template.node, seenSlots)
+}
+
+/** A fragment carries a subtree whose placeholders keep addresses independent of parameters. */
+function checkFragment(descriptor: Record<string, unknown>): void {
+  /** Fragment body. */
+  const body = descriptor.fragment
+  /** Descriptor id for messages. */
+  const id = String(descriptor.id)
+  if (!isRecord(body)) invalid(PartContractErrorText.fragmentBody(id))
+  checkFragmentNode(id, body.node, new Set())
 }

@@ -1,41 +1,61 @@
+import { eventEntries, modifierId } from '../event-key.ts'
 import { defineRule, type IRuleContext } from '../rules.ts'
-import type { IEventDeclaration, IEventSubscription } from '../types.ts'
+import type { IEventDeclaration, IEventSubscription, IPartAddress } from '../types.ts'
 import { isDeriveBinding, isStateBinding, partOf, target } from './shared.ts'
 import { DOM_EVENTS, NAMESPACED_EVENT, STATE_PATH, Z_INDEX_KEYS } from './tables.ts'
 
 /** Both built-in phases. */
 const BOTH = ['authored', 'resolved'] as const
 
-/** One subscription of the node under check with its declaration, if the part declares it. */
+/** Id of the built-in modifier that cancels the default action. */
+const PREVENT_MODIFIER = 'prevent@1'
+
+/**
+ * One subscription of the node under check: its record key (issue path), event name, normalized
+ * subscription and declaration. A `native` subscription listens for the DOM event, so it has no
+ * declaration.
+ */
 type ISubscriptionView = {
+  readonly key: string
   readonly name: string
   readonly subscription: IEventSubscription
   readonly declaration: IEventDeclaration | undefined
 }
 
-/** Subscriptions of the node under check, paired with their declarations. */
+/** Subscriptions of the node under check, normalized from shorthand keys, with declarations. */
 function subscriptionsOf(context: IRuleContext<unknown>): readonly ISubscriptionView[] {
   /** Node under check. */
   const { node } = target(context)
   /** Declarations of the part. */
   const declarations = partOf(context, node)?.events ?? {}
-  return Object.entries(node.facets?.events ?? {}).map(([name, subscription]) => ({
-    name,
-    subscription,
-    declaration: declarations[name]
+  return eventEntries(node.facets?.events).map((entry) => ({
+    key: entry.key,
+    name: entry.name,
+    subscription: entry.subscription,
+    declaration: entry.subscription.native === true ? undefined : declarations[entry.name]
   }))
 }
 
-/** Reports one event issue at the node under check. */
-function reportEvent(context: IRuleContext<unknown>, name: string, messageKey: string): void {
-  context.report({ address: context.address as string, facet: 'events', path: name, messageKey })
+/** Event kind a subscription listens to: native and undeclared subscriptions are DOM events. */
+function kindOf(view: ISubscriptionView): IEventDeclaration['kind'] {
+  return view.declaration?.kind ?? 'dom'
+}
+
+/** Reports one event issue at the node under check; `path` defaults to the record key. */
+function reportEvent(
+  context: IRuleContext<unknown>,
+  key: string,
+  messageKey: string,
+  path: string = key
+): void {
+  context.report({ address: context.address as string, facet: 'events', path, messageKey })
 }
 
 /** Subscriptions to events the part does not declare and the DOM does not define. */
 function checkDeclared(context: IRuleContext<unknown>): void {
   for (const view of subscriptionsOf(context))
     if (view.declaration === undefined && !DOM_EVENTS.has(view.name))
-      reportEvent(context, view.name, 'event.declared')
+      reportEvent(context, view.key, 'event.declared')
 }
 
 /** Component events have no capture phase and no passive listeners. */
@@ -45,7 +65,7 @@ function checkComponentCapture(context: IRuleContext<unknown>): void {
       view.declaration?.kind === 'component' &&
       (view.subscription.capture === true || view.subscription.passive === true)
     )
-      reportEvent(context, view.name, 'event.component-no-capture')
+      reportEvent(context, view.key, 'event.component-no-capture')
 }
 
 /** Filter keys must be `reason` or detail fields; reason values must be declared. */
@@ -66,7 +86,7 @@ function checkFilterFields(context: IRuleContext<unknown>): void {
       /** Whether this filter entry is valid. */
       const valid =
         key === 'reason' ? values.every((reason) => reasons.has(String(reason))) : fields.has(key)
-      if (!valid) reportEvent(context, view.name, 'event.filter-fields')
+      if (!valid) reportEvent(context, view.key, 'event.filter-fields')
     }
   }
 }
@@ -75,25 +95,25 @@ function checkFilterFields(context: IRuleContext<unknown>): void {
 function checkCustomNamespace(context: IRuleContext<unknown>): void {
   for (const view of subscriptionsOf(context))
     if (view.declaration?.kind === 'custom' && !NAMESPACED_EVENT.test(view.name))
-      reportEvent(context, view.name, 'event.custom-namespace')
+      reportEvent(context, view.key, 'event.custom-namespace')
 }
 
 /** `prevent` has no effect on a custom event that is not cancelable. */
 function checkPreventCancelable(context: IRuleContext<unknown>): void {
   for (const view of subscriptionsOf(context))
     if (
-      view.subscription.modifiers?.includes('prevent') === true &&
+      (view.subscription.modifiers ?? []).some((ref) => modifierId(ref) === PREVENT_MODIFIER) &&
       view.declaration?.kind === 'custom' &&
       view.declaration.cancelable !== true
     )
-      reportEvent(context, view.name, 'event.prevent-cancelable')
+      reportEvent(context, view.key, 'event.prevent-cancelable')
 }
 
 /** Handlers must exist in the catalog. */
 function checkHandlerExists(context: IRuleContext<unknown>): void {
   for (const view of subscriptionsOf(context))
     if (context.catalog.get(view.subscription.handler) === undefined)
-      reportEvent(context, view.name, 'event.handler-exists')
+      reportEvent(context, view.key, 'event.handler-exists')
 }
 
 /** Synchronous handlers must run in the page trust tier. */
@@ -102,19 +122,85 @@ function checkSyncTier(context: IRuleContext<unknown>): void {
     if (view.subscription.sync !== true) continue
     /** Tier of the handler, when the handler declares one. */
     const tier = context.catalog.get(view.subscription.handler)?.tier
-    if (tier !== undefined && tier !== 'page') reportEvent(context, view.name, 'event.sync-tier')
+    if (tier !== undefined && tier !== 'page') reportEvent(context, view.key, 'event.sync-tier')
   }
 }
 
-/** The `outside` modifier listens on the document, so it applies only to DOM events. */
-function checkOutsideDom(context: IRuleContext<unknown>): void {
+/** Path of one modifier inside a subscription, for issue locations. */
+function modifierPath(key: string, position: number): string {
+  return `${key}/modifiers/${position}`
+}
+
+/** Every referenced modifier must be available in the catalog. */
+function checkModifierExists(context: IRuleContext<unknown>): void {
   for (const view of subscriptionsOf(context))
-    if (
-      view.subscription.modifiers?.includes('outside') === true &&
-      view.declaration !== undefined &&
-      view.declaration.kind !== 'dom'
-    )
-      reportEvent(context, view.name, 'event.outside-dom')
+    (view.subscription.modifiers ?? []).forEach((ref, position) => {
+      if (context.catalog.get(modifierId(ref))?.kind !== 'modifier')
+        reportEvent(context, view.key, 'event.modifier-exists', modifierPath(view.key, position))
+    })
+}
+
+/** A modifier applies only to the event kinds it declares; component callbacks take none. */
+function checkModifierKind(context: IRuleContext<unknown>): void {
+  for (const view of subscriptionsOf(context))
+    (view.subscription.modifiers ?? []).forEach((ref, position) => {
+      /** Event kinds the modifier declares, when it exists. */
+      const kinds = context.catalog.get(modifierId(ref))?.eventKinds
+      /** Kind of the subscribed event. */
+      const kind = kindOf(view)
+      if (kinds !== undefined && (kind === 'component' || !kinds.includes(kind)))
+        reportEvent(context, view.key, 'event.modifier-kind', modifierPath(view.key, position))
+    })
+}
+
+/**
+ * True when the node lies in a template subtree: some ancestor's `template.node` is on its path.
+ * The walk follows parent links, so it is bounded by the tree depth.
+ */
+function inTemplate(context: IRuleContext<unknown>, address: IPartAddress): boolean {
+  /** Current entry on the walk up. */
+  let current = context.index.get(address)
+  while (current?.parent !== undefined) {
+    /** Parent entry. */
+    const parent = context.index.get(current.parent)
+    if (parent?.node.template?.node === current.node) return true
+    current = parent
+  }
+  return false
+}
+
+/**
+ * At most one modifier per subscription may move the listener, and none on template nodes, whose
+ * listeners the template host delegates.
+ */
+function checkModifierPlacement(context: IRuleContext<unknown>): void {
+  /** Whether the node under check is delegated by a template host. */
+  const delegated = inTemplate(context, context.address as string)
+  for (const view of subscriptionsOf(context)) {
+    /** Placement modifiers seen so far in this subscription. */
+    let seen = 0
+    ;(view.subscription.modifiers ?? []).forEach((ref, position) => {
+      if (context.catalog.get(modifierId(ref))?.placement !== true) return
+      seen += 1
+      if (delegated || seen > 1)
+        reportEvent(context, view.key, 'event.modifier-placement', modifierPath(view.key, position))
+    })
+  }
+}
+
+/** Each repeated occurrence of a modifier id in one subscription is reported. */
+function checkModifierDuplicate(context: IRuleContext<unknown>): void {
+  for (const view of subscriptionsOf(context)) {
+    /** Ids seen so far. */
+    const seen = new Set<string>()
+    ;(view.subscription.modifiers ?? []).forEach((ref, position) => {
+      /** Id of the reference. */
+      const id = modifierId(ref)
+      if (seen.has(id))
+        reportEvent(context, view.key, 'event.modifier-duplicate', modifierPath(view.key, position))
+      seen.add(id)
+    })
+  }
 }
 
 /** Handlers must be effects, not derives or other kinds. */
@@ -122,7 +208,7 @@ function checkCallTarget(context: IRuleContext<unknown>): void {
   for (const view of subscriptionsOf(context)) {
     /** Kind of the handler, if it exists. */
     const kind = context.catalog.get(view.subscription.handler)?.kind
-    if (kind !== undefined && kind !== 'effect') reportEvent(context, view.name, 'flow.call-target')
+    if (kind !== undefined && kind !== 'effect') reportEvent(context, view.key, 'flow.call-target')
   }
 }
 
@@ -243,7 +329,7 @@ function checkOpenStateBinding(context: IRuleContext<unknown>): void {
     })
 }
 
-/** Event, flow and behavior rules; seventeen rules in total. */
+/** Event, flow and behavior rules; twenty rules in total. */
 export const behaviorRules = [
   defineRule({
     id: 'event.component-no-capture',
@@ -295,11 +381,32 @@ export const behaviorRules = [
     check: checkSyncTier
   }),
   defineRule({
-    id: 'event.outside-dom',
+    id: 'event.modifier-exists',
     scope: 'part',
     phase: BOTH,
     severity: 'error',
-    check: checkOutsideDom
+    check: checkModifierExists
+  }),
+  defineRule({
+    id: 'event.modifier-kind',
+    scope: 'part',
+    phase: BOTH,
+    severity: 'error',
+    check: checkModifierKind
+  }),
+  defineRule({
+    id: 'event.modifier-placement',
+    scope: 'part',
+    phase: BOTH,
+    severity: 'error',
+    check: checkModifierPlacement
+  }),
+  defineRule({
+    id: 'event.modifier-duplicate',
+    scope: 'part',
+    phase: BOTH,
+    severity: 'error',
+    check: checkModifierDuplicate
   }),
   defineRule({
     id: 'flow.derive-no-write',

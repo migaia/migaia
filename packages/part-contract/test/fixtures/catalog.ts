@@ -49,6 +49,10 @@ export const ruleDescriptors: readonly IDescriptor[] = [
     id: 'combo@1',
     behavior: { semantics: { element: 'input', pattern: 'combobox' } }
   },
+  { kind: 'modifier', id: 'stop@1', eventKinds: ['dom', 'custom'], placement: false },
+  { kind: 'modifier', id: 'prevent@1', eventKinds: ['dom', 'custom'], placement: false },
+  { kind: 'modifier', id: 'outside@1', eventKinds: ['dom'], placement: true },
+  { kind: 'modifier', id: 'edge@1', eventKinds: ['dom'], placement: true },
   { kind: 'effect', id: 'eff@1' },
   { kind: 'effect', id: 'iso@1', tier: 'isolated' },
   { kind: 'derive', id: 'drv@1' },

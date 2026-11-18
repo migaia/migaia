@@ -49,9 +49,10 @@ for (const issue of engine.run('authored', blueprint))
 
 `authored` 检查原始蓝图，`resolved` 检查增强后的蓝图。`authored` 阶段把增强器 `writes` 声明的字段当作已提供，所以“必填 prop 由增强器补上”不会误报。一条规则抛错时，引擎记一条 `RULE_FAILED` 问题，原错误在 `cause` 上，其他规则照常运行。
 
-内置 26 条规则覆盖 html、aria、slot、catalog、style、event、flow、behavior。例如：
+内置 29 条规则覆盖 html、aria、slot、catalog、style、event、flow、behavior。例如：
 
-- `event.outside-dom`：`outside` 修饰符只能用于 DOM 事件，因为它在文档上监听原生事件；`custom` 和 `component` 事件不会经过文档。
+- `event.modifier-exists`、`event.modifier-kind`、`event.modifier-placement`、`event.modifier-duplicate`：引用的修饰符必须在目录中；修饰符必须声明了所订阅的事件种类（组件回调不接受修饰符）；一个订阅至多一个改变监听位置的修饰符，模板行上一个都不行；同一订阅中同一 id 只能出现一次。
+- 片段：`expandFragments(blueprint, catalog)` 把 tag 指向片段的节点替换为片段子树，用使用点的 props 代入 `{ $param }`，把插槽填充放到 `{ $slot }` 位置；插槽节点保留作者写的地址 `<使用点>/slot.<名>/<段>`。它报告 `fragment.param-missing` 与 `fragment.slot-unknown`，并抛出 `FRAGMENT_CYCLE`、`FRAGMENT_TOO_DEEP`（16 层）与 `FRAGMENT_TOO_LARGE`（10000 个节点）。
 - `behavior.no-zindex`：蓝图不能直接写 `z-index`，层级由 `behavior.layer` 决定。
 
 ## 把团队约定写成规则

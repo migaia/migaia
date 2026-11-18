@@ -1,4 +1,5 @@
 import { isValidName } from './address.ts'
+import { eventKeyProblem, isModifierRef } from './event-key.ts'
 import { PartContractErrorCode } from './error-code.ts'
 import { PartContractErrorText } from './error-text.ts'
 import { createPartContractError } from './errors.ts'
@@ -18,6 +19,26 @@ function invalid(problem: string): never {
   )
 }
 
+/** Validates the events record of a node: shorthand keys and modifier references. */
+function checkEvents(events: unknown, path: string): void {
+  if (events === undefined) return
+  if (!isRecord(events)) invalid(PartContractErrorText.nodeShape(path))
+  for (const [key, subscription] of Object.entries(events)) {
+    /** Malformed shorthand segment, if any. */
+    const problem = eventKeyProblem(key)
+    if (problem !== undefined) invalid(PartContractErrorText.eventKey(key, problem))
+    if (!isRecord(subscription)) invalid(PartContractErrorText.nodeShape(`${path}/${key}`))
+    /** Explicit modifier references. */
+    const modifiers = subscription.modifiers
+    if (modifiers === undefined) continue
+    if (!Array.isArray(modifiers)) invalid(PartContractErrorText.modifierRef(`${path}/${key}`))
+    modifiers.forEach((ref, position) => {
+      if (!isModifierRef(ref))
+        invalid(PartContractErrorText.modifierRef(`${path}/${key}/modifiers/${position}`))
+    })
+  }
+}
+
 /** Validates one node and its subtree; recursion depth equals tree depth. */
 function checkNode(value: unknown, path: string): void {
   if (!isRecord(value) || typeof value.tag !== 'string' || value.tag === '')
@@ -26,6 +47,7 @@ function checkNode(value: unknown, path: string): void {
     invalid(PartContractErrorText.nameInvalid(String(value.id)))
   if (value.facets !== undefined && !isRecord(value.facets))
     invalid(PartContractErrorText.nodeShape(path))
+  if (isRecord(value.facets)) checkEvents(value.facets.events, `${path}/facets/events`)
   /** Slot map of the node, if any. */
   const slots = isRecord(value.facets) ? value.facets.slots : undefined
   if (slots !== undefined) {

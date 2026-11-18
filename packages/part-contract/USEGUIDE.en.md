@@ -49,9 +49,10 @@ for (const issue of engine.run('authored', blueprint))
 
 `authored` checks the raw blueprint; `resolved` checks it after enhancement. In the `authored` phase a field an enhancer declares in `writes` counts as provided, so a required prop that an enhancer fills in is not reported. When a rule throws, the engine records a `RULE_FAILED` issue with the original error on `cause`, and the other rules still run.
 
-The 26 built-in rules cover html, aria, slot, catalog, style, event, flow and behavior. For example:
+The 29 built-in rules cover html, aria, slot, catalog, style, event, flow and behavior. For example:
 
-- `event.outside-dom`: the `outside` modifier applies only to DOM events, because it listens for native events on the document; `custom` and `component` events never reach the document.
+- `event.modifier-exists`, `event.modifier-kind`, `event.modifier-placement`, `event.modifier-duplicate`: a referenced modifier must be in the catalog, must declare the subscribed event kind (component callbacks take no modifiers), at most one modifier may move the listener and none on template rows, and an id may appear once per subscription.
+- Fragments: `expandFragments(blueprint, catalog)` replaces every node whose tag names a fragment by the fragment's subtree, substitutes `{ $param }` placeholders with the usage's props and inserts slot fills at `{ $slot }`; slot nodes keep their authored address `<usage>/slot.<name>/<segment>`. It reports `fragment.param-missing` and `fragment.slot-unknown`, and throws `FRAGMENT_CYCLE`, `FRAGMENT_TOO_DEEP` (16 levels) and `FRAGMENT_TOO_LARGE` (10000 nodes).
 - `behavior.no-zindex`: a blueprint cannot set `z-index`; `behavior.layer` decides layering.
 
 ## Turn a convention into a rule

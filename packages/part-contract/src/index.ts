@@ -12,6 +12,21 @@ export {
 } from './address.ts'
 export { isPartNode, parseBlueprint } from './blueprint.ts'
 export { isDescriptorId, splitDescriptorId, validateDescriptor } from './descriptor.ts'
+export {
+  eventEntries,
+  isModifierRef,
+  modifierArgs,
+  modifierId,
+  normalizeEventEntry,
+  type IEventEntry
+} from './event-key.ts'
+export {
+  expandFragments,
+  FRAGMENT_MAX_DEPTH,
+  FRAGMENT_MAX_NODES,
+  type IFragmentExpansion,
+  type IFragmentUsage
+} from './fragments.ts'
 export { ERROR_SOURCE, PartContractErrorCode, type IPartContractErrorCode } from './error-code.ts'
 export type { IPartContractError } from './errors.ts'
 export {
@@ -42,6 +57,10 @@ export type {
   IDescriptor,
   IEventDeclaration,
   IEventSubscription,
+  IFragmentBody,
+  IModifierEventKind,
+  IModifierRef,
+  IParamPlaceholder,
   IIssue,
   IJsonPatchOperation,
   IJsonSchema,

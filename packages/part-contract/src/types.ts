@@ -13,6 +13,16 @@ export type IPartNode = {
   readonly facets?: IPartFacets
   readonly children?: readonly IPartNode[]
   readonly template?: IPartTemplate
+  /**
+   * Expansion marker set by `expandFragments` on the root that replaced a fragment usage; holds the
+   * fragment id. Authors never write it. The address index uses it to address inserted slot nodes.
+   */
+  readonly $fragment?: string
+  /**
+   * Expansion marker set by `expandFragments` on each node inserted for a `{ $slot }` placeholder;
+   * holds the slot name. Such a node keeps its authored address `<usage>/slot.<name>/<segment>`.
+   */
+  readonly $slotOf?: string
 }
 
 /**
@@ -115,16 +125,31 @@ export type IEventDeclaration = {
   readonly reason?: readonly string[]
 }
 
-/** Subscription to an event in a blueprint; `handler` is an effect id. */
+/**
+ * Subscription to an event in a blueprint; `handler` is an effect id. The events record key may be
+ * shorthand: `click.once.capture.outside` is event `click` with native options `once` and `capture`
+ * and modifier `outside@1`. `native` listens for the DOM event of that name on the part's root
+ * element instead of the component callback.
+ */
 export type IEventSubscription = {
   readonly handler: string
   readonly filter?: Readonly<Record<string, unknown>>
-  readonly modifiers?: readonly ('stop' | 'prevent' | 'self' | 'outside')[]
+  readonly modifiers?: readonly IModifierRef[]
   readonly capture?: boolean
   readonly once?: boolean
   readonly passive?: boolean
+  readonly native?: boolean
   readonly sync?: boolean
 }
+
+/** Reference to a modifier: its `name@major` id, or the id with arguments. */
+export type IModifierRef = string | { readonly id: string; readonly args?: unknown }
+
+/** A placeholder inside a fragment subtree replaced by the usage's parameter of that name. */
+export type IParamPlaceholder = { readonly $param: string }
+
+/** Reusable subtree carried by a `fragment` descriptor; `slots` names its `{ $slot }` placeholders. */
+export type IFragmentBody = { readonly node: IPartNode; readonly slots?: readonly string[] }
 
 /** Content rule of a named slot. `accepts` lists part names without major. */
 export type ISlotDeclaration = {
@@ -140,7 +165,18 @@ export type IStyleHookType = 'color' | 'length' | 'token' | 'number' | 'string'
 export type IJsonSchema = Readonly<Record<string, unknown>>
 
 /** Built-in descriptor kinds. */
-export type IBuiltinKind = 'part' | 'enhancer' | 'derive' | 'resource' | 'effect' | 'rule'
+export type IBuiltinKind =
+  | 'part'
+  | 'enhancer'
+  | 'derive'
+  | 'resource'
+  | 'effect'
+  | 'rule'
+  | 'modifier'
+  | 'fragment'
+
+/** Event kinds a modifier may apply to; component callbacks never reach the DOM. */
+export type IModifierEventKind = 'dom' | 'custom'
 
 /** Fields shared by every catalog descriptor. Part-only fields are optional on the same shape. */
 export type IDescriptor = {
@@ -165,6 +201,12 @@ export type IDescriptor = {
   readonly events?: Readonly<Record<string, IEventDeclaration>>
   readonly slots?: Readonly<Record<string, ISlotDeclaration>>
   readonly styleHooks?: Readonly<Record<string, IStyleHookType>>
+  /** Modifier only: event kinds the modifier applies to. */
+  readonly eventKinds?: readonly IModifierEventKind[]
+  /** Modifier only: whether the modifier moves the listener (for example to the document). */
+  readonly placement?: boolean
+  /** Fragment only: the reusable subtree. */
+  readonly fragment?: IFragmentBody
 }
 
 /** Validation schema of an extension kind: required field names beyond the common ones. */

@@ -48,14 +48,29 @@ const cases: readonly (readonly [string, IPartNode, string])[] = [
   ['event.custom-namespace', rootWith({ events: { 'bad-custom': { handler: 'eff@1' } } }), 'root'],
   [
     'event.prevent-cancelable',
-    rootWith({ events: { 'orders:expand': { handler: 'eff@1', modifiers: ['prevent'] } } }),
+    rootWith({ events: { 'orders:expand': { handler: 'eff@1', modifiers: ['prevent@1'] } } }),
     'root'
   ],
   ['event.handler-exists', rootWith({ events: { click: { handler: 'nope@1' } } }), 'root'],
   ['event.sync-tier', rootWith({ events: { click: { handler: 'iso@1', sync: true } } }), 'root'],
   [
-    'event.outside-dom',
-    rootWith({ events: { 'orders:expand': { handler: 'eff@1', modifiers: ['outside'] } } }),
+    'event.modifier-exists',
+    rootWith({ events: { 'click.missing': { handler: 'eff@1' } } }),
+    'root'
+  ],
+  [
+    'event.modifier-kind',
+    rootWith({ events: { 'orders:expand': { handler: 'eff@1', modifiers: ['outside@1'] } } }),
+    'root'
+  ],
+  [
+    'event.modifier-placement',
+    rootWith({ events: { 'click.outside.edge': { handler: 'eff@1' } } }),
+    'root'
+  ],
+  [
+    'event.modifier-duplicate',
+    rootWith({ events: { 'click.stop.stop': { handler: 'eff@1' } } }),
     'root'
   ],
   ['flow.derive-no-write', rootWith({ props: { v: { $derive: 'wdrv@1' } } }), 'root'],
@@ -70,7 +85,7 @@ const cases: readonly (readonly [string, IPartNode, string])[] = [
 ]
 
 describe('built-in rules', () => {
-  it('ships exactly the twenty-six documented rules', () => {
+  it('ships exactly the twenty-nine documented rules', () => {
     expect(builtinRules.map((rule) => rule.id).sort()).toEqual(cases.map(([id]) => id).sort())
   })
 

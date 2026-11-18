@@ -3,7 +3,7 @@ import type { IRuleDefinition } from '../rules.ts'
 import { behaviorRules } from './behavior-rules.ts'
 import { structureRules } from './structure-rules.ts'
 
-/** All twenty-six built-in rules in a stable order. */
+/** All twenty-nine built-in rules in a stable order. */
 export const builtinRules: readonly IRuleDefinition<unknown>[] = [
   ...structureRules,
   ...behaviorRules
