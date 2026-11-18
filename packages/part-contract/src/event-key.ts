@@ -28,6 +28,11 @@ function splitKey(key: string): { readonly name: string; readonly segments: read
   return { name: parts[0] as string, segments: parts.slice(1) }
 }
 
+/** Event name of an events record key: its first dot-separated segment (`click.once` → `click`). */
+export function eventNameOf(key: string): string {
+  return splitKey(key).name
+}
+
 /** Expands a shorthand modifier segment to a full id. */
 function segmentId(segment: string): string {
   return segment.includes('@') ? segment : `${segment}${DEFAULT_MAJOR}`

@@ -14,6 +14,7 @@ export { isPartNode, parseBlueprint } from './blueprint.ts'
 export { isDescriptorId, splitDescriptorId, validateDescriptor } from './descriptor.ts'
 export {
   eventEntries,
+  eventNameOf,
   isModifierRef,
   modifierArgs,
   modifierId,
