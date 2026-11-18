@@ -123,7 +123,7 @@ async function harness(errors: unknown[]): Promise<IDomHarness> {
           defineEffect({
             id: 'run@1',
             run: (event) =>
-              void runs.push({ name: event.name, detail: event.detail, address: event.address })
+              void runs.push({ name: event.key, detail: event.detail, address: event.address })
           })
         ]
       })

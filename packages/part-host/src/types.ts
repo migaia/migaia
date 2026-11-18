@@ -66,7 +66,10 @@ export type IEffectDefinition = IDefinition & {
 /** Event delivered to an effect. */
 export type IEffectEvent = {
   readonly address: string
+  /** Event name, for example `click`, whatever shorthand the subscription key uses. */
   readonly name: string
+  /** Events record key the subscription is stored under, for example `click.once.stop`. */
+  readonly key: string
   readonly detail: unknown
   /** Row key when the event came from a template-row instance (`…@row:<key>`). */
   readonly rowKey?: string

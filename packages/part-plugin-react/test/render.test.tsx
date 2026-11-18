@@ -75,7 +75,9 @@ describe('binding', () => {
     expect(container.querySelector('button')?.className).toContain('bg-destructive')
     await userEvent.type(container.querySelector('input') as HTMLInputElement, 'a')
     await settle()
-    expect(received).toEqual([{ address: 'p/fruit', name: 'valueChange', detail: 'a' }])
+    expect(received).toEqual([
+      { address: 'p/fruit', name: 'valueChange', key: 'valueChange', detail: 'a' }
+    ])
     expect(errors).toEqual([
       expect.objectContaining({ code: 'BINDING_MISSING', source: 'part.react' })
     ])
@@ -124,7 +126,13 @@ describe('binding', () => {
     await userEvent.click(items[1]?.querySelector('span') as HTMLSpanElement)
     await settle()
     expect(received).toEqual([
-      { address: 'rows/item@row:a%2Fb', name: 'click', detail: undefined, rowKey: 'a/b' }
+      {
+        address: 'rows/item@row:a%2Fb',
+        name: 'click',
+        key: 'click',
+        detail: undefined,
+        rowKey: 'a/b'
+      }
     ])
 
     host.state.write('page.rows', [{ id: 3, name: 'three' }])

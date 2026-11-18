@@ -6,7 +6,7 @@ import {
 } from '@migaia/plugin-host'
 import { featureDependenciesModule } from '@migaia/plugin-host/feature-dependencies'
 import { featuresModule } from '@migaia/plugin-host/features'
-import { formatAddress, parseAddress } from '@migaia/part-contract'
+import { eventNameOf, formatAddress, parseAddress } from '@migaia/part-contract'
 import { createRuntime } from '@migaia/reactive'
 import { BlueprintStore } from './blueprints.ts'
 import { CoreRuntime, partCorePlugin } from './core.ts'
@@ -155,7 +155,8 @@ class PartHost implements IPartHost {
     if (subscription === undefined || !matchesFilter(subscription.filter, detail)) return
     await this.#effects.run(subscription.handler, {
       address,
-      name: event,
+      name: eventNameOf(event),
+      key: event,
       detail,
       ...(rowKey === undefined ? {} : { rowKey })
     })

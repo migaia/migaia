@@ -323,6 +323,7 @@
         "createRuleEngine",
         "defineRule",
         "eventEntries",
+        "eventNameOf",
         "expandFragments",
         "formatAddress",
         "isDescriptorId",

@@ -267,3 +267,37 @@ describe('incremental argument validation', () => {
     await host.dispose()
   })
 })
+
+describe('effect event', () => {
+  it('carries the event name and the record key separately', async () => {
+    /** Events seen by the effect. */
+    const seen: { readonly name: string; readonly key: string }[] = []
+    /** Host with a recording effect. */
+    const host = await createPartHost({
+      plugins: [
+        base,
+        definePartPlugin({
+          name: 'rec',
+          effects: [
+            defineEffect({
+              id: 'rec@1',
+              run: (event) => void seen.push({ name: event.name, key: event.key })
+            })
+          ]
+        })
+      ]
+    })
+    await host.blueprint.load({
+      id: 'ev',
+      version: 1,
+      root: {
+        tag: 'page@1',
+        id: 'p',
+        facets: { events: { 'click.once.stop': { handler: 'rec@1' } } }
+      }
+    })
+    await host.dispatch('p', 'click.once.stop', undefined)
+    expect(seen).toEqual([{ name: 'click', key: 'click.once.stop' }])
+    await host.dispose()
+  })
+})
