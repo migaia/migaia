@@ -1,18 +1,10 @@
 import { readFileSync } from 'node:fs'
 import type { IIssue } from '@migaia/part-contract'
 import type { IPartHost, IPartHostOptions, IResolvedNode } from '@migaia/part-host'
+import { DoctorText } from './doctor-text.ts'
 import { serializeCause } from './errors.ts'
 import { Harness } from './harness.ts'
 import type { Project } from './project.ts'
-
-/** Rule id of the issue recorded when loading one blueprint throws (parse or expansion error). */
-const LOAD_RULE = 'doctor.load'
-/** Code used when a load error carries no code of its own. */
-const LOAD_FALLBACK_CODE = 'LOAD_FAILED'
-/** Skip reason of a blueprint with static errors. */
-const STATIC_ERRORS = 'static errors'
-/** Skip reason of a blueprint whose load threw. */
-const LOAD_ERROR = 'load error'
 
 /** Options of one doctor run. */
 export type IDoctorOptions = {
@@ -109,7 +101,7 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
         rendered.push({
           blueprintId: document.id,
           status: 'skipped',
-          reason: result.threw ? LOAD_ERROR : STATIC_ERRORS
+          reason: result.threw ? DoctorText.skippedLoadError : DoctorText.skippedStaticErrors
         })
       else clean.push(document)
     }
@@ -158,9 +150,9 @@ async function loadOrIssue(
           address: document.id,
           facet: '',
           path: '',
-          code: typeof code === 'string' ? code : LOAD_FALLBACK_CODE,
-          rule: LOAD_RULE,
-          messageKey: LOAD_RULE,
+          code: typeof code === 'string' ? code : DoctorText.loadFallbackCode,
+          rule: DoctorText.loadRule,
+          messageKey: DoctorText.loadRule,
           severity: 'error',
           cause
         }
