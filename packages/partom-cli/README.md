@@ -36,4 +36,4 @@ export default { plugins: [appPlugin], blueprints: ['*.blueprint.json'] }
 pnpm --filter @migaia/partom-cli run build:exe
 ```
 
-目前在编译后的可执行文件中，`--version` 与 `extract` 可用；`doctor` 在编译模式下解析不到项目中带作用域的符号链接包（Bun 编译模式的解析限制），请用 `bun src/cli.ts doctor …` 运行。
+`build:exe` 先把 doctor 打成单文件 `dist/doctor-runner.js`，再把它嵌进可执行文件。Bun 编译模式解析不到项目里带作用域的符号链接包（`@migaia/*`、`@ui-sdk/*`），所以可执行文件运行 `doctor` 时，把 runner 写到系统临时目录，再以 `BUN_BE_BUN=1` 启动自己，作为普通 Bun 运行它。用户机器不需要另装 Bun，退出码与源码运行相同。`extract --probe`、`--verify` 在可执行文件中尚未验证。

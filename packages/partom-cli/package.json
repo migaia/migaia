@@ -21,7 +21,7 @@
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "node -e \"process.exit(0)\"",
-    "build:exe": "bun build --compile src/entry/darwin-arm64.ts --external 'chromium-bidi/*' --outfile dist/partom",
+    "build:exe": "bun build src/doctor-runner.ts --target bun --external 'chromium-bidi/*' --external fsevents --outfile dist/doctor-runner.js && bun build --compile src/entry/darwin-arm64.ts --external 'chromium-bidi/*' --outfile dist/partom",
     "typecheck": "bun check -p tsconfig.json",
     "typecheck:test": "bun check -p tsconfig.test.json",
     "lint": "oxlint src test",

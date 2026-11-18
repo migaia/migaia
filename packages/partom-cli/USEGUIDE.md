@@ -86,10 +86,14 @@ bunx partom extract src/components/ui/button.tsx --out src/parts/drafts --verify
 pnpm --filter @migaia/partom-cli run build:exe
 ```
 
-编译后的 `dist/partom` 中 `--version` 与 `extract` 可用。`doctor` 目前在编译模式下解析不到项目里带作用域的符号链接包（pnpm 的 `@migaia/*`、`@ui-sdk/*`），这是 Bun 编译模式的解析限制，Bun `1.4.4` 仍存在。在此之前用源码运行：
+编译后的 `dist/partom` 可直接运行 `doctor`、`extract` 和 `--version`。
+
+Bun 编译模式解析不到项目里带作用域的符号链接包（pnpm 的 `@migaia/*`、`@ui-sdk/*`），Bun `1.4.4` 仍是如此。因此 `build:exe` 先把 doctor 单独打包成 `dist/doctor-runner.js` 并嵌入可执行文件；运行 `doctor` 时，可执行文件把它写到系统临时目录的 `partom/doctor-runner-<版本>.js`（内容相同时不重写），再以环境变量 `BUN_BE_BUN=1` 启动自己，作为普通 Bun 执行它。用户机器不需要另装 Bun，输出和退出码与源码运行相同。
+
+`extract --probe` 与 `--verify` 同样需要加载项目包，在可执行文件中尚未验证；需要时用源码运行：
 
 ```bash
-bun packages/partom-cli/src/cli.ts doctor --rendered
+bun packages/partom-cli/src/cli.ts extract src/components/ui/button.tsx --out drafts --verify
 ```
 
 ## 退出码
