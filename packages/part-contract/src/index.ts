@@ -49,6 +49,7 @@ export type {
   IPartAddress,
   IPartFacets,
   IPartNode,
+  IPartTemplate,
   ISlotDeclaration,
   IStyleHookType
 } from './types.ts'

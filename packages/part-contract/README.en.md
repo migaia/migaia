@@ -19,11 +19,11 @@ const issues = engine.run('authored', parseBlueprint(input))
 - A node with an `id` uses it as its segment; otherwise the tag name (without `@major`, other characters replaced by `-`).
 - Repeated same-name siblings get ordinals: `orders/button#0`, `orders/button#1`.
 - Slot members add a `slot.<name>` segment: `orders/filter/slot.empty/text`.
-- Template row instances append the row key: `orders/rows/status@row:123`.
+- Template row instances append the row key: `orders/rows/status@row:123`. A template host declares the repeated subtree as `template: { rowKey, rows, node }`; `rows` is a `{ $state }` binding or a literal array, and `{ $row: 'field' }` inside `node` reads the current row.
 
 ## Rules
 
-`/doctor` exports 25 built-in rules in eight groups: html, aria, slot, catalog, style, event, flow and behavior. Rules run in two phases, `authored` (the raw blueprint) and `resolved` (after enhancement); rendered checks belong to `partom doctor --rendered`. In the authored phase, fields an enhancer declares in `writes` count as provided.
+`/doctor` exports 26 built-in rules in eight groups: html, aria, slot, catalog, style, event, flow and behavior. Rules run in two phases, `authored` (the raw blueprint) and `resolved` (after enhancement); rendered checks belong to `partom doctor --rendered`. In the authored phase, fields an enhancer declares in `writes` count as provided.
 
 A throwing rule does not stop the others; it produces a `RULE_FAILED` issue whose `cause` is the original error.
 

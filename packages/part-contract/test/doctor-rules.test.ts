@@ -53,6 +53,11 @@ const cases: readonly (readonly [string, IPartNode, string])[] = [
   ],
   ['event.handler-exists', rootWith({ events: { click: { handler: 'nope@1' } } }), 'root'],
   ['event.sync-tier', rootWith({ events: { click: { handler: 'iso@1', sync: true } } }), 'root'],
+  [
+    'event.outside-dom',
+    rootWith({ events: { 'orders:expand': { handler: 'eff@1', modifiers: ['outside'] } } }),
+    'root'
+  ],
   ['flow.derive-no-write', rootWith({ props: { v: { $derive: 'wdrv@1' } } }), 'root'],
   ['flow.bind-path', rootWith({ props: { v: { $state: 'global.x' } } }), 'root'],
   ['flow.call-target', rootWith({ events: { click: { handler: 'drv@1' } } }), 'root'],
@@ -65,7 +70,7 @@ const cases: readonly (readonly [string, IPartNode, string])[] = [
 ]
 
 describe('built-in rules', () => {
-  it('ships exactly the twenty-five documented rules', () => {
+  it('ships exactly the twenty-six documented rules', () => {
     expect(builtinRules.map((rule) => rule.id).sort()).toEqual(cases.map(([id]) => id).sort())
   })
 

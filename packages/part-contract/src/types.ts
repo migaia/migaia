@@ -12,7 +12,18 @@ export type IPartNode = {
   readonly id?: string
   readonly facets?: IPartFacets
   readonly children?: readonly IPartNode[]
-  readonly template?: { readonly rowKey: string; readonly node: IPartNode }
+  readonly template?: IPartTemplate
+}
+
+/**
+ * Repeated subtree of a template host. `rows` is a `{ $state }` binding or a literal array of row
+ * objects; `rowKey` names the row field whose value becomes the instance key in `…@row:<key>`
+ * addresses. Inside `node`, `{ $row: 'field' }` reads a field of the current row.
+ */
+export type IPartTemplate = {
+  readonly rowKey: string
+  readonly rows?: unknown
+  readonly node: IPartNode
 }
 
 /** Configuration groups of a node. Values may be literals or binding objects such as `{ $state }`. */
@@ -108,7 +119,7 @@ export type IEventDeclaration = {
 export type IEventSubscription = {
   readonly handler: string
   readonly filter?: Readonly<Record<string, unknown>>
-  readonly modifiers?: readonly ('stop' | 'prevent' | 'self')[]
+  readonly modifiers?: readonly ('stop' | 'prevent' | 'self' | 'outside')[]
   readonly capture?: boolean
   readonly once?: boolean
   readonly passive?: boolean

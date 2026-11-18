@@ -106,6 +106,17 @@ function checkSyncTier(context: IRuleContext<unknown>): void {
   }
 }
 
+/** The `outside` modifier listens on the document, so it applies only to DOM events. */
+function checkOutsideDom(context: IRuleContext<unknown>): void {
+  for (const view of subscriptionsOf(context))
+    if (
+      view.subscription.modifiers?.includes('outside') === true &&
+      view.declaration !== undefined &&
+      view.declaration.kind !== 'dom'
+    )
+      reportEvent(context, view.name, 'event.outside-dom')
+}
+
 /** Handlers must be effects, not derives or other kinds. */
 function checkCallTarget(context: IRuleContext<unknown>): void {
   for (const view of subscriptionsOf(context)) {
@@ -232,7 +243,7 @@ function checkOpenStateBinding(context: IRuleContext<unknown>): void {
     })
 }
 
-/** Event, flow and behavior rules; sixteen rules in total. */
+/** Event, flow and behavior rules; seventeen rules in total. */
 export const behaviorRules = [
   defineRule({
     id: 'event.component-no-capture',
@@ -282,6 +293,13 @@ export const behaviorRules = [
     phase: BOTH,
     severity: 'error',
     check: checkSyncTier
+  }),
+  defineRule({
+    id: 'event.outside-dom',
+    scope: 'part',
+    phase: BOTH,
+    severity: 'error',
+    check: checkOutsideDom
   }),
   defineRule({
     id: 'flow.derive-no-write',

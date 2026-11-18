@@ -19,11 +19,11 @@ const issues = engine.run('authored', parseBlueprint(input))
 - 节点有 `id` 时地址段就是 `id`，否则是 tag 名（去掉 `@主版本`，文法外的字符换成 `-`）。
 - 同级多个同名节点加序号：`orders/button#0`、`orders/button#1`。
 - slot 里的节点在中间加 `slot.<名称>` 段：`orders/filter/slot.empty/text`。
-- 模板行实例在静态地址后加行键：`orders/rows/status@row:123`。
+- 模板行实例在静态地址后加行键：`orders/rows/status@row:123`。模板宿主用 `template: { rowKey, rows, node }` 声明重复的子树，`rows` 是 `{ $state }` 绑定或字面量数组，`node` 内的 `{ $row: '字段' }` 读取当前行。
 
 ## 规则
 
-`/doctor` 导出 25 条内置规则，分为 html、aria、slot、catalog、style、event、flow、behavior 八组。规则只有 `authored`（原始蓝图）和 `resolved`（增强后）两个阶段；渲染后的检查由 `partom doctor --rendered` 完成。`authored` 阶段会把增强器 `writes` 声明的字段视为会被补上。
+`/doctor` 导出 26 条内置规则，分为 html、aria、slot、catalog、style、event、flow、behavior 八组。规则只有 `authored`（原始蓝图）和 `resolved`（增强后）两个阶段；渲染后的检查由 `partom doctor --rendered` 完成。`authored` 阶段会把增强器 `writes` 声明的字段视为会被补上。
 
 规则抛错时不会中断其他规则，而是产生一条 `RULE_FAILED` 问题，原错误在问题的 `cause` 上。
 
