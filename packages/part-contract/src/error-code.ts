@@ -53,7 +53,19 @@ export const PartContractErrorCode = {
    * Fragment expansion produced more than the fixed limit of 10000 nodes; expansion stops as soon
    * as the limit is passed, so its cost stays bounded. Reduce nesting or repetition.
    */
-  fragmentTooLarge: 'FRAGMENT_TOO_LARGE'
+  fragmentTooLarge: 'FRAGMENT_TOO_LARGE',
+  /**
+   * `applyPatch` received an operation other than add, remove, replace or move (for example `copy`
+   * or `test`). Nothing is applied; the operation index and op are on `cause`. Rewrite the patch
+   * with supported operations.
+   */
+  patchOpUnsupported: 'PATCH_OP_UNSUPPORTED',
+  /**
+   * `parseSnapshot` received bytes that are not a valid version snapshot: not UTF-8 JSON, a wrong
+   * shape, or a remote module name outside the module-name grammar. `cause` holds the JSON Pointer
+   * of the first problem and its reason. Rebuild the snapshot with `partom build`.
+   */
+  snapshotInvalid: 'SNAPSHOT_INVALID'
 } as const
 
 /** Value union of every `part.contract` error code. */

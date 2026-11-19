@@ -111,6 +111,6 @@ describe('data rules', () => {
     expect(issues.map((issue) => [issue.rule, issue.address, issue.path])).toEqual([
       ['model.relation-target', 'order@1', 'model.relations.lines']
     ])
-    expect(builtinRules).toHaveLength(36)
+    expect(builtinRules).toHaveLength(37)
   })
 })

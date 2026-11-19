@@ -57,6 +57,7 @@ export function validateDescriptor(
     for (const key of Object.keys(descriptor.meta))
       if (!META_KEY_PATTERN.test(key)) invalid(PartContractErrorText.descriptorMeta(key))
   }
+  if (descriptor.budget !== undefined) checkBudget(descriptor.budget)
   if (descriptor.kind === 'modifier') checkModifier(descriptor)
   if (descriptor.kind === 'fragment') checkFragment(descriptor)
   if (
@@ -68,6 +69,21 @@ export function validateDescriptor(
   if (descriptor.kind === 'part') checkDataBehavior(descriptor)
   if (descriptor.kind === 'model') checkModelBody(descriptor)
   return descriptor as unknown as IDescriptor
+}
+
+/** True for a positive finite number. */
+function isPositive(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+}
+
+/** A budget is an object whose `size` and `render`, when present, are positive finite numbers. */
+function checkBudget(budget: unknown): void {
+  if (
+    !isRecord(budget) ||
+    (budget.size !== undefined && !isPositive(budget.size)) ||
+    (budget.render !== undefined && !isPositive(budget.render))
+  )
+    invalid(PartContractErrorText.budgetInvalid)
 }
 
 /** A modifier declares its event kinds and whether it moves the listener. */

@@ -23,7 +23,7 @@ const issues = engine.run('authored', parseBlueprint(input))
 
 ## Rules
 
-`/doctor` exports 36 built-in rules in eleven groups: html, aria, slot, catalog, style, event, flow, behavior, layout, resource and field. Rules run in two phases, `authored` (the raw blueprint) and `resolved` (after enhancement); rendered checks belong to `partom doctor --rendered`. In the authored phase, fields an enhancer declares in `writes` count as provided.
+`/doctor` exports 37 built-in rules in twelve groups: html, aria, slot, catalog, style, event, flow, behavior, layout, resource, field and security. Rules run in two phases, `authored` (the raw blueprint) and `resolved` (after enhancement); rendered checks belong to `partom doctor --rendered`. In the authored phase, fields an enhancer declares in `writes` count as provided.
 
 A throwing rule does not stop the others; it produces a `RULE_FAILED` issue whose `cause` is the original error.
 
@@ -33,4 +33,4 @@ A throwing rule does not stop the others; it produces a `RULE_FAILED` issue whos
 
 ## Error codes (source `part.contract`)
 
-`BLUEPRINT_INVALID`, `ADDRESS_INVALID`, `ADDRESS_DUPLICATE`, `DESCRIPTOR_INVALID`, `SCHEMA_NOT_SERIALIZABLE`, `SCHEMA_TRANSFORMS`, `ARGS_INVALID`, `RULE_FAILED`.
+`BLUEPRINT_INVALID`, `ADDRESS_INVALID`, `ADDRESS_DUPLICATE`, `DESCRIPTOR_INVALID`, `SCHEMA_NOT_SERIALIZABLE`, `SCHEMA_TRANSFORMS`, `ARGS_INVALID`, `RULE_FAILED`, `FRAGMENT_CYCLE`, `FRAGMENT_TOO_DEEP`, `FRAGMENT_TOO_LARGE`, `PATCH_OP_UNSUPPORTED`, `SNAPSHOT_INVALID`.

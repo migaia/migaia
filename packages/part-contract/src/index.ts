@@ -64,6 +64,41 @@ export {
   type IStandardSchemaInput
 } from './schema.ts'
 export { LandmarkElement, LayoutProp, type ILayoutProps } from './layout.ts'
+export { affectedAddresses, applyPatch } from './platform/patch.ts'
+export { descriptorView } from './platform/view.ts'
+export {
+  collectDefinitions,
+  hashBytes,
+  isModuleName,
+  parseSnapshot,
+  RemoteExportKind,
+  SnapshotInvalidReason,
+  type IPartLock,
+  type IPartSnapshot,
+  type IRemoteModuleRef
+} from './platform/lock.ts'
+export {
+  checkDelivery,
+  type ICapabilityManifest,
+  type IDeliveryResult
+} from './platform/manifest.ts'
+export {
+  artifactKey,
+  ChangesetStatus,
+  checkBase,
+  type IChangeset,
+  type IChangesetArtifact,
+  type IChangesetResult
+} from './platform/changeset.ts'
+export { mergeBlueprint, type IMergeConflict, type IMergeResult } from './platform/merge.ts'
+export {
+  AuditAction,
+  auditTargets,
+  type IAuditRecord,
+  type IAuditTarget,
+  type IProvenance
+} from './platform/audit.ts'
+export { TraceEventKind, TraceStage, type ITraceEvent, type ITraceStep } from './platform/trace.ts'
 export { LayerLevel } from './types.ts'
 export type {
   ILandmark,

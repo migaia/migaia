@@ -14,6 +14,7 @@
 | 把团队约定写成规则                     | `defineRule`                        | [把团队约定写成规则](#把团队约定写成规则)                      |
 | 从地址找到节点，包括列表行             | `createAddressIndex`、`resolveAddress` | [从地址找到节点](#从地址找到节点)                           |
 | 用 zod 定义参数，同时得到 JSON Schema  | `toCatalogSchema`、`assertNoTransform` | [用校验库定义参数](#用校验库定义参数)                       |
+| 发布版本前生成快照、比对客户端能力、合并草稿 | `collectDefinitions`、`checkDelivery`、`mergeBlueprint` | [发布、下发与合并](#发布下发与合并) |
 
 ## 保存前确认蓝图结构合法
 
@@ -50,7 +51,7 @@ for (const issue of engine.run('authored', blueprint))
 
 `authored` 检查原始蓝图，`resolved` 检查增强后的蓝图。`authored` 阶段把增强器 `writes` 声明的字段当作已提供，所以“必填 prop 由增强器补上”不会误报。一条规则抛错时，引擎记一条 `RULE_FAILED` 问题，原错误在 `cause` 上，其他规则照常运行。
 
-内置 36 条规则覆盖 html、aria、slot、catalog、style、event、flow、behavior、layout、resource、field。例如：
+内置 37 条规则覆盖 html、aria、slot、catalog、style、event、flow、behavior、layout、resource、field、security。例如：
 
 - `event.modifier-exists`、`event.modifier-kind`、`event.modifier-placement`、`event.modifier-duplicate`：引用的修饰符必须在目录中；修饰符必须声明了所订阅的事件种类（组件回调不接受修饰符）；一个订阅至多一个改变监听位置的修饰符，模板行上一个都不行；同一订阅中同一 id 只能出现一次。
 - 片段：`expandFragments(blueprint, catalog)` 把 tag 指向片段的节点替换为片段子树，用使用点的 props 代入 `{ $param }`，把插槽填充放到 `{ $slot }` 位置；插槽节点保留作者写的地址 `<使用点>/slot.<名>/<段>`。它报告 `fragment.param-missing` 与 `fragment.slot-unknown`，并抛出 `FRAGMENT_CYCLE`、`FRAGMENT_TOO_DEEP`（16 层）与 `FRAGMENT_TOO_LARGE`（10000 个节点）。
@@ -160,9 +161,21 @@ const jsonSchema = toCatalogSchema(args)
 await validateArgs(args, { pageSize: 20 }) // 不合法时以 ARGS_INVALID 拒绝，问题列表在 cause 上
 ```
 
+## 发布、下发与合并
+
+阶段 4 的发布链路（目录服务、`partom build`/`pull`、客户端下发插件、编辑器）共用这里的数据形状与纯函数，不各写一份。
+
+- **快照与版本标识。** `IPartSnapshot` 含锁定文件 `lock`、蓝图与被引用定义的描述符。`collectDefinitions(blueprints, catalog)` 给出蓝图引用的全部定义 id（节点 tag、片段、事件 handler 与修饰器、`$derive`、`$resource`、模型关系、作用于这些 part 的增强器），每个只出现一次。版本由 `snapshot.json` 原字节的 `hashBytes` 标识，各方对同一字节算出同一值；`parseSnapshot(bytes)` 校验形状，失败抛 `SNAPSHOT_INVALID`，`cause.pointer` 指出第一处问题。
+- **远端模块名。** `IRemoteModuleRef.name` 是模块源文件相对远端模块根目录的路径，跨版本稳定。`isModuleName` 拒绝 `..`、`.`、绝对路径与非 `.ts`/`.tsx` 名字，服务端与 CLI 写文件前都用它。
+- **下发校验。** `checkDelivery(snapshot, manifest)` 列出客户端构建与远端模块都不提供的定义 id（全部列出，不只第一个）。
+- **合并与审计。** `mergeBlueprint(base, ours, theirs)` 按地址和配置组三方合并；两方改成不同值、删除对方改过的节点、子节点顺序不同时记冲突并保留 `ours`。`auditTargets(before, after)` 给出变化的地址与配置组。
+- **JSON Patch。** `applyPatch` 支持 `add`、`remove`、`replace` 与 `move`，其他操作整体拒绝（`PATCH_OP_UNSUPPORTED`），不写入任何位置。`affectedAddresses` 把 `move` 记为两端父节点的变化。
+- **蓝图里不放密钥。** 内置规则 `security.secret` 对配置值中的私钥头、云服务密钥形状与 `password`/`secret`/`token`/`apiKey` 字面量报 error，问题里不回显原值。
+- **预算与虚拟滚动字段。** 描述符可写 `budget: { size, render }`（字节、毫秒），模板可写 `virtual: { rowHeight, overscan }`；检查由 `partom` 与 React 渲染器执行。
+
 ## 错误码
 
-source 为 `part.contract`：`BLUEPRINT_INVALID`、`ADDRESS_INVALID`、`ADDRESS_DUPLICATE`、`DESCRIPTOR_INVALID`、`SCHEMA_NOT_SERIALIZABLE`、`SCHEMA_TRANSFORMS`、`ARGS_INVALID`、`RULE_FAILED`。
+source 为 `part.contract`：`BLUEPRINT_INVALID`、`ADDRESS_INVALID`、`ADDRESS_DUPLICATE`、`DESCRIPTOR_INVALID`、`SCHEMA_NOT_SERIALIZABLE`、`SCHEMA_TRANSFORMS`、`ARGS_INVALID`、`RULE_FAILED`、`FRAGMENT_CYCLE`、`FRAGMENT_TOO_DEEP`、`FRAGMENT_TOO_LARGE`、`PATCH_OP_UNSUPPORTED`、`SNAPSHOT_INVALID`。
 
 ## 构建与验证
 

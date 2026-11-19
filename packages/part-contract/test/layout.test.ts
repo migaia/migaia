@@ -145,7 +145,7 @@ describe('layout rules', () => {
     ).toEqual([])
   })
 
-  it('has thirty-six built-in rules', () => {
-    expect(builtinRules).toHaveLength(36)
+  it('has thirty-seven built-in rules', () => {
+    expect(builtinRules).toHaveLength(37)
   })
 })

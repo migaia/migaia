@@ -14,6 +14,7 @@ See the [README](./README.en.md) for what the package is for. The package holds 
 | Turn a team convention into a rule                   | `defineRule`                           | [Turn a convention into a rule](#turn-a-convention-into-a-rule)       |
 | Find a node from an address, list rows included      | `createAddressIndex`, `resolveAddress` | [Find a node from an address](#find-a-node-from-an-address)           |
 | Define arguments with zod and get JSON Schema too    | `toCatalogSchema`, `assertNoTransform` | [Define arguments with a schema library](#define-arguments-with-a-schema-library) |
+| Build a version snapshot, check a client's capabilities, merge drafts | `collectDefinitions`, `checkDelivery`, `mergeBlueprint` | [Release, delivery and merge](#release-delivery-and-merge) |
 
 ## Confirm a blueprint before saving
 
@@ -50,7 +51,7 @@ for (const issue of engine.run('authored', blueprint))
 
 `authored` checks the raw blueprint; `resolved` checks it after enhancement. In the `authored` phase a field an enhancer declares in `writes` counts as provided, so a required prop that an enhancer fills in is not reported. When a rule throws, the engine records a `RULE_FAILED` issue with the original error on `cause`, and the other rules still run.
 
-The 36 built-in rules cover html, aria, slot, catalog, style, event, flow, behavior, layout, resource and field. For example:
+The 37 built-in rules cover html, aria, slot, catalog, style, event, flow, behavior, layout, resource, field and security. For example:
 
 - `event.modifier-exists`, `event.modifier-kind`, `event.modifier-placement`, `event.modifier-duplicate`: a referenced modifier must be in the catalog, must declare the subscribed event kind (component callbacks take no modifiers), at most one modifier may move the listener and none on template rows, and an id may appear once per subscription.
 - Fragments: `expandFragments(blueprint, catalog)` replaces every node whose tag names a fragment by the fragment's subtree, substitutes `{ $param }` placeholders with the usage's props and inserts slot fills at `{ $slot }`; slot nodes keep their authored address `<usage>/slot.<name>/<segment>`. It reports `fragment.param-missing` and `fragment.slot-unknown`, and throws `FRAGMENT_CYCLE`, `FRAGMENT_TOO_DEEP` (16 levels) and `FRAGMENT_TOO_LARGE` (10000 nodes).
@@ -160,9 +161,21 @@ const jsonSchema = toCatalogSchema(args)
 await validateArgs(args, { pageSize: 20 }) // rejects with ARGS_INVALID, issue list on cause
 ```
 
+## Release, delivery and merge
+
+The stage-4 release path (catalog service, `partom build`/`pull`, the client delivery plugin, the editor) shares these shapes and pure functions instead of each writing its own.
+
+- **Snapshots and version identity.** `IPartSnapshot` holds the `lock`, the blueprints and the descriptors of every referenced definition. `collectDefinitions(blueprints, catalog)` returns every definition id the blueprints reference (node tags, fragments, event handlers and modifiers, `$derive`, `$resource`, model relations, enhancers targeting those parts), each once. A version is identified by `hashBytes` of the raw `snapshot.json` bytes, so every party gets the same value for the same bytes. `parseSnapshot(bytes)` checks the shape and throws `SNAPSHOT_INVALID`, with `cause.pointer` naming the first problem.
+- **Remote module names.** `IRemoteModuleRef.name` is the source path relative to the remote-module root and stays stable across versions. `isModuleName` refuses `..`, `.`, absolute paths and names that are not `.ts`/`.tsx`; the catalog and the CLI check it before writing files.
+- **Delivery check.** `checkDelivery(snapshot, manifest)` lists every definition id that neither the client build nor a remote module provides.
+- **Merge and audit.** `mergeBlueprint(base, ours, theirs)` merges three ways by address and configuration group. Different values on both sides, deleting a node the other side changed, and different child orders are conflicts that keep `ours`. `auditTargets(before, after)` returns the changed addresses and groups.
+- **JSON Patch.** `applyPatch` supports `add`, `remove`, `replace` and `move` and rejects any other op as a whole (`PATCH_OP_UNSUPPORTED`) without writing anything. `affectedAddresses` counts a `move` as a change of the parents at both ends.
+- **No secrets in blueprints.** The built-in rule `security.secret` reports private-key headers, cloud-key shapes and literal `password`/`secret`/`token`/`apiKey` values as errors; the issue never echoes the value.
+- **Budget and virtual-scroll fields.** Descriptors may declare `budget: { size, render }` (bytes, milliseconds) and templates `virtual: { rowHeight, overscan }`; `partom` and the React renderer check them.
+
 ## Error codes
 
-Source `part.contract`: `BLUEPRINT_INVALID`, `ADDRESS_INVALID`, `ADDRESS_DUPLICATE`, `DESCRIPTOR_INVALID`, `SCHEMA_NOT_SERIALIZABLE`, `SCHEMA_TRANSFORMS`, `ARGS_INVALID`, `RULE_FAILED`.
+Source `part.contract`: `BLUEPRINT_INVALID`, `ADDRESS_INVALID`, `ADDRESS_DUPLICATE`, `DESCRIPTOR_INVALID`, `SCHEMA_NOT_SERIALIZABLE`, `SCHEMA_TRANSFORMS`, `ARGS_INVALID`, `RULE_FAILED`, `FRAGMENT_CYCLE`, `FRAGMENT_TOO_DEEP`, `FRAGMENT_TOO_LARGE`, `PATCH_OP_UNSUPPORTED`, `SNAPSHOT_INVALID`.
 
 ## Build and verify
 

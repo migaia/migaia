@@ -36,6 +36,11 @@ export type IPartTemplate = {
   readonly rowKey: string
   readonly rows?: unknown
   readonly node: IPartNode
+  /**
+   * Virtual scrolling: renderers render only visible rows of fixed `rowHeight` pixels plus
+   * `overscan` rows (default 3) on each side. Row addresses exist only for rendered rows.
+   */
+  readonly virtual?: { readonly rowHeight: number; readonly overscan?: number }
 }
 
 /** Configuration groups of a node. Values may be literals or binding objects such as `{ $state }`. */
@@ -242,6 +247,12 @@ export type IDescriptor = {
   readonly replacedBy?: string
   readonly editor?: Readonly<Record<string, unknown>>
   readonly tier?: 'page' | 'restricted' | 'isolated'
+  /**
+   * Part budgets: `size` in bytes of the part's built module (checked by `partom manifest
+   * --budgets`) and `render` in milliseconds of median mount time (checked by `partom doctor
+   * --rendered`). Both positive finite numbers.
+   */
+  readonly budget?: { readonly size?: number; readonly render?: number }
   readonly inputs?: readonly string[]
   readonly behavior?: IBehavior
   readonly events?: Readonly<Record<string, IEventDeclaration>>
@@ -269,13 +280,14 @@ export type ICatalogView = {
   all(): Iterable<IDescriptor>
 }
 
-/** One JSON Patch operation, used for issue fixes and blueprint patches. */
-export type IJsonPatchOperation = {
-  readonly op: 'add' | 'remove' | 'replace' | 'move' | 'copy' | 'test'
-  readonly path: string
-  readonly value?: unknown
-  readonly from?: string
-}
+/**
+ * One JSON Patch operation, used for issue fixes and blueprint patches. Only `add`, `remove`,
+ * `replace` and `move` are supported; `applyPatch` rejects any other op with PATCH_OP_UNSUPPORTED.
+ */
+export type IJsonPatchOperation =
+  | { readonly op: 'add' | 'replace'; readonly path: string; readonly value: unknown }
+  | { readonly op: 'remove'; readonly path: string }
+  | { readonly op: 'move'; readonly from: string; readonly path: string }
 
 /** A problem found by a rule. `cause` holds a thrown error for `RULE_FAILED`. */
 export type IIssue = {

@@ -55,7 +55,18 @@ export const PartContractErrorText = {
   fragmentTooDeep: (limit: number): string => `fragment expansion is nested deeper than ${limit}`,
   /** Fragment expansion produced too many nodes. */
   fragmentTooLarge: (limit: number): string =>
-    `fragment expansion produced more than ${limit} nodes`
+    `fragment expansion produced more than ${limit} nodes`,
+  /** A template's virtual settings are malformed. */
+  virtualInvalid: (path: string): string =>
+    `template virtual settings at ${path} need a positive rowHeight and a non-negative integer overscan`,
+  /** A descriptor budget is malformed. */
+  budgetInvalid: 'descriptor budget size and render must be positive finite numbers',
+  /** A JSON Patch carries an operation `applyPatch` does not support. */
+  patchOpUnsupported: (index: number, op: string): string =>
+    `patch operation ${index} uses unsupported op "${op}"; only add, remove, replace and move are allowed`,
+  /** Snapshot bytes are not a valid version snapshot; `pointer` names the first problem. */
+  snapshotInvalid: (pointer: string, reason: string): string =>
+    `snapshot is invalid at ${pointer === '' ? '/' : pointer}: ${reason}`
 } as const
 
 /**

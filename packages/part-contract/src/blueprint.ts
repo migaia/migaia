@@ -64,8 +64,26 @@ function checkNode(value: unknown, path: string): void {
   if (value.template !== undefined) {
     if (!isRecord(value.template) || typeof value.template.rowKey !== 'string')
       invalid(PartContractErrorText.nodeShape(`${path}/template`))
+    if (value.template.virtual !== undefined)
+      checkVirtual(value.template.virtual, `${path}/template/virtual`)
     checkNode(value.template.node, `${path}/template/node`)
   }
+}
+
+/**
+ * A template's virtual settings need a positive finite `rowHeight` and a non-negative integer
+ * `overscan`.
+ */
+function checkVirtual(virtual: unknown, path: string): void {
+  if (
+    !isRecord(virtual) ||
+    typeof virtual.rowHeight !== 'number' ||
+    !Number.isFinite(virtual.rowHeight) ||
+    virtual.rowHeight <= 0 ||
+    (virtual.overscan !== undefined &&
+      (!Number.isInteger(virtual.overscan) || (virtual.overscan as number) < 0))
+  )
+    invalid(PartContractErrorText.virtualInvalid(path))
 }
 
 /** Freezes a validated plain value tree so rules and enhancers cannot mutate it in place. */
