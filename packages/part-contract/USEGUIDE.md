@@ -10,6 +10,7 @@
 | -------------------------------------- | ----------------------------------- | -------------------------------------------------------------- |
 | 编辑器保存前确认蓝图结构合法           | `parseBlueprint`                    | [保存前确认蓝图结构合法](#保存前确认蓝图结构合法)              |
 | 在服务端和编辑器里给出同一份问题清单   | `createRuleEngine`、`builtinRules`  | [在任何环境给出同一份问题清单](#在任何环境给出同一份问题清单)  |
+| 声明数据模型、资源绑定与表单字段       | `defineModel`、`checkModels`        | [声明数据模型、资源绑定与表单字段](#声明数据模型资源绑定与表单字段) |
 | 把团队约定写成规则                     | `defineRule`                        | [把团队约定写成规则](#把团队约定写成规则)                      |
 | 从地址找到节点，包括列表行             | `createAddressIndex`、`resolveAddress` | [从地址找到节点](#从地址找到节点)                           |
 | 用 zod 定义参数，同时得到 JSON Schema  | `toCatalogSchema`、`assertNoTransform` | [用校验库定义参数](#用校验库定义参数)                       |
@@ -49,7 +50,7 @@ for (const issue of engine.run('authored', blueprint))
 
 `authored` 检查原始蓝图，`resolved` 检查增强后的蓝图。`authored` 阶段把增强器 `writes` 声明的字段当作已提供，所以“必填 prop 由增强器补上”不会误报。一条规则抛错时，引擎记一条 `RULE_FAILED` 问题，原错误在 `cause` 上，其他规则照常运行。
 
-内置 32 条规则覆盖 html、aria、slot、catalog、style、event、flow、behavior、layout。例如：
+内置 36 条规则覆盖 html、aria、slot、catalog、style、event、flow、behavior、layout、resource、field。例如：
 
 - `event.modifier-exists`、`event.modifier-kind`、`event.modifier-placement`、`event.modifier-duplicate`：引用的修饰符必须在目录中；修饰符必须声明了所订阅的事件种类（组件回调不接受修饰符）；一个订阅至多一个改变监听位置的修饰符，模板行上一个都不行；同一订阅中同一 id 只能出现一次。
 - 片段：`expandFragments(blueprint, catalog)` 把 tag 指向片段的节点替换为片段子树，用使用点的 props 代入 `{ $param }`，把插槽填充放到 `{ $slot }` 位置；插槽节点保留作者写的地址 `<使用点>/slot.<名>/<段>`。它报告 `fragment.param-missing` 与 `fragment.slot-unknown`，并抛出 `FRAGMENT_CYCLE`、`FRAGMENT_TOO_DEEP`（16 层）与 `FRAGMENT_TOO_LARGE`（10000 个节点）。
@@ -72,6 +73,23 @@ const layout = {
 ```
 
 `validateDescriptor` 会拒绝以下声明并抛 `DESCRIPTOR_INVALID`：区域重名、`main` 不是恰好一个、可调区域没有像素默认值或 `min`/`max`、默认值不在范围内、`main` 可折叠、可折叠区域没有 `label`、同一地标出现多次而某个区域没有 `label`。蓝图里的布局节点可以用 `LayoutProp` 列出的三个 props：`sizes`（可调区域的初始宽度）、`labels`（覆盖区域标签，用于本地化）、`skipLabel`（“跳到主内容”链接的文字）。
+
+## 声明数据模型、资源绑定与表单字段
+
+`defineModel` 声明与后端无关的数据模型：字段 schema（Standard Schema，目录里存它的 JSON Schema，也可以用 `jsonSchema` 直接给出）、主键 `key`、字段的展示提示 `display`（标签、`ModelFieldFormat` 中的格式、枚举文案）和到其他模型的关系 `relations`。主键、提示和关系里写的字段必须在 schema 的 `properties` 中，否则抛 `DESCRIPTOR_INVALID`。
+
+```ts
+const order = defineModel({
+  id: 'order@1',
+  schema: z.object({ id: z.string(), customer: z.string().min(1), status: z.enum(['open', 'closed']) }),
+  key: ['id'],
+  display: { status: { format: 'enum', enumLabels: { open: '处理中', closed: '已完成' } } }
+})
+```
+
+part 用 `behavior.resource = { prop, slots }` 声明哪个 prop 接收数据资源的快照（`IResourceSnapshot`：`status` 取 `ResourceStatus` 中的值，另有 `data`、`error`、`refreshing`、`page`），以及加载中、空、出错时分别显示哪个插槽。蓝图在这个 prop 上写 `{ $resource: 'orders@1', params: { status: { $state: 'page.status' } } }`。表单控件用 `behavior.field = { value, change, read }` 声明字段协议：值 prop、变更事件和取值方式（`FieldRead`），渲染器据此把输入写回绑定的状态。
+
+规则 `resource.bind-target`、`resource.bind-prop`、`resource.params` 检查资源绑定的 id、位置和字面量参数，`field.value-bound` 在字段的值没有绑定状态时给出警告；绑定在 `params` 里的状态路径与推导同样受 `flow.bind-path`、`flow.scope`、`catalog.id-exists` 检查。`checkModels(catalog)` 检查模型关系指向的模型是否存在，`partom doctor` 每次运行会调用一次。
 
 ## 把团队约定写成规则
 

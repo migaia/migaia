@@ -1,7 +1,7 @@
 import { eventEntries, modifierId } from '../event-key.ts'
 import { defineRule, type IRuleContext } from '../rules.ts'
 import type { IEventDeclaration, IEventSubscription, IPartAddress } from '../types.ts'
-import { isDeriveBinding, isStateBinding, partOf, target } from './shared.ts'
+import { isDeriveBinding, isStateBinding, partOf, propValues, target } from './shared.ts'
 import { DOM_EVENTS, NAMESPACED_EVENT, STATE_PATH, Z_INDEX_KEYS } from './tables.ts'
 
 /** Both built-in phases. */
@@ -231,9 +231,9 @@ function checkDeriveNoWrite(context: IRuleContext<unknown>): void {
 function checkBindPath(context: IRuleContext<unknown>): void {
   /** Node under check. */
   const { node, address } = target(context)
-  for (const [key, value] of Object.entries(node.facets?.props ?? {}))
+  for (const { path, value } of propValues(node))
     if (isStateBinding(value) && !STATE_PATH.test(value.$state))
-      context.report({ address, facet: 'props', path: key, messageKey: 'flow.bind-path' })
+      context.report({ address, facet: 'props', path, messageKey: 'flow.bind-path' })
 }
 
 /** Section state is readable only below the section node with that id. */
@@ -242,12 +242,12 @@ function checkScope(context: IRuleContext<unknown>): void {
   const { node, address } = target(context)
   /** Address segments of the node and its ancestors. */
   const lineage = new Set(address.split('/'))
-  for (const [key, value] of Object.entries(node.facets?.props ?? {})) {
+  for (const { path, value } of propValues(node)) {
     if (!isStateBinding(value) || !value.$state.startsWith('section.')) continue
     /** Section id the binding names. */
     const section = value.$state.split('.')[1] ?? ''
     if (!lineage.has(section))
-      context.report({ address, facet: 'props', path: key, messageKey: 'flow.scope' })
+      context.report({ address, facet: 'props', path, messageKey: 'flow.scope' })
   }
 }
 

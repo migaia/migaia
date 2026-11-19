@@ -1,4 +1,4 @@
-import { isDescriptorId } from './descriptor.ts'
+import { isDescriptorId } from './descriptor-id.ts'
 import type { IEventSubscription, IModifierRef } from './types.ts'
 
 /**

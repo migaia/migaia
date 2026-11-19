@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuleEngine, parseBlueprint, type IPartFacets, type IPartNode } from '../src/index.ts'
-import { builtinRules } from '../src/doctor/index.ts'
+import { builtinRules, dataRules } from '../src/doctor/index.ts'
 import { createTestCatalog, ruleDescriptors } from './fixtures/catalog.ts'
 
 /** Engine over every built-in rule and the shared fixture catalog. */
@@ -107,8 +107,11 @@ const cases: readonly (readonly [string, IPartNode, string])[] = [
 ]
 
 describe('built-in rules', () => {
-  it('ships exactly the thirty-two documented rules', () => {
-    expect(builtinRules.map((rule) => rule.id).sort()).toEqual(cases.map(([id]) => id).sort())
+  it('ships exactly the thirty-six documented rules', () => {
+    // Data rules run only on authored blueprints; their cases live in data-rules.test.ts.
+    expect(builtinRules.map((rule) => rule.id).sort()).toEqual(
+      [...cases.map(([id]) => id), ...dataRules.map((rule) => rule.id)].sort()
+    )
   })
 
   it.each(cases)('%s reports exactly one issue for its own violation', (rule, root, address) => {

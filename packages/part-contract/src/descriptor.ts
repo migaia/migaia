@@ -3,9 +3,11 @@ import { isRecord } from './record.ts'
 import { PartContractErrorText } from './error-text.ts'
 import { createPartContractError } from './errors.ts'
 import { checkLayoutBehavior } from './layout.ts'
+import { checkDataBehavior, checkModelBody } from './data-checks.ts'
+import { isDescriptorId } from './descriptor-id.ts'
 import type { IDescriptor, IKindSchema } from './types.ts'
 
-/** Built-in kinds; this list has a fixed size of eight, so membership checks are constant time. */
+/** Built-in kinds; this list has a fixed size of nine, so membership checks are constant time. */
 const BUILTIN_KINDS: ReadonlySet<string> = new Set([
   'part',
   'enhancer',
@@ -14,30 +16,17 @@ const BUILTIN_KINDS: ReadonlySet<string> = new Set([
   'effect',
   'rule',
   'modifier',
-  'fragment'
+  'fragment',
+  'model'
 ])
 /** Event kinds a modifier may name; fixed size two. */
 const MODIFIER_EVENT_KINDS: ReadonlySet<string> = new Set(['dom', 'custom'])
-/** Descriptor id grammar: name, `@`, non-negative integer major. */
-const ID_PATTERN = /^[A-Za-z0-9_.:/-]+@\d+$/
 /** Namespaced meta key grammar: at least one dot between non-empty parts. */
 const META_KEY_PATTERN = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$/
 
 /** Throws `DESCRIPTOR_INVALID` with the problem message. */
 function invalid(message: string): never {
   throw createPartContractError(PartContractErrorCode.descriptorInvalid, message)
-}
-
-/** Splits `name@major` into its parts; callers have already validated the grammar. */
-export function splitDescriptorId(id: string): { readonly name: string; readonly major: number } {
-  /** Position of the major separator. */
-  const at = id.lastIndexOf('@')
-  return { name: id.slice(0, at), major: Number(id.slice(at + 1)) }
-}
-
-/** True when a string has the `name@major` form. */
-export function isDescriptorId(id: string): boolean {
-  return ID_PATTERN.test(id)
 }
 
 /**
@@ -54,7 +43,7 @@ export function validateDescriptor(
     typeof descriptor.id !== 'string'
   )
     invalid(PartContractErrorText.descriptorShape)
-  if (!ID_PATTERN.test(descriptor.id)) invalid(PartContractErrorText.descriptorId(descriptor.id))
+  if (!isDescriptorId(descriptor.id)) invalid(PartContractErrorText.descriptorId(descriptor.id))
   /** Extension kind schema, when the kind is not built in. */
   const extension = BUILTIN_KINDS.has(descriptor.kind)
     ? undefined
@@ -76,6 +65,8 @@ export function validateDescriptor(
     descriptor.behavior.layout !== undefined
   )
     checkLayoutBehavior(descriptor.behavior.layout)
+  if (descriptor.kind === 'part') checkDataBehavior(descriptor)
+  if (descriptor.kind === 'model') checkModelBody(descriptor)
   return descriptor as unknown as IDescriptor
 }
 

@@ -123,7 +123,7 @@ describe('modifier rules', () => {
   })
 
   it('ships twenty-nine engine rules without event.outside-dom', () => {
-    expect(builtinRules).toHaveLength(32)
+    expect(builtinRules).toHaveLength(36)
     expect(builtinRules.map((rule) => rule.id)).not.toContain('event.outside-dom')
   })
 

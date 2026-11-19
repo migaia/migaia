@@ -11,7 +11,23 @@ export {
   type IParsedAddress
 } from './address.ts'
 export { isPartNode, parseBlueprint } from './blueprint.ts'
-export { isDescriptorId, splitDescriptorId, validateDescriptor } from './descriptor.ts'
+export {
+  FieldRead,
+  isResourceBinding,
+  ModelFieldFormat,
+  ResourceStatus,
+  type IFieldBehavior,
+  type IModelBody,
+  type IModelFieldDisplay,
+  type IModelRelation,
+  type IResourceBehavior,
+  type IResourceBinding,
+  type IResourceSnapshot
+} from './data.ts'
+export { defineModel, type IModelDefinition, type IModelSpec } from './model.ts'
+export { checkModels, MODEL_RELATION_TARGET } from './models-check.ts'
+export { isDescriptorId, splitDescriptorId } from './descriptor-id.ts'
+export { validateDescriptor } from './descriptor.ts'
 export {
   eventEntries,
   eventNameOf,

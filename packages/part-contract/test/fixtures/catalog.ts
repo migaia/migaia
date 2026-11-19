@@ -17,7 +17,8 @@ export function createTestCatalog(
   return {
     get: (id) => byId.get(id),
     majors: (name) => majors.get(name) ?? [],
-    writesFor: (tag) => writes[tag] ?? []
+    writesFor: (tag) => writes[tag] ?? [],
+    all: () => descriptors
   }
 }
 

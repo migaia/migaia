@@ -1,8 +1,8 @@
 import { parseAddress, tagSegmentName } from '../address.ts'
-import { isDescriptorId, splitDescriptorId } from '../descriptor.ts'
+import { isDescriptorId, splitDescriptorId } from '../descriptor-id.ts'
 import { defineRule, type IRuleContext } from '../rules.ts'
 import type { IStyleHookType } from '../types.ts'
-import { isDeriveBinding, partOf, target } from './shared.ts'
+import { isDeriveBinding, partOf, propValues, target } from './shared.ts'
 import {
   ELEMENT_ATTRIBUTES,
   GLOBAL_ATTRIBUTES,
@@ -151,8 +151,8 @@ function referencesOf(
   const { node } = target(context)
   /** Collected references; the tag comes first. */
   const references = [{ id: node.tag, facet: 'tag', path: '' }]
-  for (const [key, value] of Object.entries(node.facets?.props ?? {}))
-    if (isDeriveBinding(value)) references.push({ id: value.$derive, facet: 'props', path: key })
+  for (const { path, value } of propValues(node))
+    if (isDeriveBinding(value)) references.push({ id: value.$derive, facet: 'props', path })
   return references
 }
 

@@ -1,3 +1,4 @@
+import { isResourceBinding } from '../data.ts'
 import type { IRuleContext } from '../rules.ts'
 import type { IDescriptor, IPartNode } from '../types.ts'
 
@@ -37,4 +38,24 @@ export function target(context: IRuleContext<unknown>): {
   readonly address: string
 } {
   return { node: context.node as IPartNode, address: context.address as string }
+}
+
+/** One value of a node's props, with its path inside `props`. */
+export type IPropValue = { readonly path: string; readonly value: unknown }
+
+/**
+ * Every props value a binding rule inspects: each top-level prop, plus each parameter of a `{
+ * $resource }` binding (path `<prop>.params.<name>`). One nesting level only, so the work is linear
+ * in the node's props and parameters.
+ */
+export function propValues(node: IPartNode): IPropValue[] {
+  /** Collected values. */
+  const values: IPropValue[] = []
+  for (const [key, value] of Object.entries(node.facets?.props ?? {})) {
+    values.push({ path: key, value })
+    if (isResourceBinding(value))
+      for (const [name, param] of Object.entries(value.params ?? {}))
+        values.push({ path: `${key}.params.${name}`, value: param })
+  }
+  return values
 }

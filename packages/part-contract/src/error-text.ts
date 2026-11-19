@@ -45,6 +45,10 @@ export const PartContractErrorText = {
   /** A fragment descriptor's subtree is malformed. */
   fragmentBody: (id: string): string =>
     `fragment ${id} must carry a node; $param may not appear in id, tag or slot names; each $slot once`,
+  /** A model descriptor breaks a structural rule; `reason` comes from `DataInvalidReason`. */
+  modelInvalid: (id: string, reason: string): string => `model ${id} is invalid: ${reason}`,
+  /** A part's resource or field behaviour group is malformed; `reason` from `DataInvalidReason`. */
+  behaviorInvalid: (id: string, reason: string): string => `part ${id} is invalid: ${reason}`,
   /** A fragment expands into itself. */
   fragmentCycle: (id: string): string => `fragment ${id} expands into itself`,
   /** Fragment nesting is too deep. */
@@ -85,4 +89,23 @@ export const LayoutInvalidReason = {
   collapseLabel: 'a collapsible region needs a label',
   /** A landmark appears more than once and this region has no label. */
   landmarkLabel: 'a repeated landmark needs a label on each region'
+} as const
+
+/**
+ * Reasons appended to `modelInvalid` and `behaviorInvalid`. Contract text: tests and tooling match
+ * them to tell data-layer structure problems apart.
+ */
+export const DataInvalidReason = {
+  /** The model body is missing or its schema is not an object schema with properties. */
+  modelSchema: 'schema must be an object schema with properties',
+  /** `key` is empty or names a field outside the schema. */
+  modelKey: 'key must list at least one field of the schema',
+  /** A display hint names a field outside the schema or has a malformed value. */
+  modelDisplay: 'display hints must name schema fields and use known formats',
+  /** A relation lacks a target id, a cardinality or `via` fields of the schema. */
+  modelRelation: 'relations need a target id, one or many, and via fields of the schema',
+  /** `behavior.resource` lacks a prop or maps a status to an undeclared slot. */
+  resource: 'resource behavior needs a prop and may map statuses only to declared slots',
+  /** `behavior.field` lacks value/change, names an undeclared change event or an unknown read. */
+  field: 'field behavior needs a value prop, a declared change event and a known read mode'
 } as const

@@ -1,5 +1,7 @@
 /** Public data shapes of the part contract. Everything here is plain, serializable data. */
 
+import type { IFieldBehavior, IModelBody, IResourceBehavior } from './data.ts'
+
 /** A part address such as `orders/button#0` or `orders/rows/status@row:12`. */
 export type IPartAddress = string
 
@@ -123,7 +125,7 @@ export type ILayoutBehavior = {
 
 /**
  * Behaviour groups of a part definition: semantics, aria, focus, keyboard, states, dismissal,
- * layer, layout.
+ * layer, layout, resource, field.
  */
 export type IBehavior = {
   readonly semantics?: {
@@ -154,6 +156,8 @@ export type IBehavior = {
   readonly layer?: 'top' | LayerLevel
   readonly managedBy?: 'host' | 'component'
   readonly layout?: ILayoutBehavior
+  readonly resource?: IResourceBehavior
+  readonly field?: IFieldBehavior
 }
 
 /** Declaration of an event a part emits. */
@@ -215,6 +219,7 @@ export type IBuiltinKind =
   | 'rule'
   | 'modifier'
   | 'fragment'
+  | 'model'
 
 /** Event kinds a modifier may apply to; component callbacks never reach the DOM. */
 export type IModifierEventKind = 'dom' | 'custom'
@@ -248,6 +253,8 @@ export type IDescriptor = {
   readonly placement?: boolean
   /** Fragment only: the reusable subtree. */
   readonly fragment?: IFragmentBody
+  /** Model only: field schema, key, display hints and relations. */
+  readonly model?: IModelBody
 }
 
 /** Validation schema of an extension kind: required field names beyond the common ones. */
@@ -258,6 +265,8 @@ export type ICatalogView = {
   get(id: string): IDescriptor | undefined
   majors(name: string): readonly number[]
   writesFor(tag: string): readonly string[]
+  /** Every current descriptor in registration order. */
+  all(): Iterable<IDescriptor>
 }
 
 /** One JSON Patch operation, used for issue fixes and blueprint patches. */

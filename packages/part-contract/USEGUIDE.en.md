@@ -10,6 +10,7 @@ See the [README](./README.en.md) for what the package is for. The package holds 
 | ---------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------- |
 | Confirm a blueprint is well formed before saving     | `parseBlueprint`                       | [Confirm a blueprint before saving](#confirm-a-blueprint-before-saving) |
 | Give the same issue list on the server and in the editor | `createRuleEngine`, `builtinRules` | [The same issue list everywhere](#the-same-issue-list-everywhere)     |
+| Declare data models, resource bindings and form fields | `defineModel`, `checkModels`         | [Declare data models](#declare-data-models-resource-bindings-and-form-fields) |
 | Turn a team convention into a rule                   | `defineRule`                           | [Turn a convention into a rule](#turn-a-convention-into-a-rule)       |
 | Find a node from an address, list rows included      | `createAddressIndex`, `resolveAddress` | [Find a node from an address](#find-a-node-from-an-address)           |
 | Define arguments with zod and get JSON Schema too    | `toCatalogSchema`, `assertNoTransform` | [Define arguments with a schema library](#define-arguments-with-a-schema-library) |
@@ -49,7 +50,7 @@ for (const issue of engine.run('authored', blueprint))
 
 `authored` checks the raw blueprint; `resolved` checks it after enhancement. In the `authored` phase a field an enhancer declares in `writes` counts as provided, so a required prop that an enhancer fills in is not reported. When a rule throws, the engine records a `RULE_FAILED` issue with the original error on `cause`, and the other rules still run.
 
-The 32 built-in rules cover html, aria, slot, catalog, style, event, flow, behavior and layout. For example:
+The 36 built-in rules cover html, aria, slot, catalog, style, event, flow, behavior, layout, resource and field. For example:
 
 - `event.modifier-exists`, `event.modifier-kind`, `event.modifier-placement`, `event.modifier-duplicate`: a referenced modifier must be in the catalog, must declare the subscribed event kind (component callbacks take no modifiers), at most one modifier may move the listener and none on template rows, and an id may appear once per subscription.
 - Fragments: `expandFragments(blueprint, catalog)` replaces every node whose tag names a fragment by the fragment's subtree, substitutes `{ $param }` placeholders with the usage's props and inserts slot fills at `{ $slot }`; slot nodes keep their authored address `<usage>/slot.<name>/<segment>`. It reports `fragment.param-missing` and `fragment.slot-unknown`, and throws `FRAGMENT_CYCLE`, `FRAGMENT_TOO_DEEP` (16 levels) and `FRAGMENT_TOO_LARGE` (10000 nodes).
@@ -72,6 +73,23 @@ const layout = {
 ```
 
 `validateDescriptor` rejects the following with `DESCRIPTOR_INVALID`: duplicate region names, a main region count other than one, a resizable region without a pixel default or `min`/`max`, a default outside the range, a collapsible `main`, a collapsible region without `label`, and a repeated landmark where some region lacks `label`. A layout node in a blueprint accepts the three props listed in `LayoutProp`: `sizes` (initial widths of resizable regions), `labels` (region label overrides, for localisation) and `skipLabel` (text of the skip-to-main link).
+
+## Declare data models, resource bindings and form fields
+
+`defineModel` declares a backend-neutral data model: a field schema (a Standard Schema; the catalog stores its JSON Schema, or the one you pass as `jsonSchema`), the primary key `key`, display hints `display` (label, a format from `ModelFieldFormat`, enum labels) and `relations` to other models. Fields named in the key, hints and relations must be in the schema's `properties`, otherwise `DESCRIPTOR_INVALID` is thrown.
+
+```ts
+const order = defineModel({
+  id: 'order@1',
+  schema: z.object({ id: z.string(), customer: z.string().min(1), status: z.enum(['open', 'closed']) }),
+  key: ['id'],
+  display: { status: { format: 'enum', enumLabels: { open: 'Open', closed: 'Closed' } } }
+})
+```
+
+A part declares with `behavior.resource = { prop, slots }` which prop receives a resource snapshot (`IResourceSnapshot`: `status` from `ResourceStatus`, plus `data`, `error`, `refreshing`, `page`) and which slots show while loading, empty or failed. The blueprint writes `{ $resource: 'orders@1', params: { status: { $state: 'page.status' } } }` on that prop. A form control declares the field protocol with `behavior.field = { value, change, read }`: the value prop, the change event and how the event carries the value (`FieldRead`); the renderer uses it to write input back to the bound state.
+
+Rules `resource.bind-target`, `resource.bind-prop` and `resource.params` check a resource binding's id, position and literal parameters; `field.value-bound` warns when a field value is not bound to state. State paths and derives bound inside `params` are checked by `flow.bind-path`, `flow.scope` and `catalog.id-exists` as well. `checkModels(catalog)` checks that model relations point at existing models; `partom doctor` calls it once per run.
 
 ## Turn a convention into a rule
 
