@@ -4,9 +4,11 @@ import type {
   IResolvedNode,
   IResolvedTree,
   IRendererMount,
-  IPartRendererFactory
+  IPartRendererFactory,
+  IResourceHandle,
+  IResourceWatch
 } from '@migaia/part-host'
-import { formatAddress, parseAddress } from '@migaia/part-contract'
+import { formatAddress, parseAddress, type IResourceSnapshot } from '@migaia/part-contract'
 import type { IDomFeatures } from '@migaia/part-plugin-dom'
 import type { IRuntime } from '@migaia/reactive'
 import { useTracked } from '@migaia/store-react'
@@ -14,6 +16,7 @@ import {
   Component,
   createContext,
   useContext,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useState,
@@ -23,6 +26,17 @@ import {
 import { createRoot, type Root } from 'react-dom/client'
 import { REACT_RENDERER, type IReactBinding } from './bind.ts'
 import { NodeCommit } from './commit.ts'
+import {
+  fieldPathOf,
+  fieldValue,
+  PENDING_SNAPSHOT,
+  resourceAttributes,
+  resourceBindingOf,
+  rowsOf,
+  startWatch,
+  statusSlotNames,
+  statusSlotOf
+} from './data-node.ts'
 import { PartReactErrorCode } from './error-code.ts'
 import { createPartReactError, PartReactErrorText } from './errors.ts'
 import { LayoutView } from './layout.tsx'
@@ -41,6 +55,7 @@ export type IMountServices = {
   }
   readonly dispatch: (address: string, event: string, detail: unknown) => Promise<void>
   readonly report: (error: unknown) => void
+  readonly resources: IResourceHandle
 }
 
 /** Context carrying the mount services to node components. */
@@ -69,6 +84,8 @@ const ROWS_KEY = `${INTERNAL_KEY}rows`
 const OPEN_KEY = `${INTERNAL_KEY}open`
 /** Prefix of bound entries holding state-derived aria values, followed by the attribute name. */
 const ARIA_KEY = `${INTERNAL_KEY}aria:`
+/** Bound entry holding the resource snapshot of a resource node. */
+const SNAPSHOT_KEY = `${INTERNAL_KEY}snapshot`
 
 /** State-derived aria values taken out of a bound record. */
 function ariaValues(bound: Readonly<Record<string, unknown>>): Record<string, unknown> {
@@ -98,14 +115,25 @@ function shallowEqual(
 function readBound(
   services: IMountServices,
   node: IResolvedNode,
-  row: IRowScope | undefined
+  row: IRowScope | undefined,
+  watch: IResourceWatch | undefined
 ): Readonly<Record<string, unknown>> {
   /** Resolved prop values. */
   const resolved: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(node.config.props ?? {}))
     resolved[key] = services.state.resolve(node, value, row?.row)
+  /** Snapshot of a resource node; the pending one until the commit-phase watch exists. */
+  const snapshot =
+    resourceBindingOf(node) === undefined ? undefined : (watch?.read() ?? PENDING_SNAPSHOT)
+  if (snapshot !== undefined) {
+    resolved[node.behavior.resource?.prop as string] = snapshot
+    resolved[SNAPSHOT_KEY] = snapshot
+  }
   if (node.template !== undefined)
-    resolved[ROWS_KEY] = services.state.resolve(node, node.template.rows, row?.row)
+    resolved[ROWS_KEY] =
+      snapshot !== undefined && node.template.rows === undefined
+        ? rowsOf(snapshot)
+        : services.state.resolve(node, node.template.rows, row?.row)
   if (node.openStatePath !== undefined) resolved[OPEN_KEY] = services.state.read(node.openStatePath)
   for (const [name, path] of Object.entries(node.ariaStates))
     resolved[`${ARIA_KEY}${name}`] = services.state.read(path)
@@ -131,13 +159,22 @@ class EventBridge {
   /** Handler passed to the component as its callback prop. */
   readonly handle = (detail: unknown): void => this.#emit(detail)
 
-  /** Writes open state for the declared open-change event, then dispatches to the host. */
+  /**
+   * Writes open state for the declared open-change event and the field value for the field's change
+   * event, then dispatches to the host.
+   */
   #emit(detail: unknown): void {
     if (
       this.#node.behavior.states?.openChange === this.#name &&
       this.#node.openStatePath !== undefined
     )
       this.#services.state.write(this.#node.openStatePath, detail)
+    /** Field protocol of the part. */
+    const field = this.#node.behavior.field
+    /** Bound state path of the field value. */
+    const path = field?.change === this.#name ? fieldPathOf(this.#node) : undefined
+    if (field !== undefined && path !== undefined)
+      this.#services.state.write(path, fieldValue(field, detail))
     this.#services
       .dispatch(this.#node.address, this.#name, detail)
       .catch((error: unknown) => this.#rejected(error))
@@ -170,7 +207,10 @@ function componentProps(
   const children: ReactNode[] = node.children.map((child) => (
     <PartNode key={child.address} address={child.address} />
   ))
+  /** Status slots of a resource node, shown only instead of the component. */
+  const statusSlots = statusSlotNames(node)
   for (const [slot, rendered] of Object.entries(slotContent(node))) {
+    if (statusSlots.has(slot)) continue
     /** Target prop of the slot. */
     const target = mapping.slots?.[slot] ?? 'children'
     if (target === 'children') children.push(...rendered)
@@ -244,6 +284,14 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
   const inRow = row !== undefined
   /** Root element of the component after commit. */
   const [element, setElement] = useState<HTMLElement | null>(null)
+  /** Resource binding of the node, when it is a resource node. */
+  const resourceBinding = resourceBindingOf(instance)
+  /** Watch of the resource binding, created in the commit phase. */
+  const [watch, setWatch] = useState<IResourceWatch | undefined>(undefined)
+  useEffect(
+    () => startWatch(services.resources, resourceBinding, row?.row, setWatch),
+    [services, resourceBinding, row]
+  )
   /** Commit helper living as long as this component. */
   const commit = useMemo(
     () =>
@@ -256,16 +304,32 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
   )
   /** Resolved bound values; reads are tracked on the host runtime. */
   const bound = useTracked(
-    () => (instance === undefined ? {} : readBound(services, instance, row)),
+    () => (instance === undefined ? {} : readBound(services, instance, row, watch)),
     shallowEqual,
     services.runtime
   )
   useLayoutEffect(() => commit.release, [commit])
+  /** Snapshot of a resource node. */
+  const snapshot = bound[SNAPSHOT_KEY] as IResourceSnapshot | undefined
   useLayoutEffect(() => {
     if (instance !== undefined)
-      commit.apply(instance, element, bound[OPEN_KEY] === true, ariaValues(bound))
-  }, [commit, instance, element, bound])
+      commit.apply(
+        instance,
+        element,
+        bound[OPEN_KEY] === true,
+        ariaValues(bound),
+        snapshot === undefined ? {} : resourceAttributes(snapshot)
+      )
+  }, [commit, instance, element, bound, snapshot])
   if (instance === undefined) return null
+  /** Status slot shown instead of the component. */
+  const statusSlot = snapshot === undefined ? undefined : statusSlotOf(instance, snapshot)
+  if (statusSlot !== undefined)
+    return (
+      <div ref={setElement} style={{ display: 'contents' }} data-part-address={instance.address}>
+        {slotContent(instance)[statusSlot]}
+      </div>
+    )
   /** React binding of the part. */
   const binding = services.catalog.implementation(
     REACT_RENDERER,

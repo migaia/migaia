@@ -88,6 +88,12 @@ A template host renders its template node once per entry of `rows`, after its ow
 
 Limit: if the template node declares an open state, all rows share one state path.
 
+## Data resources and form fields
+
+When a part declares `behavior.resource` and the blueprint puts `{ $resource }` on that prop, the component subscribes to the resource after commit and releases it on unmount; the snapshot (`status`, `data`, `error`, `refreshing`, `page`) is passed as that prop. When the current status maps to a slot in `behavior.resource.slots` and the blueprint fills it, the slot content shows instead of the component; status slots are never passed to the component as children. The first frame, before the subscription exists, shows `loading`. The node root carries `data-resource-status` (the status) and `aria-busy="true"` (loading or refreshing); the component must forward `ref` for them to be written. A template host bound to a resource without `rows` takes its rows from the snapshot's `data` (or `data.items`), rendered only when `ready`; after a parameter change the old rows stay until the new data arrives.
+
+When a part declares `behavior.field` and its value prop is bound to `$state`, the field's change event writes the new value to that path before the blueprint's subscription runs. Component callback events go through the mapped callback; DOM events (such as `input`) are listened for on the root element. Fields inside template rows are not written back.
+
 ## State-derived aria
 
 For a part declaring `aria: { expanded: { fromState: 'expanded' } }`, the renderer reads the state path tracked. A state change re-renders only that node, and the commit rewrites its `aria-expanded`.

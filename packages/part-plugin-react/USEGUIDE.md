@@ -88,6 +88,12 @@ definePart({
 
 限制：模板节点若声明打开状态，各行共享同一个状态路径。
 
+## 数据资源与表单字段
+
+part 声明了 `behavior.resource`、蓝图在对应 prop 上写了 `{ $resource }` 时，组件提交后会订阅这个资源，卸载时释放；快照（`status`、`data`、`error`、`refreshing`、`page`）作为该 prop 交给组件。当前状态在 `behavior.resource.slots` 里映射了插槽、且蓝图填了内容时，显示插槽内容代替组件；这些状态插槽不会作为子节点传给组件。第一帧还没有订阅时按 `loading` 显示。节点根元素带 `data-resource-status`（当前状态）和 `aria-busy="true"`（加载或刷新中），组件要转发 `ref` 才能写上。模板宿主同时绑定了资源且没有写 `rows` 时，行取自快照的 `data`（或 `data.items`），只在 `ready` 时渲染；参数变化后，新数据到达前保留旧行。
+
+part 声明了 `behavior.field`、值 prop 绑定了 `$state` 时，字段的变更事件先把新值写进该路径，再执行蓝图里的订阅。组件回调事件走映射表里的回调；DOM 事件（例如 `input`）在根元素上监听。模板行内的字段不回写。
+
 ## 由状态派生 aria
 
 part 声明 `aria: { expanded: { fromState: 'expanded' } }` 后，渲染器追踪读取对应状态路径。状态变化时只有这个节点重渲，并在提交期改写它的 `aria-expanded`。

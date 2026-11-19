@@ -2,7 +2,8 @@ import {
   partCorePlugin,
   type IPartPlugin,
   type IPartRendererFactory,
-  type IResolvedNode
+  type IResolvedNode,
+  type IResourceHandle
 } from '@migaia/part-host'
 import { domPlugin, type IDomFeatures } from '@migaia/part-plugin-dom'
 import { definePlugin } from '@migaia/plugin-host'
@@ -28,6 +29,7 @@ type IRendererDeps = IDomFeatures & {
   readonly catalog: { implementation(renderer: string, partId: string): unknown }
   readonly effect: { dispatch(address: string, event: string, detail: unknown): Promise<void> }
   readonly diagnostics: { report(error: unknown): void }
+  readonly resources: IResourceHandle
 }
 
 /** Builds the renderer factory of one host and registers it in the render slot. */
@@ -46,7 +48,8 @@ function createFactory(deps: IRendererDeps): ReactRendererFactory {
     catalog: deps.catalog,
     state: deps.state,
     dispatch: (address, event, detail) => deps.effect.dispatch(address, event, detail),
-    report: (error) => deps.diagnostics.report(error)
+    report: (error) => deps.diagnostics.report(error),
+    resources: deps.resources
   })
   deps.renderSlot.provide(PLUGIN_NAME, factory)
   return factory
@@ -61,6 +64,7 @@ const rendererFeature = defineFeature(
     catalog: partCorePlugin.getFeature('catalog'),
     effect: partCorePlugin.getFeature('effect'),
     diagnostics: partCorePlugin.getFeature('diagnostics'),
+    resources: partCorePlugin.getFeature('resources'),
     focus: domPlugin.getFeature('focus'),
     layer: domPlugin.getFeature('layer'),
     stylesheet: domPlugin.getFeature('stylesheet'),
