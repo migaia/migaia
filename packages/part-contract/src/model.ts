@@ -25,6 +25,29 @@ export type IModelDefinition<TValue = unknown> = {
 }
 
 /**
+ * Copy of a record of plain objects with every level frozen, so later changes to the caller's
+ * objects cannot alter a registered descriptor. Arrays inside (relation `via`) are copied too.
+ */
+function frozenRecords<T extends object>(
+  record: Readonly<Record<string, T>>
+): Readonly<Record<string, T>> {
+  /** Frozen copies by key. */
+  const copy: Record<string, T> = {}
+  for (const [key, value] of Object.entries(record)) {
+    /** Shallow copy of the entry with arrays and nested records copied and frozen. */
+    const entry: Record<string, unknown> = {}
+    for (const [field, inner] of Object.entries(value))
+      entry[field] = Array.isArray(inner)
+        ? Object.freeze([...inner])
+        : typeof inner === 'object' && inner !== null
+          ? Object.freeze({ ...inner })
+          : inner
+    copy[key] = Object.freeze(entry) as T
+  }
+  return Object.freeze(copy)
+}
+
+/**
  * Defines a model. Throws `DESCRIPTOR_INVALID` when the schema is not an object schema with
  * properties, or when key, display hints or relations name fields outside it; schema conversion
  * failures keep their own codes (`SCHEMA_NOT_SERIALIZABLE`, `SCHEMA_TRANSFORMS`).
@@ -37,8 +60,8 @@ export function defineModel<TValue = unknown>(spec: IModelSpec): IModelDefinitio
   const body: IModelBody = {
     schema: toCatalogSchema(schema, jsonSchema),
     key: Object.freeze([...key]),
-    ...(display === undefined ? {} : { display }),
-    ...(relations === undefined ? {} : { relations })
+    ...(display === undefined ? {} : { display: frozenRecords(display) }),
+    ...(relations === undefined ? {} : { relations: frozenRecords(relations) })
   }
   /** Descriptor with only the fields that were given. */
   const descriptor = validateDescriptor({

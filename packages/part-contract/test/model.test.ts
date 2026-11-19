@@ -60,6 +60,18 @@ describe('defineModel', () => {
     expect(model.schema).toBe(orderSchema)
   })
 
+  it('keeps the descriptor unchanged when the caller later edits its hints and relations', () => {
+    /** Caller-owned display hints and relations. */
+    const display = { customer: { label: 'Customer' } }
+    const relations = { lines: { target: 'line@1', cardinality: 'many' as const, via: ['id'] } }
+    /** Defined model. */
+    const model = defineModel({ ...spec, display, relations })
+    display.customer.label = 'Changed'
+    relations.lines.via.push('customer')
+    expect(model.descriptor.model?.display?.customer?.label).toBe('Customer')
+    expect(model.descriptor.model?.relations?.lines?.via).toEqual(['id'])
+  })
+
   it.each([
     ['empty key', { ...spec, key: [] }],
     ['unknown key', { ...spec, key: ['missing'] }],

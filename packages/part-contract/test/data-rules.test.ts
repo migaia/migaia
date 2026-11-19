@@ -108,8 +108,8 @@ describe('data rules', () => {
   it('reports missing model relation targets once per relation', () => {
     /** Issues of the catalog check. */
     const issues = checkModels(createTestCatalog(descriptors))
-    expect(issues.map((issue) => [issue.rule, issue.path])).toEqual([
-      ['model.relation-target', 'model.relations.lines']
+    expect(issues.map((issue) => [issue.rule, issue.address, issue.path])).toEqual([
+      ['model.relation-target', 'order@1', 'model.relations.lines']
     ])
     expect(builtinRules).toHaveLength(36)
   })
