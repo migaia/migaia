@@ -1,11 +1,14 @@
 # @migaia/partom-cli
 
-`partom` 命令：检查 part 项目（`doctor`），在本机预览蓝图（`preview`），从现有组件提取 part 定义草稿（`extract`）。用 Bun 编写。
+`partom` 命令：检查 part 项目（`doctor`），在本机预览蓝图（`preview`），从现有组件提取 part 定义草稿、把页面转成蓝图（`extract`），从 OpenAPI 生成数据层（`import`），生成类型（`types`）。用 Bun 编写。
 
 ```text
 partom doctor [--rendered] [--only <address>] [--browser <path>] [--json [--blueprints]] [--config <path>]
 partom preview [<id|file>] [--port <n>] [--config <path>]
 partom extract <files...> --out <dir> [--probe] [--verify] [--browser <path>]
+partom extract --usage <pages...> --parts <dir> --out <dir>
+partom import <openapi.json|yaml> --out <dir>
+partom types [--out <file>] [--check] [--config <path>]
 partom browser install
 partom --version
 ```
@@ -33,7 +36,13 @@ export default { plugins: [appPlugin], blueprints: ['*.blueprint.json'] }
 
 ## extract
 
-用 oxc 静态解析 shadcn 风格组件：导出的组件、props、`cva` 变体、事件回调、slot，以及从 Radix 与 cmdk 的导入推测 `pattern`。输出每个组件一份 `definePart` + `bindReactComponent` 草稿和 `report.json`。生成代码只接受合法标识符，字符串一律以 JSON 字面量写入。`--probe` 按每个变体值渲染并记录 DOM；`--verify` 比较原组件与经 part 宿主渲染的结果。
+用 oxc 静态解析 shadcn 风格组件：导出的组件、props、`cva` 变体、事件回调、slot，以及从 Radix 与 cmdk 的导入推测 `pattern`。输出每个组件一份 `definePart` + `bindReactComponent` 草稿和 `report.json`。生成代码只接受合法标识符，字符串一律以 JSON 字面量写入。`--probe` 按每个变体值渲染并记录 DOM；`--verify` 比较原组件与经 part 宿主渲染的结果。表单控件按固定规则推断字段协议；shadcn `form.tsx` 生成五个不依赖 react-hook-form 的替代 part；TanStack `data-table.tsx` 生成绑定 resource 的 `data-table@1`。报告的 `summary` 统计无不确定项的组件数与 pattern 检查结果。
+
+`--usage` 把页面 JSX 转成蓝图、初始状态插件、effect 草稿、原生元素 part 与黑盒 part，详见 [使用手册](./USEGUIDE.md#把页面转成蓝图)。
+
+## import 与 types
+
+`import` 从 OpenAPI 3.x 生成模型、资源与 HTTP 插件；`types` 生成 `partom-env.d.ts`。生成文件带归属标记，改过的文件不会被覆盖。
 
 ## 单文件可执行
 

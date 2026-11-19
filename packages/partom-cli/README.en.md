@@ -1,11 +1,14 @@
 # @migaia/partom-cli
 
-The `partom` command checks part projects (`doctor`) and drafts part definitions from existing components (`extract`). It is written for Bun.
+The `partom` command checks part projects (`doctor`), previews blueprints (`preview`), drafts part definitions from existing components and converts pages to blueprints (`extract`), generates the data layer from OpenAPI (`import`) and generates types (`types`). It is written for Bun.
 
 ```text
 partom doctor [--rendered] [--only <address>] [--browser <path>] [--json [--blueprints]] [--config <path>]
 partom preview [<id|file>] [--port <n>] [--config <path>]
 partom extract <files...> --out <dir> [--probe] [--verify] [--browser <path>]
+partom extract --usage <pages...> --parts <dir> --out <dir>
+partom import <openapi.json|yaml> --out <dir>
+partom types [--out <file>] [--check] [--config <path>]
 partom browser install
 partom --version
 ```
@@ -33,7 +36,13 @@ Starts a read-only server on `127.0.0.1` (the first free port from 4400, or `--p
 
 ## extract
 
-It parses shadcn-style components with oxc: exported components, props, `cva` variants, event callbacks, slots, and a `pattern` guess from Radix and cmdk imports. It writes one `definePart` + `bindReactComponent` draft per component and `report.json`. Generated code accepts only valid identifiers and writes every string as a JSON literal. `--probe` renders each variant value and records the DOM; `--verify` compares the original component with its rendering through a part host.
+It parses shadcn-style components with oxc: exported components, props, `cva` variants, event callbacks, slots, and a `pattern` guess from Radix and cmdk imports. It writes one `definePart` + `bindReactComponent` draft per component and `report.json`. Generated code accepts only valid identifiers and writes every string as a JSON literal. `--probe` renders each variant value and records the DOM; `--verify` compares the original component with its rendering through a part host. Form controls get a field protocol by fixed rules; shadcn's `form.tsx` becomes five substitute parts without react-hook-form; a TanStack `data-table.tsx` becomes the resource-bound `data-table@1`. The report's `summary` counts clean components and pattern checks.
+
+`--usage` converts page JSX into blueprints, a state seed plugin, effect drafts, native-element parts and black-box parts; see the [guide](./USEGUIDE.en.md#convert-pages-to-blueprints).
+
+## import and types
+
+`import` generates models, resources and an HTTP plugin from OpenAPI 3.x; `types` generates `partom-env.d.ts`. Generated files carry an ownership marker, so files edited by hand are never overwritten.
 
 ## Single executable
 
