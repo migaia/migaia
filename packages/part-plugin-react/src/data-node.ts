@@ -50,9 +50,11 @@ export function startWatch(
   return () => watch.release()
 }
 
-/** Template rows taken from a snapshot: `data` or `data.items` when ready, otherwise none. */
+/**
+ * Template rows taken from a snapshot: `data` or `data.items`, also while an error snapshot keeps
+ * the previous data; none before any data arrived.
+ */
 export function rowsOf(snapshot: IResourceSnapshot): unknown {
-  if (snapshot.status !== ResourceStatus.ready) return []
   if (Array.isArray(snapshot.data)) return snapshot.data
   /** Items of an object result. */
   const items = (snapshot.data as { items?: unknown } | null | undefined)?.items

@@ -290,7 +290,8 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
   const [watch, setWatch] = useState<IResourceWatch | undefined>(undefined)
   useEffect(
     () => startWatch(services.resources, resourceBinding, row?.row, setWatch),
-    [services, resourceBinding, row]
+    // The row data object, not the per-render context value, so row watches survive re-renders.
+    [services, resourceBinding, row?.row]
   )
   /** Commit helper living as long as this component. */
   const commit = useMemo(
