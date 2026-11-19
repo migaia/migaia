@@ -31,6 +31,12 @@ export const PartCliErrorCode = {
    * code 2; check the id or the config's `blueprints` globs.
    */
   blueprintNotFound: 'BLUEPRINT_NOT_FOUND',
+  /**
+   * `partom import` could not read its input as an OpenAPI 3.x document: the file does not parse,
+   * `openapi` does not start with `3.`, or `paths` is missing. The parse error is on `cause`. Exit
+   * code 2; nothing is written.
+   */
+  importInvalid: 'IMPORT_INVALID',
   /** Command-line usage is invalid. Exit code 2. */
   usageInvalid: 'USAGE_INVALID'
 } as const

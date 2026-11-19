@@ -44,6 +44,7 @@
     "@migaia/part-layouts": "workspace:^",
     "@migaia/part-plugin-dom": "workspace:^",
     "@migaia/part-plugin-react": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
     "@radix-ui/react-dialog": "^1.1.0",
     "@types/bun": "1.4.4",
     "@types/react": "^19.0.0",
@@ -53,6 +54,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^7.0.2",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "zod": "^4.2.0"
   }
 }

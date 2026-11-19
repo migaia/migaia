@@ -7,6 +7,7 @@ export const PartCliText = {
     'usage: partom doctor [--rendered] [--only <address>] [--browser <path>] [--json [--blueprints]] [--config <path>]\n' +
     '       partom preview [<id|file>] [--port <n>] [--config <path>]\n' +
     '       partom extract <files...> --out <dir> [--probe] [--verify] [--browser <path>]\n' +
+    '       partom import <openapi.json|yaml> --out <dir>\n' +
     '       partom browser install\n' +
     '       partom --version',
   /** Missing config. */
@@ -27,6 +28,8 @@ export const PartCliText = {
     `no free port for partom preview (tried ${ports}); pass --port <n>`,
   /** Preview target not in the config. */
   blueprintNotFound: (target: string): string => `no blueprint of the config matches "${target}"`,
+  /** Import input is not an OpenAPI 3.x document. */
+  importInvalid: (path: string): string => `${path} is not an OpenAPI 3.x document with paths`,
   /** Doctor child process ended without a result. */
   doctorChildFailed: 'partom doctor ended without a result',
   /** Unknown command. */
