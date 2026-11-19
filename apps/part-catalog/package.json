@@ -1,0 +1,28 @@
+{
+  "name": "@migaia/part-catalog",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Local catalog service for part platforms: snapshots, environments, drafts, catalog queries and audit.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "vitest run test",
+    "serve": "bun src/main.ts serve"
+  },
+  "dependencies": {
+    "@migaia/log-host": "workspace:^",
+    "@migaia/part-contract": "workspace:^",
+    "@migaia/partom-cli": "workspace:^",
+    "@migaia/storage-host": "workspace:^",
+    "@migaia/storage-plugin-sqlite": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "typescript": "^7.0.2",
+    "vitest": "4.1.10"
+  }
+}
