@@ -1,0 +1,50 @@
+{
+  "name": "@migaia/part-plugin-devtools",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Development-only inspection panel for part hosts, keyed by part address.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/noop.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./dist/index.js",
+      "default": "./dist/noop.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "vitest run test"
+  },
+  "dependencies": {
+    "@migaia/part-contract": "workspace:^",
+    "@migaia/part-host": "workspace:^",
+    "@migaia/part-plugin-dom": "workspace:^",
+    "@migaia/plugin-host": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/part-plugin-react": "workspace:^",
+    "@types/react": "^19.0.0",
+    "@vitest/browser": "4.1.10",
+    "@vitest/browser-playwright": "4.1.10",
+    "playwright": "1.62.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "4.1.10"
+  }
+}
