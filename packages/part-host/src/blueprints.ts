@@ -1,4 +1,7 @@
 import {
+  affectedAddresses,
+  applyPatch,
+  auditTargets,
   createAddressIndex,
   createRuleEngine,
   eventEntries,
@@ -28,8 +31,8 @@ import { PartHostErrorCode } from './error-code.ts'
 import { PartHostErrorText } from './error-text.ts'
 import { createPartHostError } from './errors.ts'
 import { HostIssueRule } from './issue-rules.ts'
-import { affectedAddresses, applyPatch } from './patch.ts'
 import { isStateBinding, type ScopeState } from './state.ts'
+import type { ITraceSink } from './trace/sink.ts'
 import type {
   IEnhancerDefinition,
   IFragmentDefinition,
@@ -58,11 +61,15 @@ type ILoaded = {
   readonly tree: IResolvedTree | undefined
 }
 
-/** Inputs of one processing pass. */
+/**
+ * Inputs of one processing pass. `keepOnError` leaves the previous version loaded when the new
+ * version has an error (used by `update`, so a rejected version never replaces a working one).
+ */
 type IPass = {
   readonly raw: unknown
   readonly previous: ILoaded | undefined
   readonly affected: ReadonlySet<string> | undefined
+  readonly keepOnError?: boolean
 }
 
 /** Receives the change set of a reprocessed blueprint. */
@@ -81,12 +88,34 @@ export class BlueprintStore {
   readonly #loaded = new Map<string, ILoaded>()
   /** Sink notified after a patch or a re-enhancement. */
   readonly #sink: IChangeSink
+  /** Trace sink receiving enhancement steps. */
+  readonly #trace: ITraceSink
 
-  /** Binds the store to its catalog, state and change sink. */
-  constructor(catalog: PartCatalog, state: ScopeState, sink: IChangeSink) {
+  /** Binds the store to its catalog, state, change sink and trace sink. */
+  constructor(catalog: PartCatalog, state: ScopeState, sink: IChangeSink, trace: ITraceSink) {
     this.#catalog = catalog
     this.#state = state
     this.#sink = sink
+    this.#trace = trace
+  }
+
+  /** Every expanded address of the loaded blueprints, in load order then document order. */
+  addresses(): readonly string[] {
+    /** Collected addresses. */
+    const addresses: string[] = []
+    for (const loaded of this.#loaded.values())
+      for (const entry of loaded.index.entries()) addresses.push(entry.address)
+    return addresses
+  }
+
+  /** Enhanced configuration of an address in any loaded blueprint. */
+  resolved(address: string): IPartFacets | undefined {
+    for (const loaded of this.#loaded.values()) {
+      /** Enhanced facets, when this blueprint has the address. */
+      const facets = loaded.enhanced.get(address)
+      if (facets !== undefined) return facets
+    }
+    return undefined
   }
 
   /** Loads a blueprint from scratch. */
@@ -102,6 +131,28 @@ export class BlueprintStore {
       raw: applyPatch(previous.raw, operations),
       previous,
       affected: affectedAddresses(previous.authoredIndex.entries(), operations)
+    })
+  }
+
+  /**
+   * Loads a new version of a blueprint. Only addresses whose configuration groups or child lists
+   * changed, plus the parents of added and removed nodes, are reprocessed; a changed root tag
+   * reprocesses everything. An unknown id is a plain `load`. A version with an error leaves the
+   * current version in place.
+   */
+  update(input: unknown): Promise<ILoadResult> {
+    /** New authored version. */
+    const next = parseBlueprint(input)
+    /** Current version, if loaded. */
+    const previous = this.#loaded.get(next.id)
+    if (previous === undefined) return this.load(input)
+    /** Current authored version. */
+    const before = previous.authoredIndex.blueprint
+    return this.#process({
+      raw: input,
+      previous,
+      affected: before.root.tag === next.root.tag ? changedAddresses(previous, next) : undefined,
+      keepOnError: true
     })
   }
 
@@ -133,6 +184,12 @@ export class BlueprintStore {
       const entry = loaded.index.get(address)
       if (entry !== undefined) return entry.node
     }
+    return undefined
+  }
+
+  /** Id of the loaded blueprint holding a static address, or undefined. */
+  blueprintOf(address: string): string | undefined {
+    for (const [id, loaded] of this.#loaded) if (loaded.index.get(address) !== undefined) return id
     return undefined
   }
 
@@ -201,8 +258,12 @@ export class BlueprintStore {
         changed === undefined ? undefined : { changed }
       )
     )
+    /** Whether the pass found an error. */
+    const failed = issues.some((issue) => issue.severity === 'error')
+    if (failed && pass.keepOnError === true)
+      return { blueprintId: parsed.id, tree: undefined, issues }
     /** Resolved tree, only when no error was found. */
-    const tree = issues.some((issue) => issue.severity === 'error')
+    const tree = failed
       ? undefined
       : { blueprintId: parsed.id, root: this.#resolve(parsed.root, addresses, enhanced) }
     this.#loaded.set(parsed.id, {
@@ -309,7 +370,7 @@ export class BlueprintStore {
         list = orderEnhancers(entry.node.tag, this.#catalog.enhancersFor(entry.node.tag))
         ordered.set(entry.node.tag, list)
       }
-      enhanced.set(entry.address, applyEnhancers(list, entry.node, entry.address))
+      enhanced.set(entry.address, applyEnhancers(list, entry.node, entry.address, this.#trace))
     }
     return enhanced
   }
@@ -366,7 +427,8 @@ export class BlueprintStore {
             template: {
               rowKey: node.template.rowKey,
               rows: node.template.rows,
-              node: this.#resolve(node.template.node, index, enhanced)
+              node: this.#resolve(node.template.node, index, enhanced),
+              ...(node.template.virtual === undefined ? {} : { virtual: node.template.virtual })
             }
           })
     }
@@ -452,6 +514,27 @@ function widenAffected(
     if (parent !== undefined) widened.add(entry.address)
   }
   return widened
+}
+
+/**
+ * Authored addresses a new version changes: every address with a changed group or child list, and
+ * for an added or removed node its own address plus its parent's. One pass over both indexes.
+ */
+function changedAddresses(previous: ILoaded, next: IBlueprint): ReadonlySet<string> {
+  /** Index of the new version, for parents of added nodes. */
+  const nextIndex = createAddressIndex(next)
+  /** Collected addresses. */
+  const changed = new Set<string>()
+  for (const target of auditTargets(previous.authoredIndex.blueprint, next)) {
+    /** Changed address. */
+    const address = target.address as string
+    changed.add(address)
+    if (target.facet !== 'node') continue
+    /** Parent on whichever side holds the node. */
+    const parent = (nextIndex.get(address) ?? previous.authoredIndex.get(address))?.parent
+    if (parent !== undefined) changed.add(parent)
+  }
+  return changed
 }
 
 /** Address by node object, built once per pass; nodes of one parsed blueprint are unique objects. */

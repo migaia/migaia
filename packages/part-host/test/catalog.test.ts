@@ -93,7 +93,9 @@ describe('catalog', () => {
         })
       )
     ).rejects.toMatchObject({ cause: { code: PartHostErrorCode.catalogConflict } })
-    expect(new Set(host.catalog.manifest()).size).toBe(host.catalog.manifest().length)
+    expect(new Set(host.catalog.manifest('b').definitions).size).toBe(
+      host.catalog.manifest('b').definitions.length
+    )
 
     const log = new RenderLog()
     await host.use(rendererPlugin('r', log.factory()))

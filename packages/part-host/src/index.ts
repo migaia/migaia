@@ -20,11 +20,13 @@ export type {
 } from './define.ts'
 export { definePartPlugin, partCorePlugin, PART_CORE_PLUGIN } from './core.ts'
 export { createPartHost } from './host.ts'
+export { EFFECT_GRANTS_META, type IEffectGrants } from './effects.ts'
 export { ERROR_SOURCE, PartHostErrorCode, type IPartHostErrorCode } from './error-code.ts'
 export type { IPartHostError } from './errors.ts'
 export type {
   ICatalog,
   IDefinition,
+  IDiagnosticInfo,
   IDeriveDefinition,
   IDeriveStateView,
   IEffectContext,
@@ -34,6 +36,8 @@ export type {
   IEnhancerDefinition,
   IFragmentDefinition,
   IGenerationSignal,
+  IIsolatedEffectContext,
+  IIsolatedRunner,
   IModifierContext,
   IModifierDefinition,
   IModifierInstance,

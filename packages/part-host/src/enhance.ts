@@ -1,3 +1,4 @@
+import type { ITraceSink } from './trace/sink.ts'
 import type { IPartFacets, IPartNode } from '@migaia/part-contract'
 import { PartHostErrorCode } from './error-code.ts'
 import { PartHostErrorText } from './error-text.ts'
@@ -75,13 +76,18 @@ function freeze(config: IPartFacets): IPartFacets {
 export function applyEnhancers(
   enhancers: readonly IEnhancerDefinition<unknown>[],
   node: IPartNode,
-  address: string
+  address: string,
+  trace?: ITraceSink
 ): IPartFacets {
   /** Configuration flowing through the enhancers. */
   let config: IPartFacets = node.facets ?? {}
+  traceStep(trace, address, 'authored', undefined, config, config)
   for (const enhancer of enhancers) {
     try {
+      /** Input of this enhancer. */
+      const input = config
       config = enhancer.transform(freeze(config), { address, node, args: undefined })
+      traceStep(trace, address, 'enhancer', enhancer.descriptor.id, input, config)
     } catch (cause) {
       if (cause instanceof TypeError)
         throw createPartHostError(
@@ -92,5 +98,26 @@ export function applyEnhancers(
       throw cause
     }
   }
+  traceStep(trace, address, 'resolved', undefined, config, config)
   return config
+}
+
+/** Records one enhancement step when tracing is enabled. */
+function traceStep(
+  trace: ITraceSink | undefined,
+  address: string,
+  stage: 'authored' | 'enhancer' | 'resolved',
+  enhancer: string | undefined,
+  input: IPartFacets,
+  output: IPartFacets
+): void {
+  if (trace?.enabled !== true) return
+  trace.step({
+    address,
+    stage,
+    ...(enhancer === undefined ? {} : { enhancer }),
+    input,
+    output,
+    at: Date.now()
+  })
 }

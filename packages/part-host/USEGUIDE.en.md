@@ -172,9 +172,18 @@ The `.d.ts` that `partom types` generates fills `IPartTypeRegistry`. Then `ctx.s
 - `host.unUse(name)` removes a plugin. Catalog entries of suspended dependents are marked unavailable, and the result's `errors` are also reported through `onError`.
 - `host.dispose()` is idempotent and returns the plugin-host disposal result; later calls throw `HOST_DISPOSED`.
 
+## Host interfaces for remote delivery and development inspection
+
+- **Load a new version:** `host.blueprint.update(document)` compares versions and reprocesses only addresses whose configuration groups or child lists changed (plus the parents of added or removed nodes); a changed root tag reprocesses everything; a version with an error leaves the current one in place; an unknown id behaves like `load`.
+- **Capability manifest:** `host.catalog.manifest(build)` returns `{ format: 1, build, definitions, renderers }` with every available definition (suspended plugins excluded) and the renderer names, for the client delivery check.
+- **Effect tiers:** a `restricted` effect's ctx has only `resources.run`, `state.read/write`, `dispatch` and `part()`; `features` and `models` are empty. Allowed commands and state path prefixes live in the definition's `meta['part.grants']` (`{ resources: ['orders@1:create'], state: ['page.form'] }`), set by the plugin that installs it; anything else is refused with `EFFECT_FORBIDDEN` and reported once. An `isolated` effect goes to the runner registered with `setIsolatedRunner` on the `effect` Feature, or is refused with `EFFECT_ISOLATION_UNAVAILABLE`.
+- **Diagnostic context:** after `host.diagnostics.setContext({ version, snapshot })`, `onError(error, info)` receives `{ address?, context }` as its second argument; the error object is unchanged.
+- **Development trace:** the core Feature `trace` offers `steps`, `events`, `addresses`, `resolved` and `subscribe`. It records only under the `development` condition (vitest, `bun build --conditions=development`, a Vite dev server); production builds (`bun build --production` or `NODE_ENV=production`) resolve to a no-op and carry no recorder code. Derive recomputations are recorded under `$derive:<derive id>`.
+- **Replacing definitions:** after `host.replace` or `unUse` changes a derive, enhancer or effect, cached derive values are dropped, addresses using the enhancer are re-enhanced and the next effect run uses the new definition.
+
 ## Error codes
 
-Source `part.host`: `CATALOG_CONFLICT`, `ENHANCER_CYCLE`, `ENHANCER_MUTATED_INPUT`, `DERIVE_WRITE`, `EFFECT_FAILED`, `RENDERER_MISSING`, `RENDERER_DUPLICATE`, `HOST_DISPOSED`, `BLUEPRINT_UNKNOWN`, `MODIFIER_PLACEMENT_MISMATCH`, `RESOURCE_UNKNOWN`, `RESOURCE_COMMAND_UNKNOWN`, `MODEL_UNKNOWN`, `ARGS_INVALID`. Errors during plugin install are wrapped by plugin-host as `PLUGIN_INSTALL_FAILED` with the original on `cause`.
+Source `part.host`: `CATALOG_CONFLICT`, `ENHANCER_CYCLE`, `ENHANCER_MUTATED_INPUT`, `DERIVE_WRITE`, `EFFECT_FAILED`, `RENDERER_MISSING`, `RENDERER_DUPLICATE`, `HOST_DISPOSED`, `BLUEPRINT_UNKNOWN`, `MODIFIER_PLACEMENT_MISMATCH`, `RESOURCE_UNKNOWN`, `RESOURCE_COMMAND_UNKNOWN`, `MODEL_UNKNOWN`, `ARGS_INVALID`, `EFFECT_FORBIDDEN`, `EFFECT_ISOLATION_UNAVAILABLE`. Errors during plugin install are wrapped by plugin-host as `PLUGIN_INSTALL_FAILED` with the original on `cause`.
 
 ## Build and verify
 

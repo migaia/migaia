@@ -70,6 +70,8 @@ class MountHandle implements IMountHandle {
 class PartHost implements IPartHost {
   /** Blueprint surface. */
   readonly blueprint: IPartHost['blueprint']
+  /** Diagnostics surface: context attached to later error reports. */
+  readonly diagnostics: IPartHost['diagnostics']
   /** Plugin host owning every registration. */
   readonly #plugins: IPluginHostLike
   /** Core runtime of the core plugin. */
@@ -94,25 +96,41 @@ class PartHost implements IPartHost {
     this.#plugins = plugins
     this.#core = core
     this.#disposeTimeoutMs = options.disposeTimeoutMs ?? DEFAULT_DISPOSE_TIMEOUT_MS
-    this.#state = new ScopeState(options.runtime ?? createRuntime(), (id) => this.#deriveOf(id))
-    this.#store = new BlueprintStore(core.catalog, this.#state, (changes) => this.#deliver(changes))
+    this.#state = new ScopeState(
+      options.runtime ?? createRuntime(),
+      (id) => this.#deriveOf(id),
+      core.trace
+    )
+    this.#store = new BlueprintStore(
+      core.catalog,
+      this.#state,
+      (changes) => this.#deliver(changes),
+      core.trace
+    )
     this.#effects = new EffectRunner({
       lookup: (id) => core.catalog.effect(id),
       read: (path) => this.#state.read(path),
       write: (path, value) => this.#state.write(path, value),
       enqueue: (address, event, detail) =>
         void this.dispatch(address, event, detail).catch(() => undefined),
-      report: (error) => core.diagnostics.report(error),
+      report: (error, address) => core.diagnostics.report(error, address),
+      trace: core.trace,
       resources: core.resources,
-      models: core.models
+      models: core.models,
+      blueprintOf: (address) =>
+        this.#store.blueprintOf(formatAddress({ segments: parseAddress(address).segments })),
+      isolatedRunner: () => core.isolation.get()
     })
     this.blueprint = {
       load: (input) => this.#serial(() => this.#store.load(input)),
-      patch: (id, operations) => this.#serial(() => this.#store.patch(id, operations))
+      patch: (id, operations) => this.#serial(() => this.#store.patch(id, operations)),
+      update: (input) => this.#serial(() => this.#store.update(input))
     }
+    this.diagnostics = { setContext: (context) => core.diagnostics.setContext(context) }
     if (options.onError !== undefined) core.diagnostics.setSink(options.onError)
-    core.bind(this, this.#state)
+    core.bind(this, this.#state, this.#store)
     core.catalog.subscribe((tags) => this.#refresh(tags))
+    core.catalog.subscribeDerives((ids) => this.#state.forget(ids))
   }
 
   /** Catalog surface. */
@@ -167,6 +185,8 @@ class PartHost implements IPartHost {
     /** Subscription of the event on the static node, if any. */
     const subscription = this.#store.node(formatAddress({ segments }))?.facets?.events?.[event]
     if (subscription === undefined || !matchesFilter(subscription.filter, detail)) return
+    if (this.#core.trace.enabled)
+      this.#core.trace.event({ address, kind: 'dispatch', name: event, detail, at: Date.now() })
     await this.#effects.run(subscription.handler, {
       address,
       name: eventNameOf(event),
@@ -217,6 +237,7 @@ class PartHost implements IPartHost {
     this.#mounts.clear()
     this.#core.resources.dispose()
     this.#state.dispose()
+    this.#core.trace.clear()
     /** Plugin host disposal result. */
     const result = await this.#plugins.dispose()
     for (const error of result.cleanupErrors) this.#core.diagnostics.report(error)

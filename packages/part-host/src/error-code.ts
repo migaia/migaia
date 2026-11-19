@@ -50,7 +50,19 @@ export const PartHostErrorCode = {
    * list is on `cause`; the command did not run. A resource entry shows this code in its error
    * snapshot instead of throwing. Fix the arguments.
    */
-  argsInvalid: 'ARGS_INVALID'
+  argsInvalid: 'ARGS_INVALID',
+  /**
+   * A `restricted` or `isolated` effect called something its grants do not allow: a resource
+   * command outside `part.grants.resources`, a state write outside the `part.grants.state`
+   * prefixes, or a dispatch or part reference into another blueprint. The call is refused and
+   * reported once; grant the operation in the application's trust configuration if it is intended.
+   */
+  effectForbidden: 'EFFECT_FORBIDDEN',
+  /**
+   * An `isolated` effect ran while no isolated runner was registered on the `effect` Feature.
+   * Install the plugin that provides isolation (for example part-plugin-remote) before running it.
+   */
+  effectIsolationUnavailable: 'EFFECT_ISOLATION_UNAVAILABLE'
 } as const
 
 /** Value union of every `part.host` error code. */

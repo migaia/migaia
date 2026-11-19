@@ -37,4 +37,4 @@ Runtime errors are reported once through `diagnostics` to `createPartHost({ onEr
 
 ## Error codes (source `part.host`)
 
-`CATALOG_CONFLICT`, `ENHANCER_CYCLE`, `ENHANCER_MUTATED_INPUT`, `DERIVE_WRITE`, `EFFECT_FAILED`, `RENDERER_MISSING`, `RENDERER_DUPLICATE`, `HOST_DISPOSED`, `BLUEPRINT_UNKNOWN`. Errors thrown while a plugin installs are wrapped by plugin-host as `PLUGIN_INSTALL_FAILED` with the original on `cause`.
+`CATALOG_CONFLICT`, `ENHANCER_CYCLE`, `ENHANCER_MUTATED_INPUT`, `DERIVE_WRITE`, `EFFECT_FAILED`, `RENDERER_MISSING`, `RENDERER_DUPLICATE`, `HOST_DISPOSED`, `BLUEPRINT_UNKNOWN`, `EFFECT_FORBIDDEN`, `EFFECT_ISOLATION_UNAVAILABLE`. Errors thrown while a plugin installs are wrapped by plugin-host as `PLUGIN_INSTALL_FAILED` with the original on `cause`.

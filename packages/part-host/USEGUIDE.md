@@ -172,9 +172,18 @@ const orders = defineResource({
 - `host.unUse(name)` 卸载插件。被挂起的依赖插件，其目录条目标记为不可用；结果里的 `errors` 也经 `onError` 报告。
 - `host.dispose()` 幂等，返回 plugin-host 的释放结果；之后的调用抛 `HOST_DISPOSED`。
 
+## 远端下发与开发态检查用到的宿主接口
+
+- **装入新版本：** `host.blueprint.update(document)` 比较新旧版本，只重算配置组或子节点列表变化的地址（以及增删节点的父地址）；根节点 tag 变化时全量重算；新版本有 error 时当前版本保持不变；没有装入过的 id 等同 `load`。
+- **能力清单：** `host.catalog.manifest(build)` 返回 `{ format: 1, build, definitions, renderers }`，列出当前可用的全部定义（暂停插件的不计入）与渲染器名，供客户端下发校验使用。
+- **effect 信任档：** `restricted` 档 effect 的 ctx 只有 `resources.run`、`state.read/write`、`dispatch`、`part()`，`features` 与 `models` 为空；可用的命令与状态路径前缀写在定义的 `meta['part.grants']`（`{ resources: ['orders@1:create'], state: ['page.form'] }`），由安装它的插件决定，越权以 `EFFECT_FORBIDDEN` 拒绝并报告一次。`isolated` 档交给 `effect` Feature 上 `setIsolatedRunner` 登记的执行器，没有执行器时以 `EFFECT_ISOLATION_UNAVAILABLE` 拒绝。
+- **诊断上下文：** `host.diagnostics.setContext({ version, snapshot })` 之后，`onError(error, info)` 的第二个参数为 `{ address?, context }`，错误对象本身不变。
+- **开发态追踪：** 核心 Feature `trace` 提供 `steps`、`events`、`addresses`、`resolved`、`subscribe`。只有在 `development` 条件下（vitest、`bun build --conditions=development`、Vite 开发服务器）才记录；生产构建（`bun build --production` 或 `NODE_ENV=production`）解析到空实现，产物中没有记录代码。推导重算记在 `$derive:<推导 id>` 下。
+- **替换定义：** `host.replace` 或 `unUse` 改变推导、增强器或 effect 后，缓存的推导结果作废、用到增强器的地址重新增强、下一次 effect 运行用新定义。
+
 ## 错误码
 
-source 为 `part.host`：`CATALOG_CONFLICT`、`ENHANCER_CYCLE`、`ENHANCER_MUTATED_INPUT`、`DERIVE_WRITE`、`EFFECT_FAILED`、`RENDERER_MISSING`、`RENDERER_DUPLICATE`、`HOST_DISPOSED`、`BLUEPRINT_UNKNOWN`、`MODIFIER_PLACEMENT_MISMATCH`、`RESOURCE_UNKNOWN`、`RESOURCE_COMMAND_UNKNOWN`、`MODEL_UNKNOWN`、`ARGS_INVALID`。插件安装期间的错误由 plugin-host 包装为 `PLUGIN_INSTALL_FAILED`，原错误在 `cause`。
+source 为 `part.host`：`CATALOG_CONFLICT`、`ENHANCER_CYCLE`、`ENHANCER_MUTATED_INPUT`、`DERIVE_WRITE`、`EFFECT_FAILED`、`RENDERER_MISSING`、`RENDERER_DUPLICATE`、`HOST_DISPOSED`、`BLUEPRINT_UNKNOWN`、`MODIFIER_PLACEMENT_MISMATCH`、`RESOURCE_UNKNOWN`、`RESOURCE_COMMAND_UNKNOWN`、`MODEL_UNKNOWN`、`ARGS_INVALID`、`EFFECT_FORBIDDEN`、`EFFECT_ISOLATION_UNAVAILABLE`。插件安装期间的错误由 plugin-host 包装为 `PLUGIN_INSTALL_FAILED`，原错误在 `cause`。
 
 ## 构建与验证
 

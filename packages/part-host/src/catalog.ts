@@ -1,6 +1,7 @@
 import {
   splitDescriptorId,
   tagSegmentName,
+  type ICapabilityManifest,
   type ICatalogView,
   type IDescriptor,
   type IKindSchema,
@@ -71,6 +72,8 @@ export class PartCatalog implements ICatalog {
   readonly #listeners = new Set<ICatalogListener>()
   /** Resource generation listeners. */
   readonly #resourceListeners = new Set<IResourceListener>()
+  /** Listeners told which derive ids changed generation. */
+  readonly #deriveListeners = new Set<IResourceListener>()
   /** Definition ids by targeted part name, so tag lookups do not scan the catalog. */
   readonly #byTarget = new Map<string, Set<string>>()
   /** Definition ids by name without major, so major lookups do not scan the catalog. */
@@ -86,6 +89,12 @@ export class PartCatalog implements ICatalog {
   subscribeResources(listener: IResourceListener): () => void {
     this.#resourceListeners.add(listener)
     return () => this.#resourceListeners.delete(listener)
+  }
+
+  /** Adds a listener for derive ids whose definition was registered, replaced or withdrawn. */
+  subscribeDerives(listener: IResourceListener): () => void {
+    this.#deriveListeners.add(listener)
+    return () => this.#deriveListeners.delete(listener)
   }
 
   /** Available resource definition with its generation's dependency outputs and token. */
@@ -218,12 +227,20 @@ export class PartCatalog implements ICatalog {
     return entry?.available === true ? entry.value : undefined
   }
 
-  /** Every available id, each once. */
-  manifest(): readonly string[] {
+  /**
+   * Capability manifest of this catalog for client build `build`: every available definition id in
+   * registration order, and the renderer names of available implementations, each once. Entries of
+   * suspended plugins are unavailable and not listed.
+   */
+  manifest(build: string): ICapabilityManifest {
     /** Available ids in registration order. */
-    const ids: string[] = []
-    for (const [id, entry] of this.#definitions) if (entry.available) ids.push(id)
-    return ids
+    const definitions: string[] = []
+    for (const [id, entry] of this.#definitions) if (entry.available) definitions.push(id)
+    /** Renderer names in first-seen order. */
+    const renderers = new Set<string>()
+    for (const [key, entry] of this.#implementations)
+      if (entry.available) renderers.add(key.slice(0, key.indexOf('\u0000')))
+    return { format: 1, build, definitions, renderers: [...renderers] }
   }
 
   /** Rules contributed by every registered plugin. */
@@ -359,5 +376,11 @@ export class PartCatalog implements ICatalog {
       for (const definition of contribution.definitions)
         if (definition.descriptor.kind === 'resource') resources.add(definition.descriptor.id)
     if (resources.size > 0) for (const listener of this.#resourceListeners) listener(resources)
+    /** Derive ids of both generations. */
+    const derives = new Set<string>()
+    for (const contribution of previous === undefined ? [current] : [current, previous])
+      for (const definition of contribution.definitions)
+        if (definition.descriptor.kind === 'derive') derives.add(definition.descriptor.id)
+    if (derives.size > 0) for (const listener of this.#deriveListeners) listener(derives)
   }
 }

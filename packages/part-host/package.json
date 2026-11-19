@@ -21,6 +21,17 @@
       "default": "./dist/index.js"
     }
   },
+  "imports": {
+    "#trace": {
+      "part-host-source": "./src/trace/noop.ts",
+      "development": {
+        "types": "./dist/trace/recorder.d.ts",
+        "default": "./dist/trace/recorder.js"
+      },
+      "types": "./dist/trace/noop.d.ts",
+      "default": "./dist/trace/noop.js"
+    }
+  },
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",

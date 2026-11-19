@@ -4,7 +4,8 @@
     "rootDir": "src",
     "outDir": "dist",
     "lib": ["ES2024"],
-    "types": []
+    "types": [],
+    "customConditions": ["part-host-source"]
   },
   "include": ["src", "../utils/types/host-globals.d.ts"]
 }

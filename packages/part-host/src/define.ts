@@ -63,6 +63,8 @@ export type IPartSpec = IDescriptorFields & {
   readonly events?: Readonly<Record<string, IEventDeclaration>>
   readonly slots?: Readonly<Record<string, ISlotDeclaration>>
   readonly styleHooks?: Readonly<Record<string, IStyleHookType>>
+  /** Size (bytes) and render (milliseconds) budgets, passed into the descriptor unchanged. */
+  readonly budget?: IDescriptor['budget']
   readonly props?: ISchemaInput
   readonly propsJsonSchema?: IJsonSchema
 }

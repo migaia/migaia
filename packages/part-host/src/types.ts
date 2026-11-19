@@ -1,5 +1,6 @@
 import type {
   IBehavior,
+  ICapabilityManifest,
   ICatalogView,
   IDescriptor,
   IIssue,
@@ -85,6 +86,24 @@ export type IEffectContext<TDeps> = {
   ): void
   part<A extends IPartAddressOf>(address: A): IPartRef<A>
 }
+
+/**
+ * Context an isolated runner receives: only operations whose arguments and results are
+ * structured-clone friendly, so the runner can forward each call over rpc. Calls are checked
+ * against the effect's grants on the host side.
+ */
+export type IIsolatedEffectContext = {
+  readonly resources: { run(resource: string, command: string, args: unknown): Promise<unknown> }
+  readonly state: { read(path: string): unknown; write(path: string, value: unknown): void }
+  dispatch(address: string, event: string, detail?: unknown): void
+}
+
+/** Runs an `isolated` effect outside the page; registered with `effect.setIsolatedRunner`. */
+export type IIsolatedRunner = (
+  effectId: string,
+  event: IEffectEvent,
+  ctx: IIsolatedEffectContext
+) => Promise<void>
 
 /** Reference to one part address inside an effect. */
 export type IPartRef<A extends string = IPartAddressOf> = {
@@ -287,6 +306,8 @@ export type IResolvedNode = {
     readonly rowKey: string
     readonly rows: unknown
     readonly node: IResolvedNode
+    /** Virtual scrolling settings copied from the blueprint template, when declared. */
+    readonly virtual?: { readonly rowHeight: number; readonly overscan?: number }
   }
   readonly styleRules: readonly IStyleRule[]
   readonly children: readonly IResolvedNode[]
@@ -326,7 +347,8 @@ export type ICatalog = {
   get(id: string): IDefinition | undefined
   byTag(tag: string): readonly IDefinition[]
   implementation(renderer: string, partId: string): unknown
-  manifest(): readonly string[]
+  /** Capability manifest for client build `build` (available definitions and renderer names). */
+  manifest(build: string): ICapabilityManifest
   /** Read-only view for rule engines and catalog checks such as `checkModels`. */
   view(): ICatalogView
 }
@@ -346,10 +368,19 @@ export type IMountHandle = { unmount(): void }
 export type IPartPlugin = { readonly name: string }
 
 /** Options of `createPartHost`. */
+/**
+ * Second argument of `onError`: the failing node's address when known, and the host context set
+ * with `host.diagnostics.setContext`.
+ */
+export type IDiagnosticInfo = {
+  readonly address?: string
+  readonly context: Readonly<Record<string, string>>
+}
+
 export type IPartHostOptions = {
   readonly plugins?: readonly IPartPlugin[]
   readonly runtime?: IRuntime
-  readonly onError?: (error: unknown) => void
+  readonly onError?: (error: unknown, info: IDiagnosticInfo) => void
   readonly disposeTimeoutMs?: number
 }
 
@@ -358,8 +389,12 @@ export type IPartHost = {
   readonly blueprint: {
     load(input: unknown): Promise<ILoadResult>
     patch(blueprintId: string, operations: readonly IJsonPatchOperation[]): Promise<ILoadResult>
+    /** Loads a new version of a blueprint, reprocessing only changed addresses (see `update`). */
+    update(input: unknown): Promise<ILoadResult>
   }
   readonly catalog: ICatalog
+  /** Error channel: context attached to every later report. */
+  readonly diagnostics: { setContext(context: Readonly<Record<string, string>>): void }
   readonly state: IScopeState
   readonly resources: IResourceHandle
   readonly models: IModelHandle

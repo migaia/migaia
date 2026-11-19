@@ -1,4 +1,6 @@
-import type { IIssue } from '@migaia/part-contract'
+import type { IIssue, IPartFacets, ITraceEvent, ITraceStep } from '@migaia/part-contract'
+import { createTraceSink } from '#trace'
+import type { BlueprintStore } from './blueprints.ts'
 import { definePlugin } from '@migaia/plugin-host'
 import { defineFeature } from '@migaia/plugin-host/features'
 import { PartCatalog, type IContribution } from './catalog.ts'
@@ -8,7 +10,10 @@ import { createPartHostError } from './errors.ts'
 import { ModelHandle } from './models.ts'
 import { ResourceStore } from './resources.ts'
 import type { ScopeState } from './state.ts'
+import type { ITraceSink } from './trace/sink.ts'
 import type {
+  IDiagnosticInfo,
+  IIsolatedRunner,
   IPartHost,
   IPartPlugin,
   IPartPluginSpec,
@@ -19,25 +24,67 @@ import type {
 /** PH plugin name of the core plugin. */
 export const PART_CORE_PLUGIN = 'part-core'
 
-/** Single error channel of a host: each error object is reported once. */
+/** Address carried on an error object, when a thrower attached one. */
+function addressOnError(error: unknown): string | undefined {
+  /** Candidate property. */
+  const address = (error as { readonly address?: unknown } | null | undefined)?.address
+  return typeof address === 'string' ? address : undefined
+}
+
+/**
+ * Single error channel of a host: each error object is reported once. Every report carries the host
+ * context set with `setContext` and the address of the failing node, without changing the error
+ * object.
+ */
 export class Diagnostics {
   /** Errors already reported. */
   readonly #reported = new WeakSet<object>()
   /** Sink for reported errors; replaced by `createPartHost` with the caller's `onError`. */
-  #sink: (error: unknown) => void = (error) => console.error(error)
+  #sink: (error: unknown, info: IDiagnosticInfo) => void = (error) => console.error(error)
+  /** Host context attached to every later report (for example version and snapshot hash). */
+  #context: Readonly<Record<string, string>> = {}
 
   /** Installs the caller's sink. */
-  setSink(sink: (error: unknown) => void): void {
+  setSink(sink: (error: unknown, info: IDiagnosticInfo) => void): void {
     this.#sink = sink
   }
 
-  /** Reports an error unless the same error object was already reported. */
-  report(error: unknown): void {
+  /** Replaces the context attached to later reports. */
+  setContext(context: Readonly<Record<string, string>>): void {
+    this.#context = { ...context }
+  }
+
+  /**
+   * Reports an error unless the same error object was already reported. `address` names the node
+   * that failed when the caller knows it; otherwise an `address` property on the error is used.
+   */
+  report(error: unknown, address?: string): void {
     if (typeof error === 'object' && error !== null) {
       if (this.#reported.has(error)) return
       this.#reported.add(error)
     }
-    this.#sink(error)
+    /** Address of the failure, if known. */
+    const at = address ?? addressOnError(error)
+    this.#sink(
+      error,
+      at === undefined ? { context: this.#context } : { address: at, context: this.#context }
+    )
+  }
+}
+
+/** Holds the isolated runner of a host; private state survives the freezing of Feature outputs. */
+export class IsolationSlot {
+  /** Registered runner, if any. */
+  #runner: IIsolatedRunner | undefined
+
+  /** Replaces the runner; `undefined` clears it. */
+  set(runner: IIsolatedRunner | undefined): void {
+    this.#runner = runner
+  }
+
+  /** Current runner. */
+  get(): IIsolatedRunner | undefined {
+    return this.#runner
   }
 }
 
@@ -90,6 +137,10 @@ export class CoreRuntime {
   })
   /** Host model validation surface. */
   readonly models = new ModelHandle((id) => this.catalog.get(id))
+  /** Isolated runner slot; a plugin fills it, isolated effects are refused while it is empty. */
+  readonly isolation = new IsolationSlot()
+  /** Development trace recorder, or the no-op sink in production builds. */
+  readonly trace: ITraceSink = createTraceSink()
 
   /** Subscribes the resource store to generation changes of resource definitions. */
   constructor() {
@@ -99,11 +150,19 @@ export class CoreRuntime {
   #host: IPartHost | undefined
   /** Scope state bound together with the host. */
   #state: ScopeState | undefined
+  /** Blueprint store bound together with the host, read by the trace Feature. */
+  #store: BlueprintStore | undefined
 
-  /** Binds the host and its state. */
-  bind(host: IPartHost, state: ScopeState): void {
+  /** Binds the host, its state and its blueprint store. */
+  bind(host: IPartHost, state: ScopeState, store: BlueprintStore): void {
     this.#host = host
     this.#state = state
+    this.#store = store
+  }
+
+  /** Bound blueprint store. */
+  store(): BlueprintStore {
+    return this.#store as BlueprintStore
   }
 
   /** Bound host; plugins install only after binding. */
@@ -167,6 +226,14 @@ class EffectFeature {
   dispatch(address: string, event: string, detail: unknown): Promise<void> {
     return this.#core.host().dispatch(address, event, detail)
   }
+
+  /**
+   * Registers the runner for `isolated` effects (or clears it with `undefined`). Runs already
+   * started keep the runner they started with.
+   */
+  setIsolatedRunner(runner: IIsolatedRunner | undefined): void {
+    this.#core.isolation.set(runner)
+  }
 }
 
 /** Blueprint surface other plugins receive. */
@@ -185,6 +252,46 @@ class BlueprintFeature {
   }
 }
 
+/**
+ * Development trace surface: enhancement steps and runtime events per address (derive
+ * recomputations under `$derive:<id>`), loaded addresses and resolved configuration. Without the
+ * `development` condition every read is empty and `subscribe` registers nothing.
+ */
+class TraceFeature {
+  /** Core runtime of the host. */
+  readonly #core: CoreRuntime
+
+  /** Wraps the core runtime. */
+  constructor(core: CoreRuntime) {
+    this.#core = core
+  }
+
+  /** Enhancement steps of an address, oldest first. */
+  steps(address: string): readonly ITraceStep[] {
+    return this.#core.trace.steps(address)
+  }
+
+  /** Runtime events of an address or `$derive:<id>` key, oldest first. */
+  events(key: string): readonly ITraceEvent[] {
+    return this.#core.trace.events(key)
+  }
+
+  /** Every address of the loaded blueprints, in load and document order. */
+  addresses(): readonly string[] {
+    return this.#core.trace.enabled ? this.#core.store().addresses() : []
+  }
+
+  /** Resolved configuration of an address, or undefined. */
+  resolved(address: string): IPartFacets | undefined {
+    return this.#core.trace.enabled ? this.#core.store().resolved(address) : undefined
+  }
+
+  /** Listens for new records; the removal may be called more than once. */
+  subscribe(listener: (key: string) => void): () => void {
+    return this.#core.trace.subscribe(listener)
+  }
+}
+
 /** Root Feature creating the per-host core runtime. */
 const runtimeFeature = defineFeature(() => new CoreRuntime())
 
@@ -197,6 +304,9 @@ const coreFeatures = {
   }),
   renderSlot: defineFeature((_core, deps) => deps.runtime.renderSlot, { runtime: runtimeFeature }),
   state: defineFeature((_core, deps) => new StateFeature(deps.runtime), {
+    runtime: runtimeFeature
+  }),
+  trace: defineFeature((_core, deps) => new TraceFeature(deps.runtime), {
     runtime: runtimeFeature
   }),
   effect: defineFeature((_core, deps) => new EffectFeature(deps.runtime), {
