@@ -313,6 +313,8 @@
     },
     "@migaia/part-contract": {
       ".": [
+        "AuditAction",
+        "ChangesetStatus",
         "ERROR_SOURCE",
         "FRAGMENT_MAX_DEPTH",
         "FRAGMENT_MAX_NODES",
@@ -323,27 +325,43 @@
         "MODEL_RELATION_TARGET",
         "ModelFieldFormat",
         "PartContractErrorCode",
+        "RemoteExportKind",
         "ResourceStatus",
+        "SnapshotInvalidReason",
+        "TraceEventKind",
+        "TraceStage",
+        "affectedAddresses",
+        "applyPatch",
+        "artifactKey",
         "assertNoTransform",
+        "auditTargets",
+        "checkBase",
+        "checkDelivery",
         "checkModels",
+        "collectDefinitions",
         "createAddressIndex",
         "createRuleEngine",
         "defineModel",
         "defineRule",
+        "descriptorView",
         "eventEntries",
         "eventNameOf",
         "expandFragments",
         "formatAddress",
+        "hashBytes",
         "isDescriptorId",
         "isModifierRef",
+        "isModuleName",
         "isPartNode",
         "isResourceBinding",
         "isValidName",
+        "mergeBlueprint",
         "modifierArgs",
         "modifierId",
         "normalizeEventEntry",
         "parseAddress",
         "parseBlueprint",
+        "parseSnapshot",
         "resolveAddress",
         "splitDescriptorId",
         "tagSegmentName",
@@ -356,11 +374,13 @@
         "builtinRules",
         "dataRules",
         "layoutRules",
+        "securityRules",
         "structureRules"
       ]
     },
     "@migaia/part-host": {
       ".": [
+        "EFFECT_GRANTS_META",
         "ERROR_SOURCE",
         "PART_CORE_PLUGIN",
         "PartHostErrorCode",
@@ -387,6 +407,11 @@
         "singleLayout"
       ]
     },
+    "@migaia/part-plugin-devtools": {
+      ".": [
+        "devtoolsPlugin"
+      ]
+    },
     "@migaia/part-plugin-dom": {
       ".": [
         "ADDRESS_ATTRIBUTE",
@@ -406,6 +431,19 @@
         "REACT_RENDERER",
         "bindReactComponent",
         "reactPlugin"
+      ]
+    },
+    "@migaia/part-plugin-remote": {
+      ".": [
+        "ERROR_SOURCE",
+        "PartRemoteErrorCode",
+        "RemoteClient",
+        "RemoteModuleSet",
+        "currentRemoteModules",
+        "forwardPartErrors",
+        "loadRemoteModules",
+        "remoteModulesPlugin",
+        "remotePlugin"
       ]
     },
     "@migaia/plugin-host": {
