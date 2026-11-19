@@ -21,5 +21,14 @@ export const PartHostErrorText = {
   blueprintUnknown: (id: string): string => `blueprint "${id}" has not been loaded`,
   /** Placement flag and place function disagree. */
   modifierPlacementMismatch: (id: string): string =>
-    `modifier "${id}" must provide place exactly when placement is true`
+    `modifier "${id}" must provide place exactly when placement is true`,
+  /** Unknown resource id. */
+  resourceUnknown: (id: string): string => `resource "${id}" is not in the catalog`,
+  /** Unknown resource command. */
+  resourceCommandUnknown: (id: string, command: string): string =>
+    `resource "${id}" has no command "${command}"`,
+  /** Unknown model id. */
+  modelUnknown: (id: string): string => `model "${id}" is not in the catalog`,
+  /** Runtime arguments failed their schema. */
+  argsInvalid: (target: string): string => `arguments of ${target} failed schema validation`
 } as const

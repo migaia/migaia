@@ -27,7 +27,7 @@ Resolved nodes carry `ariaStates` (aria attribute to state path) and, on templat
 - `defineEnhancer`: a pure per-tag configuration transform ordered by `after`; cycles are rejected at install.
 - `defineDerive`: a pure derive; writing state throws `DERIVE_WRITE`.
 - `defineEffect`: side effects run by event subscriptions; one effect runs in arrival order and `ctx.dispatch` only enqueues.
-- `defineResource`: a PH Feature with parameter, result and command schemas.
+- `defineResource`: a data resource with parameter, result and command schemas, a load function, cache key and invalidation tags; the host's resource store runs its asynchronous states.
 
 ## Wiring
 

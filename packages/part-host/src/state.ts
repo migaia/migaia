@@ -66,6 +66,8 @@ class DeriveView implements IDeriveStateView {
 export class ScopeState implements IScopeState {
   /** Runtime that owns every signal and computed of this host. */
   readonly runtime: IRuntime
+  /** Paths written at least once, so `seed` never overwrites an authored or user value. */
+  readonly #written = new Set<string>()
   /** Signals by state path. */
   readonly #signals = new Map<string, IReactiveSignal<unknown>>()
   /** Computeds by derive id. */
@@ -98,14 +100,15 @@ export class ScopeState implements IScopeState {
     return this.#signal(path).value
   }
 
-  /** Writes a path. */
+  /** Writes a path and remembers that it was written. */
   write(path: string, value: unknown): void {
+    this.#written.add(path)
     this.#signal(path).value = value
   }
 
-  /** Seeds a path only when it has never been written. */
+  /** Seeds a path only when it has never been written; earlier reads do not count. */
   seed(path: string, value: unknown): void {
-    if (!this.#signals.has(path)) this.#signal(path).value = value
+    if (!this.#written.has(path)) this.write(path, value)
   }
 
   /** Value of a derive, computed lazily and cached by the runtime. */

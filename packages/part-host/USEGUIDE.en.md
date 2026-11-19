@@ -15,6 +15,8 @@ See the [README](./README.en.md) for what the package is for. The host depends o
 | Call an API and write state on click                       | `defineEffect`                     | [Side effects from events](#side-effects-from-events) |
 | A click in a list row must know which row                  | `IEffectEvent.rowKey`              | [List-row events](#list-row-events)                  |
 | `aria-expanded` follows a popup's open state               | `behavior.aria.fromState`          | [State-derived aria](#state-derived-aria)            |
+| Load a list from an API with loading, empty and error states | `defineResource`, `host.resources` | [Data resources and models](#data-resources-and-models) |
+| Type hints for addresses and state paths in effects        | `IPartTypeRegistry`                | [Generated types](#generated-types)                  |
 | Remove a plugin; parts depending on it become unavailable  | `host.unUse`                       | [Replacing and removing plugins](#replacing-and-removing-plugins) |
 
 ## Load a blueprint
@@ -139,6 +141,30 @@ A blueprint node with `tag: 'card@1'` is a usage: `facets.props` are its paramet
 
 Both register through `definePartPlugin({ modifiers, fragments })` with the same conflict and replacement rules as parts.
 
+## Data resources and models
+
+`defineResource` declares a data resource: parameter and result schemas, Feature dependencies (`deps`), a load function `load(params, { features, signal })`, and optionally a cache key `key`, extra invalidation `tags`, an empty test `isEmpty`, `paging` and `commands`. Register resources with `definePartPlugin({ resources: [...] })`.
+
+```ts
+const orders = defineResource({
+  id: 'orders@1',
+  params: z.object({ status: z.string() }),
+  deps: { http: httpPlugin.getFeature('http') },
+  load: (params, { features, signal }) => features.http.request({ path: '/orders', query: params, signal }),
+  commands: {
+    create: { args: z.object({ customer: z.string().min(1) }), run: (args, { features }) => features.http.request({ method: 'POST', path: '/orders', body: args }) }
+  }
+})
+```
+
+Each host has one resource store (`host.resources`, `ctx.resources` in effects). One resource with one set of parameters is one cache entry: it starts loading when first watched (`loading`), becomes `ready` or `empty` on success, and `error` on failure while keeping the previous data. A refresh keeps the status and sets `refreshing`; a superseded load is aborted and its late result dropped. `watch(binding)` observes a `{ $resource, params }` binding: when a `$state` parameter changes it moves to the new entry and keeps showing the old data while the new entry loads for the first time. `read()` has no side effects and may run during render; call `release()` when done. `run(id, command, args)` refreshes the entries whose tags (by default the resource name) meet the command's; `invalidate(tags)` does it by hand. When the plugin providing a resource is replaced, suspended or removed, its entries are dropped and watches re-subscribe; a missing resource shows an error snapshot with `RESOURCE_UNKNOWN`.
+
+`definePartPlugin({ models: [...] })` registers models made with `defineModel`; `host.models.validate(id, value)` (`ctx.models` in effects) validates with the model schema and returns `ok` plus issues by field path. `host.state.seed(path, value)` writes only when the path was never written, for initial state.
+
+## Generated types
+
+The `.d.ts` that `partom types` generates fills `IPartTypeRegistry`. Then `ctx.state.read(path)`, `ctx.dispatch(address, event, detail)`, `ctx.part(address).dispatch(...)` and the `host.resources` methods check addresses, state paths, event details and resource parameters; without a generated file they take plain strings and `unknown`.
+
 ## Replacing and removing plugins
 
 - `host.use(plugin)` installs a plugin; its parts, rules and implementations enter the catalog.
@@ -148,7 +174,7 @@ Both register through `definePartPlugin({ modifiers, fragments })` with the same
 
 ## Error codes
 
-Source `part.host`: `CATALOG_CONFLICT`, `ENHANCER_CYCLE`, `ENHANCER_MUTATED_INPUT`, `DERIVE_WRITE`, `EFFECT_FAILED`, `RENDERER_MISSING`, `RENDERER_DUPLICATE`, `HOST_DISPOSED`, `BLUEPRINT_UNKNOWN`. Errors during plugin install are wrapped by plugin-host as `PLUGIN_INSTALL_FAILED` with the original on `cause`.
+Source `part.host`: `CATALOG_CONFLICT`, `ENHANCER_CYCLE`, `ENHANCER_MUTATED_INPUT`, `DERIVE_WRITE`, `EFFECT_FAILED`, `RENDERER_MISSING`, `RENDERER_DUPLICATE`, `HOST_DISPOSED`, `BLUEPRINT_UNKNOWN`, `MODIFIER_PLACEMENT_MISMATCH`, `RESOURCE_UNKNOWN`, `RESOURCE_COMMAND_UNKNOWN`, `MODEL_UNKNOWN`, `ARGS_INVALID`. Errors during plugin install are wrapped by plugin-host as `PLUGIN_INSTALL_FAILED` with the original on `cause`.
 
 ## Build and verify
 

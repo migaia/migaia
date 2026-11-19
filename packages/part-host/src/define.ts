@@ -9,7 +9,6 @@ import {
   type ISlotDeclaration,
   type IStyleHookType
 } from '@migaia/part-contract'
-import { defineFeature } from '@migaia/plugin-host/features'
 import { PartHostErrorCode } from './error-code.ts'
 import { PartHostErrorText } from './error-text.ts'
 import { createPartHostError } from './errors.ts'
@@ -28,9 +27,12 @@ import type {
   IModifierInstance,
   IModifierPlacement,
   IPartDefinition,
+  IResourceCommand,
   IResourceDefinition,
+  IResourceLoadContext,
   ISchemaInput
 } from './types.ts'
+import type { IFeatureDependencyRecord } from '@migaia/plugin-host'
 import type { IFragmentBody, IModifierEventKind, IPartFacets } from '@migaia/part-contract'
 
 /** Common optional descriptor fields accepted by every define function. */
@@ -158,33 +160,112 @@ export function defineEffect<TDeps extends IFeatureRecordLike = Record<never, ne
   })
 }
 
-/** Resource specification: a Feature factory plus its parameter, result and command schemas. */
-export type IResourceSpec<TOutput extends object> = IDescriptorFields & {
-  readonly id: string
-  readonly params?: ISchemaInput
-  readonly result?: ISchemaInput
-  readonly commands?: Readonly<Record<string, ISchemaInput>>
-  readonly create: () => TOutput
+/** One command of a resource specification. */
+export type IResourceCommandSpec<TDeps extends IFeatureDependencyRecord> = {
+  readonly args?: ISchemaInput
+  readonly argsJsonSchema?: IJsonSchema
+  /** UI-visibility metadata only; written to the descriptor and never checked. */
+  readonly permission?: string
+  readonly run: (args: unknown, context: IResourceLoadContext<TDeps>) => Promise<unknown>
+  readonly invalidates?: (args: unknown, result: unknown) => readonly string[]
 }
 
-/** Defines a resource: a PH Feature whose contract is listed in the catalog. */
-export function defineResource<TOutput extends object>(
-  spec: IResourceSpec<TOutput>
-): IResourceDefinition {
-  /** Spec split into schemas, the factory and descriptor fields. */
-  const { params, result, commands, create, ...fields } = spec
-  /** Command schemas converted for the catalog. */
-  const commandSchemas: Record<string, IJsonSchema | undefined> = {}
-  for (const [name, schema] of Object.entries(commands ?? {}))
-    commandSchemas[name] = argsSchema(schema, undefined)
+/**
+ * Resource specification: schemas, dependencies, the load function, cache key and tags, empty test,
+ * paging and commands. Explicit JSON Schemas, when given, are stored in the catalog as is.
+ */
+export type IResourceSpec<
+  TParams,
+  TResult,
+  TDeps extends IFeatureDependencyRecord = Record<never, never>
+> = IDescriptorFields & {
+  readonly id: string
+  readonly params?: ISchemaInput
+  readonly paramsJsonSchema?: IJsonSchema
+  readonly result?: ISchemaInput
+  readonly resultJsonSchema?: IJsonSchema
+  readonly deps?: TDeps
+  readonly load: (params: TParams, context: IResourceLoadContext<TDeps>) => Promise<TResult>
+  readonly key?: (params: TParams) => string
+  readonly tags?: (params: TParams, result: TResult) => readonly string[]
+  readonly isEmpty?: (result: TResult) => boolean
+  readonly paging?: { readonly param: string; readonly size: number }
+  readonly commands?: Readonly<Record<string, IResourceCommandSpec<TDeps>>>
+}
+
+/** Catalog entry of one command: its argument schema and permission metadata. */
+function commandEntry(command: IResourceCommandSpec<IFeatureDependencyRecord>): IJsonSchema {
+  /** Argument schema for the catalog. */
+  const args = argsSchema(command.args, command.argsJsonSchema)
+  return {
+    ...(args === undefined ? {} : { args }),
+    ...(command.permission === undefined ? {} : { permission: command.permission })
+  }
+}
+
+/** Runtime part of one command. */
+function commandRuntime(command: IResourceCommandSpec<IFeatureDependencyRecord>): IResourceCommand {
+  return {
+    ...(command.args === undefined ? {} : { args: command.args }),
+    run: command.run,
+    ...(command.invalidates === undefined ? {} : { invalidates: command.invalidates })
+  }
+}
+
+/**
+ * Defines a resource. The descriptor carries the parameter schema in `args` and the result and
+ * command schemas in `editor`; the definition carries the runtime functions the host's resource
+ * store calls. Dependencies are resolved by the owning plugin per generation.
+ */
+export function defineResource<
+  TParams = Record<string, unknown>,
+  TResult = unknown,
+  TDeps extends IFeatureDependencyRecord = Record<never, never>
+>(spec: IResourceSpec<TParams, TResult, TDeps>): IResourceDefinition {
+  /** Spec split into schemas, runtime functions and descriptor fields. */
+  const {
+    params,
+    paramsJsonSchema,
+    result,
+    resultJsonSchema,
+    deps,
+    load,
+    key,
+    tags,
+    isEmpty,
+    paging,
+    commands,
+    ...fields
+  } = spec
+  /** Command catalog entries and runtime parts, by name. */
+  const commandSchemas: Record<string, IJsonSchema> = {}
+  /** Runtime commands by name. */
+  const runtime: Record<string, IResourceCommand> = {}
+  for (const [name, command] of Object.entries(commands ?? {})) {
+    commandSchemas[name] = commandEntry(command as IResourceCommandSpec<IFeatureDependencyRecord>)
+    runtime[name] = commandRuntime(command as IResourceCommandSpec<IFeatureDependencyRecord>)
+  }
+  /** Result schema for the catalog. */
+  const resultSchema = argsSchema(result, resultJsonSchema)
   return Object.freeze({
     descriptor: descriptorOf({
       ...fields,
       kind: 'resource',
-      args: argsSchema(params, undefined),
-      editor: { result: argsSchema(result, undefined), commands: commandSchemas }
+      args: argsSchema(params, paramsJsonSchema),
+      editor: {
+        ...fields.editor,
+        ...(resultSchema === undefined ? {} : { result: resultSchema }),
+        commands: commandSchemas
+      }
     }),
-    feature: defineFeature((() => create()) as never)
+    deps: deps ?? {},
+    ...(params === undefined ? {} : { params }),
+    load: load as IResourceDefinition['load'],
+    ...(key === undefined ? {} : { key: key as IResourceDefinition['key'] }),
+    ...(tags === undefined ? {} : { tags: tags as IResourceDefinition['tags'] }),
+    ...(isEmpty === undefined ? {} : { isEmpty: isEmpty as IResourceDefinition['isEmpty'] }),
+    ...(paging === undefined ? {} : { paging }),
+    commands: Object.freeze(runtime)
   })
 }
 

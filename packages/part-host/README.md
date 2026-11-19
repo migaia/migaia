@@ -27,7 +27,7 @@ const { tree, issues } = await host.blueprint.load(blueprint)
 - `defineEnhancer`：按 tag 的纯配置转换，顺序由 `after` 决定，成环在安装时拒绝。
 - `defineDerive`：纯推导，写状态会抛 `DERIVE_WRITE`。
 - `defineEffect`：事件订阅调用的副作用；同一 effect 按到达顺序串行，`ctx.dispatch` 只入队。
-- `defineResource`：带参数、结果和命令 schema 的 PH Feature。
+- `defineResource`：数据资源：参数、结果和命令 schema，加载函数、缓存键与失效标签；运行时由宿主的资源仓库管理异步状态。
 
 ## 接线
 

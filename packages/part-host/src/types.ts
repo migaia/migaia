@@ -1,21 +1,40 @@
 import type {
   IBehavior,
+  ICatalogView,
   IDescriptor,
   IIssue,
   IJsonPatchOperation,
   IKindSchema,
   IPartFacets,
   IPartNode,
+  IModelDefinition,
+  IResourceBinding,
+  IResourceSnapshot,
   IRuleDefinition,
   IStandardSchemaInput
 } from '@migaia/part-contract'
 import type {
+  IFeatureDependencyRecord,
+  IFeatureOutputs,
   IFeatureRecord,
   IPluginDependencyMutationOptions,
   IPluginHostDisposalResult,
   IPluginRemoval
 } from '@migaia/plugin-host'
 import type { IRuntime } from '@migaia/reactive'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
+import type {
+  ICommandArgsOf,
+  ICommandNameOf,
+  IEventDetailOf,
+  IEventNameOf,
+  IPartAddressOf,
+  IResourceIdOf,
+  IResourceParamsOf,
+  IResourceResultOf,
+  IStatePathOf,
+  IStateValueOf
+} from './registry.ts'
 
 /** A definition registered in the catalog: its descriptor plus the runtime payload of its kind. */
 export type IDefinition = { readonly descriptor: IDescriptor }
@@ -46,12 +65,93 @@ export type IDeriveDefinition<TArgs, TOut> = IDefinition & {
   readonly compute: (state: IDeriveStateView, args: TArgs | undefined) => TOut
 }
 
-/** Context an effect run receives: resolved Feature outputs, state access and queued dispatch. */
+/**
+ * Context an effect run receives: resolved Feature outputs, typed state access, queued dispatch,
+ * the host's resources and models, and per-address part references. Types come from
+ * `IPartTypeRegistry` when `partom types` generated it, otherwise strings and `unknown`.
+ */
 export type IEffectContext<TDeps> = {
   readonly features: TDeps
-  readonly state: { read(path: string): unknown; write(path: string, value: unknown): void }
-  dispatch(address: string, event: string, detail: unknown): void
+  readonly state: {
+    read<P extends IStatePathOf>(path: P): IStateValueOf<P>
+    write<P extends IStatePathOf>(path: P, value: IStateValueOf<P>): void
+  }
+  readonly resources: IResourceHandle
+  readonly models: IModelHandle
+  dispatch<A extends IPartAddressOf, E extends IEventNameOf<A>>(
+    address: A,
+    event: E,
+    detail: IEventDetailOf<A, E>
+  ): void
+  part<A extends IPartAddressOf>(address: A): IPartRef<A>
 }
+
+/** Reference to one part address inside an effect. */
+export type IPartRef<A extends string = IPartAddressOf> = {
+  dispatch<E extends IEventNameOf<A>>(event: E, detail: IEventDetailOf<A, E>): void
+}
+
+/** Context of a resource load or command run: resolved dependencies and the run's abort signal. */
+export type IResourceLoadContext<TDeps extends IFeatureDependencyRecord> = {
+  readonly features: IFeatureOutputs<TDeps>
+  readonly signal: INativeAbortSignal
+}
+
+/** Runtime part of a resource command; schemas are already in the descriptor. */
+export type IResourceCommand = {
+  readonly args?: IStandardSchemaInput
+  readonly run: (
+    args: unknown,
+    context: IResourceLoadContext<IFeatureDependencyRecord>
+  ) => Promise<unknown>
+  readonly invalidates?: (args: unknown, result: unknown) => readonly string[]
+}
+
+/**
+ * Resource definition: the catalog descriptor plus the runtime functions the resource store calls.
+ * Dependencies are resolved per plugin generation when the owning plugin installs.
+ */
+export type IResourceDefinition = IDefinition & {
+  readonly deps: IFeatureDependencyRecord
+  readonly params?: IStandardSchemaInput
+  readonly load: (
+    params: unknown,
+    context: IResourceLoadContext<IFeatureDependencyRecord>
+  ) => Promise<unknown>
+  readonly key?: (params: unknown) => string
+  readonly tags?: (params: unknown, result: unknown) => readonly string[]
+  readonly isEmpty?: (result: unknown) => boolean
+  readonly paging?: { readonly param: string; readonly size: number }
+  readonly commands: Readonly<Record<string, IResourceCommand>>
+}
+
+/** Observation of one resource binding; `read` is a side-effect-free tracked read. */
+export type IResourceWatch = { read(): IResourceSnapshot; release(): void }
+
+/** Resource surface of a host: watches, queries, commands and invalidation. */
+export type IResourceHandle = {
+  watch(binding: IResourceBinding, row?: Readonly<Record<string, unknown>>): IResourceWatch
+  query<R extends IResourceIdOf>(id: R, params: IResourceParamsOf<R>): Promise<IResourceResultOf<R>>
+  refresh(id: IResourceIdOf, params?: unknown): void
+  run<R extends IResourceIdOf, C extends ICommandNameOf<R>>(
+    id: R,
+    command: C,
+    args: ICommandArgsOf<R, C>
+  ): Promise<unknown>
+  invalidate(tags: readonly string[]): void
+  errorOf(id: IResourceIdOf, params: unknown): unknown
+}
+
+/** Result of a model validation. */
+export type IModelValidation =
+  | { readonly ok: true; readonly value: unknown }
+  | {
+      readonly ok: false
+      readonly issues: readonly { readonly path: string; readonly message: string }[]
+    }
+
+/** Model surface of a host. */
+export type IModelHandle = { validate(id: string, value: unknown): Promise<IModelValidation> }
 
 /** Effect: ordered side effects run for event subscriptions. */
 export type IEffectDefinition = IDefinition & {
@@ -77,9 +177,6 @@ export type IEffectEvent = {
 
 /** Feature reference map accepted as effect dependencies. */
 export type IFeatureRecordLike = Readonly<Record<string, unknown>>
-
-/** Resource: a PH Feature with parameter, result and command schemas plus its descriptor. */
-export type IResourceDefinition = IDefinition & { readonly feature: unknown }
 
 /**
  * Per-subscription instance of a modifier. `handle` runs synchronously in the listener; calling
@@ -137,7 +234,8 @@ export type IPartPluginSpec = {
   readonly effects?: readonly IEffectDefinition[]
   readonly modifiers?: readonly IModifierDefinition<never>[]
   readonly fragments?: readonly IFragmentDefinition<unknown>[]
-  readonly resources?: Readonly<Record<string, IResourceDefinition>>
+  readonly resources?: readonly IResourceDefinition[]
+  readonly models?: readonly IModelDefinition<unknown>[]
   readonly rules?: readonly IRuleDefinition<unknown>[]
   readonly kinds?: Readonly<Record<string, IKindSchema>>
   readonly implementations?: readonly IPartImplementation[]
@@ -218,6 +316,8 @@ export type IScopeState = {
   readonly runtime: IRuntime
   read(path: string): unknown
   write(path: string, value: unknown): void
+  /** Writes the path only when it was never written; reads do not count. */
+  seed(path: string, value: unknown): void
   resolve(node: IResolvedNode, value: unknown, row?: Readonly<Record<string, unknown>>): unknown
 }
 
@@ -227,6 +327,8 @@ export type ICatalog = {
   byTag(tag: string): readonly IDefinition[]
   implementation(renderer: string, partId: string): unknown
   manifest(): readonly string[]
+  /** Read-only view for rule engines and catalog checks such as `checkModels`. */
+  view(): ICatalogView
 }
 
 /** Renderer mount created per `host.mount` call. */
@@ -259,6 +361,8 @@ export type IPartHost = {
   }
   readonly catalog: ICatalog
   readonly state: IScopeState
+  readonly resources: IResourceHandle
+  readonly models: IModelHandle
   mount(target: unknown, blueprintId: string): IMountHandle
   dispatch(address: string, event: string, detail: unknown): Promise<void>
   use(plugin: IPartPlugin): Promise<void>

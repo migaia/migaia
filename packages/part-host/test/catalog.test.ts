@@ -7,7 +7,6 @@ import {
   defineEnhancer,
   definePart,
   definePartPlugin,
-  defineResource,
   PartHostErrorCode,
   type IPartPlugin
 } from '../src/index.ts'
@@ -28,35 +27,6 @@ describe('definitions', () => {
         transform: (c) => c
       })
     ).toThrow(expect.objectContaining({ code: 'SCHEMA_TRANSFORMS', source: 'part.contract' }))
-  })
-
-  it('exposes a resource as a Feature other plugins can depend on', async () => {
-    const orders = defineResource({ id: 'orders@1', create: () => ({ list: () => [1, 2] }) })
-    const data = definePartPlugin({ name: 'data', resources: { orders } }) as IPartPlugin & {
-      getFeature(n: string): unknown
-    }
-    let seen: unknown
-    const consumer = definePlugin({
-      name: 'consumer',
-      features: {
-        read: defineFeature(
-          (_core, deps: { readonly orders: { list(): number[] } }) => ({
-            items: deps.orders.list()
-          }),
-          {
-            orders: data.getFeature('orders')
-          } as never
-        )
-      },
-      install: (core: { readonly features: { readonly read: { items: number[] } } }) => {
-        seen = core.features.read.items
-        return {}
-      }
-    }) as unknown as IPartPlugin
-    const host = await createPartHost({ plugins: [data, consumer] })
-    expect(seen).toEqual([1, 2])
-    expect(host.catalog.get('orders@1')?.descriptor.kind).toBe('resource')
-    await host.dispose()
   })
 })
 

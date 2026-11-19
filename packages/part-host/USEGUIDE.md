@@ -15,6 +15,8 @@
 | 点击后请求接口、写状态                       | `defineEffect`                     | [事件触发副作用](#事件触发副作用)                              |
 | 列表行里的点击要知道是哪一行                 | `IEffectEvent.rowKey`              | [列表行事件](#列表行事件)                                      |
 | 弹层打开时 `aria-expanded` 跟着变            | `behavior.aria.fromState`          | [由状态派生 aria](#由状态派生-aria)                            |
+| 列表从接口取数，带加载、空、出错状态         | `defineResource`、`host.resources` | [数据资源与模型](#数据资源与模型)                              |
+| 在 effect 里得到地址和状态路径的类型提示     | `IPartTypeRegistry`                | [生成的类型](#生成的类型)                                      |
 | 卸载一个插件，依赖它的部件暂时不可用         | `host.unUse`                       | [插件替换与卸载](#插件替换与卸载)                              |
 
 ## 装载蓝图
@@ -139,6 +141,30 @@ const card = defineFragment({
 
 两者都经 `definePartPlugin({ modifiers, fragments })` 登记，冲突与替换规则与 part 相同。
 
+## 数据资源与模型
+
+`defineResource` 声明一个数据资源：参数与结果的 schema、依赖的 Feature（`deps`）、加载函数 `load(params, { features, signal })`，以及可选的缓存键 `key`、额外失效标签 `tags`、空结果判断 `isEmpty`、分页 `paging` 和命令 `commands`。资源经 `definePartPlugin({ resources: [...] })` 登记。
+
+```ts
+const orders = defineResource({
+  id: 'orders@1',
+  params: z.object({ status: z.string() }),
+  deps: { http: httpPlugin.getFeature('http') },
+  load: (params, { features, signal }) => features.http.request({ path: '/orders', query: params, signal }),
+  commands: {
+    create: { args: z.object({ customer: z.string().min(1) }), run: (args, { features }) => features.http.request({ method: 'POST', path: '/orders', body: args }) }
+  }
+})
+```
+
+每个宿主有一份资源仓库（`host.resources`，effect 里是 `ctx.resources`）。同一资源加同一组参数是一个缓存条目：第一次被观察时开始加载（`loading`），成功后是 `ready` 或 `empty`，失败是 `error` 且保留上一次的数据；刷新时状态不变、`refreshing` 为 `true`，被取代的加载会被中止，迟到的结果被丢弃。`watch(binding)` 观察一个 `{ $resource, params }` 绑定：参数里的 `$state` 变化时自动换到新条目，新条目首次加载期间继续显示旧数据；`read()` 没有副作用，可以在渲染时调用；用完调用 `release()`。命令 `run(id, command, args)` 成功后按标签（默认是资源名）刷新相关条目；`invalidate(tags)` 手动失效。提供资源的插件被替换、挂起或卸载时，相关条目作废，观察会自动重新订阅，资源不存在时快照为 `RESOURCE_UNKNOWN` 的出错状态。
+
+`definePartPlugin({ models: [...] })` 登记 `defineModel` 定义的模型；`host.models.validate(id, value)`（effect 里是 `ctx.models`）用模型的 schema 校验，返回 `ok` 与按字段路径的问题列表。`host.state.seed(path, value)` 只在该路径从未被写过时写入，适合初始状态。
+
+## 生成的类型
+
+`partom types` 生成的 `.d.ts` 会填充 `IPartTypeRegistry`。之后 `ctx.state.read(path)`、`ctx.dispatch(address, event, detail)`、`ctx.part(address).dispatch(...)` 与 `host.resources` 的方法都会检查地址、状态路径、事件 `detail` 和资源参数；没有生成文件时，这些参数都是普通字符串和 `unknown`。
+
 ## 插件替换与卸载
 
 - `host.use(plugin)` 安装插件；它提供的部件、规则和实现进入目录。
@@ -148,7 +174,7 @@ const card = defineFragment({
 
 ## 错误码
 
-source 为 `part.host`：`CATALOG_CONFLICT`、`ENHANCER_CYCLE`、`ENHANCER_MUTATED_INPUT`、`DERIVE_WRITE`、`EFFECT_FAILED`、`RENDERER_MISSING`、`RENDERER_DUPLICATE`、`HOST_DISPOSED`、`BLUEPRINT_UNKNOWN`。插件安装期间的错误由 plugin-host 包装为 `PLUGIN_INSTALL_FAILED`，原错误在 `cause`。
+source 为 `part.host`：`CATALOG_CONFLICT`、`ENHANCER_CYCLE`、`ENHANCER_MUTATED_INPUT`、`DERIVE_WRITE`、`EFFECT_FAILED`、`RENDERER_MISSING`、`RENDERER_DUPLICATE`、`HOST_DISPOSED`、`BLUEPRINT_UNKNOWN`、`MODIFIER_PLACEMENT_MISMATCH`、`RESOURCE_UNKNOWN`、`RESOURCE_COMMAND_UNKNOWN`、`MODEL_UNKNOWN`、`ARGS_INVALID`。插件安装期间的错误由 plugin-host 包装为 `PLUGIN_INSTALL_FAILED`，原错误在 `cause`。
 
 ## 构建与验证
 

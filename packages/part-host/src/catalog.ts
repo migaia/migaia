@@ -2,6 +2,7 @@ import {
   splitDescriptorId,
   tagSegmentName,
   type ICatalogView,
+  type IDescriptor,
   type IKindSchema,
   type IRuleDefinition
 } from '@migaia/part-contract'
@@ -14,8 +15,10 @@ import type {
   IDefinition,
   IEffectDefinition,
   IEnhancerDefinition,
-  IPartImplementation
+  IPartImplementation,
+  IResourceDefinition
 } from './types.ts'
+import type { IResourceRuntime } from './resources.ts'
 
 /** Everything one plugin generation contributes; `token` identifies the generation. */
 export type IContribution = {
@@ -27,6 +30,8 @@ export type IContribution = {
   readonly rules: readonly IRuleDefinition<unknown>[]
   readonly kinds: Readonly<Record<string, IKindSchema>>
   readonly effectFeatures: ReadonlyMap<string, Readonly<Record<string, unknown>>>
+  /** Resolved dependency outputs per resource id of this generation. */
+  readonly resourceFeatures: ReadonlyMap<string, Readonly<Record<string, unknown>>>
 }
 
 /** One stored entry with its owning generation and availability. */
@@ -42,6 +47,9 @@ type IEntry<TValue> = {
  * fragment of that name changed.
  */
 export type ICatalogListener = (tags: ReadonlySet<string>) => void
+
+/** Listener told which resource ids changed generation (registered, replaced, withdrawn, suspended). */
+export type IResourceListener = (ids: ReadonlySet<string>) => void
 
 /** Composite key of a renderer implementation. */
 function implementationKey(renderer: string, partId: string): string {
@@ -61,6 +69,8 @@ export class PartCatalog implements ICatalog {
   readonly #contributions = new Map<string, IContribution>()
   /** Change listeners. */
   readonly #listeners = new Set<ICatalogListener>()
+  /** Resource generation listeners. */
+  readonly #resourceListeners = new Set<IResourceListener>()
   /** Definition ids by targeted part name, so tag lookups do not scan the catalog. */
   readonly #byTarget = new Map<string, Set<string>>()
   /** Definition ids by name without major, so major lookups do not scan the catalog. */
@@ -70,6 +80,26 @@ export class PartCatalog implements ICatalog {
   subscribe(listener: ICatalogListener): () => void {
     this.#listeners.add(listener)
     return () => this.#listeners.delete(listener)
+  }
+
+  /** Adds a resource generation listener; returns its removal. */
+  subscribeResources(listener: IResourceListener): () => void {
+    this.#resourceListeners.add(listener)
+    return () => this.#resourceListeners.delete(listener)
+  }
+
+  /** Available resource definition with its generation's dependency outputs and token. */
+  resource(id: string): IResourceRuntime | undefined {
+    /** Stored entry. */
+    const entry = this.#definitions.get(id)
+    if (entry?.available !== true || entry.value.descriptor.kind !== 'resource') return undefined
+    /** Contribution that registered the resource. */
+    const contribution = this.#contributions.get(entry.plugin)
+    return {
+      definition: entry.value as IResourceDefinition,
+      features: contribution?.resourceFeatures.get(id) ?? {},
+      token: entry.token
+    }
   }
 
   /** Registers one plugin generation atomically: all conflicts are checked before any write. */
@@ -236,8 +266,15 @@ export class PartCatalog implements ICatalog {
     return {
       get: (id) => this.get(id)?.descriptor,
       majors: (name) => this.#majors(name),
-      writesFor: (tag) => this.#writesFor(tag)
+      writesFor: (tag) => this.#writesFor(tag),
+      all: () => this.#allDescriptors()
     }
+  }
+
+  /** Descriptors of every available definition, in registration order. */
+  *#allDescriptors(): Iterable<IDescriptor> {
+    for (const entry of this.#definitions.values())
+      if (entry.available) yield entry.value.descriptor
   }
 
   /** Available majors of a name. */
@@ -316,5 +353,11 @@ export class PartCatalog implements ICatalog {
         else if (definition.descriptor.kind === 'fragment')
           tags.add(splitDescriptorId(definition.descriptor.id).name)
     for (const listener of this.#listeners) listener(tags)
+    /** Resource ids of both generations. */
+    const resources = new Set<string>()
+    for (const contribution of previous === undefined ? [current] : [current, previous])
+      for (const definition of contribution.definitions)
+        if (definition.descriptor.kind === 'resource') resources.add(definition.descriptor.id)
+    if (resources.size > 0) for (const listener of this.#resourceListeners) listener(resources)
   }
 }

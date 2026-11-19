@@ -5,6 +5,8 @@ import { PartCatalog, type IContribution } from './catalog.ts'
 import { PartHostErrorCode } from './error-code.ts'
 import { PartHostErrorText } from './error-text.ts'
 import { createPartHostError } from './errors.ts'
+import { ModelHandle } from './models.ts'
+import { ResourceStore } from './resources.ts'
 import type { ScopeState } from './state.ts'
 import type {
   IPartHost,
@@ -78,6 +80,21 @@ export class CoreRuntime {
   readonly diagnostics = new Diagnostics()
   /** Host render slot. */
   readonly renderSlot = new RenderSlot()
+  /** Host resource store; reads state lazily, so it exists before the host binds. */
+  readonly resources = new ResourceStore({
+    runtime: () => this.state().runtime,
+    resource: (id) => this.catalog.resource(id),
+    readState: (path) => this.state().read(path),
+    derived: (id) => this.state().derived(id),
+    report: (error) => this.diagnostics.report(error)
+  })
+  /** Host model validation surface. */
+  readonly models = new ModelHandle((id) => this.catalog.get(id))
+
+  /** Subscribes the resource store to generation changes of resource definitions. */
+  constructor() {
+    this.catalog.subscribeResources((ids) => this.resources.changed(ids))
+  }
   /** Host bound by `createPartHost` right after the core plugin installs. */
   #host: IPartHost | undefined
   /** Scope state bound together with the host. */
@@ -123,6 +140,11 @@ class StateFeature {
   /** Write of a path. */
   write(path: string, value: unknown): void {
     this.#core.state().write(path, value)
+  }
+
+  /** Writes a path only when it was never written. */
+  seed(path: string, value: unknown): void {
+    this.#core.state().seed(path, value)
   }
 
   /** Resolves a facet value of a node; `row` feeds `$row` bindings of template-row instances. */
@@ -197,7 +219,9 @@ const coreFeatures = {
   ),
   style: defineFeature((_core, deps) => ({ catalog: deps.runtime.catalog }), {
     runtime: runtimeFeature
-  })
+  }),
+  resources: defineFeature((_core, deps) => deps.runtime.resources, { runtime: runtimeFeature }),
+  models: defineFeature((_core, deps) => deps.runtime.models, { runtime: runtimeFeature })
 }
 
 /** Names of the Features the core plugin provides. */
@@ -223,20 +247,34 @@ function effectAlias(effect: number, alias: string): string {
   return `effect${effect}_${alias}`
 }
 
+/** Dependency alias of one resource dependency inside the registration Feature. */
+function resourceAlias(resource: number, alias: string): string {
+  return `resource${resource}_${alias}`
+}
+
+/** Resolved dependency outputs of each definition, keyed by descriptor id. */
+function resolvedOutputs(
+  definitions: readonly { readonly descriptor: { readonly id: string }; readonly deps: object }[],
+  deps: Readonly<Record<string, unknown>>,
+  aliasOf: (position: number, alias: string) => string
+): Map<string, Readonly<Record<string, unknown>>> {
+  /** Outputs per definition id. */
+  const resolved = new Map<string, Readonly<Record<string, unknown>>>()
+  definitions.forEach((definition, position) => {
+    /** Outputs keyed by the definition's own aliases. */
+    const outputs: Record<string, unknown> = {}
+    for (const alias of Object.keys(definition.deps))
+      outputs[alias] = deps[aliasOf(position, alias)]
+    resolved.set(definition.descriptor.id, outputs)
+  })
+  return resolved
+}
+
 /** Builds the contribution of one plugin generation from its spec and resolved outputs. */
 function contributionOf(
   spec: IPartPluginSpec,
   deps: Readonly<Record<string, unknown>>
 ): IContribution {
-  /** Resolved Feature outputs per effect id. */
-  const effectFeatures = new Map<string, Readonly<Record<string, unknown>>>()
-  ;(spec.effects ?? []).forEach((effect, position) => {
-    /** Outputs keyed by the effect's own aliases. */
-    const outputs: Record<string, unknown> = {}
-    for (const alias of Object.keys(effect.deps))
-      outputs[alias] = deps[effectAlias(position, alias)]
-    effectFeatures.set(effect.descriptor.id, outputs)
-  })
   return {
     plugin: spec.name,
     token: {},
@@ -248,12 +286,14 @@ function contributionOf(
       ...(spec.effects ?? []),
       ...(spec.modifiers ?? []),
       ...(spec.fragments ?? []),
-      ...Object.values(spec.resources ?? {})
+      ...(spec.resources ?? []),
+      ...(spec.models ?? [])
     ],
     implementations: spec.implementations ?? [],
     rules: spec.rules ?? [],
     kinds: spec.kinds ?? {},
-    effectFeatures
+    effectFeatures: resolvedOutputs(spec.effects ?? [], deps, effectAlias),
+    resourceFeatures: resolvedOutputs(spec.resources ?? [], deps, resourceAlias)
   }
 }
 
@@ -268,6 +308,10 @@ export function definePartPlugin(spec: IPartPluginSpec): IPartPlugin {
     for (const [alias, reference] of Object.entries(effect.deps))
       dependencies[effectAlias(position, alias)] = reference
   })
+  ;(spec.resources ?? []).forEach((resource, position) => {
+    for (const [alias, reference] of Object.entries(resource.deps))
+      dependencies[resourceAlias(position, alias)] = reference
+  })
   /** Feature that resolves dependencies and builds this generation's contribution. */
   const registration = defineFeature(
     (_core, deps: Readonly<Record<string, unknown>>) => ({
@@ -276,13 +320,9 @@ export function definePartPlugin(spec: IPartPluginSpec): IPartPlugin {
     }),
     dependencies as never
   )
-  /** Resource Features exposed under their declared names. */
-  const resourceFeatures: Record<string, unknown> = {}
-  for (const [name, resource] of Object.entries(spec.resources ?? {}))
-    resourceFeatures[name] = resource.feature
   return definePlugin({
     name: spec.name,
-    features: { ...spec.features, ...resourceFeatures, partRegistration: registration } as never,
+    features: { ...spec.features, partRegistration: registration } as never,
     install: (core: {
       readonly features: Record<string, unknown>
       readonly lifecycle: { readonly signal: IAbortSignalLike }

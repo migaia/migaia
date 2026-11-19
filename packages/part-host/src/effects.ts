@@ -1,7 +1,14 @@
 import { PartHostErrorCode } from './error-code.ts'
 import { PartHostErrorText } from './error-text.ts'
 import { createPartHostError } from './errors.ts'
-import type { IEffectContext, IEffectDefinition, IEffectEvent } from './types.ts'
+import type {
+  IEffectContext,
+  IEffectDefinition,
+  IEffectEvent,
+  IModelHandle,
+  IPartRef,
+  IResourceHandle
+} from './types.ts'
 
 /** Lookup of an effect and its resolved Feature outputs. */
 export type IEffectLookup = (
@@ -17,6 +24,27 @@ export type IEffectServices = {
   readonly write: (path: string, value: unknown) => void
   readonly enqueue: (address: string, event: string, detail: unknown) => void
   readonly report: (error: unknown) => void
+  readonly resources: IResourceHandle
+  readonly models: IModelHandle
+}
+
+/** Effect-side reference to one part address; dispatches through the host queue. */
+class PartRef implements IPartRef<string> {
+  /** Address of the part. */
+  readonly #address: string
+  /** Host services. */
+  readonly #services: IEffectServices
+
+  /** Binds the reference to an address. */
+  constructor(address: string, services: IEffectServices) {
+    this.#address = address
+    this.#services = services
+  }
+
+  /** Queues an event of this address, like `ctx.dispatch(address, …)`. */
+  dispatch(event: string, detail: unknown): void {
+    this.#services.enqueue(this.#address, event, detail)
+  }
 }
 
 /**
@@ -58,14 +86,18 @@ export class EffectRunner {
     const entry = this.#services.lookup(handler)
     if (entry === undefined) return
     /** Context of this run. */
-    const context: IEffectContext<Readonly<Record<string, unknown>>> = {
+    const context = {
       features: entry.features,
       state: {
-        read: (path) => this.#services.read(path),
-        write: (path, value) => this.#services.write(path, value)
+        read: (path: string) => this.#services.read(path),
+        write: (path: string, value: unknown) => this.#services.write(path, value)
       },
-      dispatch: (address, name, detail) => this.#services.enqueue(address, name, detail)
-    }
+      resources: this.#services.resources,
+      models: this.#services.models,
+      dispatch: (address: string, name: string, detail: unknown) =>
+        this.#services.enqueue(address, name, detail),
+      part: (address: string) => new PartRef(address, this.#services)
+    } as IEffectContext<Readonly<Record<string, unknown>>>
     try {
       await entry.definition.run(event, context)
     } catch (cause) {

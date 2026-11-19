@@ -34,7 +34,23 @@ export const PartHostErrorCode = {
    * `defineModifier` was given `placement: true` without `place`, or `place` with `placement:
    * false`. Provide both together or neither.
    */
-  modifierPlacementMismatch: 'MODIFIER_PLACEMENT_MISMATCH'
+  modifierPlacementMismatch: 'MODIFIER_PLACEMENT_MISMATCH',
+  /**
+   * `query`, `refresh`, `errorOf` or `run` named a resource id that is not in the catalog (never
+   * registered, or its plugin was removed or suspended). Install the plugin that provides it.
+   * Watches do not throw this; they show an error snapshot with this code instead.
+   */
+  resourceUnknown: 'RESOURCE_UNKNOWN',
+  /** `run` named a command the resource does not declare. Use a command from the resource spec. */
+  resourceCommandUnknown: 'RESOURCE_COMMAND_UNKNOWN',
+  /** `models.validate` named a model id that is not in the catalog. Register the model first. */
+  modelUnknown: 'MODEL_UNKNOWN',
+  /**
+   * Resource parameters or command arguments failed their Standard Schema at runtime. The issue
+   * list is on `cause`; the command did not run. A resource entry shows this code in its error
+   * snapshot instead of throwing. Fix the arguments.
+   */
+  argsInvalid: 'ARGS_INVALID'
 } as const
 
 /** Value union of every `part.host` error code. */

@@ -18,12 +18,14 @@ import { ScopeState } from './state.ts'
 import type {
   ICatalog,
   IDeriveDefinition,
+  IModelHandle,
   IMountHandle,
   IPartHost,
   IPartHostOptions,
   IPartPlugin,
   IRendererMount,
   IResolvedChanges,
+  IResourceHandle,
   IScopeState
 } from './types.ts'
 
@@ -100,7 +102,9 @@ class PartHost implements IPartHost {
       write: (path, value) => this.#state.write(path, value),
       enqueue: (address, event, detail) =>
         void this.dispatch(address, event, detail).catch(() => undefined),
-      report: (error) => core.diagnostics.report(error)
+      report: (error) => core.diagnostics.report(error),
+      resources: core.resources,
+      models: core.models
     })
     this.blueprint = {
       load: (input) => this.#serial(() => this.#store.load(input)),
@@ -119,6 +123,16 @@ class PartHost implements IPartHost {
   /** Scope state surface. */
   get state(): IScopeState {
     return this.#state
+  }
+
+  /** Resource surface; the same object effects and renderers receive. */
+  get resources(): IResourceHandle {
+    return this.#core.resources
+  }
+
+  /** Model validation surface. */
+  get models(): IModelHandle {
+    return this.#core.models
   }
 
   /** Mounts the latest tree of a blueprint through the render slot. */
@@ -201,6 +215,7 @@ class PartHost implements IPartHost {
     ])
     for (const set of this.#mounts.values()) for (const mount of set) mount.unmount()
     this.#mounts.clear()
+    this.#core.resources.dispose()
     this.#state.dispose()
     /** Plugin host disposal result. */
     const result = await this.#plugins.dispose()

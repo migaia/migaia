@@ -15,6 +15,7 @@ export type {
   IFragmentSpec,
   IModifierSpec,
   IPartSpec,
+  IResourceCommandSpec,
   IResourceSpec
 } from './define.ts'
 export { definePartPlugin, partCorePlugin, PART_CORE_PLUGIN } from './core.ts'
@@ -50,7 +51,27 @@ export type {
   IResolvedChanges,
   IResolvedNode,
   IResolvedTree,
+  IModelHandle,
+  IModelValidation,
+  IPartRef,
+  IResourceCommand,
   IResourceDefinition,
+  IResourceHandle,
+  IResourceLoadContext,
+  IResourceWatch,
   IScopeState,
   IStyleRule
 } from './types.ts'
+export type {
+  ICommandArgsOf,
+  ICommandNameOf,
+  IEventDetailOf,
+  IEventNameOf,
+  IPartAddressOf,
+  IPartTypeRegistry,
+  IResourceIdOf,
+  IResourceParamsOf,
+  IResourceResultOf,
+  IStatePathOf,
+  IStateValueOf
+} from './registry.ts'
