@@ -148,6 +148,7 @@ export class Project {
     readonly config: IPartomConfig
     readonly createPartHost: unknown
     readonly domPlugin: unknown
+    readonly checkModels: unknown
   }> {
     /** Config file path. */
     const path = this.configPath(explicit)
@@ -158,12 +159,13 @@ export class Project {
       readonly config?: unknown
       readonly createPartHost?: unknown
       readonly domPlugin?: unknown
+      readonly checkModels?: unknown
     }
     try {
       mkdirSync(dir, { recursive: true })
       writeFileSync(
         join(dir, 'entry.ts'),
-        `export { default as config } from ${JSON.stringify(path)}\nexport { createPartHost } from '@migaia/part-host'\nexport { domPlugin } from '@migaia/part-plugin-dom'\n`
+        `export { default as config } from ${JSON.stringify(path)}\nexport { createPartHost } from '@migaia/part-host'\nexport { domPlugin } from '@migaia/part-plugin-dom'\nexport { checkModels } from '@migaia/part-contract'\n`
       )
       /** Bundle result. */
       const result = await Bun.build({
@@ -192,7 +194,8 @@ export class Project {
     return {
       config: config as IPartomConfig,
       createPartHost: loaded.createPartHost,
-      domPlugin: loaded.domPlugin
+      domPlugin: loaded.domPlugin,
+      checkModels: loaded.checkModels
     }
   }
 

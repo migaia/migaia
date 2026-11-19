@@ -1,0 +1,25 @@
+{
+  "id": "page",
+  "version": 1,
+  "root": {
+    "tag": "box@1",
+    "id": "page",
+    "children": [
+      { "tag": "dialog@1", "id": "dialog" },
+      {
+        "tag": "field@1",
+        "id": "customer",
+        "facets": { "props": { "value": { "$state": "page.form.customer" } } }
+      },
+      {
+        "tag": "box@1",
+        "id": "rows",
+        "template": {
+          "rowKey": "id",
+          "rows": { "$state": "page.rows" },
+          "node": { "tag": "cell@1", "id": "cell" }
+        }
+      }
+    ]
+  }
+}

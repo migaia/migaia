@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { relative } from 'node:path'
 import type { IIssue } from '@migaia/part-contract'
-import type { IPartHost, IPartHostOptions, IResolvedNode } from '@migaia/part-host'
+import type { IPartHost, IPartHostOptions, IResolvedNode, IResolvedTree } from '@migaia/part-host'
 import { DoctorText } from './doctor-text.ts'
 import { serializeCause } from './errors.ts'
 import { Harness } from './harness.ts'
 import type { Project } from './project.ts'
+import { TypesCollector, type ITypesData } from './types/collect.ts'
 
 /** Options of one doctor run. */
 export type IDoctorOptions = {
@@ -13,6 +14,8 @@ export type IDoctorOptions = {
   readonly rendered: boolean
   readonly only: string | undefined
   readonly browser: string | undefined
+  /** Whether to collect the data `partom types` generates from. */
+  readonly types?: boolean
 }
 
 /** Rendered-check status of one blueprint. */
@@ -35,6 +38,7 @@ export type IDoctorResult = {
   readonly issues: readonly IIssue[]
   readonly rendered: readonly IRenderedStatus[]
   readonly blueprints: readonly IBlueprintEntry[]
+  readonly types?: ITypesData
 }
 
 /** Targets of the rendered check found in one mounted blueprint. */
@@ -102,6 +106,10 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
   const clean: unknown[] = []
   /** Every blueprint with its own static issues. */
   const blueprints: IBlueprintEntry[] = []
+  /** Type data collector, when asked. */
+  const types = options.types === true ? new TypesCollector() : undefined
+  /** Collected type data. */
+  let typesData: ITypesData | undefined
   try {
     for (const file of project.blueprintFiles(config)) {
       /** Blueprint document. */
@@ -116,8 +124,15 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
           status: 'skipped',
           reason: result.threw ? DoctorText.skippedLoadError : DoctorText.skippedStaticErrors
         })
-      else clean.push(document)
+      else {
+        clean.push(document)
+        types?.addTree((result.tree as IResolvedTree).root)
+      }
     }
+    /** The project's catalog check of model relations. */
+    const checkModels = bundle.checkModels as (catalog: unknown) => IIssue[]
+    issues.push(...checkModels(host.catalog.view()))
+    typesData = types?.result(host.catalog.view().all())
   } finally {
     await host.dispose()
   }
@@ -133,7 +148,7 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
       await harness.close()
     }
   }
-  return { issues, rendered, blueprints }
+  return { issues, rendered, blueprints, ...(typesData === undefined ? {} : { types: typesData }) }
 }
 
 /**
@@ -347,6 +362,7 @@ export function formatJson(result: IDoctorResult, withBlueprints = false): strin
             issues: entry.issues.map(outputIssue)
           }))
         }
-      : {})
+      : {}),
+    ...(result.types === undefined ? {} : { types: result.types })
   })
 }

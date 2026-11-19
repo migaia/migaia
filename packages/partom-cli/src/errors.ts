@@ -4,10 +4,11 @@ import { ERROR_SOURCE, type IPartCliErrorCode } from './error-code.ts'
 export const PartCliText = {
   /** Usage printed for invalid arguments. */
   usage:
-    'usage: partom doctor [--rendered] [--only <address>] [--browser <path>] [--json [--blueprints]] [--config <path>]\n' +
+    'usage: partom doctor [--rendered] [--only <address>] [--browser <path>] [--json [--blueprints] [--types]] [--config <path>]\n' +
     '       partom preview [<id|file>] [--port <n>] [--config <path>]\n' +
     '       partom extract <files...> --out <dir> [--probe] [--verify] [--browser <path>]\n' +
     '       partom import <openapi.json|yaml> --out <dir>\n' +
+    '       partom types [--out <file>] [--check] [--config <path>]\n' +
     '       partom browser install\n' +
     '       partom --version',
   /** Missing config. */
@@ -30,6 +31,12 @@ export const PartCliText = {
   blueprintNotFound: (target: string): string => `no blueprint of the config matches "${target}"`,
   /** Import input is not an OpenAPI 3.x document. */
   importInvalid: (path: string): string => `${path} is not an OpenAPI 3.x document with paths`,
+  /** A blueprint left out of `partom types` because it has static errors. */
+  typesSkipped: (id: string): string => `partom types: blueprint ${id} has errors and was left out`,
+  /** `partom types --check` found the file missing or out of date. */
+  typesStale: (path: string): string => `${path} is missing or out of date; run partom types`,
+  /** The declaration file was edited by hand. */
+  typesTakenOver: (path: string): string => `${path} was edited by hand; delete it to regenerate`,
   /** Doctor child process ended without a result. */
   doctorChildFailed: 'partom doctor ended without a result',
   /** Unknown command. */

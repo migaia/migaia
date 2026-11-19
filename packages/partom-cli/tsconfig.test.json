@@ -5,6 +5,7 @@
   "exclude": [
     "test/fixtures/extract/tabs.tsx",
     "test/fixtures/extract/combobox.tsx",
-    "test/fixtures/openapi/check.ts"
+    "test/fixtures/openapi/check.ts",
+    "test/fixtures/types-app"
   ]
 }

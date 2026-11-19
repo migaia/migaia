@@ -8,6 +8,7 @@ import { createPartCliError, PartCliText, serializeCause } from './errors.ts'
 import { extractFile, readReport, writeDrafts, type IExtractedComponent } from './extract.ts'
 import { importCommand } from './import/command.ts'
 import { previewCommand } from './preview/server.ts'
+import { typesCommand } from './types/command.ts'
 import { probe, verify } from './probe.ts'
 import { Project } from './project.ts'
 
@@ -89,6 +90,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     if (command === 'extract') return await extract(args)
     if (command === 'preview') return await previewCommand(args)
     if (command === 'import') return importCommand(args)
+    if (command === 'types') return await typesCommand(args)
     if (command === 'browser' && args.positional[1] === 'install') return await installBrowser()
     throw createPartCliError(PartCliErrorCode.usageInvalid, PartCliText.usage)
   } catch (error) {

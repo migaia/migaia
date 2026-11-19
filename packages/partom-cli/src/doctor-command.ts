@@ -14,7 +14,8 @@ export async function doctorCommand(args: IArgs): Promise<number> {
     config: flag(args, '--config'),
     rendered: args.flags.has('--rendered'),
     only: flag(args, '--only'),
-    browser: flag(args, '--browser')
+    browser: flag(args, '--browser'),
+    types: args.flags.has('--types')
   })
   console.log(
     args.flags.has('--json')

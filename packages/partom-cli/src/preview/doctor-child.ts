@@ -45,19 +45,25 @@ function failureOf(stderr: string): IDoctorFailure {
   }
 }
 
+/** Outcome of one doctor child run returning its whole JSON result. */
+export type IDoctorJsonOutcome =
+  | { readonly ok: true; readonly code: number; readonly result: Readonly<Record<string, unknown>> }
+  | { readonly ok: false; readonly failure: IDoctorFailure }
+
 /**
- * Runs `partom doctor --json --blueprints` in a child process in the project directory. Exit code 0
- * or 1 yields the blueprint list; exit code 2 (configuration or dependency error) or any other
- * ending yields the child's error.
+ * Runs `partom doctor --json <flags>` in a child process in the project directory. Exit code 0 or 1
+ * yields the parsed result and the code; exit code 2 (configuration or dependency error) or any
+ * other ending yields the child's error.
  */
-export async function runDoctorChild(
+export async function runDoctorJson(
   projectDir: string,
-  config: string | undefined
-): Promise<IDoctorOutcome> {
+  config: string | undefined,
+  flags: readonly string[]
+): Promise<IDoctorJsonOutcome> {
   /** Child command line. */
   const { cmd, env } = await doctorChildCommand([
     '--json',
-    '--blueprints',
+    ...flags,
     ...(config === undefined ? [] : ['--config', config])
   ])
   /** Child process. */
@@ -70,12 +76,9 @@ export async function runDoctorChild(
   ])
   if (code !== 0 && code !== 1) return { ok: false, failure: failureOf(stderr) }
   try {
-    /** Parsed result. */
-    const parsed = JSON.parse(lastLine(stdout)) as { blueprints?: IDoctorBlueprint[] }
-    if (!Array.isArray(parsed.blueprints)) throw new TypeError(PartCliText.doctorChildFailed)
-    return { ok: true, blueprints: parsed.blueprints }
+    return { ok: true, code, result: JSON.parse(lastLine(stdout)) as Record<string, unknown> }
   } catch (cause) {
-    // Wrong output from the child is reported to the page like any other failed rebuild.
+    // Wrong output from the child is a failed run like any other.
     return {
       ok: false,
       failure: {
@@ -86,6 +89,31 @@ export async function runDoctorChild(
           cause
         ).message
       }
+    }
+  }
+}
+
+/**
+ * Runs `partom doctor --json --blueprints` in a child process in the project directory. Exit code 0
+ * or 1 yields the blueprint list; exit code 2 (configuration or dependency error) or any other
+ * ending yields the child's error.
+ */
+export async function runDoctorChild(
+  projectDir: string,
+  config: string | undefined
+): Promise<IDoctorOutcome> {
+  /** Child run. */
+  const outcome = await runDoctorJson(projectDir, config, ['--blueprints'])
+  if (!outcome.ok) return outcome
+  /** Blueprint list. */
+  const blueprints = outcome.result.blueprints
+  if (Array.isArray(blueprints)) return { ok: true, blueprints: blueprints as IDoctorBlueprint[] }
+  return {
+    ok: false,
+    failure: {
+      code: PartCliErrorCode.harnessFailed,
+      message: createPartCliError(PartCliErrorCode.harnessFailed, PartCliText.doctorChildFailed)
+        .message
     }
   }
 }
