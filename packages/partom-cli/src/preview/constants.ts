@@ -44,3 +44,25 @@ export const PAGE_ROOT_ID = 'partom-root'
  * child's own error code instead. This is event data, never a thrown error.
  */
 export const BUILD_FAILED = 'BUILD_FAILED'
+
+/**
+ * Message kinds of the editor bridge (`editor-bridge` 1) between the editor and `partom preview
+ * --editor`. The editor app keeps the same values in its own text file.
+ */
+export const EditorMessage = {
+  /** Page → editor: the host is ready for messages. */
+  ready: 'ready',
+  /** Editor → page: update and mount a blueprint document. */
+  blueprint: 'blueprint',
+  /** Editor → page: load draft modules over `remote:modules`. */
+  modules: 'modules',
+  /** Page → editor: the issues of one update. */
+  issues: 'issues',
+  /** Page → editor: the modules loaded. */
+  modulesLoaded: 'modules-loaded',
+  /** Page → editor: loading the modules failed; `error` has source, code and message. */
+  modulesFailed: 'modules-failed'
+} as const
+
+/** Session storage key counting page loads of an editor preview tab (hot updates never reload). */
+export const PREVIEW_LOADS_KEY = 'partom.preview.loads'

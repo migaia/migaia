@@ -8,6 +8,7 @@
     "test/fixtures/openapi/check.ts",
     "test/fixtures/types-app",
     "test/fixtures/orders-admin",
+    "test/fixtures/remote-modules",
     "test/fixtures/*-run-*"
   ]
 }

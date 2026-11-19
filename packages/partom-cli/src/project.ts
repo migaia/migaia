@@ -1,7 +1,19 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { PartCliErrorCode } from './error-code.ts'
 import { createPartCliError, PartCliText } from './errors.ts'
+
+/**
+ * Name prefix of the tool's own working directories inside a project (`.partom-preview`,
+ * `.partom-tmp`, `.partom-config-*`, ...). They come and go while commands run, so the preview
+ * watcher and the release clean-tree check both skip them.
+ */
+export const PROJECT_TOOL_DIR_PREFIX = '.partom-'
+
+/** Whether a project-relative path lies in one of the tool's own working directories. */
+export function isToolPath(path: string): boolean {
+  return path.split(/[\\/]/).some((segment) => segment.startsWith(PROJECT_TOOL_DIR_PREFIX))
+}
 
 /** Packages loaded from the checked project instead of being bundled into the executable. */
 export const PROJECT_PACKAGES = [
@@ -15,12 +27,20 @@ export const PROJECT_PACKAGES = [
 ] as const
 
 /** Export map entry: a path, or conditions mapping to paths. */
-type IExportTarget = string | { readonly import?: IExportTarget; readonly default?: IExportTarget }
+type IExportTarget = string | { readonly [condition: string]: IExportTarget | undefined }
 
-/** Picks the ESM path of an export target. */
-function exportPath(target: IExportTarget | undefined): string | undefined {
+/**
+ * Picks the ESM path of an export target: the first of `conditions` the entry has, then `import`,
+ * then `default` (the order the preview's `development` mode needs).
+ */
+function exportPath(
+  target: IExportTarget | undefined,
+  conditions: readonly string[]
+): string | undefined {
   if (target === undefined || typeof target === 'string') return target
-  return exportPath(target.import ?? target.default)
+  for (const condition of [...conditions, 'import', 'default'])
+    if (target[condition] !== undefined) return exportPath(target[condition], conditions)
+  return undefined
 }
 
 /**
@@ -28,7 +48,11 @@ function exportPath(target: IExportTarget | undefined): string | undefined {
  * export map. Compiled executables cannot always resolve scoped, symlinked workspace packages with
  * `Bun.resolveSync`, so this runs first; it returns undefined when nothing is found.
  */
-export function resolveFromNodeModules(specifier: string, from: string): string | undefined {
+export function resolveFromNodeModules(
+  specifier: string,
+  from: string,
+  conditions: readonly string[] = []
+): string | undefined {
   /** Specifier segments. */
   const segments = specifier.split('/')
   /** Package name: two segments when scoped. */
@@ -50,7 +74,7 @@ export function resolveFromNodeModules(specifier: string, from: string): string 
       }
       /** File from the export map or main. */
       const file =
-        exportPath(manifest.exports?.[subpath === '' ? '.' : `./${subpath}`]) ??
+        exportPath(manifest.exports?.[subpath === '' ? '.' : `./${subpath}`], conditions) ??
         (subpath === '' ? (manifest.main ?? 'index.js') : undefined)
       return file === undefined ? undefined : realpathSync(join(root, file))
     }
@@ -67,29 +91,49 @@ const SCOPED = /^@[^/]+\/[^/]+/
 /** Resolve hook arguments the plugin reads. */
 type IResolveArgs = { readonly path: string; readonly importer: string }
 
-/** Resolves a scoped specifier relative to its importer, for runtime and bundler plugins. */
-function onScopedResolve(args: IResolveArgs): { readonly path: string } | undefined {
+/** Resolves a scoped specifier relative to its importer with export `conditions` first. */
+function onScopedResolve(
+  args: IResolveArgs,
+  conditions: readonly string[]
+): { readonly path: string } | undefined {
   /** Resolved file, when found by walking node_modules. */
-  const path = resolveFromNodeModules(args.path, dirname(args.importer))
+  const path = resolveFromNodeModules(args.path, dirname(args.importer), conditions)
   return path === undefined ? undefined : { path }
 }
 
 /**
- * Plugin resolving scoped packages by walking `node_modules`. Registered for runtime imports of the
- * project config and passed to the check-page bundler, so compiled executables load project
- * packages.
+ * Plugin resolving scoped packages by walking `node_modules`, preferring export `conditions` (for
+ * example `development` in `partom preview --editor`). Passed to the page bundlers, so compiled
+ * executables load project packages.
  */
-export const scopedResolverPlugin: Bun.BunPlugin = {
-  name: 'partom-scoped-resolver',
-  setup(build) {
-    build.onResolve({ filter: SCOPED }, (args) => onScopedResolve(args))
+export function scopedResolver(conditions: readonly string[]): Bun.BunPlugin {
+  return {
+    name: 'partom-scoped-resolver',
+    setup(build) {
+      build.onResolve({ filter: SCOPED }, (args) => onScopedResolve(args, conditions))
+    }
   }
 }
+
+/** Scoped resolver with the default conditions (`import`, then `default`). */
+export const scopedResolverPlugin: Bun.BunPlugin = scopedResolver([])
 
 /** Config shape exported by `partom.config.ts`. */
 export type IPartomConfig = {
   readonly plugins: readonly unknown[]
   readonly blueprints: readonly string[]
+  /** Release settings read by `partom build`, `manifest` and the catalog commands. */
+  readonly release?: IReleaseConfig
+}
+
+/**
+ * Release settings: the catalog `project`, part module globs for client chunks (`parts`), and the
+ * remote-module root with entry globs relative to the project (`remote`).
+ */
+export type IReleaseConfig = {
+  readonly project?: string
+  readonly parts?: readonly string[]
+  readonly remote?: { readonly root: string; readonly modules: readonly string[] }
 }
 
 /**
@@ -149,23 +193,29 @@ export class Project {
     readonly createPartHost: unknown
     readonly domPlugin: unknown
     readonly checkModels: unknown
+    readonly definePartPlugin: unknown
+    readonly collectDefinitions: unknown
   }> {
     /** Config file path. */
     const path = this.configPath(explicit)
-    /** Bundle directory inside the project. */
-    const dir = join(this.dir, '.partom-config')
+    /**
+     * Bundle directory inside the project, unique per run: a preview's doctor child and another
+     * command may bundle the same config at once.
+     */
+    const dir = mkdtempSync(join(this.dir, `${PROJECT_TOOL_DIR_PREFIX}config-`))
     /** Imported bundle. */
     let loaded: {
       readonly config?: unknown
       readonly createPartHost?: unknown
       readonly domPlugin?: unknown
       readonly checkModels?: unknown
+      readonly definePartPlugin?: unknown
+      readonly collectDefinitions?: unknown
     }
     try {
-      mkdirSync(dir, { recursive: true })
       writeFileSync(
         join(dir, 'entry.ts'),
-        `export { default as config } from ${JSON.stringify(path)}\nexport { createPartHost } from '@migaia/part-host'\nexport { domPlugin } from '@migaia/part-plugin-dom'\nexport { checkModels } from '@migaia/part-contract'\n`
+        `export { default as config } from ${JSON.stringify(path)}\nexport { createPartHost, definePartPlugin } from '@migaia/part-host'\nexport { domPlugin } from '@migaia/part-plugin-dom'\nexport { checkModels, collectDefinitions } from '@migaia/part-contract'\n`
       )
       /** Bundle result. */
       const result = await Bun.build({
@@ -195,7 +245,9 @@ export class Project {
       config: config as IPartomConfig,
       createPartHost: loaded.createPartHost,
       domPlugin: loaded.domPlugin,
-      checkModels: loaded.checkModels
+      checkModels: loaded.checkModels,
+      definePartPlugin: loaded.definePartPlugin,
+      collectDefinitions: loaded.collectDefinitions
     }
   }
 

@@ -37,6 +37,25 @@ export const PartCliErrorCode = {
    * code 2; nothing is written.
    */
   importInvalid: 'IMPORT_INVALID',
+  /**
+   * `partom remote build` was given an entry outside `--root`, a `--root` outside the project, or
+   * an entry whose path relative to the root is not a valid module name. That entry fails (exit 1);
+   * other entries still build. Move the file under the remote-module root.
+   */
+  remoteEntryOutside: 'REMOTE_ENTRY_OUTSIDE',
+  /**
+   * `partom build` found no tag on HEAD (or `--tag` does not name HEAD), or the working tree
+   * differs from the tag. Releases are built only from committed tags. Exit code 2; commit and tag
+   * first.
+   */
+  releaseDirty: 'RELEASE_DIRTY',
+  /** A release command needs `release.project` in `partom.config.ts` and it is missing. Exit code 2. */
+  releaseConfigMissing: 'RELEASE_CONFIG_MISSING',
+  /**
+   * A catalog request failed on the network or the catalog answered 5xx; the original error or
+   * status is on `cause`. Exit code 2; check `--service` and retry.
+   */
+  serviceUnreachable: 'SERVICE_UNREACHABLE',
   /** Command-line usage is invalid. Exit code 2. */
   usageInvalid: 'USAGE_INVALID'
 } as const

@@ -44,6 +44,10 @@ export default { plugins: [appPlugin], blueprints: ['*.blueprint.json'] }
 
 `import` 从 OpenAPI 3.x 生成模型、资源与 HTTP 插件；`types` 生成 `partom-env.d.ts`。生成文件带归属标记，改过的文件不会被覆盖。
 
+## build、manifest、publish、pull
+
+`release` 配置启用发布链路：`partom build` 从打了 tag 的提交构建版本快照与远端模块；`partom manifest` 生成客户端模块（能力清单、共享运行时、按需加载的 part 与内联蓝图，可检查体积预算）；`publish`、`promote`、`rollback`、`history` 操作目录服务的环境；`pull`、`push` 与编辑器草稿同步。令牌只从 `PARTOM_TOKEN` 读取。见 [USEGUIDE](./USEGUIDE.md#发布与同步)。
+
 ## 单文件可执行
 
 ```bash

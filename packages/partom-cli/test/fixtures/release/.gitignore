@@ -1,0 +1,4 @@
+partom-build/
+.partom-tmp/
+.partom-config-*/
+src/

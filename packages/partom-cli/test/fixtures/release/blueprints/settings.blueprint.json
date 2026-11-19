@@ -1,0 +1,9 @@
+{
+  "id": "settings",
+  "version": 1,
+  "root": {
+    "tag": "page@1",
+    "id": "settings-page",
+    "children": [{ "tag": "button@1", "id": "save", "facets": { "props": { "label": "Save" } } }]
+  }
+}

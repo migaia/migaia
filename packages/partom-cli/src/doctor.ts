@@ -62,6 +62,46 @@ function collectTargets(
     for (const member of members) collectTargets(member, into)
 }
 
+/** Mounts per budget measurement; the median of these is compared with the budget. */
+export const BUDGET_RUNS = 5
+
+/** One part whose render budget is measured: its first node in the blueprint. */
+type IBudgetTarget = {
+  readonly address: string
+  readonly tag: string
+  readonly config: unknown
+  readonly budget: number
+}
+
+/**
+ * Budget targets of a resolved tree: the first node of each tag whose part declares
+ * `budget.render`, in walk order (children, slots, template node). Each node is visited once.
+ */
+function collectBudgets(root: IResolvedNode): IBudgetTarget[] {
+  /** Targets found. */
+  const targets: IBudgetTarget[] = []
+  /** Tags already measured. */
+  const seen = new Set<string>()
+  /** Nodes to visit. */
+  const pending: IResolvedNode[] = [root]
+  for (let cursor = 0; cursor < pending.length; cursor += 1) {
+    /** Node at the cursor. */
+    const node = pending[cursor] as IResolvedNode
+    /** Declared render budget. */
+    const budget = node.definition.descriptor.budget?.render
+    /** Tag of the node. */
+    const tag = node.definition.descriptor.id
+    if (budget !== undefined && !seen.has(tag)) {
+      seen.add(tag)
+      targets.push({ address: node.address, tag, config: node.config, budget })
+    }
+    pending.push(...node.children)
+    for (const members of Object.values(node.slots)) pending.push(...members)
+    if (node.template !== undefined) pending.push(node.template.node)
+  }
+  return targets
+}
+
 /** Issue reported by a rendered check. */
 function renderedIssue(address: string, rule: string, message: string, basis: string): IIssue {
   return {
@@ -235,6 +275,23 @@ async function checkRendered(
       issues.push(renderedIssue(target.address, 'rendered.invariant', problem, 'page invariant'))
   }
   await page.evaluate(unmountInPage)
+  for (const target of collectBudgets(tree).filter((entry) => selected(entry.address))) {
+    /** Median mount-to-commit time in milliseconds. */
+    const median = (await page.evaluate(measureInPage, [target.tag, target.config, BUDGET_RUNS] as [
+      string,
+      unknown,
+      number
+    ])) as number
+    if (median > target.budget)
+      issues.push({
+        ...renderedIssue(
+          target.address,
+          DoctorText.budgetRule,
+          DoctorText.budgetRule,
+          DoctorText.budgetBasis(median, target.budget)
+        )
+      })
+  }
   return issues
 }
 
@@ -278,6 +335,52 @@ async function mountInPage(blueprint: unknown): Promise<unknown> {
       key === 'definition' ? { descriptor: (value as { descriptor: unknown }).descriptor } : value
     )
   )
+}
+
+/**
+ * Page side: mounts a one-node blueprint of `tag` with `config` `runs` times in fresh hosts and
+ * returns the median time from `mount` to the commit that inserts the part's element. Each run is
+ * counted in `window.__partomBudgetRuns`.
+ */
+async function measureInPage([tag, config, runs]: [string, unknown, number]): Promise<number> {
+  /** Page globals. */
+  const page = window as unknown as IPage & { __partomBudgetRuns?: number }
+  /** Config plugins without duplicates of the DOM and React plugins. */
+  const plugins = page.__partom.config.plugins.filter(
+    (plugin) => plugin.name !== 'part-dom' && plugin.name !== 'part-react'
+  )
+  /** Measured durations. */
+  const times: number[] = []
+  for (let run = 0; run < runs; run += 1) {
+    /** Host of this run. */
+    const host = await page.__partom.createPartHost({
+      plugins: [page.__partom.domPlugin, page.__partom.reactPlugin, ...plugins]
+    })
+    /** Blueprint id of this run. */
+    const id = `__budget${run}`
+    await host.blueprint.load({ id, version: 1, root: { tag, id: 'budget', facets: config } })
+    /** Mount container. */
+    const container = document.createElement('div')
+    document.body.append(container)
+    /** Start time. */
+    const started = performance.now()
+    host.mount(container, id)
+    // Yield one macrotask at a time (React commits from a scheduler task) until the element exists.
+    while (container.querySelector('[data-part-address="budget"]') === null)
+      await new Promise((resolve) => {
+        /** Channel used as a zero-delay macrotask. */
+        const channel = new MessageChannel()
+        channel.port1.onmessage = resolve
+        channel.port2.postMessage(0)
+      })
+    times.push(performance.now() - started)
+    page.__partomBudgetRuns = (page.__partomBudgetRuns ?? 0) + 1
+    await host.dispose()
+    container.remove()
+  }
+  /** Ordered durations; the list has exactly BUDGET_RUNS (5) entries, a compile-time bound. */
+  const ordered = times.toSorted((first, second) => first - second)
+  return ordered[Math.floor(ordered.length / 2)] as number
 }
 
 /** Page side: runs checkPattern on the element of an address and returns problem lines. */

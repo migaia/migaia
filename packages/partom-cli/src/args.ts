@@ -20,7 +20,17 @@ const VALUE_FLAGS: ReadonlySet<string> = new Set([
   '--out',
   '--parts',
   '--project',
-  '--port'
+  '--port',
+  '--root',
+  '--tag',
+  '--build',
+  '--inline',
+  '--service',
+  '--env',
+  '--dir',
+  '--from',
+  '--to',
+  '--editor-origin'
 ])
 
 /** Parses argv into positional arguments and flags. */

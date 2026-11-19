@@ -44,6 +44,10 @@ It parses shadcn-style components with oxc: exported components, props, `cva` va
 
 `import` generates models, resources and an HTTP plugin from OpenAPI 3.x; `types` generates `partom-env.d.ts`. Generated files carry an ownership marker, so files edited by hand are never overwritten.
 
+## build, manifest, publish, pull
+
+The `release` config enables the release chain: `partom build` builds the version snapshot and remote modules from a tagged commit; `partom manifest` generates the client module (capability manifest, shared runtime, on-demand parts and inlined blueprints, with optional size budgets); `publish`, `promote`, `rollback` and `history` work on catalog environments; `pull` and `push` sync with the editor draft. The token comes only from `PARTOM_TOKEN`. See the [guide](./USEGUIDE.en.md#release-and-sync).
+
 ## Single executable
 
 ```bash

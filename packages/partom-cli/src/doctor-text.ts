@@ -10,5 +10,10 @@ export const DoctorText = {
   /** Skip reason of a blueprint with static errors. */
   skippedStaticErrors: 'static errors',
   /** Skip reason of a blueprint whose load threw. */
-  skippedLoadError: 'load error'
+  skippedLoadError: 'load error',
+  /** Rule id of a part whose median mount time exceeds its `budget.render`. */
+  budgetRule: 'budget.render',
+  /** Basis of a budget issue: measured median against the declared budget, in milliseconds. */
+  budgetBasis: (median: number, budget: number): string =>
+    `median ${median.toFixed(1)}ms > budget ${budget}ms`
 } as const

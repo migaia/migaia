@@ -1,17 +1,23 @@
 import { watch, type FSWatcher } from 'node:fs'
+import { isToolPath } from '../project.ts'
+import { DEFAULT_BUILD_DIR } from '../release/text.ts'
 import { REBUILD_DEBOUNCE_MS } from './constants.ts'
 
-/** Directory names whose changes never trigger a rebuild. */
-const IGNORED_SEGMENTS: ReadonlySet<string> = new Set(['node_modules', '.git', 'dist'])
-
-/** Prefix of the tool's own working directories (`.partom-preview`, `.partom-check`, ...). */
-const TOOL_DIR_PREFIX = '.partom-'
+/**
+ * Directory names whose changes never trigger a rebuild. `partom build` writes its output into the
+ * project; without skipping it every release build would reload the preview.
+ */
+const IGNORED_SEGMENTS: ReadonlySet<string> = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  DEFAULT_BUILD_DIR
+])
 
 /** Whether a changed path (relative to the project) should be ignored. */
 export function isIgnoredPath(path: string): boolean {
-  for (const segment of path.split(/[\\/]/))
-    if (IGNORED_SEGMENTS.has(segment) || segment.startsWith(TOOL_DIR_PREFIX)) return true
-  return false
+  for (const segment of path.split(/[\\/]/)) if (IGNORED_SEGMENTS.has(segment)) return true
+  return isToolPath(path)
 }
 
 /**

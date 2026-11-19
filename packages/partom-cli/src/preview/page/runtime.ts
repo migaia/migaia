@@ -4,6 +4,7 @@
  * imports nothing from the project, so the executable can embed it pre-bundled.
  */
 import { PAGE_ROOT_ID, PreviewEvent, PreviewRoute } from '../constants.ts'
+import { EditorBridgePage, type IEditorDeps } from './editor-bridge.ts'
 import { PreviewOverlay, type IOverlayIssue } from './overlay.ts'
 import { PreviewText } from './text.ts'
 
@@ -145,4 +146,9 @@ export async function startPreviewPage(deps: IPreviewDeps): Promise<void> {
       overlay
     )
   else await renderHome(root)
+}
+
+/** Starts the editor bridge page (`partom preview --editor`). */
+export async function startEditorPage(deps: IEditorDeps): Promise<void> {
+  await new EditorBridgePage(deps, document.getElementById(PAGE_ROOT_ID) as HTMLElement).start()
 }

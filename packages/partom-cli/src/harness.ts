@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { chromium, type Browser, type Page } from 'playwright-core'
 import { PartCliErrorCode } from './error-code.ts'
 import { createPartCliError, PartCliText } from './errors.ts'
-import { scopedResolverPlugin, type Project } from './project.ts'
+import { scopedResolver, type Project } from './project.ts'
 
 /** Usual macOS, Linux and Windows locations of a locally installed Chrome. */
 const LOCAL_CHROME = [
@@ -58,9 +58,15 @@ window.__partom = { config, createPartHost, domPlugin, reactPlugin, checkPattern
  * builds it into `outDir`, so project packages resolve from the project. Doctor's check page and
  * `partom preview` share this. Environment variables named `PARTOM_PUBLIC_*` are inlined so a
  * config can read them in the browser; no other variable reaches the bundle. Throws an
- * `AggregateError` of the build logs on failure.
+ * `AggregateError` of the build logs on failure. `conditions` are export conditions tried before
+ * `import`/`default`; `partom preview --editor` passes `development`.
  */
-export async function bundleEntry(dir: string, outDir: string, source: string): Promise<void> {
+export async function bundleEntry(
+  dir: string,
+  outDir: string,
+  source: string,
+  conditions: readonly string[] = []
+): Promise<void> {
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'entry.tsx'), source)
   /** Bundle result. */
@@ -69,7 +75,8 @@ export async function bundleEntry(dir: string, outDir: string, source: string): 
     outdir: outDir,
     target: 'browser',
     sourcemap: 'linked',
-    plugins: [scopedResolverPlugin],
+    plugins: [scopedResolver(conditions)],
+    conditions: [...conditions],
     define: { 'process.env.NODE_ENV': '"development"' },
     env: PUBLIC_ENV
   })

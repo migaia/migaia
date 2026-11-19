@@ -3,7 +3,12 @@ import { join } from 'node:path'
 import { bundleEntry } from '../harness.ts'
 import { BUILD_FAILED } from './constants.ts'
 import { runDoctorChild, type IDoctorBlueprint, type IDoctorFailure } from './doctor-child.ts'
-import { pageEntrySource, runtimeModule } from './page-entry.ts'
+import {
+  editorEntrySource,
+  pageEntrySource,
+  runtimeModule,
+  type IRemoteEntry
+} from './page-entry.ts'
 
 /** One live generation: its number, blueprints and parsed documents. */
 export type IGeneration = {
@@ -30,7 +35,12 @@ export type IRebuildOptions = {
   /** The `--config` value as given, passed on to the doctor child. */
   readonly config: string | undefined
   readonly previewDir: string
+  /** Editor bridge mode: the editor origin and the remote module entries to bundle. */
+  readonly editor?: { readonly origin: string; readonly remote: readonly IRemoteEntry[] }
 }
+
+/** Export conditions of the editor preview bundle, tried before `import`/`default`. */
+const EDITOR_CONDITIONS = ['development'] as const
 
 /** Reads blueprint documents of a generation; a file that is not JSON maps to `null`. */
 async function readDocuments(
@@ -148,6 +158,22 @@ export class Rebuilder {
     }
   }
 
+  /** Bundles the page of one generation: the editor bridge entry in editor mode, else the page. */
+  async #bundle(dir: string): Promise<void> {
+    /** Page runtime module. */
+    const runtime = await runtimeModule(this.#options.previewDir)
+    /** Editor mode settings. */
+    const editor = this.#options.editor
+    await bundleEntry(
+      join(this.#options.previewDir, 'src'),
+      dir,
+      editor === undefined
+        ? pageEntrySource(this.#options.configPath, runtime)
+        : editorEntrySource(this.#options.configPath, runtime, editor.origin, editor.remote),
+      editor === undefined ? [] : EDITOR_CONDITIONS
+    )
+  }
+
   /** One rebuild; returns the failure or makes a new generation live. */
   async #rebuild(): Promise<IDoctorFailure | undefined> {
     /** Doctor result. */
@@ -160,11 +186,7 @@ export class Rebuilder {
     const dir = join(this.#options.previewDir, String(number))
     try {
       mkdirSync(dir, { recursive: true })
-      await bundleEntry(
-        join(this.#options.previewDir, 'src'),
-        dir,
-        pageEntrySource(this.#options.configPath, await runtimeModule(this.#options.previewDir))
-      )
+      await this.#bundle(dir)
     } catch (cause) {
       rmSync(dir, { recursive: true, force: true })
       return { code: BUILD_FAILED, message: bundleMessage(cause) }

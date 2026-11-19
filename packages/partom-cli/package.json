@@ -39,12 +39,17 @@
     "@oxc-parser/binding-win32-x64-msvc": "0.154.0"
   },
   "devDependencies": {
+    "@migaia/log-host": "workspace:^",
     "@migaia/part-contract": "workspace:^",
     "@migaia/part-host": "workspace:^",
     "@migaia/part-layouts": "workspace:^",
+    "@migaia/part-plugin-devtools": "workspace:^",
     "@migaia/part-plugin-dom": "workspace:^",
     "@migaia/part-plugin-react": "workspace:^",
+    "@migaia/part-plugin-remote": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
+    "@migaia/storage-host": "workspace:^",
+    "@migaia/storage-plugin-browser": "workspace:^",
     "@radix-ui/react-checkbox": "^1.4.1",
     "@radix-ui/react-dialog": "^1.1.0",
     "@radix-ui/react-select": "^2.4.1",

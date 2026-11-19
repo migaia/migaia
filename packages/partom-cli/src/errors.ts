@@ -5,11 +5,19 @@ export const PartCliText = {
   /** Usage printed for invalid arguments. */
   usage:
     'usage: partom doctor [--rendered] [--only <address>] [--browser <path>] [--json [--blueprints] [--types]] [--config <path>]\n' +
-    '       partom preview [<id|file>] [--port <n>] [--config <path>]\n' +
+    '       partom preview [<id|file>] [--port <n>] [--config <path>] [--editor --editor-origin <url>]\n' +
     '       partom extract <files...> --out <dir> [--probe] [--verify] [--browser <path>]\n' +
     '       partom extract --usage <pages...> --parts <dir> --out <dir>\n' +
     '       partom import <openapi.json|yaml> --out <dir>\n' +
     '       partom types [--out <file>] [--check] [--config <path>]\n' +
+    '       partom remote build <entries...> --out <dir> --root <dir> [--project <dir>]\n' +
+    '       partom build [--tag <tag>] [--out partom-build]\n' +
+    '       partom manifest [--out <file>] [--build <name>] [--inline <id,...>] [--budgets]\n' +
+    '       partom publish --service <url> [--env dev] [--dir partom-build]\n' +
+    '       partom promote --service <url> --env <env> --from <env>\n' +
+    '       partom rollback --service <url> --env <env> --to <tag|snapshot>\n' +
+    '       partom history --service <url> --env <env>\n' +
+    '       partom pull|push --service <url>\n' +
     '       partom browser install\n' +
     '       partom --version',
   /** Missing config. */

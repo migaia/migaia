@@ -1,0 +1,13 @@
+{
+  "id": "budgets",
+  "version": 1,
+  "root": {
+    "tag": "page@1",
+    "id": "p",
+    "children": [
+      { "tag": "fast@1", "id": "quick" },
+      { "tag": "slow@1", "id": "heavy" },
+      { "tag": "slow@1", "id": "again" }
+    ]
+  }
+}

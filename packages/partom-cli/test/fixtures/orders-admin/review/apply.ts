@@ -1,8 +1,8 @@
 // Simulated review, run with Bun in a copy of the fixture: applies `source.patch.json` to the
-// generated blueprint with part-host's JSON Patch implementation and puts the reviewed effects
+// generated blueprint with part-contract's JSON Patch implementation and puts the reviewed effects
 // over the generated drafts.
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
-import { applyPatch } from '../../../../../part-host/src/patch.ts'
+import { applyPatch } from '../../../../../part-contract/src/platform/patch.ts'
 
 /** Generated blueprint of the orders page. */
 const file = 'src/blueprints/orders-page.blueprint.json'

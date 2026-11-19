@@ -8,6 +8,11 @@ import { createPartCliError, PartCliText, serializeCause } from './errors.ts'
 import { extractFile, readReport, writeDrafts, type IExtractedComponent } from './extract.ts'
 import { importCommand } from './import/command.ts'
 import { previewCommand } from './preview/server.ts'
+import { remoteCommand } from './remote/command.ts'
+import { buildCommand } from './release/build.ts'
+import { manifestCommand } from './release/manifest.ts'
+import { EnvironmentCommand } from './release/publish.ts'
+import { SyncCommand } from './release/sync.ts'
 import { typesCommand } from './types/command.ts'
 import { usageCommand } from './usage/command.ts'
 import { extractSummary, writeReport } from './extract/summary.ts'
@@ -113,6 +118,13 @@ export async function main(argv: readonly string[]): Promise<number> {
     if (command === 'preview') return await previewCommand(args)
     if (command === 'import') return importCommand(args)
     if (command === 'types') return await typesCommand(args)
+    if (command === 'remote') return await remoteCommand(args)
+    if (command === 'build') return await buildCommand(args)
+    if (command === 'manifest') return await manifestCommand(args)
+    if (command !== undefined && Object.hasOwn(EnvironmentCommand, command))
+      return await EnvironmentCommand[command as keyof typeof EnvironmentCommand](args)
+    if (command !== undefined && Object.hasOwn(SyncCommand, command))
+      return await SyncCommand[command as keyof typeof SyncCommand](args)
     if (command === 'browser' && args.positional[1] === 'install') return await installBrowser()
     throw createPartCliError(PartCliErrorCode.usageInvalid, PartCliText.usage)
   } catch (error) {

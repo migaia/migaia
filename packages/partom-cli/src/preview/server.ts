@@ -1,5 +1,5 @@
 import { rmSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { ExitCode, flag, type IArgs } from '../args.ts'
 import { PartCliErrorCode, type IPartCliErrorCode } from '../error-code.ts'
 import { createPartCliError, PartCliText } from '../errors.ts'
@@ -12,7 +12,10 @@ import {
   PreviewRoute
 } from './constants.ts'
 import type { IDoctorBlueprint } from './doctor-child.ts'
-import { Rebuilder } from './rebuild.ts'
+import { Rebuilder, type IRebuildOptions } from './rebuild.ts'
+import { releaseData } from '../release/child.ts'
+import { remoteEntries } from '../release/collect.ts'
+import { ReleaseMode } from '../release/text.ts'
 import { PreviewRoutes } from './routes.ts'
 import { ProjectWatcher } from './watch.ts'
 
@@ -104,12 +107,23 @@ class PreviewSession {
   /** Whether shutdown started. */
   #closing = false
 
-  /** Prepares the preview directory and rebuild inputs. */
-  constructor(project: Project, configPath: string, config: string | undefined) {
+  /** Prepares the preview directory and rebuild inputs; `editor` selects the bridge mode. */
+  constructor(
+    project: Project,
+    configPath: string,
+    config: string | undefined,
+    editor: IRebuildOptions['editor']
+  ) {
     this.#dir = join(project.dir, PREVIEW_DIR)
     rmSync(this.#dir, { recursive: true, force: true })
     this.#rebuilder = new Rebuilder(
-      { projectDir: project.dir, configPath, config, previewDir: this.#dir },
+      {
+        projectDir: project.dir,
+        configPath,
+        config,
+        previewDir: this.#dir,
+        ...(editor === undefined ? {} : { editor })
+      },
       this.#routes
     )
   }
@@ -186,6 +200,33 @@ class PreviewSession {
 }
 
 /**
+ * Editor bridge settings of `--editor --editor-origin <url>`, with the project's remote module
+ * entries read through the release child; undefined without `--editor`.
+ */
+async function editorMode(
+  args: IArgs,
+  dir: string,
+  config: string | undefined
+): Promise<IRebuildOptions['editor']> {
+  if (!args.flags.has('--editor')) return undefined
+  /** Editor origin. */
+  const origin = flag(args, '--editor-origin')
+  if (origin === undefined || origin === '')
+    throw createPartCliError(PartCliErrorCode.usageInvalid, PartCliText.usage)
+  /** Release settings. */
+  const data = await releaseData(dir, config, [ReleaseMode.release])
+  /** Remote module root. */
+  const root = data.release.remote === undefined ? dir : resolve(dir, data.release.remote.root)
+  return {
+    origin: new URL(origin).origin,
+    remote: remoteEntries(dir, data.release).map((file) => ({
+      name: relative(root, file).split(sep).join('/'),
+      file
+    }))
+  }
+}
+
+/**
  * Runs `partom preview [<id|file>] [--port <n>] [--config <path>]`. Resolves project dependencies
  * and the config first (exit 2 on failure), then serves until SIGINT or SIGTERM and returns 0.
  */
@@ -199,7 +240,12 @@ export async function previewCommand(args: IArgs): Promise<number> {
   /** Port flag. */
   const port = portOf(args)
   /** Preview run. */
-  const session = new PreviewSession(project, configPath, config)
+  const session = new PreviewSession(
+    project,
+    configPath,
+    config,
+    await editorMode(args, project.dir, config)
+  )
   process.on('SIGINT', session.onSignal)
   process.on('SIGTERM', session.onSignal)
   try {

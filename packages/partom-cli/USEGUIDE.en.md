@@ -39,7 +39,7 @@ Rendered checks and the local preview bundle the config into a browser page. Onl
 bunx partom doctor
 ```
 
-Runs every rule of the authored and resolved phases (36 built-in rules plus plugin rules; the project's `domPlugin` is added when the config omits it, so built-in modifiers resolve) on each blueprint, with the same result as host loading. Errors exit with code 1.
+Runs every rule of the authored and resolved phases (37 built-in rules plus plugin rules; the project's `domPlugin` is added when the config omits it, so built-in modifiers resolve) on each blueprint, with the same result as host loading. Errors exit with code 1.
 
 ## Rendered checks
 
@@ -51,6 +51,7 @@ Mounts blueprints without static errors in a real headless browser:
 
 - Parts claiming a `pattern` go through ui-sdk's `checkPattern`, which checks roles, keyboard and aria against the APG pattern.
 - Layered parts are opened and closed with Escape while focus (not on `body`, not in `inert` content) and id references are checked.
+- Parts whose descriptor declares `budget.render` (milliseconds) are mounted alone five times, using the first node of each in the blueprint; a median mount-to-commit time above the budget reports a `budget.render` error with `basis` `median <measured>ms > budget <budget>ms`. Parts without a budget are not measured. Timing depends on machine load, so leave headroom.
 
 The browser comes from `--browser`, then the `PARTOM_BROWSER` environment variable, then local Chrome, then the Chromium installed by `partom browser install`. An explicit path that does not exist fails without falling back, and nothing is downloaded silently.
 
@@ -148,6 +149,45 @@ bunx partom preview orders     # also prints {"url":"http://127.0.0.1:4400/b/ord
 - When bundling or the config fails, the page keeps its last content and the overlay at the bottom right shows the error; the next change after the fix recovers.
 - The overlay lists the blueprint's doctor issues; clicking one outlines the element and scrolls to it. A blueprint with errors is not mounted, matching doctor's rule for skipping rendered checks. The overlay lives in Shadow DOM, untouched by page styles and outside the F6 region cycle.
 - The preview writes only the project's `.partom-preview/` directory, cleared at start and removed at exit, so running `partom doctor` at the same time does not interfere. Ctrl+C stops it with exit code 0.
+
+- **Editor bridge mode**: `partom preview --editor --editor-origin <editor url>` is what the preview column of `apps/part-editor` embeds. The page is bundled with the `development` condition first, so devtools and host tracing are real; it installs `devtoolsPlugin` and the entries of `release.remote.modules` as `remote:modules`. It accepts `postMessage` only from the editor origin: `{ kind: 'blueprint', document }` updates and mounts a blueprint, and `{ kind: 'modules', modules, base, token }` hot-replaces remote modules by name (every module runs at tier `page` in the preview). The issues of every update (project rules and resolved issues included) go back to the editor; on start the page sends `{ kind: 'ready' }`.
+
+## Build remote code modules
+
+```bash
+partom remote build remote/effects/notify.ts --out partom-build --root remote --project .
+```
+
+A remote module is one TS file whose default export is the result of `defineEnhancer`, `defineEffect` or `defineDerive` (or an array of them); its name is the file path relative to `--root`. Each entry is processed on its own:
+
+- **Code rules:** imports only `@migaia/part-host`, `@migaia/part-contract`, `react` and `react/jsx-runtime` (`remote.import`; relative imports, dynamic `import()` and `require` are refused); no top-level `let`/`var` or statements other than definition calls (`remote.module-state`); no host globals such as `window`, `process` or `fetch` (`remote.global`).
+- **Type check:** the project's own `tsc` on a generated tsconfig holding only this entry, in a temporary directory inside the project; without TypeScript the command exits 2 (`PROJECT_DEPENDENCY_MISSING`).
+- **Build:** `Bun.build` emits browser ESM without minification or source maps, byte-identical for equal input; imports of the shared runtime become shims reading `globalThis[Symbol.for('migaia.part.shared')]`, which the page fills.
+- **Contract test:** runs in a Bun child whose environment holds only `PATH`: enhancers and derives run twice and must agree (`remote.impure`); effects run once against a recording ctx, reporting `remote.contract-timeout` after 2 seconds and `remote.contract-failed` when they throw.
+
+Outputs are `<out>/m/<content hash>.js` and `<out>/modules.json` (`name`, `id`, `url`, `integrity`, `exports`); stdout prints `{ modules, failed, issues }`. A failed entry makes the exit code 1; an entry outside `--root` reports `REMOTE_ENTRY_OUTSIDE`. These checks give early feedback and are not a sandbox: running the command executes module code on this machine.
+
+## Release and sync
+
+Add `release` to `partom.config.ts`:
+
+```ts
+export default {
+  plugins: [appPlugin],
+  blueprints: ['blueprints/*.blueprint.json'],
+  release: {
+    project: 'orders', // project name in the catalog
+    parts: ['parts/*.part.tsx'], // part modules loaded on demand
+    remote: { root: 'remote', modules: ['**/*.ts'] } // remote-module root and entry globs
+  }
+}
+```
+
+- **`partom build [--tag <tag>] [--out partom-build]`** builds only from a clean, tagged HEAD; otherwise it exits 2 (`RELEASE_DIRTY`). It writes `snapshot.json`, remote modules under `m/` and `sources.json`. Remote modules are installed in the checking host first, so a remote effect a blueprint uses does not trigger `event.handler-exists`, and its descriptor goes into the snapshot. Two builds of one tag are byte-identical. A static error in any blueprint prints `{ issues }` and exits 1.
+- **`partom manifest [--out src/partom-client.gen.ts] [--build <name>] [--inline <id,...>] [--budgets]`** generates the client module. It exports `manifest`, `shared`, `chunks`, `lazyPartsPlugin` and `inlined`, ready to pass to `remotePlugin`. The manifest leaves out definitions that remote modules provide. `lazyPartsPlugin` registers the parts of `release.parts` at once and renders each component after its module loads. `--budgets` checks each part module's minified size (shared runtime external) against `budget.size`; an oversize module reports `budget.size` and exits 1, and the module file is still written. When the config itself imports a remote module, both `manifest` and `build` report `release.remote-in-config` and exit 1.
+- **`partom publish --service <url> [--env dev] [--dir partom-build]`** uploads the modules, the snapshot bytes and the sources, then points the environment at the snapshot. `promote --env <env> --from <env>`, `rollback --env <env> --to <tag|snapshot hash>` and `history --env <env>` work on environment pointers. The token comes only from `PARTOM_TOKEN`. A 4xx answer is printed to stderr as is and exits 1; a network failure or 5xx exits 2 (`SERVICE_UNREACHABLE`).
+- **`partom pull --service <url>`** merges the editor draft into the workspace blueprints by address (the base is the file at the draft's base tag) and writes draft module sources whose workspace file has not changed since that tag. Conflicts and failures are listed and exit 1; a merge conflict keeps the local value. A draft with rebase conflicts writes nothing.
+- **`partom push --service <url>`** sends workspace blueprints and remote modules changed since the draft's base tag as one changeset and prints the result; `rejected` or `conflict` exits 1. The catalog never commits to git: developers commit and open the PR.
 
 ## Single executable
 

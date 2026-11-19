@@ -39,7 +39,7 @@ export default { plugins: [appPlugin], blueprints: ['blueprints/*.blueprint.json
 bunx partom doctor
 ```
 
-对每份蓝图运行 authored 与 resolved 两个阶段的全部规则（36 条内置规则加上插件规则；配置里没有 `domPlugin` 时会自动加入项目里的那一份，内置修饰符因此可用），与宿主装载时的结果一致。有 error 时退出码为 1。
+对每份蓝图运行 authored 与 resolved 两个阶段的全部规则（37 条内置规则加上插件规则；配置里没有 `domPlugin` 时会自动加入项目里的那一份，内置修饰符因此可用），与宿主装载时的结果一致。有 error 时退出码为 1。
 
 ## 渲染检查
 
@@ -51,6 +51,7 @@ bunx partom doctor --rendered
 
 - 声明了 `pattern` 的 part 交给 ui-sdk 的 `checkPattern`，检查角色、键盘和 aria 是否符合 APG 模式。
 - 有层级的 part 打开后按 Esc 关闭，检查焦点没有落在 `body` 或 `inert` 区域、id 引用都存在。
+- 描述符声明了 `budget.render`（毫秒）的 part，取每份蓝图中第一个使用它的节点，单独挂载 5 次，挂载到提交完成的中位数超过预算时报 `budget.render` error，`basis` 写 `median <实测>ms > budget <预算>ms`。没有声明预算的 part 不测。耗时受机器负载影响，预算要留出余量。
 
 浏览器依次取 `--browser`、环境变量 `PARTOM_BROWSER`、本机 Chrome、`partom browser install` 安装的 Chromium。显式路径不存在时直接报错，不会退回其他浏览器，也从不静默下载。
 
@@ -148,6 +149,45 @@ bunx partom preview orders     # 再打印 {"url":"http://127.0.0.1:4400/b/order
 - 打包或配置出错时页面保留上一次的内容，右下角浮层显示错误；修好后下一次改动自动恢复。
 - 浮层列出这份蓝图的 doctor 问题，点一条会给对应元素加轮廓并滚动过去。有 error 时不挂载，与 doctor 跳过渲染检查的规则一致。浮层在 Shadow DOM 里，不受页面样式影响，也不参与 F6 区域切换。
 - 预览只写项目里的 `.partom-preview/` 目录，启动时清空、退出时删除；同时运行 `partom doctor` 互不影响。按 Ctrl+C 结束，退出码 0。
+
+- **编辑器桥接模式**：`partom preview --editor --editor-origin <编辑器地址>` 供 `apps/part-editor` 的预览栏嵌入。打包时先按 `development` 条件解析（devtools 与宿主追踪因此生效），页面装上 `devtoolsPlugin`，并把 `release.remote.modules` 的入口作为 `remote:modules` 一起装入。页面只接受编辑器源的 `postMessage`：`{ kind: 'blueprint', document }` 更新并挂载蓝图，`{ kind: 'modules', modules, base, token }` 按模块名热替换远端模块（预览中一律按 `page` 档运行）。每次更新的问题（含项目规则与 resolved 问题）回发编辑器；页面启动时先发 `{ kind: 'ready' }`。
+
+## 构建远端代码模块
+
+```bash
+partom remote build remote/effects/notify.ts --out partom-build --root remote --project .
+```
+
+远端模块是一个 TS 文件，默认导出 `defineEnhancer`、`defineEffect` 或 `defineDerive` 的结果（或它们的数组），模块名是文件相对 `--root` 的路径。每个入口独立处理，依次：
+
+- **代码规则：** 只能导入 `@migaia/part-host`、`@migaia/part-contract`、`react`、`react/jsx-runtime`（`remote.import`，相对导入、动态 `import()` 与 `require` 都不允许）；模块顶层不能有 `let`/`var` 或定义调用以外的语句（`remote.module-state`）；不能引用 `window`、`process`、`fetch` 等宿主全局（`remote.global`）。
+- **类型检查：** 用项目自己的 `tsc`，在项目内临时目录生成只含该入口的 tsconfig；项目没有 TypeScript 时退出 2（`PROJECT_DEPENDENCY_MISSING`）。
+- **构建：** `Bun.build` 输出浏览器 ESM，不压缩、不带 source map，同一输入逐字节相同；对共享运行时的导入换成读取 `globalThis[Symbol.for('migaia.part.shared')]` 的垫片，页面负责放好这些包。
+- **契约测试：** 在只带 `PATH` 环境变量的 Bun 子进程中运行：增强器与推导各运行两次，结果必须相同（`remote.impure`）；effect 用记录型假 ctx 运行，2 秒不结束报 `remote.contract-timeout`，抛错报 `remote.contract-failed`。
+
+输出 `<out>/m/<内容哈希>.js` 与 `<out>/modules.json`（`name`、`id`、`url`、`integrity`、`exports`），标准输出打印 `{ modules, failed, issues }`；有失败入口时退出 1，入口不在 `--root` 内时报 `REMOTE_ENTRY_OUTSIDE`。这些检查是提前反馈，不是沙箱：运行它就等于在本机执行模块代码。
+
+## 发布与同步
+
+在 `partom.config.ts` 中加 `release`：
+
+```ts
+export default {
+  plugins: [appPlugin],
+  blueprints: ['blueprints/*.blueprint.json'],
+  release: {
+    project: 'orders', // 目录服务中的项目名
+    parts: ['parts/*.part.tsx'], // 按需加载的 part 模块
+    remote: { root: 'remote', modules: ['**/*.ts'] } // 远端模块根目录与入口 glob
+  }
+}
+```
+
+- **`partom build [--tag <tag>] [--out partom-build]`**：只从干净且打了 tag 的 HEAD 构建，否则退出 2（`RELEASE_DIRTY`）。产出 `snapshot.json`、`m/` 下的远端模块与 `sources.json`。远端模块会先装进检查用的宿主，所以蓝图引用的远端 effect 不会报 `event.handler-exists`，它的描述符也进入快照。同一 tag 两次构建逐字节相同。任一蓝图有静态 error 时打印 `{ issues }` 并退出 1。
+- **`partom manifest [--out src/partom-client.gen.ts] [--build <名>] [--inline <id,...>] [--budgets]`**：生成客户端模块，导出 `manifest`、`shared`、`chunks`、`lazyPartsPlugin` 与 `inlined`，直接传给 `remotePlugin`。能力清单不含远端模块提供的定义；`release.parts` 中的 part 由 `lazyPartsPlugin` 立即登记描述符，组件在模块加载后才渲染。`--budgets` 按 `budget.size` 检查每个 part 模块压缩后的体积（共享运行时外置），超出时报 `budget.size` 并退出 1，生成文件照常写出。配置本身也导入了远端模块时，`manifest` 与 `build` 都报 `release.remote-in-config` 并退出 1。
+- **`partom publish --service <url> [--env dev] [--dir partom-build]`**：上传模块、快照原字节与源码，再把环境指向该快照。`promote --env <env> --from <env>`、`rollback --env <env> --to <tag|快照哈希>`、`history --env <env>` 操作环境指针。令牌只从环境变量 `PARTOM_TOKEN` 读取。服务返回 4xx 时原样打印到 stderr 并退出 1；网络失败或 5xx 退出 2（`SERVICE_UNREACHABLE`）。
+- **`partom pull --service <url>`**：按地址把编辑器草稿三方合并进工作区蓝图（base 为草稿基于的 tag 中的文件），把自 base 以来没改过的远端模块写成草稿源码。冲突与失败都列出并退出 1；合并有冲突时保留本地值。草稿还有变基冲突时什么都不写。
+- **`partom push --service <url>`**：把相对草稿 base tag 有改动的蓝图与远端模块作为一个变更集提交，打印结果；有 `rejected` 或 `conflict` 时退出 1。服务不提交 git，由开发者提交并开 PR。
 
 ## 单文件可执行
 

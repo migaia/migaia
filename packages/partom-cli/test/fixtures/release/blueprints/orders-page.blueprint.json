@@ -1,0 +1,19 @@
+{
+  "id": "orders-page",
+  "version": 1,
+  "root": {
+    "tag": "page@1",
+    "id": "page",
+    "children": [
+      {
+        "tag": "button@1",
+        "id": "create",
+        "facets": {
+          "props": { "label": "Create order" },
+          "events": { "click": { "handler": "notify@1" } }
+        }
+      },
+      { "tag": "button@1", "id": "other", "facets": { "props": { "label": "Other" } } }
+    ]
+  }
+}
