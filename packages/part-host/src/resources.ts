@@ -63,7 +63,18 @@ function snapshotError(error: unknown): { readonly code?: string; readonly messa
   }
   return {
     ...(typeof fields.code === 'string' ? { code: fields.code } : {}),
-    message: typeof fields.message === 'string' ? fields.message : String(error)
+    message: typeof fields.message === 'string' ? fields.message : messageOf(error)
+  }
+}
+
+/** Text of a failure without a message: JSON for plain objects, `String` for anything else. */
+function messageOf(error: unknown): string {
+  if (typeof error !== 'object' || error === null) return String(error)
+  try {
+    return JSON.stringify(error) ?? String(error)
+  } catch {
+    // Cyclic or otherwise unserialisable objects fall back to their string form.
+    return String(error)
   }
 }
 
@@ -158,6 +169,11 @@ export class ResourceEntry {
     return this.#error
   }
 
+  /** Promise of the latest load, without starting one. */
+  get current(): Promise<unknown> | undefined {
+    return this.#promise
+  }
+
   /** Promise of the latest load, starting one when none ran yet. */
   promise(): Promise<unknown> {
     if (this.#promise === undefined) this.start()
@@ -250,8 +266,10 @@ export class ResourceEntry {
     /** Paging declaration. */
     const paging = this.#resource.definition.paging
     if (paging === undefined) return {}
-    /** Page index from the parameters. */
-    const index = Number((this.params as Record<string, unknown> | undefined)?.[paging.param] ?? 0)
+    /** Page index parameter as a number. */
+    const raw = Number((this.params as Record<string, unknown> | undefined)?.[paging.param] ?? 0)
+    /** Page index; a parameter that is not a finite number counts as the first page. */
+    const index = Number.isFinite(raw) ? raw : 0
     /** Total count from the result, when it is a number. */
     const total = (result as { total?: unknown } | null | undefined)?.total
     return {
@@ -292,13 +310,14 @@ export class ResourceWatch implements IResourceWatch {
   /** Whether `release` ran. */
   #released = false
 
-  /** Starts watching. */
+  /** Starts watching; the store tracks the watch until it is released. */
   constructor(
     store: ResourceStore,
     binding: IResourceBinding,
     row?: Readonly<Record<string, unknown>>
   ) {
     this.#store = store
+    store.track(this)
     this.#binding = binding
     this.#row = row
     this.#target = store.runtime().signal<IWatchTarget>({
@@ -339,6 +358,7 @@ export class ResourceWatch implements IResourceWatch {
     if (this.#released) return
     this.#released = true
     this.#effect.dispose()
+    this.#store.untrack(this)
     this.#store.release(this.#target.value.entry)
   }
 
@@ -401,6 +421,10 @@ export class ResourceStore implements IResourceHandle {
   readonly #byTag = new Map<string, Set<ResourceEntry>>()
   /** Version signals by resource id. */
   readonly #versions = new Map<string, IReactiveSignal<number>>()
+  /** Live watches, released when the store is disposed. */
+  readonly #watches = new Set<ResourceWatch>()
+  /** Abort controllers of running commands, aborted when the store is disposed. */
+  readonly #commands = new Set<AbortController>()
   /** Whether the store was disposed. */
   #disposed = false
 
@@ -432,10 +456,39 @@ export class ResourceStore implements IResourceHandle {
     const entry = this.acquire(id, params)
     if (entry === undefined) throw this.#unknown(id)
     try {
-      return (await entry.promise()) as never
+      return (await this.#settled(entry)) as never
     } finally {
       this.release(entry)
     }
+  }
+
+  /**
+   * Result of an entry's load. When the awaited load fails because a newer load replaced it (a
+   * refresh or invalidation), the newer load is awaited instead; a deleted entry rethrows.
+   */
+  async #settled(entry: ResourceEntry): Promise<unknown> {
+    /** Load being awaited. */
+    let promise = entry.promise()
+    for (;;) {
+      try {
+        return await promise
+      } catch (error) {
+        /** Newer load of the entry, when one replaced the failed one. */
+        const next = entry.dead ? undefined : entry.current
+        if (next === undefined || next === promise) throw error
+        promise = next
+      }
+    }
+  }
+
+  /** Records a live watch. */
+  track(watch: ResourceWatch): void {
+    this.#watches.add(watch)
+  }
+
+  /** Forgets a released watch. */
+  untrack(watch: ResourceWatch): void {
+    this.#watches.delete(watch)
   }
 
   /** Refreshes one entry, or every entry of a resource when no parameters are given. */
@@ -463,11 +516,19 @@ export class ResourceStore implements IResourceHandle {
       )
     /** Validated arguments. */
     const value = await validateRuntimeArgs(spec.args, args, `${id} ${command}`)
+    /** Controller of this run, aborted when the store is disposed. */
+    const controller = new AbortController()
+    this.#commands.add(controller)
     /** Command result; a rejection propagates unchanged and invalidates nothing. */
-    const result = await spec.run(value, {
-      features: resource.features as never,
-      signal: new AbortController().signal
-    })
+    let result: unknown
+    try {
+      result = await spec.run(value, {
+        features: resource.features as never,
+        signal: controller.signal
+      })
+    } finally {
+      this.#commands.delete(controller)
+    }
     if (!this.#disposed) this.invalidate(spec.invalidates?.(value, result) ?? [resourceName(id)])
     return result
   }
@@ -539,7 +600,7 @@ export class ResourceStore implements IResourceHandle {
 
   /** Re-indexes an entry under its default tag plus the given extra tags. */
   retag(entry: ResourceEntry, extra: readonly string[]): void {
-    for (const tag of entry.tags) this.#byTag.get(tag)?.delete(entry)
+    for (const tag of entry.tags) this.#remove(this.#byTag, tag, entry)
     /** New tag set. */
     const tags = new Set([resourceName(entry.id), ...extra])
     entry.tags = tags
@@ -559,9 +620,15 @@ export class ResourceStore implements IResourceHandle {
     }
   }
 
-  /** Aborts every load and deletes every entry; later calls throw HOST_DISPOSED. */
+  /**
+   * Releases every watch, aborts every running command and load and deletes every entry; later
+   * calls throw HOST_DISPOSED.
+   */
   dispose(): void {
     this.#disposed = true
+    for (const watch of this.#watches) watch.release()
+    for (const controller of this.#commands) controller.abort()
+    this.#commands.clear()
     for (const entry of this.#entries.values()) this.#delete(entry)
   }
 
@@ -569,8 +636,17 @@ export class ResourceStore implements IResourceHandle {
   #delete(entry: ResourceEntry): void {
     entry.kill()
     this.#entries.delete(entry.key)
-    this.#byId.get(entry.id)?.delete(entry)
-    for (const tag of entry.tags) this.#byTag.get(tag)?.delete(entry)
+    this.#remove(this.#byId, entry.id, entry)
+    for (const tag of entry.tags) this.#remove(this.#byTag, tag, entry)
+  }
+
+  /** Removes an entry from a set index, dropping the key once its set is empty. */
+  #remove(index: Map<string, Set<ResourceEntry>>, key: string, entry: ResourceEntry): void {
+    /** Set under the key. */
+    const set = index.get(key)
+    if (set === undefined) return
+    set.delete(entry)
+    if (set.size === 0) index.delete(key)
   }
 
   /** Composite key of an entry. */

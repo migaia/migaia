@@ -96,3 +96,27 @@ describe('resource commands and invalidation', () => {
     await host.dispose()
   })
 })
+
+describe('queries across reloads', () => {
+  it('resolves with the newer load when an invalidation aborts the awaited one', async () => {
+    /** Load control. */
+    const load = new ControlledLoad()
+    const orders = defineResource({ id: 'orders@1', load: load.load })
+    const host = await createPartHost({
+      plugins: [definePartPlugin({ name: 'data', resources: [orders] })]
+    })
+    /** Query started before the invalidation. */
+    const query = host.resources.query('orders@1', {})
+    await settle(host)
+    /** The load the query first awaits. */
+    const first = load.last()
+    host.resources.invalidate(['orders'])
+    expect(first.signal.aborted).toBe(true)
+    first.result.reject(new DOMException('aborted', 'AbortError'))
+    await settle(host)
+    expect(load.calls).toHaveLength(2)
+    load.last().result.resolve(['new'])
+    await expect(query).resolves.toEqual(['new'])
+    await host.dispose()
+  })
+})
