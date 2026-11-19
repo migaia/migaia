@@ -28,7 +28,7 @@ type IRendererDeps = IDomFeatures & {
   }
   readonly catalog: { implementation(renderer: string, partId: string): unknown }
   readonly effect: { dispatch(address: string, event: string, detail: unknown): Promise<void> }
-  readonly diagnostics: { report(error: unknown): void }
+  readonly diagnostics: { report(error: unknown, address?: string): void }
   readonly resources: IResourceHandle
 }
 
@@ -48,7 +48,7 @@ function createFactory(deps: IRendererDeps): ReactRendererFactory {
     catalog: deps.catalog,
     state: deps.state,
     dispatch: (address, event, detail) => deps.effect.dispatch(address, event, detail),
-    report: (error) => deps.diagnostics.report(error),
+    report: (error, address) => deps.diagnostics.report(error, address),
     resources: deps.resources
   })
   deps.renderSlot.provide(PLUGIN_NAME, factory)

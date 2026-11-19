@@ -88,6 +88,10 @@ definePart({
 
 限制：模板节点若声明打开状态，各行共享同一个状态路径。
 
+## 大列表只渲染可见行
+
+模板写 `virtual: { rowHeight, overscan }`（`overscan` 默认 3）时，渲染器只为可见范围内的行（前后各多 `overscan` 行）创建节点，行地址 `…@row:<key>` 也只存在于这些行。被跳过的高度由前后两个占位元素撑出（宿主为 `tbody` 时是 `<tr>`，`ul`/`ol` 时是 `<li>`，其他为 `<div>`，都带 `aria-hidden="true"` 与 `data-part-spacer`）。滚动容器取宿主最近的 `overflow-y: auto|scroll` 祖先，没有时用文档滚动；滚动与容器尺寸变化时重算范围，范围不变时不重新渲染。行高必须固定；不写 `virtual` 的模板仍渲染全部行。
+
 ## 数据资源与表单字段
 
 part 声明了 `behavior.resource`、蓝图在对应 prop 上写了 `{ $resource }` 时，组件提交后会订阅这个资源，卸载时释放；快照（`status`、`data`、`error`、`refreshing`、`page`）作为该 prop 交给组件。当前状态在 `behavior.resource.slots` 里映射了插槽、且蓝图填了内容时，显示插槽内容代替组件；这些状态插槽不会作为子节点传给组件。第一帧还没有订阅时按 `loading` 显示。节点根元素带 `data-resource-status`（当前状态）和 `aria-busy="true"`（加载或刷新中），组件要转发 `ref` 才能写上。模板宿主同时绑定了资源且没有写 `rows` 时，行取自快照的 `data`（或 `data.items`），只在 `ready` 时渲染；参数变化后，新数据到达前保留旧行。

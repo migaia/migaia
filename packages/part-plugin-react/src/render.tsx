@@ -9,16 +9,18 @@ import type {
   IResourceWatch
 } from '@migaia/part-host'
 import { formatAddress, parseAddress, type IResourceSnapshot } from '@migaia/part-contract'
-import type { IDomFeatures } from '@migaia/part-plugin-dom'
+import { ADDRESS_ATTRIBUTE, type IDomFeatures } from '@migaia/part-plugin-dom'
 import type { IRuntime } from '@migaia/reactive'
 import { useTracked } from '@migaia/store-react'
 import {
   Component,
   createContext,
+  createElement,
   useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode
@@ -26,6 +28,15 @@ import {
 import { createRoot, type Root } from 'react-dom/client'
 import { REACT_RENDERER, type IReactBinding } from './bind.ts'
 import { NodeCommit } from './commit.ts'
+import {
+  DEFAULT_OVERSCAN,
+  measure,
+  sameRange,
+  scrollContainer,
+  spacerTag,
+  visibleRange,
+  type IVirtualRange
+} from './virtual.ts'
 import {
   fieldPathOf,
   fieldValue,
@@ -54,7 +65,8 @@ export type IMountServices = {
     resolve(node: IResolvedNode, value: unknown, row?: Readonly<Record<string, unknown>>): unknown
   }
   readonly dispatch: (address: string, event: string, detail: unknown) => Promise<void>
-  readonly report: (error: unknown) => void
+  /** Reports a failure to the host; `address` names the failing node when known. */
+  readonly report: (error: unknown, address?: string) => void
   readonly resources: IResourceHandle
 }
 
@@ -193,7 +205,8 @@ function componentProps(
   node: IResolvedNode,
   binding: IReactBinding,
   bound: Readonly<Record<string, unknown>>,
-  setElement: (element: HTMLElement | null) => void
+  setElement: (element: HTMLElement | null) => void,
+  element: HTMLElement | null
 ): Record<string, unknown> {
   /** Props handed to the component. */
   const props: Record<string, unknown> = {}
@@ -216,31 +229,177 @@ function componentProps(
     if (target === 'children') children.push(...rendered)
     else props[String(target)] = rendered
   }
-  if (node.template !== undefined) children.push(...rowElements(node.template, bound[ROWS_KEY]))
+  if (node.template?.virtual !== undefined)
+    children.push(
+      <VirtualRows
+        key="$virtual"
+        template={node.template}
+        rows={objectRows(bound[ROWS_KEY])}
+        element={element}
+      />
+    )
+  else if (node.template !== undefined)
+    children.push(...rowElements(node.template, bound[ROWS_KEY]))
   if (children.length > 0) props.children = children
   if (mapping.element !== 'query') props.ref = setElement
   return props
 }
 
-/**
- * One rendered template node per row. Rows that are not objects are skipped; the key is the string
- * value of the row's `rowKey` field.
- */
+/** Rows of a template value that are objects; other values are skipped. */
+function objectRows(rows: unknown): readonly Readonly<Record<string, unknown>>[] {
+  if (!Array.isArray(rows)) return []
+  return (rows as unknown[]).filter(
+    (row): row is Readonly<Record<string, unknown>> => typeof row === 'object' && row !== null
+  )
+}
+
+/** The rendered template node of one row; the key is the string value of the row's `rowKey`. */
+function rowElement(
+  template: NonNullable<IResolvedNode['template']>,
+  row: Readonly<Record<string, unknown>>
+): ReactNode {
+  /** Instance key of the row. */
+  const key = String(row[template.rowKey])
+  return (
+    <RowContext.Provider key={key} value={{ key, row }}>
+      <PartNode address={template.node.address} />
+    </RowContext.Provider>
+  )
+}
+
+/** One rendered template node per row. Rows that are not objects are skipped. */
 function rowElements(template: NonNullable<IResolvedNode['template']>, rows: unknown): ReactNode[] {
-  /** Rendered rows. */
-  const rendered: ReactNode[] = []
-  if (!Array.isArray(rows)) return rendered
-  for (const row of rows as unknown[]) {
-    if (typeof row !== 'object' || row === null) continue
-    /** Instance key of the row. */
-    const key = String((row as Record<string, unknown>)[template.rowKey])
-    rendered.push(
-      <RowContext.Provider key={key} value={{ key, row: row as Readonly<Record<string, unknown>> }}>
-        <PartNode address={template.node.address} />
-      </RowContext.Provider>
-    )
+  return objectRows(rows).map((row) => rowElement(template, row))
+}
+
+/**
+ * Tag of the element that holds the rows of a template: the parent of the first rendered row
+ * instance under the component's root element; undefined until a row has rendered.
+ */
+function rowHostTag(element: HTMLElement | null, templateAddress: string): string | undefined {
+  /** First row instance element. */
+  const row = element?.querySelector(`[${ADDRESS_ATTRIBUTE}^="${templateAddress}@row:"]`)
+  return row?.parentElement?.tagName
+}
+
+/**
+ * Keeps the rendered range of one virtual template in step with scrolling and container resizes.
+ * Each update measures once and costs O(1); an unchanged range is not set again.
+ */
+class RangeWatcher {
+  /** Host element holding the rows (parent of the top spacer). */
+  readonly #host: HTMLElement
+  /** Scroll container, or undefined for document scrolling. */
+  readonly #container: HTMLElement | undefined
+  /** Fixed row geometry and count. */
+  readonly #shape: { readonly rowHeight: number; readonly overscan: number; readonly count: number }
+  /** Range setter of the component. */
+  readonly #setRange: (update: (previous: IVirtualRange) => IVirtualRange) => void
+
+  /** Binds the watcher to the host of `spacer`. */
+  constructor(
+    spacer: HTMLElement,
+    shape: { readonly rowHeight: number; readonly overscan: number; readonly count: number },
+    setRange: (update: (previous: IVirtualRange) => IVirtualRange) => void
+  ) {
+    this.#host = spacer.parentElement as HTMLElement
+    this.#container = scrollContainer(this.#host)
+    this.#shape = shape
+    this.#setRange = setRange
   }
-  return rendered
+
+  /** Recomputes the range and sets it when it changed. */
+  update(): void {
+    /** New range. */
+    const next = visibleRange({ ...measure(this.#host, this.#container), ...this.#shape })
+    this.#setRange((previous) => (sameRange(previous, next) ? previous : next))
+  }
+
+  /** Starts listening (passive scroll, ResizeObserver); returns the matching cleanup. */
+  start(): () => void {
+    /** Scroll event target. */
+    const target: EventTarget = this.#container ?? window
+    /** Listener shared by scroll events. */
+    const listener = (): void => this.update()
+    target.addEventListener('scroll', listener, { passive: true })
+    /** Observer of the container size. */
+    const observer = new ResizeObserver(listener)
+    observer.observe(this.#container ?? document.documentElement)
+    this.update()
+    return () => {
+      target.removeEventListener('scroll', listener)
+      observer.disconnect()
+    }
+  }
+}
+
+/**
+ * Rows of a template with `virtual`: only rows in the visible range (plus overscan) render, with a
+ * spacer element before and after them that takes the height of the skipped rows. Spacers appear
+ * once the row host is known (after the first rows render), using a tag valid in that host.
+ */
+function VirtualRows(props: {
+  readonly template: NonNullable<IResolvedNode['template']>
+  readonly rows: readonly Readonly<Record<string, unknown>>[]
+  readonly element: HTMLElement | null
+}): ReactNode {
+  /** Virtual settings of the template. */
+  const virtual = props.template.virtual as {
+    readonly rowHeight: number
+    readonly overscan?: number
+  }
+  /** Rows rendered on each side of the visible range. */
+  const overscan = virtual.overscan ?? DEFAULT_OVERSCAN
+  /** Row count. */
+  const count = props.rows.length
+  /** Tag of the row host, once known. */
+  const [hostTag, setHostTag] = useState<string | undefined>(undefined)
+  /** Rendered range. */
+  const [range, setRange] = useState<IVirtualRange>({
+    start: 0,
+    end: Math.min(count, overscan + 1)
+  })
+  /** Top spacer element. */
+  const top = useRef<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    if (hostTag === undefined) setHostTag(rowHostTag(props.element, props.template.node.address))
+  }, [props.element, hostTag, props.template.node.address])
+  useLayoutEffect(
+    () =>
+      top.current === null
+        ? undefined
+        : new RangeWatcher(
+            top.current,
+            { rowHeight: virtual.rowHeight, overscan, count },
+            setRange
+          ).start(),
+    [hostTag, count, virtual.rowHeight, overscan]
+  )
+  /** Clamped range for the current rows. */
+  const start = Math.min(range.start, count)
+  /** End of the clamped range. */
+  const end = Math.min(range.end, count)
+  /** Rendered rows. */
+  const nodes = props.rows.slice(start, end).map((row) => rowElement(props.template, row))
+  if (hostTag === undefined || count === 0) return nodes
+  /** Spacer tag valid in the host. */
+  const tag = spacerTag(hostTag)
+  return [
+    createElement(tag, {
+      key: '$top',
+      ref: top,
+      'aria-hidden': 'true',
+      'data-part-spacer': '',
+      style: { height: start * virtual.rowHeight }
+    }),
+    ...nodes,
+    createElement(tag, {
+      key: '$bottom',
+      'aria-hidden': 'true',
+      'data-part-spacer': '',
+      style: { height: (count - end) * virtual.rowHeight }
+    })
+  ]
 }
 
 /** Rendered members of every slot of a node, by slot name. */
@@ -355,14 +514,14 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
     )
   /** Component of the binding. */
   const Bound = binding.component
-  return <Bound {...componentProps(services, instance, binding, bound, setElement)} />
+  return <Bound {...componentProps(services, instance, binding, bound, setElement, element)} />
 }
 
 /** Error boundary isolating one node; reports the failure once and renders nothing. */
 class NodeBoundary extends Component<
   {
     readonly address: string
-    readonly report: (error: unknown) => void
+    readonly report: (error: unknown, address?: string) => void
     readonly children: ReactNode
   },
   { readonly failed: boolean }
@@ -386,7 +545,8 @@ class NodeBoundary extends Component<
             PartReactErrorCode.renderFailed,
             PartReactErrorText.renderFailed(this.props.address),
             error
-          )
+          ),
+      this.props.address
     )
   }
 

@@ -88,6 +88,10 @@ A template host renders its template node once per entry of `rows`, after its ow
 
 Limit: if the template node declares an open state, all rows share one state path.
 
+## Render only visible rows of large lists
+
+When a template declares `virtual: { rowHeight, overscan }` (`overscan` defaults to 3), the renderer creates nodes only for rows in the visible range plus `overscan` rows on each side, so row addresses `…@row:<key>` exist only for those rows. Two spacer elements fill the height of skipped rows (`<tr>` inside a `tbody`, `<li>` inside `ul`/`ol`, `<div>` otherwise, all with `aria-hidden="true"` and `data-part-spacer`). The scroll container is the host's nearest `overflow-y: auto|scroll` ancestor, or the document; the range is recomputed on scroll and container resize and does not re-render when unchanged. Rows must have a fixed height; templates without `virtual` still render every row.
+
 ## Data resources and form fields
 
 When a part declares `behavior.resource` and the blueprint puts `{ $resource }` on that prop, the component subscribes to the resource after commit and releases it on unmount; the snapshot (`status`, `data`, `error`, `refreshing`, `page`) is passed as that prop. When the current status maps to a slot in `behavior.resource.slots` and the blueprint fills it, the slot content shows instead of the component; status slots are never passed to the component as children. The first frame, before the subscription exists, shows `loading`. The node root carries `data-resource-status` (the status) and `aria-busy="true"` (loading or refreshing); the component must forward `ref` for them to be written. A template host bound to a resource without `rows` takes its rows from the snapshot's `data` (or `data.items`), rendered only when `ready`; after a parameter change the old rows stay until the new data arrives.
