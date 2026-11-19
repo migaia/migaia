@@ -31,6 +31,9 @@ export function browserPath(explicit: string | undefined): string {
   throw createPartCliError(PartCliErrorCode.browserNotFound, PartCliText.browserNotFound)
 }
 
+/** Environment variables inlined into browser bundles: only this public prefix, never the rest. */
+const PUBLIC_ENV = 'PARTOM_PUBLIC_*'
+
 /** Source of the page entry: it imports the project's packages and exposes check functions. */
 function entrySource(configPath: string, extraImports: string): string {
   return `
@@ -53,7 +56,9 @@ window.__partom = { config, createPartHost, domPlugin, reactPlugin, checkPattern
 /**
  * Bundles a generated browser entry from the project directory: writes `entry.tsx` into `dir` and
  * builds it into `outDir`, so project packages resolve from the project. Doctor's check page and
- * `partom preview` share this. Throws an `AggregateError` of the build logs on failure.
+ * `partom preview` share this. Environment variables named `PARTOM_PUBLIC_*` are inlined so a
+ * config can read them in the browser; no other variable reaches the bundle. Throws an
+ * `AggregateError` of the build logs on failure.
  */
 export async function bundleEntry(dir: string, outDir: string, source: string): Promise<void> {
   mkdirSync(dir, { recursive: true })
@@ -65,7 +70,8 @@ export async function bundleEntry(dir: string, outDir: string, source: string): 
     target: 'browser',
     sourcemap: 'linked',
     plugins: [scopedResolverPlugin],
-    define: { 'process.env.NODE_ENV': '"development"' }
+    define: { 'process.env.NODE_ENV': '"development"' },
+    env: PUBLIC_ENV
   })
   if (!result.success) throw new AggregateError(result.logs, PartCliText.harnessFailed)
 }

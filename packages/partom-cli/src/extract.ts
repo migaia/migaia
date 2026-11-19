@@ -1,8 +1,18 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, join, relative, resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join, relative, resolve } from 'node:path'
+import type { IFieldBehavior } from '@migaia/part-contract'
 import { parseSync } from 'oxc-parser'
 import { PartCliErrorCode } from './error-code.ts'
 import { createPartCliError, PartCliText } from './errors.ts'
+import { DATA_TABLE_PART, dataTableModule, isDataTableFile } from './extract/data-table.ts'
+import { inferField } from './extract/field.ts'
+import {
+  classOf,
+  FORM_SUBSTITUTES,
+  formModule,
+  isFormFile,
+  type IFormSubstitute
+} from './extract/form.ts'
 
 /** Identifier grammar accepted into generated code. */
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/
@@ -26,6 +36,15 @@ export type IExtractedComponent = {
     readonly props?: Readonly<Record<string, string>>
     readonly events?: Readonly<Record<string, string>>
   }
+  /** Field protocol inferred for a form control. */
+  readonly field?: IFieldBehavior
+  /**
+   * Set when the component is not wrapped but replaced by a generated module: `form` for a
+   * react-hook-form `form.tsx`, `data-table` for a TanStack DataTable.
+   */
+  readonly substitute?: 'form' | 'data-table'
+  /** Class texts of the form substitutes, copied from the original file. */
+  readonly classes?: Readonly<Record<string, string>>
 }
 
 /** Generic ESTree node view. */
@@ -71,6 +90,10 @@ type IFileFacts = {
   readonly typeMembers: Map<string, string[]>
   readonly paramMembers: Map<string, string[]>
   readonly usesChildren: { value: boolean }
+  /** Source text of the file, for per-function slices. */
+  readonly source: string
+  /** Source text of each named function declaration. */
+  readonly functions: Map<string, string>
 }
 
 /** Collects variants and defaults from a `cva(base, { variants, defaultVariants })` call. */
@@ -131,10 +154,16 @@ function record(node: INode, facts: IFileFacts): void {
         : [
             ...literalMembers(annotation),
             ...(param?.type === 'ObjectPattern'
-              ? ((param.properties as INode[]) ?? []).map((p) => keyOf(p) ?? '')
+              ? ((param.properties as INode[]) ?? [])
+                  .filter((p) => p.type !== 'RestElement')
+                  .map((p) => keyOf(p) ?? '')
               : [])
           ]
     facts.paramMembers.set(String(node.id.name), members)
+    facts.functions.set(
+      String(node.id.name),
+      facts.source.slice(Number(node.start), Number(node.end))
+    )
   }
   if (node.type === 'ExportNamedDeclaration') {
     /** Declared function, if any. */
@@ -188,12 +217,58 @@ export function extractFile(file: string): IExtractedComponent[] {
     defaults: {},
     typeMembers: new Map(),
     paramMembers: new Map(),
-    usesChildren: { value: false }
+    usesChildren: { value: false },
+    source,
+    functions: new Map()
   }
   walk(parsed.program, (node) => record(node, facts))
+  if (isFormFile(source, facts.imports)) return formEntries(file, facts)
   /** Pattern guess shared by components of the file. */
   const guess = patternOf(facts.imports)
-  return facts.components.map((component) => describeComponent(file, component, facts, guess))
+  /** Whether the file is a TanStack DataTable. */
+  const dataTable = isDataTableFile(source, facts.imports)
+  return facts.components.map((component) =>
+    dataTable ? dataTableEntry(file, component) : describeComponent(file, component, facts, guess)
+  )
+}
+
+/** Report entries of a replaced react-hook-form file; only the five substitutes get parts. */
+function formEntries(file: string, facts: IFileFacts): IExtractedComponent[] {
+  /** Class texts of the substitutes. */
+  const classes: Record<string, string> = {}
+  for (const name of Object.keys(FORM_SUBSTITUTES))
+    classes[name] = classOf(facts.functions.get(name))
+  return facts.components.map((component) => ({
+    component,
+    file,
+    partId: FORM_SUBSTITUTES[component as IFormSubstitute] ?? '',
+    props: [],
+    variants: {},
+    defaults: {},
+    events: {},
+    slots: [],
+    uncertain: [],
+    mapping: {},
+    substitute: 'form',
+    classes
+  }))
+}
+
+/** Report entry of a DataTable component, replaced by the generated `data-table@1`. */
+function dataTableEntry(file: string, component: string): IExtractedComponent {
+  return {
+    component,
+    file,
+    partId: DATA_TABLE_PART,
+    props: ['columns'],
+    variants: {},
+    defaults: {},
+    events: {},
+    slots: ['loading', 'empty', 'error', 'header'],
+    uncertain: [],
+    mapping: {},
+    substitute: 'data-table'
+  }
 }
 
 /** Builds the extracted description of one component. */
@@ -221,7 +296,13 @@ function describeComponent(
     if (EVENT_PROP.test(name)) events[name.charAt(2).toLowerCase() + name.slice(3)] = name
     else props.add(name)
   }
-  if (raw.length === 0 && Object.keys(facts.variants).length === 0)
+  /** Field protocol of a form control. */
+  const inferred = inferField(facts.functions.get(component) ?? '', facts.imports)
+  if (inferred !== undefined) {
+    events[inferred.field.change] = inferred.callback
+    props.add(inferred.field.value)
+  }
+  if (raw.length === 0 && Object.keys(facts.variants).length === 0 && inferred === undefined)
     uncertain.push('props type could not be determined syntactically')
   return {
     component,
@@ -234,23 +315,36 @@ function describeComponent(
     slots: facts.usesChildren.value ? ['children'] : [],
     ...guess,
     uncertain,
-    mapping: Object.keys(events).length === 0 ? {} : { events }
+    mapping: Object.keys(events).length === 0 ? {} : { events },
+    ...(inferred === undefined ? {} : { field: inferred.field })
   }
 }
 
 /** Writes one draft module per component and the report; strings are emitted as JSON literals. */
 export function writeDrafts(components: readonly IExtractedComponent[], outDir: string): void {
   mkdirSync(outDir, { recursive: true })
+  /** Substitute kinds already written; each generated module is written once. */
+  const substitutes = new Set<string>()
   for (const entry of components) {
+    if (entry.substitute !== undefined) {
+      if (!substitutes.has(entry.substitute)) writeSubstitute(entry, outDir)
+      substitutes.add(entry.substitute)
+      continue
+    }
     if (!IDENTIFIER.test(entry.component)) continue
     /** Import path of the component from the draft. */
     const from = relative(resolve(outDir), resolve(entry.file))
     /** Part spec fields. */
     const spec = {
       id: entry.partId,
-      ...(entry.pattern === undefined
+      ...(entry.pattern === undefined && entry.field === undefined
         ? {}
-        : { behavior: { semantics: { pattern: entry.pattern } } }),
+        : {
+            behavior: {
+              ...(entry.pattern === undefined ? {} : { semantics: { pattern: entry.pattern } }),
+              ...(entry.field === undefined ? {} : { field: entry.field })
+            }
+          }),
       ...(Object.keys(entry.events).length === 0
         ? {}
         : {
@@ -276,6 +370,28 @@ export function writeDrafts(components: readonly IExtractedComponent[], outDir: 
     )
   }
   writeFileSync(join(outDir, 'report.json'), JSON.stringify({ components }, null, 2))
+}
+
+/** Writes the generated module that replaces a form or DataTable file; once per kind. */
+function writeSubstitute(entry: IExtractedComponent, outDir: string): void {
+  if (entry.substitute === 'form' && entry.classes !== undefined) {
+    writeFileSync(
+      join(outDir, 'form.part.tsx'),
+      formModule(entry.classes as Readonly<Record<IFormSubstitute, string>>)
+    )
+    return
+  }
+  if (entry.substitute !== 'data-table') return
+  /** The project's table component next to the DataTable, or in a `ui` directory below it. */
+  const sibling = join(dirname(entry.file), 'table.tsx')
+  /** Table file used by the module. */
+  const table = existsSync(sibling) ? sibling : join(dirname(entry.file), 'ui', 'table.tsx')
+  /** Specifier of the table file from the output directory. */
+  const from = relative(resolve(outDir), table)
+  writeFileSync(
+    join(outDir, 'data-table.part.tsx'),
+    dataTableModule(from.startsWith('.') ? from : `./${from}`)
+  )
 }
 
 /** Reads a previously written report. */

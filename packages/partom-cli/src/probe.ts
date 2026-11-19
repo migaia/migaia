@@ -80,6 +80,35 @@ async function renderOriginal([name, props]: [string, Record<string, string>]): 
   return html.replace(/ (id|data-part-address)="[^"]*"/g, '')
 }
 
+/** Page side: renders a component with default props and runs `checkPattern` on its root. */
+async function patternOfOriginal([name, pattern]: [string, string]): Promise<number> {
+  /** Page helpers. */
+  const helpers = (window as unknown as { __partomExtract: IExtractHelpers }).__partomExtract
+  /** Pattern checker of the check page. */
+  const check = (
+    window as unknown as {
+      __partom: { checkPattern(root: Element, pattern: string): Promise<void> }
+    }
+  ).__partom.checkPattern
+  /** Container. */
+  const container = document.createElement('div')
+  document.body.append(container)
+  /** React root. */
+  const root = helpers.createRoot(container)
+  root.render(helpers.createElement(helpers.components[name], {}))
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  /** Number of problems, counted from the error message lines. */
+  let problems = 0
+  try {
+    await check(container.firstElementChild ?? container, pattern)
+  } catch (error) {
+    problems = Math.max(1, String((error as Error).message).split('\n').length - 1)
+  }
+  root.unmount()
+  container.remove()
+  return problems
+}
+
 /** Page side: renders a component through a part host with a mapping and returns normalized HTML. */
 async function renderViaHost([name, partId, props, mapping]: [
   string,
@@ -144,20 +173,37 @@ type IHostLike = {
   dispose(): Promise<unknown>
 }
 
-/** Renders each component once per variant value and stores the snapshots in the report directory. */
+/** Pattern check counts of a probe run, for the extraction summary. */
+export type IPatternCounts = { readonly checked: number; readonly passed: number }
+
+/**
+ * Renders each component once per variant value and stores the snapshots in the report directory;
+ * components with a guessed pattern are also checked with `checkPattern` in their default state.
+ */
 export async function probe(
   project: Project,
   configPath: string,
   components: readonly IExtractedComponent[],
   outDir: string,
   browser: string | undefined
-): Promise<readonly IProbe[]> {
+): Promise<IPatternCounts> {
   /** Check page with the components. */
   const harness = await Harness.open(project, configPath, browser, importsFor(components))
   /** Snapshots. */
   const probes: IProbe[] = []
+  /** Pattern counts. */
+  const counts = { checked: 0, passed: 0 }
   try {
-    for (const entry of components)
+    for (const entry of components) {
+      if (entry.pattern !== undefined) {
+        counts.checked += 1
+        /** Problems of the pattern check. */
+        const problems = (await harness.page.evaluate(patternOfOriginal, [
+          entry.component,
+          entry.pattern
+        ] as [string, string])) as number
+        if (problems === 0) counts.passed += 1
+      }
       for (const props of probeProps(entry))
         probes.push({
           component: entry.component,
@@ -167,11 +213,12 @@ export async function probe(
             Record<string, string>
           ])) as string
         })
+    }
   } finally {
     await harness.close()
   }
   writeFileSync(join(outDir, 'probe.json'), JSON.stringify({ probes }, null, 2))
-  return probes
+  return counts
 }
 
 /** Compares each component rendered directly and through a part host; returns the differences. */

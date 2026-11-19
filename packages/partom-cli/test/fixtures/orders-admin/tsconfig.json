@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2024", "DOM"],
+    "types": ["bun"]
+  },
+  "include": ["src", "partom.config.ts", "ui-plugin.ts", "partom-env.d.ts"]
+}

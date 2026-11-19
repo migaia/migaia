@@ -1,0 +1,30 @@
+[
+  {
+    "op": "add",
+    "path": "/root/children/3/facets/props/source",
+    "value": { "$resource": "list-orders@1", "params": { "status": { "$state": "page.status" } } }
+  },
+  {
+    "op": "add",
+    "path": "/root/children/3/facets/slots",
+    "value": {
+      "loading": [
+        {
+          "tag": "html-p@1",
+          "id": "loading",
+          "facets": { "props": { "role": "status", "children": "Loading orders" } }
+        }
+      ],
+      "empty": [
+        { "tag": "html-p@1", "id": "empty", "facets": { "props": { "children": "No orders" } } }
+      ],
+      "error": [
+        {
+          "tag": "html-p@1",
+          "id": "error",
+          "facets": { "props": { "role": "alert", "children": "Orders failed to load" } }
+        }
+      ]
+    }
+  }
+]

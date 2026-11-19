@@ -18,6 +18,7 @@ const VALUE_FLAGS: ReadonlySet<string> = new Set([
   '--browser',
   '--config',
   '--out',
+  '--parts',
   '--project',
   '--port'
 ])

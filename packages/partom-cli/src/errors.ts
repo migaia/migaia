@@ -7,6 +7,7 @@ export const PartCliText = {
     'usage: partom doctor [--rendered] [--only <address>] [--browser <path>] [--json [--blueprints] [--types]] [--config <path>]\n' +
     '       partom preview [<id|file>] [--port <n>] [--config <path>]\n' +
     '       partom extract <files...> --out <dir> [--probe] [--verify] [--browser <path>]\n' +
+    '       partom extract --usage <pages...> --parts <dir> --out <dir>\n' +
     '       partom import <openapi.json|yaml> --out <dir>\n' +
     '       partom types [--out <file>] [--check] [--config <path>]\n' +
     '       partom browser install\n' +
@@ -39,6 +40,9 @@ export const PartCliText = {
   typesTakenOver: (path: string): string => `${path} was edited by hand; delete it to regenerate`,
   /** Doctor child process ended without a result. */
   doctorChildFailed: 'partom doctor ended without a result',
+  /** `extract --usage` found no component report in its `--parts` directory. */
+  partsReportMissing: (path: string): string =>
+    `${path} not found; run partom extract on the components first and pass its --out as --parts`,
   /** Unknown command. */
   usageInvalid: 'invalid arguments'
 } as const

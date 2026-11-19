@@ -9,11 +9,14 @@ import { extractFile, readReport, writeDrafts, type IExtractedComponent } from '
 import { importCommand } from './import/command.ts'
 import { previewCommand } from './preview/server.ts'
 import { typesCommand } from './types/command.ts'
-import { probe, verify } from './probe.ts'
+import { usageCommand } from './usage/command.ts'
+import { extractSummary, writeReport } from './extract/summary.ts'
+import { probe, verify, type IPatternCounts } from './probe.ts'
 import { Project } from './project.ts'
 
 /** Runs `partom extract`. */
 async function extract(args: IArgs): Promise<number> {
+  if (args.flags.has('--usage')) return usageCommand(args)
   /** Output directory. */
   const out = flag(args, '--out')
   if (out === undefined || args.positional.length < 2)
@@ -30,20 +33,39 @@ async function extract(args: IArgs): Promise<number> {
       console.error(JSON.stringify(serializeCause(error)))
     }
   }
-  if (args.flags.has('--verify')) return verifyExisting(args, out)
+  // `--verify` alone checks drafts written earlier, which may carry reviewed edits; only together
+  // with `--probe` does one run write, probe and then verify.
+  if (args.flags.has('--verify') && !args.flags.has('--probe'))
+    return await verifyExisting(args, out)
   writeDrafts(components, out)
+  /** Pattern counts of a probe run. */
+  let pattern: IPatternCounts | undefined
   if (args.flags.has('--probe')) {
     /** Project for the check page. */
     const project = new Project(flag(args, '--project') ?? process.cwd())
-    await probe(
+    pattern = await probe(
       project,
       project.configPath(flag(args, '--config')),
-      components,
+      wrapped(components),
       out,
       flag(args, '--browser')
     )
   }
+  /** Clean-component and pattern counts of this extraction. */
+  const summary = extractSummary(components, pattern)
+  writeReport(out, components, summary)
+  console.log(JSON.stringify({ summary }))
+  if (args.flags.has('--verify')) {
+    /** Verification exit code. */
+    const verified = await verifyExisting(args, out)
+    if (verified !== ExitCode.ok) return verified
+  }
   return failed ? ExitCode.problems : ExitCode.ok
+}
+
+/** Components wrapped as they are; substitutes are generated modules, not checked against originals. */
+function wrapped(components: readonly IExtractedComponent[]): IExtractedComponent[] {
+  return components.filter((entry) => entry.substitute === undefined)
 }
 
 /** Verifies the components of an existing report against their part-host rendering. */
@@ -54,7 +76,7 @@ async function verifyExisting(args: IArgs, out: string): Promise<number> {
   const differences = await verify(
     project,
     project.configPath(flag(args, '--config')),
-    readReport(out),
+    wrapped(readReport(out)),
     flag(args, '--browser')
   )
   console.log(JSON.stringify({ differences }))
