@@ -1,0 +1,55 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "Orders admin", "version": "1.0.0" },
+  "paths": {
+    "/orders": {
+      "get": {
+        "operationId": "listOrders",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["open", "closed", "archived"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Order" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createOrder",
+        "tags": ["orders"],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Order" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Order": {
+        "type": "object",
+        "required": ["customer"],
+        "properties": {
+          "id": { "type": "string" },
+          "customer": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["open", "closed", "archived"] }
+        }
+      }
+    }
+  }
+}

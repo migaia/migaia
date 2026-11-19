@@ -1,0 +1,30 @@
+{
+  "name": "@migaia/part-editor",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Browser editor for part blueprints and remote modules, backed by the part catalog drafts.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "vitest run test",
+    "serve": "bun src/main.ts serve"
+  },
+  "dependencies": {
+    "@migaia/part-contract": "workspace:^",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@migaia/part-catalog": "workspace:^",
+    "@migaia/partom-cli": "workspace:^",
+    "@types/bun": "1.4.4",
+    "@types/react": "^19.0.0",
+    "playwright": "1.62.1",
+    "typescript": "^7.0.2",
+    "vitest": "4.1.10"
+  }
+}

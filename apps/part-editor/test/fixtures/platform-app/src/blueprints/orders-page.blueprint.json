@@ -1,0 +1,319 @@
+{
+  "$partom": "@partom-generated sha256:091a3f53804c48d01d497fb4b36317e5ab45ffdc6a04752d6e44740f73e28b94",
+  "id": "orders-page",
+  "version": 1,
+  "root": {
+    "tag": "html-main@1",
+    "id": "main-0",
+    "facets": {
+      "props": {
+        "className": "space-y-6 p-6"
+      }
+    },
+    "children": [
+      {
+        "tag": "html-h1@1",
+        "id": "h1-0",
+        "facets": {
+          "props": {
+            "children": "Orders"
+          }
+        }
+      },
+      {
+        "tag": "html-p@1",
+        "id": "p-0",
+        "facets": {
+          "props": {
+            "children": "Track and create customer orders."
+          }
+        }
+      },
+      {
+        "tag": "select@1",
+        "id": "select-0",
+        "facets": {
+          "props": {
+            "value": {
+              "$state": "page.status"
+            }
+          }
+        },
+        "children": [
+          {
+            "tag": "select-trigger@1",
+            "id": "select-trigger-0",
+            "children": [
+              {
+                "tag": "select-value@1",
+                "id": "select-value-0",
+                "facets": {
+                  "props": {
+                    "placeholder": "Status"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "tag": "select-content@1",
+            "id": "select-content-0",
+            "children": [
+              {
+                "tag": "select-item@1",
+                "id": "select-item-0",
+                "facets": {
+                  "props": {
+                    "value": "open",
+                    "children": "Open"
+                  }
+                }
+              },
+              {
+                "tag": "select-item@1",
+                "id": "select-item-1",
+                "facets": {
+                  "props": {
+                    "value": "closed",
+                    "children": "Closed"
+                  }
+                }
+              },
+              {
+                "tag": "select-item@1",
+                "id": "select-item-2",
+                "facets": {
+                  "props": {
+                    "value": "archived",
+                    "children": "Archived"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "tag": "data-table@1",
+        "id": "data-table-0",
+        "facets": {
+          "props": {
+            "columns": [
+              {
+                "key": "id",
+                "header": "Order"
+              },
+              {
+                "key": "customer",
+                "header": "Customer"
+              }
+            ],
+            "source": {
+              "$resource": "list-orders@1",
+              "params": {
+                "status": {
+                  "$state": "page.status"
+                }
+              }
+            }
+          },
+          "slots": {
+            "loading": [
+              {
+                "tag": "html-p@1",
+                "id": "loading",
+                "facets": {
+                  "props": {
+                    "role": "status",
+                    "children": "Loading orders"
+                  }
+                }
+              }
+            ],
+            "empty": [
+              {
+                "tag": "html-p@1",
+                "id": "empty",
+                "facets": {
+                  "props": {
+                    "children": "No orders"
+                  }
+                }
+              }
+            ],
+            "error": [
+              {
+                "tag": "html-p@1",
+                "id": "error",
+                "facets": {
+                  "props": {
+                    "role": "alert",
+                    "children": "Orders failed to load"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "template": {
+          "rowKey": "id",
+          "node": {
+            "tag": "table-row@1",
+            "id": "row",
+            "children": [
+              {
+                "tag": "table-cell@1",
+                "id": "cell-id",
+                "facets": {
+                  "props": {
+                    "children": {
+                      "$row": "id"
+                    }
+                  }
+                }
+              },
+              {
+                "tag": "table-cell@1",
+                "id": "cell-customer",
+                "facets": {
+                  "props": {
+                    "children": {
+                      "$row": "customer"
+                    }
+                  }
+                }
+              },
+              {
+                "tag": "table-cell@1",
+                "id": "cell-status",
+                "facets": {
+                  "props": {
+                    "children": {
+                      "$row": "status"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tag": "orders-page-blackbox-1@1",
+        "id": "blackbox-0"
+      },
+      {
+        "tag": "html-form@1",
+        "id": "form-0",
+        "facets": {
+          "events": {
+            "submit.prevent": {
+              "handler": "orders-page.onSubmit@1"
+            }
+          }
+        },
+        "children": [
+          {
+            "tag": "form-item@1",
+            "id": "form-item-0",
+            "children": [
+              {
+                "tag": "form-label@1",
+                "id": "form-label-0",
+                "facets": {
+                  "props": {
+                    "children": "Customer"
+                  }
+                }
+              },
+              {
+                "tag": "form-control@1",
+                "id": "form-control-0",
+                "children": [
+                  {
+                    "tag": "input@1",
+                    "id": "input-0",
+                    "facets": {
+                      "props": {
+                        "value": {
+                          "$state": "page.form.customer"
+                        },
+                        "placeholder": "Customer name"
+                      },
+                      "aria": {
+                        "label": "Customer"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "tag": "form-message@1",
+                "id": "form-message-0",
+                "facets": {
+                  "props": {
+                    "message": {
+                      "$state": "page.form-errors.customer"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button@1",
+            "id": "button-0",
+            "facets": {
+              "props": {
+                "type": "submit",
+                "children": "Create order"
+              },
+              "events": {
+                "click": {
+                  "handler": "notify@1"
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "tag": "button@1",
+        "id": "log-button",
+        "facets": {
+          "props": {
+            "type": "button",
+            "children": "Log"
+          },
+          "events": {
+            "click": {
+              "handler": "log@1"
+            }
+          }
+        }
+      },
+      {
+        "tag": "html-p@1",
+        "id": "notice",
+        "facets": {
+          "props": {
+            "children": {
+              "$state": "page.notice"
+            }
+          }
+        }
+      },
+      {
+        "tag": "html-p@1",
+        "id": "log-line",
+        "facets": {
+          "props": {
+            "children": {
+              "$state": "page.log"
+            }
+          }
+        }
+      }
+    ]
+  }
+}
