@@ -68,6 +68,12 @@ export class PartCatalog implements ICatalog {
   readonly #implementations = new Map<string, IEntry<unknown>>()
   /** Contributions by plugin name, for withdrawal and suspension. */
   readonly #contributions = new Map<string, IContribution>()
+  /**
+   * Registered, not yet withdrawn generations per plugin name, oldest first. While a replacement
+   * installs, the old generation is still live; if the new one is withdrawn (its install rolled
+   * back) the newest remaining generation is put back.
+   */
+  readonly #live = new Map<string, IContribution[]>()
   /** Change listeners. */
   readonly #listeners = new Set<ICatalogListener>()
   /** Resource generation listeners. */
@@ -124,6 +130,24 @@ export class PartCatalog implements ICatalog {
     /** Previous generation of the same plugin, replaced by this one. */
     const previous = this.#contributions.get(contribution.plugin)
     if (previous !== undefined) this.#remove(previous)
+    this.#put(contribution)
+    try {
+      this.#checkOrder(contribution)
+    } catch (error) {
+      this.#remove(contribution)
+      this.#contributions.delete(contribution.plugin)
+      if (previous !== undefined) this.register(previous)
+      throw error
+    }
+    /** Live generations of the plugin. */
+    const live = this.#live.get(contribution.plugin) ?? []
+    if (live.at(-1) !== contribution) live.push(contribution)
+    this.#live.set(contribution.plugin, live)
+    this.#notify(contribution, previous)
+  }
+
+  /** Stores a contribution's entries and makes it the plugin's current one. */
+  #put(contribution: IContribution): void {
     for (const definition of contribution.definitions) {
       this.#definitions.set(definition.descriptor.id, {
         value: definition,
@@ -141,15 +165,6 @@ export class PartCatalog implements ICatalog {
         available: true
       })
     this.#contributions.set(contribution.plugin, contribution)
-    try {
-      this.#checkOrder(contribution)
-    } catch (error) {
-      this.#remove(contribution)
-      this.#contributions.delete(contribution.plugin)
-      if (previous !== undefined) this.register(previous)
-      throw error
-    }
-    this.#notify(contribution, previous)
   }
 
   /** Orders the enhancers of every tag the contribution targets, so a cycle fails at install. */
@@ -160,14 +175,33 @@ export class PartCatalog implements ICatalog {
           orderEnhancers(target, this.enhancersFor(target))
   }
 
-  /** Withdraws a generation; a newer generation of the same plugin is left untouched. */
+  /**
+   * Withdraws a generation; a newer generation of the same plugin is left untouched. Withdrawing
+   * the current generation while an older one is still live (a rolled-back replacement) puts the
+   * older one back.
+   */
   withdraw(plugin: string, token: object): void {
+    /** Live generations of the plugin. */
+    const live = this.#live.get(plugin)
+    if (live !== undefined) {
+      /** Position of the withdrawn generation. */
+      const index = live.findIndex((contribution) => contribution.token === token)
+      if (index >= 0) live.splice(index, 1)
+      if (live.length === 0) this.#live.delete(plugin)
+    }
     /** Current contribution of the plugin. */
     const current = this.#contributions.get(plugin)
     if (current === undefined || current.token !== token) return
     this.#remove(current)
     this.#contributions.delete(plugin)
-    this.#notify(current, undefined)
+    /** Older live generation to put back, if any. */
+    const restored = live?.at(-1)
+    if (restored === undefined) {
+      this.#notify(current, undefined)
+      return
+    }
+    this.#put(restored)
+    this.#notify(restored, current)
   }
 
   /** Marks the entries of the named plugins unavailable or available again. */
