@@ -1200,7 +1200,7 @@ const selectFamily = (name) => {
 }
 
 /**
- * Keep direct children of one workspace root and return their sorted directory names.
+ * Keep direct children of one workspace root and return their directory names.
  *
  * @param {string[]} paths Repository-relative project paths.
  * @param {string} root `packages/` or `apps/`.
