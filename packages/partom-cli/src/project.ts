@@ -124,6 +124,11 @@ export type IPartomConfig = {
   readonly blueprints: readonly string[]
   /** Release settings read by `partom build`, `manifest` and the catalog commands. */
   readonly release?: IReleaseConfig
+  /**
+   * Extraction settings: `transparentWrappers` names higher-order functions (such as `withTheme`)
+   * that `partom extract` unwraps one level, taking their first argument as the component.
+   */
+  readonly extract?: { readonly transparentWrappers?: readonly string[] }
 }
 
 /**

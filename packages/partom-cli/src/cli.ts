@@ -1,11 +1,18 @@
 #!/usr/bin/env bun
-import { resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { ExitCode, PARTOM_VERSION, failureExit, flag, parseArgs, type IArgs } from './args.ts'
 import { delegateDoctor, shouldDelegateDoctor } from './delegate.ts'
 import { doctorCommand } from './doctor-command.ts'
 import { PartCliErrorCode } from './error-code.ts'
 import { createPartCliError, PartCliText, serializeCause } from './errors.ts'
-import { extractFile, readReport, writeDrafts, type IExtractedComponent } from './extract.ts'
+import {
+  extractFile,
+  readReport,
+  writeDrafts,
+  type IExtractedComponent,
+  type IExtractOptions
+} from './extract.ts'
 import { importCommand } from './import/command.ts'
 import { previewCommand } from './preview/server.ts'
 import { remoteCommand } from './remote/command.ts'
@@ -19,6 +26,25 @@ import { extractSummary, writeReport } from './extract/summary.ts'
 import { probe, verify, type IPatternCounts } from './probe.ts'
 import { Project } from './project.ts'
 
+/**
+ * Extraction options from the project config (`extract.transparentWrappers`). The config is loaded
+ * only when its text names `transparentWrappers`: extraction also runs in projects whose config
+ * imports files the extraction itself produces, which cannot load yet. Without such a config the
+ * built-in wrappers apply.
+ */
+async function extractOptions(args: IArgs): Promise<IExtractOptions> {
+  /** Project directory. */
+  const dir = flag(args, '--project') ?? process.cwd()
+  /** Config file path. */
+  const path = resolve(flag(args, '--config') ?? join(dir, 'partom.config.ts'))
+  if (!existsSync(path) || !readFileSync(path, 'utf8').includes('transparentWrappers')) return {}
+  /** Project config. */
+  const config = await new Project(dir).config(flag(args, '--config'))
+  return config.extract?.transparentWrappers === undefined
+    ? {}
+    : { transparentWrappers: config.extract.transparentWrappers }
+}
+
 /** Runs `partom extract`. */
 async function extract(args: IArgs): Promise<number> {
   if (args.flags.has('--usage')) return usageCommand(args)
@@ -30,9 +56,11 @@ async function extract(args: IArgs): Promise<number> {
   const components: IExtractedComponent[] = []
   /** Whether any file failed to parse. */
   let failed = false
+  /** Configured wrappers of the project, when it has a config. */
+  const options = await extractOptions(args)
   for (const file of args.positional.slice(1)) {
     try {
-      components.push(...extractFile(resolve(file)))
+      components.push(...extractFile(resolve(file), options))
     } catch (error) {
       failed = true
       console.error(JSON.stringify(serializeCause(error)))

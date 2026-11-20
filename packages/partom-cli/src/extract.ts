@@ -45,6 +45,35 @@ export type IExtractedComponent = {
   readonly substitute?: 'form' | 'data-table'
   /** Class texts of the form substitutes, copied from the original file. */
   readonly classes?: Readonly<Record<string, string>>
+  /** Wrapper calls around the analysed function, outer to inner (`['memo', 'forwardRef']`). */
+  readonly wrappers?: readonly string[]
+  /** Export the binding references: the component name, or `default`. */
+  readonly exportName?: string
+}
+
+/** Options of `extractFile`. */
+export type IExtractOptions = {
+  /** Calls unwrapped one level besides `memo` and `forwardRef` (from `extract.transparentWrappers`). */
+  readonly transparentWrappers?: readonly string[]
+}
+
+/** Wrappers every extraction unwraps, with or without the `React.` prefix. */
+const KNOWN_WRAPPERS: ReadonlySet<string> = new Set([
+  'memo',
+  'forwardRef',
+  'React.memo',
+  'React.forwardRef'
+])
+
+/**
+ * Result of unwrapping an exported expression: the wrapper chain (outer to inner), the analysed
+ * function's name or inline node, and whether an unknown higher-order call stopped the walk.
+ */
+type IUnwrapped = {
+  readonly chain: readonly string[]
+  readonly inner?: string
+  readonly inline?: INode
+  readonly opaque: boolean
 }
 
 /** Generic ESTree node view. */
@@ -94,6 +123,94 @@ type IFileFacts = {
   readonly source: string
   /** Source text of each named function declaration. */
   readonly functions: Map<string, string>
+  /** Unwrapped exports by exported component name. */
+  readonly wrapped: Map<string, IUnwrapped>
+  /** Exported component name to the name its binding imports (`default` for a default export). */
+  readonly exports: Map<string, string>
+  /** Names unwrapped like `memo`. */
+  readonly transparent: ReadonlySet<string>
+}
+
+/** Dotted name of a callee (`memo`, `React.memo`), or `undefined` for other expressions. */
+function calleeName(callee: INode): string | undefined {
+  if (callee.type === 'Identifier') return String(callee.name)
+  if (
+    callee.type === 'MemberExpression' &&
+    (callee.object as INode).type === 'Identifier' &&
+    (callee.property as INode).type === 'Identifier'
+  )
+    return `${String((callee.object as INode).name)}.${String((callee.property as INode).name)}`
+  return undefined
+}
+
+/**
+ * Unwraps known and configured wrapper calls, any nesting. Stops at an identifier or an inline
+ * function; any other call (`connect(map)(X)`, an unlisted `withX(X)`) is opaque.
+ */
+function unwrap(expression: INode, transparent: ReadonlySet<string>): IUnwrapped {
+  /** Wrapper names, outer to inner. */
+  const chain: string[] = []
+  /** Node under inspection. */
+  let node: INode = expression
+  for (;;) {
+    if (node.type === 'Identifier') return { chain, inner: String(node.name), opaque: false }
+    if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression')
+      return { chain, inline: node, opaque: false }
+    if (node.type !== 'CallExpression') return { chain, opaque: true }
+    /** Called name. */
+    const name = calleeName(node.callee as INode)
+    /** First argument. */
+    const first = (node.arguments as INode[] | undefined)?.[0]
+    if (
+      name === undefined ||
+      first === undefined ||
+      !(KNOWN_WRAPPERS.has(name) || transparent.has(name))
+    )
+      return { chain, opaque: true }
+    chain.push(name)
+    node = first
+  }
+}
+
+/** Prop names of a function's first parameter: inline type members or destructured names. */
+function paramMembersOf(fn: INode): string[] {
+  /** First parameter. */
+  const param = (fn.params as INode[])[0]
+  /** Annotated parameter type. */
+  const annotation = (param?.typeAnnotation as INode | undefined)?.typeAnnotation as
+    | INode
+    | undefined
+  if (annotation?.type === 'TSTypeReference')
+    return [`@ref:${String((annotation.typeName as INode).name)}`]
+  return [
+    ...literalMembers(annotation),
+    ...(param?.type === 'ObjectPattern'
+      ? ((param.properties as INode[]) ?? [])
+          .filter((p) => p.type !== 'RestElement')
+          .map((p) => keyOf(p) ?? '')
+      : [])
+  ]
+}
+
+/** Records an exported wrapped expression under `name` (binding import `exportName`). */
+function recordWrapped(
+  name: string,
+  exportName: string,
+  expression: INode,
+  facts: IFileFacts
+): void {
+  /** Unwrapped export. */
+  const unwrapped = unwrap(expression, facts.transparent)
+  facts.wrapped.set(name, unwrapped)
+  facts.exports.set(name, exportName)
+  facts.components.push(name)
+  if (unwrapped.inline !== undefined) {
+    facts.paramMembers.set(name, paramMembersOf(unwrapped.inline))
+    facts.functions.set(
+      name,
+      facts.source.slice(Number(unwrapped.inline.start), Number(unwrapped.inline.end))
+    )
+  }
 }
 
 /** Collects variants and defaults from a `cva(base, { variants, defaultVariants })` call. */
@@ -141,35 +258,38 @@ function record(node: INode, facts: IFileFacts): void {
     isNode(node.id) &&
     /^[A-Z]/.test(String(node.id.name))
   ) {
-    /** First parameter. */
-    const param = (node.params as INode[])[0]
-    /** Annotated parameter type. */
-    const annotation = (param?.typeAnnotation as INode | undefined)?.typeAnnotation as
-      | INode
-      | undefined
-    /** Member names from a referenced alias or an inline literal. */
-    const members =
-      annotation?.type === 'TSTypeReference'
-        ? [`@ref:${String((annotation.typeName as INode).name)}`]
-        : [
-            ...literalMembers(annotation),
-            ...(param?.type === 'ObjectPattern'
-              ? ((param.properties as INode[]) ?? [])
-                  .filter((p) => p.type !== 'RestElement')
-                  .map((p) => keyOf(p) ?? '')
-              : [])
-          ]
-    facts.paramMembers.set(String(node.id.name), members)
+    facts.paramMembers.set(String(node.id.name), paramMembersOf(node))
     facts.functions.set(
       String(node.id.name),
       facts.source.slice(Number(node.start), Number(node.end))
     )
+  }
+  if (
+    node.type === 'ExportDefaultDeclaration' &&
+    (node.declaration as INode).type === 'CallExpression'
+  ) {
+    /** Unwrapped default export, named after its innermost function when there is one. */
+    const unwrapped = unwrap(node.declaration as INode, facts.transparent)
+    recordWrapped(unwrapped.inner ?? 'Default', 'default', node.declaration as INode, facts)
   }
   if (node.type === 'ExportNamedDeclaration') {
     /** Declared function, if any. */
     const declaration = node.declaration as INode | null
     if (declaration?.type === 'FunctionDeclaration' && isNode(declaration.id))
       facts.components.push(String(declaration.id.name))
+    if (declaration?.type === 'VariableDeclaration')
+      for (const declarator of (declaration.declarations as INode[]) ?? []) {
+        /** Declared identifier. */
+        const id = declarator.id as INode
+        /** Initializer. */
+        const init = declarator.init as INode | null
+        if (
+          id.type === 'Identifier' &&
+          /^[A-Z]/.test(String(id.name)) &&
+          init?.type === 'CallExpression'
+        )
+          recordWrapped(String(id.name), String(id.name), init, facts)
+      }
     for (const specifier of (node.specifiers as INode[]) ?? []) {
       /** Exported name. */
       const name = String((specifier.exported as INode).name)
@@ -198,7 +318,7 @@ function partName(component: string): string {
 }
 
 /** Extracts every exported component of one file; parse errors are PARSE_FAILED. */
-export function extractFile(file: string): IExtractedComponent[] {
+export function extractFile(file: string, options: IExtractOptions = {}): IExtractedComponent[] {
   /** Source text. */
   const source = readFileSync(file, 'utf8')
   /** Parse result. */
@@ -219,7 +339,10 @@ export function extractFile(file: string): IExtractedComponent[] {
     paramMembers: new Map(),
     usesChildren: { value: false },
     source,
-    functions: new Map()
+    functions: new Map(),
+    wrapped: new Map(),
+    exports: new Map(),
+    transparent: new Set(options.transparentWrappers ?? [])
   }
   walk(parsed.program, (node) => record(node, facts))
   if (isFormFile(source, facts.imports)) return formEntries(file, facts)
@@ -278,8 +401,13 @@ function describeComponent(
   facts: IFileFacts,
   guess: { readonly pattern?: string; readonly basis?: string }
 ): IExtractedComponent {
+  /** Unwrapped export, when the component is a wrapper call. */
+  const wrapped = facts.wrapped.get(component)
+  if (wrapped?.opaque === true) return opaqueComponent(file, component, wrapped, facts)
+  /** Name whose function the props come from: the innermost named function, or the export. */
+  const source = wrapped?.inner ?? component
   /** Raw member names, following one alias reference. */
-  const raw = (facts.paramMembers.get(component) ?? []).flatMap((name) =>
+  const raw = (facts.paramMembers.get(source) ?? []).flatMap((name) =>
     name.startsWith('@ref:') ? (facts.typeMembers.get(name.slice(5)) ?? []) : [name]
   )
   /** Uncertain items for the report. */
@@ -297,7 +425,7 @@ function describeComponent(
     else props.add(name)
   }
   /** Field protocol of a form control. */
-  const inferred = inferField(facts.functions.get(component) ?? '', facts.imports)
+  const inferred = inferField(facts.functions.get(source) ?? '', facts.imports)
   if (inferred !== undefined) {
     events[inferred.field.change] = inferred.callback
     props.add(inferred.field.value)
@@ -316,7 +444,43 @@ function describeComponent(
     ...guess,
     uncertain,
     mapping: Object.keys(events).length === 0 ? {} : { events },
-    ...(inferred === undefined ? {} : { field: inferred.field })
+    ...(inferred === undefined ? {} : { field: inferred.field }),
+    ...wrapperFields(component, wrapped, facts)
+  }
+}
+
+/** Report fields of a wrapped export: its wrapper chain and the export its binding imports. */
+function wrapperFields(
+  component: string,
+  wrapped: IUnwrapped | undefined,
+  facts: IFileFacts
+): Pick<IExtractedComponent, 'wrappers' | 'exportName'> {
+  if (wrapped === undefined) return {}
+  return { wrappers: wrapped.chain, exportName: facts.exports.get(component) ?? component }
+}
+
+/**
+ * A component behind an unknown higher-order call: bound as a black box with no guessed props; its
+ * contract comes from the developer or `--probe`. The report carries `hoc-opaque`.
+ */
+function opaqueComponent(
+  file: string,
+  component: string,
+  wrapped: IUnwrapped,
+  facts: IFileFacts
+): IExtractedComponent {
+  return {
+    component,
+    file,
+    partId: `${partName(component)}@1`,
+    props: [],
+    variants: {},
+    defaults: {},
+    events: {},
+    slots: [],
+    uncertain: ['hoc-opaque'],
+    mapping: {},
+    ...wrapperFields(component, wrapped, facts)
   }
 }
 
@@ -361,7 +525,7 @@ export function writeDrafts(components: readonly IExtractedComponent[], outDir: 
       [
         "import { definePart } from '@migaia/part-host'",
         "import { bindReactComponent } from '@migaia/part-plugin-react'",
-        `import { ${entry.component} } from ${JSON.stringify(from.startsWith('.') ? from : `./${from}`)}`,
+        importLine(entry, from.startsWith('.') ? from : `./${from}`),
         '',
         `export const ${name}Part = definePart(${JSON.stringify(spec, null, 2)})`,
         `export const ${name}Binding = bindReactComponent(${name}Part, ${entry.component}, ${JSON.stringify(entry.mapping)})`,
@@ -370,6 +534,13 @@ export function writeDrafts(components: readonly IExtractedComponent[], outDir: 
     )
   }
   writeFileSync(join(outDir, 'report.json'), JSON.stringify({ components }, null, 2))
+}
+
+/** Import of the component a draft binds: the named export, or the default export. */
+function importLine(entry: IExtractedComponent, specifier: string): string {
+  return entry.exportName === 'default'
+    ? `import ${entry.component} from ${JSON.stringify(specifier)}`
+    : `import { ${entry.exportName ?? entry.component} } from ${JSON.stringify(specifier)}`
 }
 
 /** Writes the generated module that replaces a form or DataTable file; once per kind. */
