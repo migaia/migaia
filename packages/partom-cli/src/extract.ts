@@ -172,6 +172,25 @@ function unwrap(expression: INode, transparent: ReadonlySet<string>): IUnwrapped
   }
 }
 
+/** Higher-order call names guessed as component wrappers even when not configured (`withX`). */
+const HOC_NAME = /^with[A-Z]/
+
+/**
+ * True when a call looks like a wrapped component: a known or configured wrapper, a `withX(...)`
+ * call, or a curried call such as `connect(map)(X)`. Other calls (`createContext()`, `cva(...)`)
+ * are not components.
+ */
+function isComponentCall(call: INode, transparent: ReadonlySet<string>): boolean {
+  /** Callee of the call. */
+  const callee = call.callee as INode
+  if (callee.type === 'CallExpression') return true
+  /** Called name. */
+  const name = calleeName(callee)
+  return (
+    name !== undefined && (KNOWN_WRAPPERS.has(name) || transparent.has(name) || HOC_NAME.test(name))
+  )
+}
+
 /** Prop names of a function's first parameter: inline type members or destructured names. */
 function paramMembersOf(fn: INode): string[] {
   /** First parameter. */
@@ -266,7 +285,8 @@ function record(node: INode, facts: IFileFacts): void {
   }
   if (
     node.type === 'ExportDefaultDeclaration' &&
-    (node.declaration as INode).type === 'CallExpression'
+    (node.declaration as INode).type === 'CallExpression' &&
+    isComponentCall(node.declaration as INode, facts.transparent)
   ) {
     /** Unwrapped default export, named after its innermost function when there is one. */
     const unwrapped = unwrap(node.declaration as INode, facts.transparent)
@@ -286,7 +306,8 @@ function record(node: INode, facts: IFileFacts): void {
         if (
           id.type === 'Identifier' &&
           /^[A-Z]/.test(String(id.name)) &&
-          init?.type === 'CallExpression'
+          init?.type === 'CallExpression' &&
+          isComponentCall(init, facts.transparent)
         )
           recordWrapped(String(id.name), String(id.name), init, facts)
       }

@@ -79,7 +79,7 @@ bunx partom extract src/components/ui/*.tsx --out src/parts/drafts
 
 用 oxc 静态解析 shadcn 风格组件：导出的组件、props、`cva` 变体、事件回调、slot，并从 Radix、cmdk 的导入推测 `pattern`。每个组件生成一份 `definePart` + `bindReactComponent` 草稿，另写 `report.json` 记录推测依据。草稿需要人工审阅：推测的 pattern 和事件种类可能不准。加 `--probe` 会按每个变体值渲染组件并记录 DOM。
 
-被 `memo`、`forwardRef`（含 `React.` 前缀，可任意嵌套）包装的导出会被解开，从最内层函数提取 props，`report.json` 的 `wrappers` 记录包装链，草稿绑定外层导出。项目自己的透明高阶组件在 `partom.config.ts` 的 `extract.transparentWrappers`（如 `['withTheme']`）中列出，按第一个参数解开一层。其他高阶组件（如 `connect(map)(X)`）不猜测：整体作为黑盒绑定，没有推测的 props，报告带 `hoc-opaque`。
+被 `memo`、`forwardRef`（含 `React.` 前缀，可任意嵌套）包装的导出会被解开，从最内层函数提取 props，`report.json` 的 `wrappers` 记录包装链，草稿绑定外层导出。项目自己的透明高阶组件在 `partom.config.ts` 的 `extract.transparentWrappers`（如 `['withTheme']`）中列出，按第一个参数解开一层；这个键要直接写在配置文件里，`partom extract` 只在配置文本出现 `transparentWrappers` 时加载配置。其他高阶组件（如 `connect(map)(X)`）不猜测：整体作为黑盒绑定，没有推测的 props，报告带 `hoc-opaque`。
 
 ## 核对提取结果
 

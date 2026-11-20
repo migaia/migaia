@@ -46,6 +46,7 @@ describe('extract wrapped components (A9)', () => {
         props: ['title']
       })
       expect(byName.get('Row')).toMatchObject({ props: [], uncertain: ['hoc-opaque'] })
+      expect(byName.has('RowContext')).toBe(false)
       expect(readFileSync(join(out, 'button.part.ts'), 'utf8')).toContain('import Button from "../')
       expect(readFileSync(join(out, 'card.part.ts'), 'utf8')).toContain('import { Card } from')
       expect(readFileSync(join(out, 'card.part.ts'), 'utf8')).toContain(
