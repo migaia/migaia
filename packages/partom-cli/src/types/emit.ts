@@ -1,5 +1,6 @@
 /** Text of the `.d.ts` that fills `IPartTypeRegistry`; pure and stable for the same input. */
 import type { ITypesData } from './collect.ts'
+import type { IJsonSchema } from '@migaia/part-contract'
 import { schemaType } from './schema-type.ts'
 
 /** Union of addresses: static ones as literals, template rows as template-literal types. */
@@ -13,9 +14,30 @@ function addressesType(data: ITypesData): string {
   return members.length === 0 ? 'never' : members.join('\n      | ')
 }
 
-/** Object type of state paths. */
+/**
+ * Object type of state paths: bound paths, the top-level properties of every store namespace with a
+ * schema (`<namespace>.<key>`, the store schema winning over an unknown binding), and an open ``
+ * `<namespace>.${string}` `` member with `unknown` values for stores without a schema.
+ */
 function statesType(data: ITypesData): string {
-  return `{\n${data.states.map((entry) => `      ${JSON.stringify(entry.path)}: ${schemaType(entry.schema)}`).join('\n')}\n    }`
+  /** Value type per path, in first-seen order. */
+  const members = new Map<string, string>()
+  for (const entry of data.states) members.set(JSON.stringify(entry.path), schemaType(entry.schema))
+  /** Open members of stores without a schema. */
+  const open: string[] = []
+  for (const store of data.stores) {
+    if (store.schema === undefined) {
+      open.push(`      [path: \`${store.namespace}.\${string}\`]: unknown`)
+      continue
+    }
+    /** Top-level properties of the store schema. */
+    const properties = (store.schema.properties ?? {}) as Readonly<Record<string, IJsonSchema>>
+    for (const [key, schema] of Object.entries(properties))
+      members.set(JSON.stringify(`${store.namespace}.${key}`), schemaType(schema))
+  }
+  /** Lines of the object type. */
+  const lines = [...members].map(([path, type]) => `      ${path}: ${type}`)
+  return `{\n${[...lines, ...open].join('\n')}\n    }`
 }
 
 /** Object type of events by address, then by event name. */

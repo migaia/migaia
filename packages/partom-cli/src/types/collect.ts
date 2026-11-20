@@ -2,7 +2,7 @@
  * Type data collected by `partom doctor --types` from resolved trees and the catalog. Runs in the
  * doctor process, which already loaded the project; the result is plain JSON.
  */
-import type { IDescriptor, IJsonSchema } from '@migaia/part-contract'
+import type { IDescriptor, IJsonSchema, IStoreDescriptor } from '@migaia/part-contract'
 import type { IResolvedNode } from '@migaia/part-host'
 
 /** One address entry: a static address, or the prefix of template-row instance addresses. */
@@ -26,14 +26,21 @@ export type IResourceEntry = {
   readonly commands: Readonly<Record<string, IJsonSchema | undefined>>
 }
 
-/** Everything the `.d.ts` generator needs. */
+/**
+ * Everything the `.d.ts` generator needs. `stores` lists the host's registered namespaces besides
+ * `page`, `section` and `part`, with the JSON Schema of their values when declared.
+ */
 export type ITypesData = {
   readonly addresses: IAddressEntry[]
   readonly states: IStateEntry[]
   readonly events: IEventEntry[]
   readonly resources: IResourceEntry[]
+  readonly stores: IStoreDescriptor[]
   readonly notes: string[]
 }
+
+/** Namespaces of the default store, never listed in `stores`. */
+const DEFAULT_NAMESPACES: ReadonlySet<string> = new Set(['page', 'section', 'part'])
 
 /** True for a `{ $state }` binding. */
 function statePath(value: unknown): string | undefined {
@@ -61,8 +68,8 @@ export class TypesCollector {
     this.#walk(root, false)
   }
 
-  /** The collected data with the catalog's resources. */
-  result(descriptors: Iterable<IDescriptor>): ITypesData {
+  /** The collected data with the catalog's resources and registered store namespaces. */
+  result(descriptors: Iterable<IDescriptor>, stores: readonly IStoreDescriptor[] = []): ITypesData {
     /** Resources of the catalog. */
     const resources: IResourceEntry[] = []
     for (const descriptor of descriptors) {
@@ -87,6 +94,7 @@ export class TypesCollector {
       states: [...this.#states.values()],
       events: this.#events,
       resources,
+      stores: stores.filter((store) => !DEFAULT_NAMESPACES.has(store.namespace)),
       notes: [...this.#conflicts]
     }
   }

@@ -172,7 +172,7 @@ export async function runDoctor(project: Project, options: IDoctorOptions): Prom
     /** The project's catalog check of model relations. */
     const checkModels = bundle.checkModels as (catalog: unknown) => IIssue[]
     issues.push(...checkModels(host.catalog.view()))
-    typesData = types?.result(host.catalog.view().all())
+    typesData = types?.result(host.catalog.view().all(), host.catalog.view().stores?.() ?? [])
   } finally {
     await host.dispose()
   }
