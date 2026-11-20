@@ -79,8 +79,6 @@ const obsoleteSubpaths = [
   './internal/chunk-attachment',
   './plugin',
   './probe',
-  './features/auth',
-  './features/chunk',
   './features/typegen'
 ]
 /**
