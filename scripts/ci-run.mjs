@@ -838,6 +838,20 @@ const runParity = (runtime) =>
   )
 
 /**
+ * Reject an application list naming a directory without a manifest, before any gate runs, so a typo
+ * fails fast instead of aborting CI after the package pool.
+ *
+ * @param {string[]} apps Application directory names under `apps/`.
+ * @returns {void}
+ * @throws {Error} A listed application has no manifest.
+ */
+const assertApps = (apps) => {
+  for (const name of apps)
+    if (!existsSync(join(repositoryRoot, 'apps', name, 'package.json')))
+      throw new Error(text.missingApp(name))
+}
+
+/**
  * Run every application's gates in order. Applications consume the workspace build but own no build
  * output or coverage unit, so their gates are their own scripts, run through pnpm.
  *
@@ -846,7 +860,6 @@ const runParity = (runtime) =>
  * @param {readonly string[]} [gates] Gates to run; fast mode passes `appFastGates`.
  * @returns {Promise<IGateResult[]>} Ordered `app/gate` rows; a missing script is a blocking skip,
  *   matching ci-fast.
- * @throws {Error} A listed application has no manifest.
  */
 const runAppGates = async (apps, runtime, gates = appGates) => {
   /** Rows in application, then gate order. */
@@ -854,8 +867,6 @@ const runAppGates = async (apps, runtime, gates = appGates) => {
   for (const name of apps) {
     /** Directory relative to the repository root, as Make and pnpm filters expect it. */
     const directory = `./apps/${name}`
-    if (!existsSync(join(repositoryRoot, directory, 'package.json')))
-      throw new Error(text.missingApp(name))
     /** Scripts decide which gates exist, as for packages. */
     const scripts = JSON.parse(
       readFileSync(join(repositoryRoot, directory, 'package.json'), 'utf8')
@@ -902,6 +913,7 @@ export const runCi = async (
   scope = { rpc: true, website: true },
   extra = { part: [], apps: [] }
 ) => {
+  assertApps(extra.apps)
   /** Root rows stay in their old order even though both package groups now share one pool. */
   const results = []
   results.push(
@@ -1155,7 +1167,7 @@ const selectAffected = (release, store, unreleased) => {
  * Resolve one family to its members and their workspace dependency closure.
  *
  * @param {string} name Family key from `ciFamilies`.
- * @returns {IFamilySelection} Package and app directory names in sorted order, plus the pnpm
+ * @returns {IFamilySelection} Package and app directory names in pnpm's order, plus the pnpm
  *   `<name>...` selectors that build the closure.
  * @throws {Error} Unknown family name.
  */
@@ -1192,14 +1204,12 @@ const selectFamily = (name) => {
  *
  * @param {string[]} paths Repository-relative project paths.
  * @param {string} root `packages/` or `apps/`.
- * @returns {string[]} Directory names in code-unit order.
+ * @returns {string[]} Directory names in pnpm's listing order.
  */
 const directoryNames = (paths, root) =>
   paths
     .filter((path) => path.startsWith(root) && !path.slice(root.length).includes('/'))
     .map((path) => path.slice(root.length))
-    /** Default string sort compares UTF-16 code units, so the order is locale-independent. */
-    .sort()
 
 /**
  * Run one family's CI. Fast mode runs the static gates of every closure package and app without a
@@ -1217,6 +1227,7 @@ const runFamily = async (name, selection, fast, runtime) => {
   for (const member of selection.packages)
     if (!existsSync(join(repositoryRoot, 'packages', member, 'package.json')))
       throw new Error(text.missingPackage(member))
+  assertApps(selection.apps)
   if (fast) {
     /** Static rows per package, in closure order. */
     const results = selection.packages.map((member) => ({
@@ -1254,6 +1265,7 @@ const runFamily = async (name, selection, fast, runtime) => {
   const conformance = rpc && !missingTools.length ? createConformanceGate(runtime) : undefined
   /** Rows produced once the package pool drains. */
   const tailRows = []
+  /** Completed package results, summarized one row per package. */
   const packages = await runPackages(selection.packages, runtime, {
     partialFamilyAlone: true,
     onFamilyReady: () => conformance?.startEarly(),

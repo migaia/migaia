@@ -215,7 +215,8 @@ test('lists every utils code with its own scenario and regenerates a checkable r
   assert.deepEqual(new Set(utilsRows.map((row) => row.code)), new Set(utilsCodes))
   /** Header first sentences of every error-code file in the repository. */
   const headers = new Set(
-    listErrorCodeFiles(join(repositoryRoot, 'packages'))
+    ['packages', 'apps']
+      .flatMap((directory) => listErrorCodeFiles(join(repositoryRoot, directory)))
       .map((file) => headerSentence(readFileSync(file, 'utf8')))
       .filter((sentence) => sentence !== undefined && sentence.length > 0)
   )
@@ -228,6 +229,7 @@ test('lists every utils code with its own scenario and regenerates a checkable r
   const root = mkdtempSync(join(tmpdir(), 'migai-error-registry-live-'))
   try {
     symlinkSync(join(repositoryRoot, 'packages'), join(root, 'packages'), 'dir')
+    symlinkSync(join(repositoryRoot, 'apps'), join(root, 'apps'), 'dir')
     mkdirSync(join(root, 'docs/contracts'), { recursive: true })
     writeFileSync(
       join(root, 'docs/contracts/error-codes.md'),

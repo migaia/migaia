@@ -22,6 +22,8 @@ CI_APPS := part-catalog part-editor
 CI_FAMILIES := storage rpc log part
 FAMILY_CI_TARGETS := $(addsuffix -ci,$(CI_FAMILIES))
 FAMILY_CI_FAST_TARGETS := $(addsuffix -ci-fast,$(CI_FAMILIES))
+# Storage backends read their service URLs from storage-services; other families need none.
+FAMILY_CI_SERVICES_storage := node scripts/storage-services.mts run --
 RELEASE_BRANCH ?= main
 GITHUB_PACKAGES_REGISTRY := https://npm.pkg.github.com
 
@@ -139,7 +141,7 @@ ci-affected:
 ci-fast:
 	@$(CI_REPORT) \
 	for gate in fmt lint typecheck typecheck:test; do \
-		for package in $(PUBLISHABLE_PACKAGES); do \
+		for package in $(PUBLISHABLE_PACKAGES) $(PART_PACKAGES); do \
 			if [ "$$gate" = fmt ]; then \
 				run_gate required "$$package/$$gate" $(CI_MAKE) fmt-check DIRECTORY="packages/$$package"; \
 			elif node -e 'const p=require("./packages/"+process.argv[1]+"/package.json"); process.exit(p.scripts?.[process.argv[2]] ? 0 : 1)' "$$package" "$$gate"; then \
@@ -150,6 +152,13 @@ ci-fast:
 				else record_gate SKIP-BLOCKING "$$package/$$gate (no script)" 1 0; fi; \
 			fi; \
 		done; \
+		for app in $(CI_APPS); do \
+			if [ "$$gate" = fmt ]; then \
+				run_gate required "apps/$$app/$$gate" $(CI_MAKE) fmt-check DIRECTORY="apps/$$app"; \
+			else \
+				run_gate required "apps/$$app/$$gate" pnpm --filter "./apps/$$app" run "$$gate"; \
+			fi; \
+		done; \
 		run_gate required "website/$$gate" $(CI_MAKE) ci-website-check GATE="$$gate"; \
 	done; \
 	finish_ci
@@ -158,7 +167,8 @@ ci-fast:
 # family's app gates and, for rpc, conformance and suite-parity. Repository gates (registry,
 # custody, website) stay in full ci.
 $(FAMILY_CI_TARGETS):
-	@CI_ALLOW_MISSING_TOOLCHAINS=$(CI_ALLOW_MISSING_TOOLCHAINS) node scripts/ci-run.mjs family \
+	@CI_ALLOW_MISSING_TOOLCHAINS=$(CI_ALLOW_MISSING_TOOLCHAINS) $(FAMILY_CI_SERVICES_$(@:-ci=)) \
+		node scripts/ci-run.mjs family \
 		--family $(@:-ci=)
 
 # Fast family CI runs only format, lint and type gates of the same closure, without a build.
