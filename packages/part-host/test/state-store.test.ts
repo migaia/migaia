@@ -1288,3 +1288,28 @@ describe('host catalog namespaces (A6, host side)', () => {
     await host.dispose()
   })
 })
+
+describe('load after a write to an unread path (A10)', () => {
+  it('waits for the write before its qualifying read', async () => {
+    const calls = new AsyncCalls()
+    const host = await createPartHost()
+    await host.use(definePartPlugin({ name: 'z', stores: [asyncStore('zed', calls, [])] }))
+    calls.creates[0]?.resolve({})
+    await settle(host)
+    host.state.write('zed.v', 1)
+    let done = false
+    const loaded = host.state.load('zed.v').then((value) => {
+      done = true
+      return value
+    })
+    await settle(host)
+    expect(calls.gets).toHaveLength(0)
+    calls.sets[0]?.deferred.resolve(undefined)
+    await settle(host)
+    expect(calls.gets).toHaveLength(1)
+    expect(done).toBe(false)
+    calls.gets[0]?.deferred.resolve(1)
+    expect(await loaded).toBe(1)
+    await host.dispose()
+  })
+})

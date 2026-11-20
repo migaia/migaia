@@ -166,8 +166,6 @@ class ReadCell {
   inflight: IReadRequest | undefined
   /** True when a compare request arrived while a read was in flight. */
   reread = false
-  /** Tokens of writes in flight in the current read generation. */
-  readonly sets = new Set<object>()
   /** `load` calls waiting on this path. */
   waiters: ILoadWaiter[] = []
 
@@ -212,6 +210,11 @@ export class NamespaceSlot {
   readonly #written = new Set<string>()
   /** Seeds waiting for an asynchronous `has`. */
   readonly #seeds = new Set<IPendingSeed>()
+  /**
+   * Tokens of writes in flight in the current read generation, by key. Kept per key rather than per
+   * read cell, so a `load` waits for writes to a path that was never read.
+   */
+  readonly #sets = new Map<string, Set<object>>()
 
   /** Creates an unregistered slot. */
   constructor(namespace: string, services: ISlotServices) {
@@ -392,9 +395,9 @@ export class NamespaceSlot {
     for (const cell of this.#cells.values()) {
       cell.inflight = undefined
       cell.reread = false
-      cell.sets.clear()
       cell.fresh = true
     }
+    this.#sets.clear()
     if (this.#mode === SlotMode.unregistered) this.#reportedUnknown = false
     if (this.services.closed()) return
     this.services.runtime.batch(() => {
@@ -429,6 +432,11 @@ export class NamespaceSlot {
     const waiters = cell.waiters
     cell.waiters = []
     for (const waiter of waiters) waiter.reject(error)
+  }
+
+  /** Number of writes in flight for a key in the current read generation. */
+  #writesOf(key: string): number {
+    return this.#sets.get(key)?.size ?? 0
   }
 
   /** Bumps a cell's version. */
@@ -615,7 +623,9 @@ export class NamespaceSlot {
       )
     /** Status after the read. */
     const status: IStateStatus =
-      cell.sets.size > 0 ? { status: ResourceStatus.ready, refreshing: true } : READY_STATUS
+      this.#writesOf(cell.key) > 0
+        ? { status: ResourceStatus.ready, refreshing: true }
+        : READY_STATUS
     this.services.runtime.batch(() => {
       if (changed) {
         cell.value = value
@@ -667,13 +677,13 @@ export class NamespaceSlot {
     return new Promise((resolve, reject) => {
       cell.waiters.push({
         readGen: this.#readGen,
-        sets: new Set(cell.sets),
+        sets: new Set(this.#sets.get(key)),
         attached: false,
         resolve,
         reject
       })
       if (this.#mode !== SlotMode.target) return
-      if (existing === undefined || cell.sets.size === 0) this.#request(cell)
+      if (this.#writesOf(key) === 0) this.#request(cell)
     })
   }
 
@@ -705,12 +715,13 @@ export class NamespaceSlot {
     const token = {}
     /** Read generation of the write. */
     const readGen = this.#readGen
+    /** Writes in flight for the key. */
+    const tokens = this.#sets.get(key) ?? new Set<object>()
+    tokens.add(token)
+    this.#sets.set(key, tokens)
     /** Cell of the written key, if read. */
     const cell = this.#cells.get(key)
-    if (cell !== undefined) {
-      cell.sets.add(token)
-      cell.status.value = { ...cell.status.peek(), refreshing: true }
-    }
+    if (cell !== undefined) cell.status.value = { ...cell.status.peek(), refreshing: true }
     result.then(
       (keys) => this.#writeSettled(key, token, readGen, generation, true, keys),
       (error: unknown) => this.#writeSettled(key, token, readGen, generation, false, error)
@@ -744,10 +755,11 @@ export class NamespaceSlot {
       if (readGen !== this.#readGen || generation.dead || this.services.closed()) return
       /** Cell of the written key, if read. */
       const cell = this.#cells.get(key)
-      if (cell !== undefined) {
-        cell.sets.delete(token)
-        for (const waiter of cell.waiters) waiter.sets.delete(token)
-      }
+      /** Writes in flight for the key. */
+      const tokens = this.#sets.get(key)
+      tokens?.delete(token)
+      if (tokens?.size === 0) this.#sets.delete(key)
+      if (cell !== undefined) for (const waiter of cell.waiters) waiter.sets.delete(token)
       if (ok) {
         this.#compareAfterWrite(key, outcome as readonly string[] | void)
         return
@@ -755,7 +767,7 @@ export class NamespaceSlot {
       if (cell !== undefined)
         cell.status.value = {
           status: ResourceStatus.error,
-          refreshing: cell.sets.size > 0,
+          refreshing: this.#writesOf(key) > 0,
           error: errorSnapshot(outcome)
         }
       this.services.report(
