@@ -16,6 +16,7 @@ See the [README](./README.en.md) for what the package is for. The host depends o
 | A click in a list row must know which row                  | `IEffectEvent.rowKey`              | [List-row events](#list-row-events)                  |
 | `aria-expanded` follows a popup's open state               | `behavior.aria.fromState`          | [State-derived aria](#state-derived-aria)            |
 | Load a list from an API with loading, empty and error states | `defineResource`, `host.resources` | [Data resources and models](#data-resources-and-models) |
+| Cart and session live in your own store; the UI reads and writes it | `defineStateStore`, `composeStore` | [Bring your own store](#bring-your-own-store) |
 | Type hints for addresses and state paths in effects        | `IPartTypeRegistry`                | [Generated types](#generated-types)                  |
 | Remove a plugin; parts depending on it become unavailable  | `host.unUse`                       | [Replacing and removing plugins](#replacing-and-removing-plugins) |
 
@@ -160,6 +161,41 @@ const orders = defineResource({
 Each host has one resource store (`host.resources`, `ctx.resources` in effects). One resource with one set of parameters is one cache entry: it starts loading when first watched (`loading`), becomes `ready` or `empty` on success, and `error` on failure while keeping the previous data. A refresh keeps the status and sets `refreshing`; a superseded load is aborted and its late result dropped. `watch(binding)` observes a `{ $resource, params }` binding: when a `$state` parameter changes it moves to the new entry and keeps showing the old data while the new entry loads for the first time. `read()` has no side effects and may run during render; call `release()` when done. `run(id, command, args)` refreshes the entries whose tags (by default the resource name) meet the command's; `invalidate(tags)` does it by hand. When the plugin providing a resource is replaced, suspended or removed, its entries are dropped and watches re-subscribe; a missing resource shows an error snapshot with `RESOURCE_UNKNOWN`.
 
 `definePartPlugin({ models: [...] })` registers models made with `defineModel`; `host.models.validate(id, value)` (`ctx.models` in effects) validates with the model schema and returns `ok` plus issues by field path. `host.state.seed(path, value)` writes only when the path was never written, for initial state.
+
+## Bring your own store
+
+The first segment of a state path is its namespace. `page`, `section` and `part` live in the host's default store; any other namespace is served by a store a plugin registers. Values stay in your store: the host only keeps a cache and a reactive version for each path that was read, to notify bindings, derives and resource parameters.
+
+```ts
+import { createPartHost, definePartPlugin, defineStateStore } from '@migaia/part-host'
+
+const items = new Map<string, unknown>([['items', []]])
+const cart = defineStateStore<Map<string, unknown>>({
+  namespace: 'cart',
+  create: () => items,
+  get: (map, key) => map.get(key),
+  set: (map, key, value) => {
+    map.set(key, value)
+    if (key === 'items') {
+      map.set('count', (value as unknown[]).length)
+      return ['count']
+    }
+  }
+})
+const host = await createPartHost({ plugins: [definePartPlugin({ name: 'cart', stores: [cart] })] })
+host.state.write('cart.items', ['a'])
+host.state.read('cart.count') // 1: `set` returned count, so it is compared and updated during the write
+```
+
+- **Keys:** the store receives keys without the namespace (`cart.items.0` has key `items.0`). The store states how keys relate: `set` returns the other keys a write changed.
+- **Reference contract:** when a value changes, `get` must return a new reference; when it does not, it should return the same one. A store that mutates values in place (mobx style) returns a copy or snapshot from `get`; a store that returns a fresh copy every time provides a structural `equals`, otherwise every comparison counts as a change.
+- **Writes outside the host:** with `subscribe(handle, listener)` the host subscribes right after `create`; `listener(keys)` compares those keys and `listener()` every read key. Or keep `ctx.invalidate` from `create(ctx)` and call it after an outside change. Without either, outside writes are not shown. Notifications within one microtask are merged into one comparison.
+- **Equality:** `Object.is` first, then the comparator only when the values differ; `equalsBy` picks a comparator by key prefix, longest prefix first. Comparators must be synchronous; a throw or a returned Promise reports `STATE_EQUALS_FAILED` and counts as a change. Equal values keep the old one.
+- **Default-store equality:** a plugin listing `stores: [defaultStateStore({ equals, equalsBy })]` sets the comparators of `page`, `section` and `part` (`equalsBy` keys are full path prefixes such as `page.form`); one plugin per host may do this.
+- **Asynchronous stores:** `create`, `get`, `set`, `has` and `dispose` may return a Promise. `ctx.state.status(path)` and `state.status(path)` in derives give `idle`/`loading`/`ready`/`error` plus `refreshing`; `ctx.state.load(path)` waits for the first read issued after the call. Failed reads and writes report `STATE_STORE_READ_FAILED` and `STATE_STORE_WRITE_FAILED`; the cache keeps the old value.
+- **Middleware:** `composeStore(store, m1, m2)` calls m1 → m2 → store; a middleware returns only the functions it overrides plus its own `dispose`, and releases run m1, m2, then the store.
+- **Handles:** effect contexts carry no handle. A local plugin that needs one references `partCorePlugin.getFeature('stateStores')` in `deps` and calls `handle(namespace)`.
+- **Unregistered namespaces:** explicit reads and writes throw `STATE_NAMESPACE_UNKNOWN`; rendering, derives and resource parameters read `undefined` and report once per unregistered period.
 
 ## Generated types
 

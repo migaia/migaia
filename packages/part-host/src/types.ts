@@ -23,6 +23,7 @@ import type {
   IPluginRemoval
 } from '@migaia/plugin-host'
 import type { IRuntime } from '@migaia/reactive'
+import type { IDefaultStateStore, IStateStatus, IStateStore } from './state-store.ts'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type {
   ICommandArgsOf,
@@ -59,6 +60,8 @@ export type IEnhancerContext<TArgs> = {
 export type IDeriveStateView = {
   read(path: string): unknown
   write(path: string, value: unknown): never
+  /** Tracked status of a path; an unregistered namespace is `idle`. */
+  status(path: string): IStateStatus
 }
 
 /** Derive: a pure computation over state paths. */
@@ -76,6 +79,10 @@ export type IEffectContext<TDeps> = {
   readonly state: {
     read<P extends IStatePathOf>(path: P): IStateValueOf<P>
     write<P extends IStatePathOf>(path: P, value: IStateValueOf<P>): void
+    /** Status of a path; `page`/`section`/`part` are always ready. */
+    status<P extends IStatePathOf>(path: P): IStateStatus
+    /** Value of the first read issued after this call and after the path's writes settle. */
+    load<P extends IStatePathOf>(path: P): Promise<IStateValueOf<P>>
   }
   readonly resources: IResourceHandle
   readonly models: IModelHandle
@@ -261,6 +268,12 @@ export type IPartPluginSpec = {
   readonly override?: readonly string[]
   readonly features?: IFeatureRecord
   /**
+   * State stores this plugin registers: external stores (`defineStateStore`, `composeStore`) own a
+   * namespace each; one `defaultStateStore` per host customizes equality of
+   * `page`/`section`/`part`.
+   */
+  readonly stores?: readonly (IStateStore<unknown> | IDefaultStateStore)[]
+  /**
    * Runs once per generation after its catalog entries are registered, with this plugin's resolved
    * Feature outputs and the generation's lifetime signal (aborted on release).
    */
@@ -332,13 +345,21 @@ export type ILoadResult = {
   readonly issues: readonly IIssue[]
 }
 
-/** Scope state of a host. Paths are `page.*`, `section.*` or `part.*`. */
+/**
+ * Scope state of a host. Paths are `page.*`, `section.*`, `part.*` (the default store) or
+ * `<namespace>.*` of a store a plugin registered. Explicit reads and writes of an unregistered
+ * namespace throw STATE_NAMESPACE_UNKNOWN.
+ */
 export type IScopeState = {
   readonly runtime: IRuntime
   read(path: string): unknown
   write(path: string, value: unknown): void
-  /** Writes the path only when it was never written; reads do not count. */
+  /** Writes the path only when it was never written (or the store's `has` reports it absent). */
   seed(path: string, value: unknown): void
+  /** Status of a path; `page`/`section`/`part` are always ready. */
+  status(path: string): IStateStatus
+  /** Value of the first read issued after this call and after the path's writes settle. */
+  load(path: string): Promise<unknown>
   resolve(node: IResolvedNode, value: unknown, row?: Readonly<Record<string, unknown>>): unknown
 }
 

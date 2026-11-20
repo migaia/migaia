@@ -1,6 +1,7 @@
 import { PartHostErrorCode } from './error-code.ts'
 import { PartHostErrorText } from './error-text.ts'
 import { createPartHostError } from './errors.ts'
+import type { IStateStatus } from './state-store.ts'
 import type { ITraceSink } from './trace/sink.ts'
 import type {
   IEffectContext,
@@ -25,6 +26,10 @@ export type IEffectServices = {
   readonly lookup: IEffectLookup
   readonly read: (path: string) => unknown
   readonly write: (path: string, value: unknown) => void
+  /** Status of a path (page tier only). */
+  readonly status: (path: string) => IStateStatus
+  /** Next qualifying read of a path (page tier only). */
+  readonly load: (path: string) => Promise<unknown>
   readonly enqueue: (address: string, event: string, detail: unknown) => void
   readonly report: (error: unknown, address?: string) => void
   /** Trace sink for effect runs and state writes. */
@@ -256,7 +261,9 @@ export class EffectRunner {
       features,
       state: {
         read: (path: string) => this.#services.read(path),
-        write: (path: string, value: unknown) => tracedWrite(this.#services, address, path, value)
+        write: (path: string, value: unknown) => tracedWrite(this.#services, address, path, value),
+        status: (path: string) => this.#services.status(path),
+        load: (path: string) => this.#services.load(path)
       },
       resources: this.#services.resources,
       models: this.#services.models,

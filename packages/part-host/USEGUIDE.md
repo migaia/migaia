@@ -16,6 +16,7 @@
 | 列表行里的点击要知道是哪一行                 | `IEffectEvent.rowKey`              | [列表行事件](#列表行事件)                                      |
 | 弹层打开时 `aria-expanded` 跟着变            | `behavior.aria.fromState`          | [由状态派生 aria](#由状态派生-aria)                            |
 | 列表从接口取数，带加载、空、出错状态         | `defineResource`、`host.resources` | [数据资源与模型](#数据资源与模型)                              |
+| 购物车、会话用自己的 store，界面直接读写它 | `defineStateStore`、`composeStore` | [接入自己的 store](#接入自己的-store)                          |
 | 在 effect 里得到地址和状态路径的类型提示     | `IPartTypeRegistry`                | [生成的类型](#生成的类型)                                      |
 | 卸载一个插件，依赖它的部件暂时不可用         | `host.unUse`                       | [插件替换与卸载](#插件替换与卸载)                              |
 
@@ -160,6 +161,41 @@ const orders = defineResource({
 每个宿主有一份资源仓库（`host.resources`，effect 里是 `ctx.resources`）。同一资源加同一组参数是一个缓存条目：第一次被观察时开始加载（`loading`），成功后是 `ready` 或 `empty`，失败是 `error` 且保留上一次的数据；刷新时状态不变、`refreshing` 为 `true`，被取代的加载会被中止，迟到的结果被丢弃。`watch(binding)` 观察一个 `{ $resource, params }` 绑定：参数里的 `$state` 变化时自动换到新条目，新条目首次加载期间继续显示旧数据；`read()` 没有副作用，可以在渲染时调用；用完调用 `release()`。命令 `run(id, command, args)` 成功后按标签（默认是资源名）刷新相关条目；`invalidate(tags)` 手动失效。提供资源的插件被替换、挂起或卸载时，相关条目作废，观察会自动重新订阅，资源不存在时快照为 `RESOURCE_UNKNOWN` 的出错状态。
 
 `definePartPlugin({ models: [...] })` 登记 `defineModel` 定义的模型；`host.models.validate(id, value)`（effect 里是 `ctx.models`）用模型的 schema 校验，返回 `ok` 与按字段路径的问题列表。`host.state.seed(path, value)` 只在该路径从未被写过时写入，适合初始状态。
+
+## 接入自己的 store
+
+状态路径的第一段是命名空间。`page`、`section`、`part` 由宿主自带的默认 store 保存；其他命名空间由插件登记的 store 提供，值始终留在你的 store 里，宿主只为被读过的路径保留缓存和 reactive 版本号，用来通知绑定、推导和资源参数。
+
+```ts
+import { createPartHost, definePartPlugin, defineStateStore } from '@migaia/part-host'
+
+const items = new Map<string, unknown>([['items', []]])
+const cart = defineStateStore<Map<string, unknown>>({
+  namespace: 'cart',
+  create: () => items,
+  get: (map, key) => map.get(key),
+  set: (map, key, value) => {
+    map.set(key, value)
+    if (key === 'items') {
+      map.set('count', (value as unknown[]).length)
+      return ['count']
+    }
+  }
+})
+const host = await createPartHost({ plugins: [definePartPlugin({ name: 'cart', stores: [cart] })] })
+host.state.write('cart.items', ['a'])
+host.state.read('cart.count') // 1：`set` 返回了 count，写入当下就比较并更新
+```
+
+- **key：** store 收到的 key 不带命名空间（`cart.items.0` 的 key 是 `items.0`）。key 之间的关系由 store 自己说明：`set` 返回受这次写入影响的其他 key。
+- **引用契约：** 值变了，`get` 必须返回新引用；值没变，应返回同一个引用。原地修改值的 store（mobx 式）要在 `get` 里返回副本或快照；每次都返回新副本的 store 要提供结构比较的 `equals`，否则每次比较都判为变化。
+- **绕过宿主的写入：** 提供 `subscribe(handle, listener)` 时，宿主在 `create` 后立即订阅；`listener(keys)` 只比较这些 key，`listener()` 比较全部被读过的 key。也可以在 `create(ctx)` 里保存 `ctx.invalidate`，外部改完后调用。两者都没有时，外部写入不会显示。同一微任务内的多次通知合并为一次比较。
+- **相等判断：** 先 `Object.is`，不同才调用比较器；`equalsBy` 按 key 前缀选比较器，最长前缀优先。比较器必须同步；抛错或返回 Promise 时报 `STATE_EQUALS_FAILED` 并按“已变化”处理。相等时保留旧值。
+- **默认 store 的比较：** 插件以 `stores: [defaultStateStore({ equals, equalsBy })]` 为 `page`、`section`、`part` 设置比较器（`equalsBy` 的键是完整路径前缀，如 `page.form`）；一个宿主只允许一个插件这样做。
+- **异步：** `create`、`get`、`set`、`has`、`dispose` 都可以返回 Promise。`ctx.state.status(path)` 与 derive 里的 `state.status(path)` 给出 `idle`/`loading`/`ready`/`error` 与 `refreshing`；`ctx.state.load(path)` 等待调用之后的第一次读取。读取或写入失败分别报 `STATE_STORE_READ_FAILED`、`STATE_STORE_WRITE_FAILED`，缓存保留旧值。
+- **中间件：** `composeStore(store, m1, m2)` 按 m1 → m2 → store 调用；中间件只返回它覆盖的函数和自己的 `dispose`，释放顺序为 m1、m2、store。
+- **句柄：** 效果的 ctx 上没有句柄。需要句柄的本地插件在 `deps` 里引用 `partCorePlugin.getFeature('stateStores')`，调用 `handle(namespace)`。
+- **未登记的命名空间：** 显式读写抛 `STATE_NAMESPACE_UNKNOWN`；渲染、derive 和资源参数读到 `undefined`，每段未登记期间只报告一次。
 
 ## 生成的类型
 

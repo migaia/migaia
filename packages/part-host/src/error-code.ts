@@ -62,7 +62,59 @@ export const PartHostErrorCode = {
    * An `isolated` effect ran while no isolated runner was registered on the `effect` Feature.
    * Install the plugin that provides isolation (for example part-plugin-remote) before running it.
    */
-  effectIsolationUnavailable: 'EFFECT_ISOLATION_UNAVAILABLE'
+  effectIsolationUnavailable: 'EFFECT_ISOLATION_UNAVAILABLE',
+  /**
+   * `defineStateStore` got a namespace that does not match `^[a-z][a-zA-Z0-9]*$` or is one of the
+   * reserved `page`, `section`, `part` (thrown synchronously as a TypeError). Pick another name;
+   * the default store is replaced with `defaultStateStore` instead.
+   */
+  stateStoreInvalid: 'STATE_STORE_INVALID',
+  /**
+   * An explicit state read or write, `seed`, `status`, `load` or `stateStores.handle` named a
+   * namespace no live plugin generation serves (or `page`/`section`/`part` for `handle`).
+   * Rendering, derive and resource-parameter reads return `undefined` instead and report this code
+   * once per period the namespace stays unregistered. Install the plugin that registers the store.
+   */
+  stateNamespaceUnknown: 'STATE_NAMESPACE_UNKNOWN',
+  /**
+   * A plugin registered a namespace (or a `defaultStateStore`) another plugin name already holds;
+   * the later plugin fails to install and the earlier one is unchanged. Replacing a plugin of the
+   * same name is not a conflict. Use one owner per namespace.
+   */
+  stateStoreConflict: 'STATE_STORE_CONFLICT',
+  /**
+   * An asynchronous `create` of a store rejected; reported through the host diagnostics with the
+   * rejection on `cause`. The plugin stays installed; the namespace is unregistered unless another
+   * generation serves it.
+   */
+  stateStoreCreateFailed: 'STATE_STORE_CREATE_FAILED',
+  /**
+   * An asynchronous `get` of a store rejected; reported every time with the rejection on `cause`.
+   * The path keeps its cached value and shows `status: 'error'` until a later read succeeds.
+   */
+  stateStoreReadFailed: 'STATE_STORE_READ_FAILED',
+  /**
+   * An asynchronous `set` of a store rejected; reported every time with the rejection on `cause`.
+   * The cached value is unchanged and the path shows `status: 'error'`.
+   */
+  stateStoreWriteFailed: 'STATE_STORE_WRITE_FAILED',
+  /**
+   * A store or default-store equality function threw or returned a thenable; reported with the
+   * failure on `cause`, and the value is treated as changed. Keep `equals` synchronous and total.
+   */
+  stateEqualsFailed: 'STATE_EQUALS_FAILED',
+  /**
+   * Releasing a store failed. The host reports a new error with this code whose `cause` is the
+   * `dispose` failure; `composeStore` also tags the `AggregateError` it builds when several layers
+   * fail. Other stores are still released.
+   */
+  stateStoreDisposeFailed: 'STATE_STORE_DISPOSE_FAILED',
+  /**
+   * A plugin install failed (a store `create` or `catalog.register` threw) and releasing an already
+   * created store synchronously threw too. The install fails with an `AggregateError` carrying this
+   * code; `errors[0]` and `cause` are the original failure, followed by the release failures.
+   */
+  stateStoreRollbackFailed: 'STATE_STORE_ROLLBACK_FAILED'
 } as const
 
 /** Value union of every `part.host` error code. */

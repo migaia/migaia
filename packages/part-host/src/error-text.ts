@@ -36,5 +36,32 @@ export const PartHostErrorText = {
     `effect "${effect}" is not allowed to ${operation}`,
   /** An isolated effect ran without an isolated runner. */
   effectIsolationUnavailable: (effect: string): string =>
-    `effect "${effect}" is isolated but no isolated runner is registered`
+    `effect "${effect}" is isolated but no isolated runner is registered`,
+  /** Invalid or reserved store namespace. */
+  stateStoreInvalid: (namespace: string): string =>
+    `state store namespace "${namespace}" must match ^[a-z][a-zA-Z0-9]*$ and not be page, section or part`,
+  /** Unregistered namespace. */
+  stateNamespaceUnknown: (namespace: string): string =>
+    `state namespace "${namespace}" is not registered by any installed plugin`,
+  /** Namespace already held by another plugin. */
+  stateStoreConflict: (namespace: string, owner: string): string =>
+    `state namespace "${namespace}" is already registered by plugin "${owner}"`,
+  /** Asynchronous create rejected. */
+  stateStoreCreateFailed: (namespace: string): string =>
+    `creating state store "${namespace}" failed`,
+  /** Asynchronous get rejected. */
+  stateStoreReadFailed: (path: string): string => `reading state "${path}" failed`,
+  /** Asynchronous set rejected. */
+  stateStoreWriteFailed: (path: string): string => `writing state "${path}" failed`,
+  /** Equality function failed. */
+  stateEqualsFailed: (path: string): string =>
+    `equality check of state "${path}" failed; the value is treated as changed`,
+  /** Store release failed. */
+  stateStoreDisposeFailed: (namespace: string): string =>
+    `releasing state store "${namespace}" failed`,
+  /** Several composed layers failed to release. */
+  stateStoreLayersDisposeFailed: 'several layers of a composed state store failed to release',
+  /** Install rollback failed to release a created store. */
+  stateStoreRollbackFailed: (plugin: string): string =>
+    `plugin "${plugin}" failed to install and releasing its created state stores failed too`
 } as const

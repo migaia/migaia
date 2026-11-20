@@ -9,7 +9,9 @@ import { PartHostErrorText } from './error-text.ts'
 import { createPartHostError } from './errors.ts'
 import { ModelHandle } from './models.ts'
 import { ResourceStore } from './resources.ts'
-import type { ScopeState } from './state.ts'
+import type { IStoreAdmission, ScopeState } from './state.ts'
+import { toCatalogSchema, type IStoreDescriptor } from '@migaia/part-contract'
+import { StateStoreKind, type IStateStatus } from './state-store.ts'
 import type { ITraceSink } from './trace/sink.ts'
 import type {
   IDiagnosticInfo,
@@ -131,7 +133,7 @@ export class CoreRuntime {
   readonly resources = new ResourceStore({
     runtime: () => this.state().runtime,
     resource: (id) => this.catalog.resource(id),
-    readState: (path) => this.state().read(path),
+    readState: (path) => this.state().readShared(path),
     derived: (id) => this.state().derived(id),
     report: (error) => this.diagnostics.report(error)
   })
@@ -201,9 +203,19 @@ class StateFeature {
     this.#core.state().write(path, value)
   }
 
-  /** Writes a path only when it was never written. */
+  /** Writes a path only when it was never written (or the store reports it absent). */
   seed(path: string, value: unknown): void {
     this.#core.state().seed(path, value)
+  }
+
+  /** Tracked status of a path. */
+  status(path: string): IStateStatus {
+    return this.#core.state().status(path)
+  }
+
+  /** Value of the next qualifying read of a path. */
+  load(path: string): Promise<unknown> {
+    return this.#core.state().load(path)
   }
 
   /** Resolves a facet value of a node; `row` feeds `$row` bindings of template-row instances. */
@@ -331,7 +343,15 @@ const coreFeatures = {
     runtime: runtimeFeature
   }),
   resources: defineFeature((_core, deps) => deps.runtime.resources, { runtime: runtimeFeature }),
-  models: defineFeature((_core, deps) => deps.runtime.models, { runtime: runtimeFeature })
+  models: defineFeature((_core, deps) => deps.runtime.models, { runtime: runtimeFeature }),
+  /**
+   * Store handles: `handle(namespace)` returns the handle of the store serving a namespace now.
+   * Holding a reference to this Feature is the permission; effects and remote modules cannot.
+   */
+  stateStores: defineFeature(
+    (_core, deps) => ({ handle: (namespace: string) => deps.runtime.state().handle(namespace) }),
+    { runtime: runtimeFeature }
+  )
 }
 
 /** Names of the Features the core plugin provides. */
@@ -403,17 +423,56 @@ function contributionOf(
     rules: spec.rules ?? [],
     kinds: spec.kinds ?? {},
     effectFeatures: resolvedOutputs(spec.effects ?? [], deps, effectAlias),
-    resourceFeatures: resolvedOutputs(spec.resources ?? [], deps, resourceAlias)
+    resourceFeatures: resolvedOutputs(spec.resources ?? [], deps, resourceAlias),
+    stores: storeDescriptors(spec)
+  }
+}
+
+/** Catalog records of a plugin's external stores, with schemas converted to JSON Schema. */
+function storeDescriptors(spec: IPartPluginSpec): readonly IStoreDescriptor[] {
+  /** Records in declaration order. */
+  const records: IStoreDescriptor[] = []
+  for (const store of spec.stores ?? [])
+    if (store.__kind === StateStoreKind.store)
+      records.push(
+        store.schema === undefined
+          ? { namespace: store.namespace }
+          : { namespace: store.namespace, schema: toCatalogSchema(store.schema) }
+      )
+  return records
+}
+
+/**
+ * Install step 3: registers the contribution; on failure releases the admitted stores and throws
+ * the original error (or the rollback AggregateError).
+ */
+function registerContribution(
+  output: {
+    readonly catalog: PartCatalog
+    readonly core: CoreRuntime
+    readonly contribution: IContribution
+  },
+  admission: IStoreAdmission | undefined
+): void {
+  try {
+    output.catalog.register(output.contribution)
+  } catch (error) {
+    if (admission === undefined) throw error
+    throw output.core.state().rollback(admission, error)
   }
 }
 
 /**
- * Defines a part plugin. Installing it registers its contributions in the host catalog for exactly
- * this generation; releasing the generation withdraws them.
+ * Defines a part plugin. Installing it runs, in order: store conflict checks, every store `create`,
+ * catalog registration, store routing, then `onInstall`. Releasing the generation withdraws its
+ * contributions and releases its stores.
  */
 export function definePartPlugin(spec: IPartPluginSpec): IPartPlugin {
-  /** Dependencies of the registration Feature: the core catalog plus every effect dependency. */
-  const dependencies: Record<string, unknown> = { catalog: partCorePlugin.getFeature('catalog') }
+  /** Dependencies of the registration Feature: the core runtime and catalog, then effect deps. */
+  const dependencies: Record<string, unknown> = {
+    catalog: partCorePlugin.getFeature('catalog'),
+    runtime: partCorePlugin.getFeature('runtime')
+  }
   ;(spec.effects ?? []).forEach((effect, position) => {
     for (const [alias, reference] of Object.entries(effect.deps))
       dependencies[effectAlias(position, alias)] = reference
@@ -426,6 +485,7 @@ export function definePartPlugin(spec: IPartPluginSpec): IPartPlugin {
   const registration = defineFeature(
     (_core, deps: Readonly<Record<string, unknown>>) => ({
       catalog: deps.catalog as PartCatalog,
+      core: deps.runtime as CoreRuntime,
       contribution: contributionOf(spec, deps)
     }),
     dependencies as never
@@ -440,9 +500,13 @@ export function definePartPlugin(spec: IPartPluginSpec): IPartPlugin {
       /** Registration output of this generation. */
       const output = core.features.partRegistration as {
         readonly catalog: PartCatalog
+        readonly core: CoreRuntime
         readonly contribution: IContribution
       }
-      output.catalog.register(output.contribution)
+      /** Steps 1–2: conflicts, then every store `create` (skipped after the state closed). */
+      const admission = output.core.state().admit(spec.name, spec.stores ?? [])
+      registerContribution(output, admission)
+      if (admission !== undefined) output.core.state().activate(admission, core.lifecycle.signal)
       core.lifecycle.signal.addEventListener(
         'abort',
         () => output.catalog.withdraw(spec.name, output.contribution.token),

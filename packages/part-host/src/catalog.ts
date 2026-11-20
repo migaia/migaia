@@ -1,8 +1,10 @@
 import {
+  DEFAULT_STATE_NAMESPACES,
   splitDescriptorId,
   tagSegmentName,
   type ICapabilityManifest,
   type ICatalogView,
+  type IStoreDescriptor,
   type IDescriptor,
   type IKindSchema,
   type IRuleDefinition
@@ -33,7 +35,14 @@ export type IContribution = {
   readonly effectFeatures: ReadonlyMap<string, Readonly<Record<string, unknown>>>
   /** Resolved dependency outputs per resource id of this generation. */
   readonly resourceFeatures: ReadonlyMap<string, Readonly<Record<string, unknown>>>
+  /** External stores the generation declares (listed even while their `create` failed). */
+  readonly stores: readonly IStoreDescriptor[]
 }
+
+/** Default namespaces as catalog records (no schema), listed first by `stores()`. */
+const DEFAULT_STORE_RECORDS: readonly IStoreDescriptor[] = Object.freeze(
+  DEFAULT_STATE_NAMESPACES.map((namespace) => Object.freeze({ namespace }))
+)
 
 /** One stored entry with its owning generation and availability. */
 type IEntry<TValue> = {
@@ -274,7 +283,7 @@ export class PartCatalog implements ICatalog {
     const renderers = new Set<string>()
     for (const [key, entry] of this.#implementations)
       if (entry.available) renderers.add(key.slice(0, key.indexOf('\u0000')))
-    return { format: 1, build, definitions, renderers: [...renderers] }
+    return { format: 1, build, definitions, renderers: [...renderers], stores: this.#storeNames() }
   }
 
   /** Rules contributed by every registered plugin. */
@@ -312,14 +321,32 @@ export class PartCatalog implements ICatalog {
     }
   }
 
-  /** Read-only view for the rule engine. */
+  /** Read-only view for the rule engine; `stores` lists the host's namespaces. */
   view(): ICatalogView {
     return {
       get: (id) => this.get(id)?.descriptor,
       majors: (name) => this.#majors(name),
       writesFor: (tag) => this.#writesFor(tag),
-      all: () => this.#allDescriptors()
+      all: () => this.#allDescriptors(),
+      stores: () => this.stores()
     }
+  }
+
+  /** `page`, `section`, `part`, then every store the registered plugins declare. */
+  stores(): readonly IStoreDescriptor[] {
+    /** Records in registration order. */
+    const records: IStoreDescriptor[] = [...DEFAULT_STORE_RECORDS]
+    for (const contribution of this.#contributions.values()) records.push(...contribution.stores)
+    return records
+  }
+
+  /** Non-default namespaces of the registered plugins, for the capability manifest. */
+  #storeNames(): string[] {
+    /** Names in registration order. */
+    const names: string[] = []
+    for (const contribution of this.#contributions.values())
+      for (const store of contribution.stores) names.push(store.namespace)
+    return names
   }
 
   /** Descriptors of every available definition, in registration order. */

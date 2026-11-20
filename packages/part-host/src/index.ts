@@ -19,6 +19,22 @@ export type {
   IResourceSpec
 } from './define.ts'
 export { definePartPlugin, partCorePlugin, PART_CORE_PLUGIN } from './core.ts'
+export {
+  composeStore,
+  defaultStateStore,
+  defineStateStore,
+  StateStoreKind,
+  type IDefaultStateStore,
+  type IDefaultStateStoreOptions,
+  type IMaybePromise,
+  type IStateEquals,
+  type IStateStatus,
+  type IStateStore,
+  type IStateStoreContext,
+  type IStateStoreLayer,
+  type IStateStoreMiddleware,
+  type IStateStoreSpec
+} from './state-store.ts'
 export { createPartHost } from './host.ts'
 export { EFFECT_GRANTS_META, type IEffectGrants } from './effects.ts'
 export { ERROR_SOURCE, PartHostErrorCode, type IPartHostErrorCode } from './error-code.ts'

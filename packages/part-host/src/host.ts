@@ -99,6 +99,7 @@ class PartHost implements IPartHost {
     this.#state = new ScopeState(
       options.runtime ?? createRuntime(),
       (id) => this.#deriveOf(id),
+      (error) => core.diagnostics.report(error),
       core.trace
     )
     this.#store = new BlueprintStore(
@@ -111,6 +112,8 @@ class PartHost implements IPartHost {
       lookup: (id) => core.catalog.effect(id),
       read: (path) => this.#state.read(path),
       write: (path, value) => this.#state.write(path, value),
+      status: (path) => this.#state.status(path),
+      load: (path) => this.#state.load(path),
       enqueue: (address, event, detail) =>
         void this.dispatch(address, event, detail).catch(() => undefined),
       report: (error, address) => core.diagnostics.report(error, address),
