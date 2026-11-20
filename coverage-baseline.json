@@ -266,6 +266,182 @@
         "pct": 96.95
       }
     },
+    "part-contract": {
+      "lines": {
+        "covered": 998,
+        "total": 1085,
+        "pct": 91.98
+      },
+      "statements": {
+        "covered": 1121,
+        "total": 1260,
+        "pct": 88.96
+      },
+      "functions": {
+        "covered": 231,
+        "total": 247,
+        "pct": 93.52
+      },
+      "branches": {
+        "covered": 932,
+        "total": 1112,
+        "pct": 83.81
+      }
+    },
+    "part-host": {
+      "lines": {
+        "covered": 921,
+        "total": 1011,
+        "pct": 91.09
+      },
+      "statements": {
+        "covered": 1038,
+        "total": 1170,
+        "pct": 88.71
+      },
+      "functions": {
+        "covered": 309,
+        "total": 361,
+        "pct": 85.59
+      },
+      "branches": {
+        "covered": 487,
+        "total": 611,
+        "pct": 79.7
+      }
+    },
+    "part-layouts": {
+      "lines": {
+        "covered": 15,
+        "total": 15,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 16,
+        "total": 16,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 7,
+        "total": 10,
+        "pct": 70
+      }
+    },
+    "part-plugin-devtools": {
+      "lines": {
+        "covered": 150,
+        "total": 156,
+        "pct": 96.15
+      },
+      "statements": {
+        "covered": 165,
+        "total": 176,
+        "pct": 93.75
+      },
+      "functions": {
+        "covered": 30,
+        "total": 32,
+        "pct": 93.75
+      },
+      "branches": {
+        "covered": 47,
+        "total": 57,
+        "pct": 82.45
+      }
+    },
+    "part-plugin-dom": {
+      "lines": {
+        "covered": 720,
+        "total": 790,
+        "pct": 91.13
+      },
+      "statements": {
+        "covered": 816,
+        "total": 927,
+        "pct": 88.02
+      },
+      "functions": {
+        "covered": 201,
+        "total": 222,
+        "pct": 90.54
+      },
+      "branches": {
+        "covered": 413,
+        "total": 558,
+        "pct": 74.01
+      }
+    },
+    "part-plugin-react": {
+      "lines": {
+        "covered": 356,
+        "total": 373,
+        "pct": 95.44
+      },
+      "statements": {
+        "covered": 403,
+        "total": 436,
+        "pct": 92.43
+      },
+      "functions": {
+        "covered": 100,
+        "total": 106,
+        "pct": 94.33
+      },
+      "branches": {
+        "covered": 227,
+        "total": 270,
+        "pct": 84.07
+      }
+    },
+    "part-plugin-remote": {
+      "lines": {
+        "covered": 250,
+        "total": 306,
+        "pct": 81.69
+      },
+      "statements": {
+        "covered": 282,
+        "total": 348,
+        "pct": 81.03
+      },
+      "functions": {
+        "covered": 95,
+        "total": 119,
+        "pct": 79.83
+      },
+      "branches": {
+        "covered": 102,
+        "total": 143,
+        "pct": 71.32
+      }
+    },
+    "partom-cli": {
+      "lines": {
+        "covered": 43,
+        "total": 2564,
+        "pct": 1.67
+      },
+      "statements": {
+        "covered": 59,
+        "total": 2942,
+        "pct": 2
+      },
+      "functions": {
+        "covered": 11,
+        "total": 546,
+        "pct": 2.01
+      },
+      "branches": {
+        "covered": 58,
+        "total": 1822,
+        "pct": 3.18
+      }
+    },
     "plugin-host": {
       "lines": {
         "covered": 3394,
@@ -5558,6 +5734,4098 @@
         "covered": 7,
         "total": 7,
         "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/address.ts": {
+      "lines": {
+        "covered": 76,
+        "total": 78,
+        "pct": 97.43
+      },
+      "statements": {
+        "covered": 79,
+        "total": 82,
+        "pct": 96.34
+      },
+      "functions": {
+        "covered": 20,
+        "total": 20,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 52,
+        "total": 60,
+        "pct": 86.66
+      }
+    },
+    "packages/part-contract/src/blueprint.ts": {
+      "lines": {
+        "covered": 44,
+        "total": 49,
+        "pct": 89.79
+      },
+      "statements": {
+        "covered": 51,
+        "total": 62,
+        "pct": 82.25
+      },
+      "functions": {
+        "covered": 9,
+        "total": 10,
+        "pct": 90
+      },
+      "branches": {
+        "covered": 60,
+        "total": 74,
+        "pct": 81.08
+      }
+    },
+    "packages/part-contract/src/data-checks.ts": {
+      "lines": {
+        "covered": 42,
+        "total": 43,
+        "pct": 97.67
+      },
+      "statements": {
+        "covered": 46,
+        "total": 54,
+        "pct": 85.18
+      },
+      "functions": {
+        "covered": 10,
+        "total": 10,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 68,
+        "total": 76,
+        "pct": 89.47
+      }
+    },
+    "packages/part-contract/src/data.ts": {
+      "lines": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/descriptor-id.ts": {
+      "lines": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/descriptor.ts": {
+      "lines": {
+        "covered": 37,
+        "total": 50,
+        "pct": 74
+      },
+      "statements": {
+        "covered": 45,
+        "total": 62,
+        "pct": 72.58
+      },
+      "functions": {
+        "covered": 8,
+        "total": 9,
+        "pct": 88.88
+      },
+      "branches": {
+        "covered": 60,
+        "total": 80,
+        "pct": 75
+      }
+    },
+    "packages/part-contract/src/doctor/behavior-rules.ts": {
+      "lines": {
+        "covered": 115,
+        "total": 115,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 127,
+        "total": 128,
+        "pct": 99.21
+      },
+      "functions": {
+        "covered": 32,
+        "total": 32,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 122,
+        "total": 130,
+        "pct": 93.84
+      }
+    },
+    "packages/part-contract/src/doctor/data-rules.ts": {
+      "lines": {
+        "covered": 40,
+        "total": 46,
+        "pct": 86.95
+      },
+      "statements": {
+        "covered": 45,
+        "total": 57,
+        "pct": 78.94
+      },
+      "functions": {
+        "covered": 7,
+        "total": 9,
+        "pct": 77.77
+      },
+      "branches": {
+        "covered": 43,
+        "total": 57,
+        "pct": 75.43
+      }
+    },
+    "packages/part-contract/src/doctor/index.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/doctor/layout-rules.ts": {
+      "lines": {
+        "covered": 33,
+        "total": 35,
+        "pct": 94.28
+      },
+      "statements": {
+        "covered": 37,
+        "total": 39,
+        "pct": 94.87
+      },
+      "functions": {
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 31,
+        "total": 32,
+        "pct": 96.87
+      }
+    },
+    "packages/part-contract/src/doctor/security-rules.ts": {
+      "lines": {
+        "covered": 16,
+        "total": 16,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 20,
+        "total": 20,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 16,
+        "total": 16,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/doctor/shared.ts": {
+      "lines": {
+        "covered": 12,
+        "total": 12,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 12,
+        "total": 12,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 14,
+        "total": 14,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/doctor/structure-rules.ts": {
+      "lines": {
+        "covered": 69,
+        "total": 70,
+        "pct": 98.57
+      },
+      "statements": {
+        "covered": 76,
+        "total": 78,
+        "pct": 97.43
+      },
+      "functions": {
+        "covered": 12,
+        "total": 12,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 79,
+        "total": 83,
+        "pct": 95.18
+      }
+    },
+    "packages/part-contract/src/doctor/tables.ts": {
+      "lines": {
+        "covered": 10,
+        "total": 10,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 10,
+        "total": 10,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/error-code.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/error-text.ts": {
+      "lines": {
+        "covered": 23,
+        "total": 24,
+        "pct": 95.83
+      },
+      "statements": {
+        "covered": 23,
+        "total": 24,
+        "pct": 95.83
+      },
+      "functions": {
+        "covered": 20,
+        "total": 21,
+        "pct": 95.23
+      },
+      "branches": {
+        "covered": 3,
+        "total": 4,
+        "pct": 75
+      }
+    },
+    "packages/part-contract/src/errors.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/event-key.ts": {
+      "lines": {
+        "covered": 26,
+        "total": 28,
+        "pct": 92.85
+      },
+      "statements": {
+        "covered": 30,
+        "total": 33,
+        "pct": 90.9
+      },
+      "functions": {
+        "covered": 7,
+        "total": 9,
+        "pct": 77.77
+      },
+      "branches": {
+        "covered": 22,
+        "total": 26,
+        "pct": 84.61
+      }
+    },
+    "packages/part-contract/src/fragments.ts": {
+      "lines": {
+        "covered": 82,
+        "total": 88,
+        "pct": 93.18
+      },
+      "statements": {
+        "covered": 90,
+        "total": 102,
+        "pct": 88.23
+      },
+      "functions": {
+        "covered": 14,
+        "total": 17,
+        "pct": 82.35
+      },
+      "branches": {
+        "covered": 63,
+        "total": 73,
+        "pct": 86.3
+      }
+    },
+    "packages/part-contract/src/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/layout.ts": {
+      "lines": {
+        "covered": 37,
+        "total": 40,
+        "pct": 92.5
+      },
+      "statements": {
+        "covered": 42,
+        "total": 46,
+        "pct": 91.3
+      },
+      "functions": {
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 74,
+        "total": 86,
+        "pct": 86.04
+      }
+    },
+    "packages/part-contract/src/model.ts": {
+      "lines": {
+        "covered": 12,
+        "total": 12,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 12,
+        "total": 12,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 11,
+        "total": 16,
+        "pct": 68.75
+      }
+    },
+    "packages/part-contract/src/models-check.ts": {
+      "lines": {
+        "covered": 8,
+        "total": 8,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 9,
+        "total": 9,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 4,
+        "total": 6,
+        "pct": 66.66
+      }
+    },
+    "packages/part-contract/src/platform/audit.ts": {
+      "lines": {
+        "covered": 19,
+        "total": 22,
+        "pct": 86.36
+      },
+      "statements": {
+        "covered": 19,
+        "total": 22,
+        "pct": 86.36
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 9,
+        "total": 16,
+        "pct": 56.25
+      }
+    },
+    "packages/part-contract/src/platform/changeset.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 5,
+        "pct": 40
+      },
+      "statements": {
+        "covered": 2,
+        "total": 7,
+        "pct": 28.57
+      },
+      "functions": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "branches": {
+        "covered": 2,
+        "total": 6,
+        "pct": 33.33
+      }
+    },
+    "packages/part-contract/src/platform/lock.ts": {
+      "lines": {
+        "covered": 86,
+        "total": 95,
+        "pct": 90.52
+      },
+      "statements": {
+        "covered": 102,
+        "total": 120,
+        "pct": 85
+      },
+      "functions": {
+        "covered": 16,
+        "total": 16,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 54,
+        "total": 68,
+        "pct": 79.41
+      }
+    },
+    "packages/part-contract/src/platform/manifest.ts": {
+      "lines": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/platform/merge.ts": {
+      "lines": {
+        "covered": 86,
+        "total": 92,
+        "pct": 93.47
+      },
+      "statements": {
+        "covered": 106,
+        "total": 116,
+        "pct": 91.37
+      },
+      "functions": {
+        "covered": 16,
+        "total": 16,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 69,
+        "total": 89,
+        "pct": 77.52
+      }
+    },
+    "packages/part-contract/src/platform/patch.ts": {
+      "lines": {
+        "covered": 51,
+        "total": 54,
+        "pct": 94.44
+      },
+      "statements": {
+        "covered": 62,
+        "total": 67,
+        "pct": 92.53
+      },
+      "functions": {
+        "covered": 10,
+        "total": 10,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 33,
+        "total": 39,
+        "pct": 84.61
+      }
+    },
+    "packages/part-contract/src/platform/trace.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/platform/view.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 19,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 19,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 14,
+        "pct": 0
+      }
+    },
+    "packages/part-contract/src/record.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      }
+    },
+    "packages/part-contract/src/rules.ts": {
+      "lines": {
+        "covered": 29,
+        "total": 29,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 30,
+        "total": 30,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 11,
+        "total": 11,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 22,
+        "total": 24,
+        "pct": 91.66
+      }
+    },
+    "packages/part-contract/src/schema.ts": {
+      "lines": {
+        "covered": 21,
+        "total": 23,
+        "pct": 91.3
+      },
+      "statements": {
+        "covered": 22,
+        "total": 25,
+        "pct": 88
+      },
+      "functions": {
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 10,
+        "total": 12,
+        "pct": 83.33
+      }
+    },
+    "packages/part-contract/src/types.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-host/src/blueprints.ts": {
+      "lines": {
+        "covered": 164,
+        "total": 175,
+        "pct": 93.71
+      },
+      "statements": {
+        "covered": 194,
+        "total": 208,
+        "pct": 93.26
+      },
+      "functions": {
+        "covered": 42,
+        "total": 44,
+        "pct": 95.45
+      },
+      "branches": {
+        "covered": 116,
+        "total": 140,
+        "pct": 82.85
+      }
+    },
+    "packages/part-host/src/catalog.ts": {
+      "lines": {
+        "covered": 135,
+        "total": 137,
+        "pct": 98.54
+      },
+      "statements": {
+        "covered": 159,
+        "total": 169,
+        "pct": 94.08
+      },
+      "functions": {
+        "covered": 29,
+        "total": 35,
+        "pct": 82.85
+      },
+      "branches": {
+        "covered": 72,
+        "total": 88,
+        "pct": 81.81
+      }
+    },
+    "packages/part-host/src/core.ts": {
+      "lines": {
+        "covered": 88,
+        "total": 100,
+        "pct": 88
+      },
+      "statements": {
+        "covered": 91,
+        "total": 108,
+        "pct": 84.25
+      },
+      "functions": {
+        "covered": 52,
+        "total": 66,
+        "pct": 78.78
+      },
+      "branches": {
+        "covered": 49,
+        "total": 56,
+        "pct": 87.5
+      }
+    },
+    "packages/part-host/src/define.ts": {
+      "lines": {
+        "covered": 29,
+        "total": 29,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 30,
+        "total": 30,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 11,
+        "total": 11,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 31,
+        "total": 38,
+        "pct": 81.57
+      }
+    },
+    "packages/part-host/src/effects.ts": {
+      "lines": {
+        "covered": 72,
+        "total": 76,
+        "pct": 94.73
+      },
+      "statements": {
+        "covered": 75,
+        "total": 80,
+        "pct": 93.75
+      },
+      "functions": {
+        "covered": 33,
+        "total": 36,
+        "pct": 91.66
+      },
+      "branches": {
+        "covered": 31,
+        "total": 34,
+        "pct": 91.17
+      }
+    },
+    "packages/part-host/src/enhance.ts": {
+      "lines": {
+        "covered": 33,
+        "total": 34,
+        "pct": 97.05
+      },
+      "statements": {
+        "covered": 37,
+        "total": 39,
+        "pct": 94.87
+      },
+      "functions": {
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 17,
+        "total": 20,
+        "pct": 85
+      }
+    },
+    "packages/part-host/src/error-code.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-host/src/error-text.ts": {
+      "lines": {
+        "covered": 14,
+        "total": 15,
+        "pct": 93.33
+      },
+      "statements": {
+        "covered": 14,
+        "total": 15,
+        "pct": 93.33
+      },
+      "functions": {
+        "covered": 13,
+        "total": 14,
+        "pct": 92.85
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-host/src/errors.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 3,
+        "pct": 66.66
+      },
+      "statements": {
+        "covered": 2,
+        "total": 3,
+        "pct": 66.66
+      },
+      "functions": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      },
+      "branches": {
+        "covered": 2,
+        "total": 6,
+        "pct": 33.33
+      }
+    },
+    "packages/part-host/src/host.ts": {
+      "lines": {
+        "covered": 96,
+        "total": 103,
+        "pct": 93.2
+      },
+      "statements": {
+        "covered": 115,
+        "total": 126,
+        "pct": 91.26
+      },
+      "functions": {
+        "covered": 45,
+        "total": 47,
+        "pct": 95.74
+      },
+      "branches": {
+        "covered": 30,
+        "total": 45,
+        "pct": 66.66
+      }
+    },
+    "packages/part-host/src/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-host/src/issue-rules.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-host/src/models.ts": {
+      "lines": {
+        "covered": 10,
+        "total": 10,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 11,
+        "total": 11,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 6,
+        "total": 8,
+        "pct": 75
+      }
+    },
+    "packages/part-host/src/registry.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-host/src/resources.ts": {
+      "lines": {
+        "covered": 217,
+        "total": 230,
+        "pct": 94.34
+      },
+      "statements": {
+        "covered": 241,
+        "total": 268,
+        "pct": 89.92
+      },
+      "functions": {
+        "covered": 54,
+        "total": 57,
+        "pct": 94.73
+      },
+      "branches": {
+        "covered": 107,
+        "total": 139,
+        "pct": 76.97
+      }
+    },
+    "packages/part-host/src/state.ts": {
+      "lines": {
+        "covered": 58,
+        "total": 59,
+        "pct": 98.3
+      },
+      "statements": {
+        "covered": 66,
+        "total": 69,
+        "pct": 95.65
+      },
+      "functions": {
+        "covered": 18,
+        "total": 18,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 26,
+        "total": 29,
+        "pct": 89.65
+      }
+    },
+    "packages/part-host/src/trace/noop.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 7,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-host/src/trace/recorder.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 31,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 34,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 12,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      }
+    },
+    "packages/part-host/src/trace/sink.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-host/src/types.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-layouts/src/builtins.ts": {
+      "lines": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-layouts/src/define-layout.ts": {
+      "lines": {
+        "covered": 8,
+        "total": 8,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 9,
+        "total": 9,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 7,
+        "total": 10,
+        "pct": 70
+      }
+    },
+    "packages/part-layouts/src/error-code.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-layouts/src/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-layouts/src/plugin.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-layouts/src/text.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-devtools/src/error-code.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 1,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 1,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-devtools/src/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-devtools/src/noop.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-devtools/src/panel.ts": {
+      "lines": {
+        "covered": 86,
+        "total": 90,
+        "pct": 95.55
+      },
+      "statements": {
+        "covered": 95,
+        "total": 104,
+        "pct": 91.34
+      },
+      "functions": {
+        "covered": 18,
+        "total": 20,
+        "pct": 90
+      },
+      "branches": {
+        "covered": 24,
+        "total": 31,
+        "pct": 77.41
+      }
+    },
+    "packages/part-plugin-devtools/src/plugin.ts": {
+      "lines": {
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-devtools/src/text.ts": {
+      "lines": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-devtools/src/views.ts": {
+      "lines": {
+        "covered": 50,
+        "total": 51,
+        "pct": 98.03
+      },
+      "statements": {
+        "covered": 55,
+        "total": 56,
+        "pct": 98.21
+      },
+      "functions": {
+        "covered": 9,
+        "total": 9,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 23,
+        "total": 26,
+        "pct": 88.46
+      }
+    },
+    "packages/part-plugin-dom/src/args-schema.ts": {
+      "lines": {
+        "covered": 12,
+        "total": 22,
+        "pct": 54.54
+      },
+      "statements": {
+        "covered": 15,
+        "total": 26,
+        "pct": 57.69
+      },
+      "functions": {
+        "covered": 7,
+        "total": 9,
+        "pct": 77.77
+      },
+      "branches": {
+        "covered": 3,
+        "total": 17,
+        "pct": 17.64
+      }
+    },
+    "packages/part-plugin-dom/src/aria.ts": {
+      "lines": {
+        "covered": 14,
+        "total": 17,
+        "pct": 82.35
+      },
+      "statements": {
+        "covered": 17,
+        "total": 21,
+        "pct": 80.95
+      },
+      "functions": {
+        "covered": 3,
+        "total": 4,
+        "pct": 75
+      },
+      "branches": {
+        "covered": 5,
+        "total": 12,
+        "pct": 41.66
+      }
+    },
+    "packages/part-plugin-dom/src/error-code.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-dom/src/error-text.ts": {
+      "lines": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-dom/src/errors.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-dom/src/events.ts": {
+      "lines": {
+        "covered": 117,
+        "total": 126,
+        "pct": 92.85
+      },
+      "statements": {
+        "covered": 130,
+        "total": 146,
+        "pct": 89.04
+      },
+      "functions": {
+        "covered": 30,
+        "total": 31,
+        "pct": 96.77
+      },
+      "branches": {
+        "covered": 66,
+        "total": 80,
+        "pct": 82.5
+      }
+    },
+    "packages/part-plugin-dom/src/focus.ts": {
+      "lines": {
+        "covered": 31,
+        "total": 34,
+        "pct": 91.17
+      },
+      "statements": {
+        "covered": 33,
+        "total": 38,
+        "pct": 86.84
+      },
+      "functions": {
+        "covered": 7,
+        "total": 8,
+        "pct": 87.5
+      },
+      "branches": {
+        "covered": 24,
+        "total": 34,
+        "pct": 70.58
+      }
+    },
+    "packages/part-plugin-dom/src/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-dom/src/layer-constants.ts": {
+      "lines": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-dom/src/layer.ts": {
+      "lines": {
+        "covered": 56,
+        "total": 59,
+        "pct": 94.91
+      },
+      "statements": {
+        "covered": 68,
+        "total": 74,
+        "pct": 91.89
+      },
+      "functions": {
+        "covered": 13,
+        "total": 13,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 46,
+        "total": 58,
+        "pct": 79.31
+      }
+    },
+    "packages/part-plugin-dom/src/layout/attachment.ts": {
+      "lines": {
+        "covered": 96,
+        "total": 98,
+        "pct": 97.95
+      },
+      "statements": {
+        "covered": 107,
+        "total": 117,
+        "pct": 91.45
+      },
+      "functions": {
+        "covered": 18,
+        "total": 19,
+        "pct": 94.73
+      },
+      "branches": {
+        "covered": 59,
+        "total": 81,
+        "pct": 72.83
+      }
+    },
+    "packages/part-plugin-dom/src/layout/collapse.ts": {
+      "lines": {
+        "covered": 37,
+        "total": 38,
+        "pct": 97.36
+      },
+      "statements": {
+        "covered": 42,
+        "total": 44,
+        "pct": 95.45
+      },
+      "functions": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 16,
+        "total": 21,
+        "pct": 76.19
+      }
+    },
+    "packages/part-plugin-dom/src/layout/constants.ts": {
+      "lines": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-dom/src/layout/focus-cycle.ts": {
+      "lines": {
+        "covered": 27,
+        "total": 27,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 30,
+        "total": 32,
+        "pct": 93.75
+      },
+      "functions": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 23,
+        "total": 26,
+        "pct": 88.46
+      }
+    },
+    "packages/part-plugin-dom/src/layout/ids.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-dom/src/layout/regions.ts": {
+      "lines": {
+        "covered": 46,
+        "total": 46,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 54,
+        "total": 56,
+        "pct": 96.42
+      },
+      "functions": {
+        "covered": 8,
+        "total": 8,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 36,
+        "total": 48,
+        "pct": 75
+      }
+    },
+    "packages/part-plugin-dom/src/layout/separator.ts": {
+      "lines": {
+        "covered": 45,
+        "total": 47,
+        "pct": 95.74
+      },
+      "statements": {
+        "covered": 52,
+        "total": 57,
+        "pct": 91.22
+      },
+      "functions": {
+        "covered": 11,
+        "total": 11,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 33,
+        "total": 48,
+        "pct": 68.75
+      }
+    },
+    "packages/part-plugin-dom/src/layout/storage.ts": {
+      "lines": {
+        "covered": 9,
+        "total": 10,
+        "pct": 90
+      },
+      "statements": {
+        "covered": 9,
+        "total": 10,
+        "pct": 90
+      },
+      "functions": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 11,
+        "total": 11,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-dom/src/modifiers.ts": {
+      "lines": {
+        "covered": 115,
+        "total": 136,
+        "pct": 84.55
+      },
+      "statements": {
+        "covered": 127,
+        "total": 156,
+        "pct": 81.41
+      },
+      "functions": {
+        "covered": 44,
+        "total": 56,
+        "pct": 78.57
+      },
+      "branches": {
+        "covered": 52,
+        "total": 82,
+        "pct": 63.41
+      }
+    },
+    "packages/part-plugin-dom/src/plugin.ts": {
+      "lines": {
+        "covered": 33,
+        "total": 34,
+        "pct": 97.05
+      },
+      "statements": {
+        "covered": 36,
+        "total": 37,
+        "pct": 97.29
+      },
+      "functions": {
+        "covered": 24,
+        "total": 25,
+        "pct": 96
+      },
+      "branches": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-dom/src/stylesheet.ts": {
+      "lines": {
+        "covered": 61,
+        "total": 75,
+        "pct": 81.33
+      },
+      "statements": {
+        "covered": 75,
+        "total": 92,
+        "pct": 81.52
+      },
+      "functions": {
+        "covered": 14,
+        "total": 16,
+        "pct": 87.5
+      },
+      "branches": {
+        "covered": 35,
+        "total": 36,
+        "pct": 97.22
+      }
+    },
+    "packages/part-plugin-react/src/bind.ts": {
+      "lines": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-react/src/commit.ts": {
+      "lines": {
+        "covered": 67,
+        "total": 69,
+        "pct": 97.1
+      },
+      "statements": {
+        "covered": 78,
+        "total": 82,
+        "pct": 95.12
+      },
+      "functions": {
+        "covered": 16,
+        "total": 16,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 51,
+        "total": 56,
+        "pct": 91.07
+      }
+    },
+    "packages/part-plugin-react/src/data-node.ts": {
+      "lines": {
+        "covered": 24,
+        "total": 24,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 28,
+        "total": 29,
+        "pct": 96.55
+      },
+      "functions": {
+        "covered": 9,
+        "total": 9,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 32,
+        "total": 36,
+        "pct": 88.88
+      }
+    },
+    "packages/part-plugin-react/src/error-code.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-react/src/errors.ts": {
+      "lines": {
+        "covered": 4,
+        "total": 6,
+        "pct": 66.66
+      },
+      "statements": {
+        "covered": 4,
+        "total": 6,
+        "pct": 66.66
+      },
+      "functions": {
+        "covered": 2,
+        "total": 4,
+        "pct": 50
+      },
+      "branches": {
+        "covered": 1,
+        "total": 2,
+        "pct": 50
+      }
+    },
+    "packages/part-plugin-react/src/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-react/src/layout.tsx": {
+      "lines": {
+        "covered": 52,
+        "total": 52,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 59,
+        "total": 62,
+        "pct": 95.16
+      },
+      "functions": {
+        "covered": 11,
+        "total": 11,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 38,
+        "total": 43,
+        "pct": 88.37
+      }
+    },
+    "packages/part-plugin-react/src/node-store.ts": {
+      "lines": {
+        "covered": 15,
+        "total": 19,
+        "pct": 78.94
+      },
+      "statements": {
+        "covered": 19,
+        "total": 26,
+        "pct": 73.07
+      },
+      "functions": {
+        "covered": 5,
+        "total": 6,
+        "pct": 83.33
+      },
+      "branches": {
+        "covered": 4,
+        "total": 6,
+        "pct": 66.66
+      }
+    },
+    "packages/part-plugin-react/src/plugin.ts": {
+      "lines": {
+        "covered": 13,
+        "total": 13,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 13,
+        "total": 13,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-react/src/render.tsx": {
+      "lines": {
+        "covered": 156,
+        "total": 161,
+        "pct": 96.89
+      },
+      "statements": {
+        "covered": 175,
+        "total": 184,
+        "pct": 95.1
+      },
+      "functions": {
+        "covered": 45,
+        "total": 48,
+        "pct": 93.75
+      },
+      "branches": {
+        "covered": 89,
+        "total": 104,
+        "pct": 85.57
+      }
+    },
+    "packages/part-plugin-react/src/text.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-react/src/virtual.ts": {
+      "lines": {
+        "covered": 19,
+        "total": 23,
+        "pct": 82.6
+      },
+      "statements": {
+        "covered": 21,
+        "total": 28,
+        "pct": 75
+      },
+      "functions": {
+        "covered": 5,
+        "total": 5,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 11,
+        "total": 22,
+        "pct": 50
+      }
+    },
+    "packages/part-plugin-remote/src/browser/blob-import.ts": {
+      "lines": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 8,
+        "total": 8,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-remote/src/browser/isolated-worker.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 32,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 32,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 13,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 4,
+        "pct": 0
+      }
+    },
+    "packages/part-plugin-remote/src/cache.ts": {
+      "lines": {
+        "covered": 7,
+        "total": 7,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 9,
+        "total": 9,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-remote/src/chunks.ts": {
+      "lines": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 8,
+        "total": 8,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-remote/src/client.ts": {
+      "lines": {
+        "covered": 12,
+        "total": 12,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 13,
+        "total": 13,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 9,
+        "total": 10,
+        "pct": 90
+      }
+    },
+    "packages/part-plugin-remote/src/error-code.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-remote/src/errors.ts": {
+      "lines": {
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 6,
+        "total": 6,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 1,
+        "total": 1,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-remote/src/index.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/part-plugin-remote/src/install.ts": {
+      "lines": {
+        "covered": 42,
+        "total": 47,
+        "pct": 89.36
+      },
+      "statements": {
+        "covered": 45,
+        "total": 51,
+        "pct": 88.23
+      },
+      "functions": {
+        "covered": 10,
+        "total": 10,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 13,
+        "total": 19,
+        "pct": 68.42
+      }
+    },
+    "packages/part-plugin-remote/src/isolated-runner.ts": {
+      "lines": {
+        "covered": 36,
+        "total": 47,
+        "pct": 76.59
+      },
+      "statements": {
+        "covered": 37,
+        "total": 52,
+        "pct": 71.15
+      },
+      "functions": {
+        "covered": 11,
+        "total": 15,
+        "pct": 73.33
+      },
+      "branches": {
+        "covered": 8,
+        "total": 18,
+        "pct": 44.44
+      }
+    },
+    "packages/part-plugin-remote/src/modules.ts": {
+      "lines": {
+        "covered": 62,
+        "total": 64,
+        "pct": 96.87
+      },
+      "statements": {
+        "covered": 71,
+        "total": 73,
+        "pct": 97.26
+      },
+      "functions": {
+        "covered": 24,
+        "total": 25,
+        "pct": 96
+      },
+      "branches": {
+        "covered": 28,
+        "total": 32,
+        "pct": 87.5
+      }
+    },
+    "packages/part-plugin-remote/src/plugin.ts": {
+      "lines": {
+        "covered": 53,
+        "total": 57,
+        "pct": 92.98
+      },
+      "statements": {
+        "covered": 63,
+        "total": 72,
+        "pct": 87.5
+      },
+      "functions": {
+        "covered": 25,
+        "total": 29,
+        "pct": 86.2
+      },
+      "branches": {
+        "covered": 30,
+        "total": 41,
+        "pct": 73.17
+      }
+    },
+    "packages/part-plugin-remote/src/report.ts": {
+      "lines": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 4,
+        "total": 4,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 3,
+        "total": 3,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 7,
+        "total": 12,
+        "pct": 58.33
+      }
+    },
+    "packages/part-plugin-remote/src/text.ts": {
+      "lines": {
+        "covered": 16,
+        "total": 18,
+        "pct": 88.88
+      },
+      "statements": {
+        "covered": 16,
+        "total": 18,
+        "pct": 88.88
+      },
+      "functions": {
+        "covered": 7,
+        "total": 9,
+        "pct": 77.77
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/args.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 17,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 19,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/cli.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 54,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 66,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 60,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/delegate.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 16,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 16,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/doctor-command.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 10,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 10,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/doctor-runner.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 4,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 4,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 1,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/doctor-text.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 1,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/doctor.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 153,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 167,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 31,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 58,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/entry/darwin-arm64.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/entry/darwin-x64.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/entry/linux-arm64-gnu.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/entry/linux-x64-gnu.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/entry/win32-x64-msvc.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/error-code.ts": {
+      "lines": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 2,
+        "total": 2,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/errors.ts": {
+      "lines": {
+        "covered": 1,
+        "total": 19,
+        "pct": 5.26
+      },
+      "statements": {
+        "covered": 1,
+        "total": 21,
+        "pct": 4.76
+      },
+      "functions": {
+        "covered": 0,
+        "total": 12,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 16,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/extract.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 118,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 139,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 27,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 149,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/extract/data-table.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/extract/field.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 12,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 14,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/extract/form.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/extract/summary.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 14,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 16,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/harness.ts": {
+      "lines": {
+        "covered": 5,
+        "total": 41,
+        "pct": 12.19
+      },
+      "statements": {
+        "covered": 7,
+        "total": 48,
+        "pct": 14.58
+      },
+      "functions": {
+        "covered": 2,
+        "total": 9,
+        "pct": 22.22
+      },
+      "branches": {
+        "covered": 4,
+        "total": 20,
+        "pct": 20
+      }
+    },
+    "packages/partom-cli/src/import/command.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 34,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 36,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 10,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/import/emit.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 46,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 48,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 20,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 16,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/import/mapping.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 100,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 122,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 13,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 112,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/import/names.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 17,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 18,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/import/openapi.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 45,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 50,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 10,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 31,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/import/ownership.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 41,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 47,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 10,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 33,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/import/text.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/import/zod-source.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 39,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 50,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 11,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 55,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/preview/constants.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 11,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 11,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/preview/doctor-child.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 18,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 21,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 4,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 16,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/preview/page-entry.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 11,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 12,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/preview/page/editor-bridge.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 38,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 40,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 11,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 30,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/preview/page/overlay.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 42,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 48,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 12,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/preview/page/runtime.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 46,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 48,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 10,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/preview/page/text.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/preview/rebuild.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 58,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 62,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 11,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 22,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/preview/routes.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 55,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 68,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 22,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 34,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/preview/server.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 79,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 88,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 15,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 43,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/preview/watch.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 13,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 18,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 7,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/probe.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 78,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 86,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 13,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 12,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/project.ts": {
+      "lines": {
+        "covered": 5,
+        "total": 56,
+        "pct": 8.92
+      },
+      "statements": {
+        "covered": 5,
+        "total": 62,
+        "pct": 8.06
+      },
+      "functions": {
+        "covered": 1,
+        "total": 13,
+        "pct": 7.69
+      },
+      "branches": {
+        "covered": 0,
+        "total": 39,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/budgets.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 14,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 15,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/build.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 42,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 44,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 11,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 16,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/child.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 7,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 7,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/client-module.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 24,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 26,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/collect.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 77,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 86,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 17,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 30,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/git.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 14,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 18,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 13,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/manifest.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 31,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 38,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 12,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 32,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/publish.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 46,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 51,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 14,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 24,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/service.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 15,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 18,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 12,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/sync.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 79,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 92,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 13,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 56,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/release/text.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 19,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 19,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 7,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/remote/build.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 27,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 31,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 9,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 16,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/remote/command.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 59,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 64,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 7,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 32,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/remote/contract.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 19,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 20,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/remote/rules.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 38,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 43,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 9,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 39,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/remote/text.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 5,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/remote/typecheck.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 23,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 26,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 3,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 16,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/types/collect.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 50,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 61,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 7,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 48,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/types/command.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 20,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 22,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 20,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/types/emit.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 21,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 22,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 7,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/types/native.d.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "statements": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "functions": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 0,
+        "total": 0,
+        "pct": 100
+      }
+    },
+    "packages/partom-cli/src/types/schema-type.ts": {
+      "lines": {
+        "covered": 30,
+        "total": 31,
+        "pct": 96.77
+      },
+      "statements": {
+        "covered": 44,
+        "total": 45,
+        "pct": 97.77
+      },
+      "functions": {
+        "covered": 8,
+        "total": 8,
+        "pct": 100
+      },
+      "branches": {
+        "covered": 54,
+        "total": 58,
+        "pct": 93.1
+      }
+    },
+    "packages/partom-cli/src/usage/ast.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 50,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 67,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 9,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 58,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/usage/blackbox.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 51,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 65,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 60,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/usage/command.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 46,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 50,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 21,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/usage/convert.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 295,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 349,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 45,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 273,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/usage/emit.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 20,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 20,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 8,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/usage/scope.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 69,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 80,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 12,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 75,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/usage/table.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 45,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 59,
+        "pct": 0
+      },
+      "functions": {
+        "covered": 0,
+        "total": 6,
+        "pct": 0
+      },
+      "branches": {
+        "covered": 0,
+        "total": 51,
+        "pct": 0
+      }
+    },
+    "packages/partom-cli/src/usage/text.ts": {
+      "lines": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
+      },
+      "statements": {
+        "covered": 0,
+        "total": 2,
+        "pct": 0
       },
       "functions": {
         "covered": 0,
@@ -35412,48 +39680,56 @@
     "rpc"
   ],
   "inputs": {
-    "capability": "e67f6de797577fbcd8ac211af5db22931a3981e1e0971fd150af984b398add9b",
-    "event-subscriber": "a8b12f3a7bbf6f18a11577f63dfaa9ff5f044bb1be671601ab70b9b90d3e1754",
-    "lifecycle": "4687e13cb160e869acd4ea24b3bd38c41e9985def9269ef957a22b1d5c29530a",
-    "log-host": "7e02b75a86e99e630e45e6e70975158b91260820f841b96f9b6af6e320be8a63",
-    "log-plugin-console": "4aa760250e641853b0fa122404976928a9180933bbc8be521bb09dcc7e7203a9",
-    "log-plugin-durable": "963b360873d9b97185763cd3ecee4ef33adc20ba32bf556036c6bc0eef8e8ed2",
-    "log-plugin-file": "318ce984a5eb03bbcf3318eec9a36e26f39eaf00cc3afee4342e096832a4ebcd",
-    "log-plugin-http": "4890fbc6e4283a7bc7c2c71d8b1772d4c640020aee6a813bd0c930a477f3306d",
-    "log-plugin-process": "879ea4f61fc57ffbaf08b18c7e56cec04ed27788112125b0f42e9cf2b0f602f8",
-    "log-plugin-reasoning": "2743df28ec0e0fe2f87a94d3ef02bb08603aa11c7888a9defd7a4646899465b7",
-    "micro-hub": "17cb6b2095a779da354400e3f75213111c38534d9c60e7b263796f6947df3cfe",
-    "middleware-pipeline": "b3540a1fa137e9c94f99855daf29d33dae0d0fa7ff45228772d81333f460546c",
-    "plugin-host": "4c53461e24ffa429d46efa8b2af8f4c9bd32bafa3018afa91c3452400fd8b579",
-    "reactive": "35f25d12b994f531c8acbc748832e6d7444207be640ddae0f164c1d56236f896",
-    "resource": "49bdae407d997c3db0dd805609fbe761b8578679a7a767a60efcafa6f2aa010a",
-    "rpc-family": "a1ed13b04945f873d61986be5777a7084ac89701766657d1d11b73203b06740f",
-    "serialize": "1b31c082af5e685f1d4c1f6fdd9b4f4d25b0261f1a0bd25558feb43070d0f740",
-    "storage-contract": "be41a821fdc5290f320cb97c528fe6f7f5a332acf750f05e18220cf6a0bac366",
-    "storage-host": "60f29ad06fefaed376a596e4cd3198e9ef088f8138e16e2d3cebeaf1c8aa5171",
-    "storage-plugin-archive": "8d5439fc23ac97b2ef4e48d4ea26771532f3d2f0e237c739024b339a4e6badcf",
-    "storage-plugin-browser": "383adeaa693e8914488995e5c712019639312b9c4b93bfdd3ef228de7b4cb698",
-    "storage-plugin-cache": "9a195b2c971b5aaddc4cc890cdadf72e6bab41325098f369cad133ecc8b5560a",
-    "storage-plugin-object": "d7ca150175e7b86fd9a2ca0c148c421108920b2d26551e443b0d16ff98b2c0e2",
-    "storage-plugin-postgres": "4490833e6f9ba3cabfd8a053e6685a0eb2627834952f70932220d47173e3beae",
-    "storage-plugin-qdrant": "58640122e12c4358799593df78f6b21dcd9583516e059adc52e0bf8ba2109b1b",
-    "storage-plugin-redis": "d814d0d81f338d4b4c9117e8ccfa7c3a97ea2ab478e5dbd0a1878eb977c2fd39",
-    "storage-plugin-sparql": "0fc7490cb71183cf68cb95c6ac3d84dddf2379f7835a40cc35477d10b2f904b0",
-    "storage-plugin-sqlite": "1e969bd2d64a11777f25624afcd47d07f32d6cee07d98bda42c2c430ba4306d6",
-    "store-devtools": "84cc4ae7c8aba4fef604aaed9e4029f163ad2768e302e5139a55bf5bd8c6240b",
-    "store-indexed": "46b6ece4047bf7148977bf4217f677dccb1033f02546f0e2466fdcdb564c5a29",
-    "store-keyed": "abc79ec8aed6f78b80d552b7935ee085d2dd3e0c58969710ff1a3f0fbb0fe74a",
-    "store-light": "c8b1dfe48b88a144223cc62d95086aee1a4c558e1930de69c11cf934e17de856",
-    "store-middleware": "ee095b9a603a4ce80b3d08911f5f02921b94be58653044ce65527a3843ac295c",
-    "store-persist": "830b60365958fc9e83bf295a2c716d90bd99ceb7032b72d4fa7458e30547c4df",
-    "store-react": "8b3e9cba703a5fcee6de8398cb298f8215622796d611a74db343a8b1892f10bc",
-    "store-shared": "1624017a46293475c112462460519be8d6c1224c6204b864154f1a926d1c46fd",
-    "store-ssr": "0d1ffb7389aef5e02b0d1cee38a360b81d63f60f10233663110aa35f6430c30f",
-    "store-wasm": "32eae2cbd642f4ce8940669105932096c4e78d151828097e9d0812d4ba26b720",
-    "store-worker": "7367d6b98bf3ccbc71e6b5b5d9e4154d69faf43d997fc93a8fe0e77f12fc1209",
-    "supervision": "e187ed280a12f6773ce9e053f94d6b0233e91feba491330c6dffa54f4404f017",
-    "tray": "09edde7e126f2e248965b2becf3861a32cf20e7f2cbcad8053e889f8dab70534",
-    "utils": "6a9ce76310b2625ba243fa9434d4d8e68b6211baef6783893fabc243da4f7c2f"
+    "capability": "1c3ef16e4a35855a98e4b35b7ec748927459a69b7d11dbd649094ea5cbdb7471",
+    "event-subscriber": "9cf5b317cc9fd012567b4d21d9cfe08fdc1919553af5844d5fada65514d0d4d0",
+    "lifecycle": "53207bb1d77b3878def5bab93b660a0eb4e4b9d049469bbb65158c9dc382213d",
+    "log-host": "0b5672d65ab344a4c3a03d0eb9682ce0c454d67913418610050677a8e07fa8f4",
+    "log-plugin-console": "8b3901230f5d10f73594a9c818dc353e387c98290034869ac53c4f043e9b3d40",
+    "log-plugin-durable": "a22f26f49e78a054522e846f0f0af1ce26f94b0c0d8e7613ff12638a25220e68",
+    "log-plugin-file": "88237212409da9f6ec037d995a40bc0ddf78e121a23bdac881a0b40373451a74",
+    "log-plugin-http": "c79f48d2453ecca7dc6912a66a958b065fce615730d0fceb25042926ca42c174",
+    "log-plugin-process": "eb465f6b4582baf8fad613b9ba0b3ae8709940dc8dba19e17978603244aa5424",
+    "log-plugin-reasoning": "85d6ba5403fff7d5a7eee88876e5cc7a0f3dcb81409a3beba34b1a9ca15f3ddb",
+    "micro-hub": "aeba0bf766f3d35f3f68ca2f46c8b37abbac59cc8de74c0bd01c05477117701f",
+    "middleware-pipeline": "79245470aa075a44f1a345f57162a08f644e6243d457658b395cf8c9d3011d64",
+    "part-contract": "004ce4992bf08817a8ed34b629de0456d2cd6d8992562dfa8bff7d31d78f5999",
+    "part-host": "3670808613bd38f311f89d3bb83b9f56b0769b0f036079c7266556b4eb1a198a",
+    "part-layouts": "607a1af40cffd93447537be25be12d500930b01a80a4fe4509fef471b7d0e4c2",
+    "part-plugin-devtools": "48fd1f13dc97931d2c279331518750196fea9bd68cd7e7ceeb38dcd6a85ea57b",
+    "part-plugin-dom": "1f22a1bb779f1dc9fd4190f9665df0ca6fcfb10d22c685dd7710543d0623f621",
+    "part-plugin-react": "53c05db1102db4cf73f08099137466908402c79c5d3e3ae54b55817a9f94ddd1",
+    "part-plugin-remote": "12e544a771ba906fabbcd048a569e3fb4062978f18a5e8f7b71ed063c91fb337",
+    "partom-cli": "f024ef09eecf36a0f4fc28b734dc0788a2fd72fd3781eb465fd4c45ed82928e9",
+    "plugin-host": "62230550073aafb344f39e7ffb2e5190b51ead3b9ff5c14ab42b412cd487d6f3",
+    "reactive": "813f5de93fbbb83cf2e5d3937a38e989715ab6b6c69ca0a089b608ee8eb7105d",
+    "resource": "07cf7e8486518a8e7a04346252e7b76dd29b8e332117315f88736b3af25f9073",
+    "rpc-family": "0355794fb7b6f31c768d61dd51cb480db6cb87fd12892709c677ed3e4e8c1418",
+    "serialize": "acac16c950cdb3347598cc1dabd48993a95f2eddc59f353f9b0ee958f1a81d32",
+    "storage-contract": "0a8ff6db3893579459aebb5a38d95dc0bcc9f52013c6f28c126c1a0a8d428b37",
+    "storage-host": "d53097e653015d3bb2e8edf0c1924be8d176b867bd295bf363d5ade58227db3d",
+    "storage-plugin-archive": "9e3fa3c73e35100b630a0d3e8e22fe95e9bdc5bb4fa96e7ac7ad480c95b528e3",
+    "storage-plugin-browser": "b0967367a247027dfd797c0fa687394a2a5bffa9497a958368b7fcb050c7043c",
+    "storage-plugin-cache": "bfa15a0d0a1d628aaee65882e197199ece9ae40eb53fa7e37f25a1a60f371743",
+    "storage-plugin-object": "d45bdefada8ac14895445ec1cd06d7b44564e661278a99729efd98e937b7d50d",
+    "storage-plugin-postgres": "31dfd5e73a16fa3d340ab4b03dbbbd4626303dacf626313b5e61f73429a81264",
+    "storage-plugin-qdrant": "01353d501e49192563ac25bdd0797d91a035c1b5782f6af0630921579021eacd",
+    "storage-plugin-redis": "0d9d7fdf0b9d951b780045719ccfbb1dd92ef3524ef354506f01c177fd5b2013",
+    "storage-plugin-sparql": "0511e54f9ea05f3be1333a1548738fc27df0bf5fb3c93ec66b96e5e7baf74651",
+    "storage-plugin-sqlite": "6f64eaa460ad24586e668119935a16663d011201c3126de995802d5d6e9a373a",
+    "store-devtools": "2a0675de9f91b449165795a09b43bc1f9e052f16a33af18161f3f36826e857d1",
+    "store-indexed": "8dd096a60293b7040463da1d824be7690864315ca0ef2a119aeed941bfc663ba",
+    "store-keyed": "6a0ebdede6ad2607d6073cc22733404882b96aef4bb1a0861dd0b8a27eaca383",
+    "store-light": "7f15c407e4d1b91abd49a40a2064abf1acefcb8960ce42ca825b33ba1514fd15",
+    "store-middleware": "6ba22b4b1e0d60fb4d3db5bc659c0e6dbf82b726cb97ee4a65074ee632bef7c3",
+    "store-persist": "811f5c41dc2e75a9ad249111d1172a4dea95d87166c9b64c705f060d0b0b909e",
+    "store-react": "4700b6bfa203ecc962c19c27a3d2b977b3bc460dd6463ab5e507930dbfb7c99a",
+    "store-shared": "b71c7ca3056e0192e5f94c13b5f8fa28f2f4e2dbea21fd13e8aeb67e8c5ba76e",
+    "store-ssr": "aa5aa6c0341467db271096f5cdd6262fc3cf2aba6220419f050bbf9395369f04",
+    "store-wasm": "f2443e6c6ae5259d17774e3d63fe004e0d5765958d541403cfe13d0e2f703461",
+    "store-worker": "779ca62476d393380d0714cf4c977b41bb5d211491cfd849dd25cf1b0dadbe5c",
+    "supervision": "129ccc0f8a531ff3e30858851cae8ecff4213d61d7b6ce54d2888dd617ada2cc",
+    "tray": "195152bed53daf1224d087ba95d60baf36d78a4f2cca0575cb36be5ecc1f9abb",
+    "utils": "60573126df298db4033e71822cc58570b8ac57fa21e04913dcb4cf5fe95622bd"
   },
   "baselineInventoryDrift": {
     "missing": [],
