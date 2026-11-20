@@ -1254,3 +1254,37 @@ describe('asynchronous stores (A10)', () => {
 
 /** Asynchronous `get` calls the A10 test already settled. */
 const settledCalls = new Set<IAsyncCall>()
+
+describe('host catalog namespaces (A6, host side)', () => {
+  it('lists default and registered stores with JSON Schema and refuses unknown bindings', async () => {
+    const cart = defineStateStore({
+      namespace: 'cart',
+      schema: z.object({ total: z.number() }),
+      create: () => ({}),
+      get: () => undefined,
+      set: () => undefined
+    })
+    const host = await createPartHost({
+      plugins: [
+        definePartPlugin({ name: 'cart', parts: [definePart({ id: 'box@1' })], stores: [cart] })
+      ]
+    })
+    const stores = host.catalog.view().stores?.() ?? []
+    expect(stores.map((store) => store.namespace)).toEqual(['page', 'section', 'part', 'cart'])
+    expect(stores[3]?.schema).toMatchObject({ type: 'object' })
+    expect(host.catalog.manifest('b').stores).toEqual(['cart'])
+    const result = await host.blueprint.load({
+      id: 'bp',
+      version: 1,
+      root: {
+        tag: 'box@1',
+        id: 'root',
+        facets: { props: { a: { $state: 'cart.items' }, b: { $state: 'global.x' } } }
+      }
+    })
+    expect(result.issues.filter((issue) => issue.rule === 'flow.bind-path')).toEqual([
+      expect.objectContaining({ path: 'b' })
+    ])
+    await host.dispose()
+  })
+})
