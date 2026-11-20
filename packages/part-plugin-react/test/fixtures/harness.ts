@@ -51,7 +51,8 @@ export const fixturePlugin = definePartPlugin({
   name: 'fixtures',
   parts: Object.values(parts),
   implementations: [
-    bindReactComponent(parts.page, PageRoot),
+    // PageRoot renders only its children, so it has no element of its own to pass to `ref`.
+    bindReactComponent(parts.page, PageRoot, { element: 'query' }),
     bindReactComponent(parts.button, Button),
     bindReactComponent(parts.combobox, Combobox, { events: { valueChange: 'onValueChange' } }),
     bindReactComponent(parts.radix, RadixDialog, {

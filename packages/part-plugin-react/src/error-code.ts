@@ -9,10 +9,13 @@ export const PartReactErrorCode = {
    */
   bindingMissing: 'BINDING_MISSING',
   /**
-   * After commit the component's root element could not be obtained although the node needs DOM
-   * work. Forward `ref` from the component, or use `element: 'query'`.
+   * A bound component with the default `element: 'ref'` never passed an element to its `ref` by the
+   * first layout effect after mounting (for example a wrapper that does not forward `ref`).
+   * Reported once per mount with the node address and part id, never thrown; the node gets no
+   * element-dependent behaviour (modifiers, measuring, `data-part-address`) in that mount. Forward
+   * `ref` from the component, or bind with `element: 'query'`.
    */
-  elementUnresolved: 'ELEMENT_UNRESOLVED',
+  elementMissing: 'PART_ELEMENT_MISSING',
   /** A node component threw while rendering; only that node is replaced by an empty placeholder. */
   renderFailed: 'RENDER_FAILED'
 } as const

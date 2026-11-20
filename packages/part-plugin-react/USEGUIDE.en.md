@@ -36,7 +36,7 @@ await host.blueprint.load(blueprint)
 host.mount(document.getElementById('root'), blueprint.id)
 ```
 
-Each `mount` uses its own React root. The root element comes from `ref` by default; for a component that does not forward `ref`, use `mapping.element: 'query'`. `partom extract` drafts such bindings from shadcn sources.
+Each `mount` uses its own React root. The root element comes from `ref` by default, and components wrapped in `memo`, `forwardRef` or `lazy` bind directly. For a component that does not forward `ref`, use `mapping.element: 'query'`: the renderer wraps it in a `display: contents` container that carries the DOM behaviour. With the default `ref`, a component whose ref received no element by the first layout effect after mounting is reported once through the host diagnostics as `PART_ELEMENT_MISSING` (with address and part id), and gets no element-dependent behaviour such as modifiers in that mount. `partom extract` drafts such bindings from shadcn sources.
 
 ## Events and callbacks
 

@@ -6,8 +6,9 @@ export const PartReactErrorText = {
   /** No React binding for a part. */
   bindingMissing: (partId: string, address: string): string =>
     `part "${partId}" at "${address}" has no React binding`,
-  /** No root element after commit. */
-  elementUnresolved: (address: string): string => `no root element was resolved for "${address}"`,
+  /** A ref-bound component never received its root element. */
+  elementMissing: (partId: string, address: string): string =>
+    `part "${partId}" at "${address}" never passed an element to ref; forward ref or use element: 'query'`,
   /** Node render failure. */
   renderFailed: (address: string): string => `part at "${address}" failed to render`
 } as const

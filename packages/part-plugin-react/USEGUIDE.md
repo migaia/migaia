@@ -36,7 +36,7 @@ await host.blueprint.load(blueprint)
 host.mount(document.getElementById('root'), blueprint.id)
 ```
 
-每次 `mount` 用一个独立的 React 根。根元素默认通过 `ref` 获得；组件不转发 `ref` 时用 `mapping.element: 'query'`。`partom extract` 能从 shadcn 源码生成这类绑定的草稿。
+每次 `mount` 用一个独立的 React 根。根元素默认通过 `ref` 获得，`memo`、`forwardRef`、`lazy` 包装的组件可以直接绑定。组件不转发 `ref` 时用 `mapping.element: 'query'`：渲染器在组件外包一个 `display: contents` 容器，用它承载 DOM 行为。默认 `ref` 方式下，组件挂载后第一个 layout effect 时 ref 还没收到元素，就经宿主诊断报告一次 `PART_ELEMENT_MISSING`（带地址和 part id），该次挂载不挂接修饰符等依赖元素的行为。`partom extract` 能从 shadcn 源码生成这类绑定的草稿。
 
 ## 事件与回调
 

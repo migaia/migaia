@@ -16,6 +16,7 @@ import {
   Component,
   createContext,
   createElement,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -146,9 +147,11 @@ function readBound(
       snapshot !== undefined && node.template.rows === undefined
         ? rowsOf(snapshot)
         : services.state.resolve(node, node.template.rows, row?.row)
-  if (node.openStatePath !== undefined) resolved[OPEN_KEY] = services.state.read(node.openStatePath)
+  // Open and aria paths are shared renderer reads: an unregistered namespace reads `undefined`.
+  if (node.openStatePath !== undefined)
+    resolved[OPEN_KEY] = services.state.resolve(node, { $state: node.openStatePath })
   for (const [name, path] of Object.entries(node.ariaStates))
-    resolved[`${ARIA_KEY}${name}`] = services.state.read(path)
+    resolved[`${ARIA_KEY}${name}`] = services.state.resolve(node, { $state: path })
   return resolved
 }
 
@@ -443,6 +446,13 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
   const inRow = row !== undefined
   /** Root element of the component after commit. */
   const [element, setElement] = useState<HTMLElement | null>(null)
+  /** True once any element reached the node's ref in this mount. */
+  const elementSeen = useRef(false)
+  /** Ref callback recording that an element arrived, then storing it. */
+  const takeElement = useCallback((value: HTMLElement | null) => {
+    if (value !== null) elementSeen.current = true
+    setElement(value)
+  }, [])
   /** Resource binding of the node, when it is a resource node. */
   const resourceBinding = resourceBindingOf(instance)
   /** Watch of the resource binding, created in the commit phase. */
@@ -469,6 +479,11 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
     services.runtime
   )
   useLayoutEffect(() => commit.release, [commit])
+  useLayoutEffect(
+    () => reportMissingElement(services, instance, elementSeen.current),
+    // Once per mount: the first layout effect decides; a remount checks again.
+    []
+  )
   /** Snapshot of a resource node. */
   const snapshot = bound[SNAPSHOT_KEY] as IResourceSnapshot | undefined
   useLayoutEffect(() => {
@@ -486,7 +501,7 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
   const statusSlot = snapshot === undefined ? undefined : statusSlotOf(instance, snapshot)
   if (statusSlot !== undefined)
     return (
-      <div ref={setElement} style={{ display: 'contents' }} data-part-address={instance.address}>
+      <div ref={takeElement} style={{ display: 'contents' }} data-part-address={instance.address}>
         {slotContent(instance)[statusSlot]}
       </div>
     )
@@ -504,7 +519,7 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
         dom={services.dom}
         bound={bound}
         content={slotContent(instance)}
-        setElement={setElement}
+        setElement={takeElement}
       />
     )
   if (binding === undefined)
@@ -514,7 +529,40 @@ function NodeView({ address }: { readonly address: string }): ReactNode {
     )
   /** Component of the binding. */
   const Bound = binding.component
-  return <Bound {...componentProps(services, instance, binding, bound, setElement, element)} />
+  if (binding.mapping.element !== 'query')
+    return <Bound {...componentProps(services, instance, binding, bound, takeElement, element)} />
+  // `element: 'query'`: a `display: contents` container holds the node's element for DOM work.
+  return (
+    <div ref={takeElement} style={{ display: 'contents' }} data-part-address={instance.address}>
+      <Bound {...componentProps(services, instance, binding, bound, takeElement, element)} />
+    </div>
+  )
+}
+
+/**
+ * Reports PART_ELEMENT_MISSING when a node bound with the default `element: 'ref'` mounted without
+ * any element reaching its ref. Unbound, layout and `element: 'query'` nodes are not checked.
+ */
+function reportMissingElement(
+  services: IMountServices,
+  instance: IResolvedNode | undefined,
+  seen: boolean
+): void {
+  if (instance === undefined || seen) return
+  /** Part id of the node. */
+  const partId = instance.definition.descriptor.id
+  /** React binding of the part. */
+  const binding = services.catalog.implementation(REACT_RENDERER, partId) as
+    | IReactBinding
+    | undefined
+  if (binding === undefined || binding.mapping.element === 'query') return
+  services.report(
+    createPartReactError(
+      PartReactErrorCode.elementMissing,
+      PartReactErrorText.elementMissing(partId, instance.address)
+    ),
+    instance.address
+  )
 }
 
 /** Error boundary isolating one node; reports the failure once and renders nothing. */
