@@ -124,7 +124,7 @@ pnpm add @migaia/reactive
 | API                                                                     | What it does                                                                                       |
 | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `createRuntime(options?)`                                               | Creates an isolated Runtime; options set the scheduling, `maxFlushPasses`, `onError` and `onTrace` |
-| `runtime.signal(value)` / `runtime.computed(fn)` / `runtime.effect(fn)` | Create writable values, derived values and effects; each has `dispose()`                           |
+| `runtime.signal(value, { equals? })` / `runtime.computed(fn)` / `runtime.effect(fn)` | Create writable values, derived values and effects; each has `dispose()`                           |
 | `runtime.batch(fn)` / `runtime.flush()`                                 | Merge several writes into one flush / flush synchronously right now                                |
 | `runtime.untracked(fn)`                                                 | Read without registering dependencies                                                              |
 | `runtime.subscribeTrace(listener)`                                      | Subscribe to read-only diagnostic events                                                           |

@@ -355,7 +355,7 @@ count.value // throws NODE_DISPOSED
 Edge behavior:
 
 - Created with `runtime.signal(value, options?)`; it returns a narrow node view that exposes no graph edges or internal methods.
-- `value = next`: when `Object.is(next, previous)` is true the write short-circuits, with no version bump and no notification. Otherwise it first takes a new version number from the `VersionClock` and then stores the value. If taking a version fails (the clock is exhausted), the write fails atomically, so "value changed but version did not" can never happen.
+- `value = next`: when `Object.is(next, previous)` is true the write short-circuits, with no version bump and no notification. If the signal was created with `options.equals`, a write that `Object.is` reports as different then calls `equals(previous, next)` (previous first); `true` also counts as equal, so the old value (and its object identity) is kept, with no version bump and no notification. When `equals` throws, the write throws that original error and leaves value, version and dependents unchanged. Without `equals` only `Object.is` is used. `equals` belongs to `signal` alone: the options of `effect` and `observe` do not have it. Otherwise it first takes a new version number from the `VersionClock` and then stores the value. If taking a version fails (the clock is exhausted), the write fails atomically, so "value changed but version did not" can never happen.
 - `dispose()` is idempotent. Releasing first marks the node `disposed` and then removes every downstream edge, in that order, so an Effect forced to rerun reads a clear `NODE_DISPOSED` instead of subscribing to a released node again.
 - `addObservedHooks({ onObserved?, onUnobserved? })` registers node-level lifecycle hooks (several callers can register without overwriting each other) and returns a removal function. When hooks fail, a single failure keeps its original instance and several failures are aggregated as an `OBSERVER_FAILED` `AggregateError`; the public observation path catches them and reports them to `onError` with phase `lifecycle-hook`, so creating an Effect never surfaces hook failures as a synchronous throw.
 - Reading or subscribing to a `Signal` from another `Runtime` throws `CROSS_RUNTIME`.
@@ -472,7 +472,7 @@ The public methods of `IRuntime` (brand fields omitted):
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 type IRuntime = {
-  signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T>
+  signal<T>(value: T, options?: IReactiveSignalOptions<T>): IReactiveSignal<T> // IReactiveNodeOptions & { equals?(prev, next) }
   computed<T>(fn: () => T, config?: IComputedConfig<T>): IReactiveComputed<T>
   effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IReactiveEffect // returns the lifecycle handle of the node
   batch<T>(fn: () => T): T

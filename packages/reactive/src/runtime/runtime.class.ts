@@ -35,6 +35,7 @@ import {
   type IFlushResult,
   type IObservable,
   type IReactiveNodeOptions,
+  type IReactiveSignalOptions,
   type IRuntime,
   type IRuntimeErrorContext,
   type IRuntimeErrorReportContext,
@@ -181,7 +182,7 @@ export class Runtime implements IRuntime {
   }
 
   /** Creates a source that shares this Runtime's graph, clock and admitted diagnostic capabilities. */
-  signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T> {
+  signal<T>(value: T, options?: IReactiveSignalOptions<T>): Signal<T> {
     return new Signal(value, this, options)
   }
   /** Creates a lazy derived node whose dependencies and cache remain owned by this graph. */

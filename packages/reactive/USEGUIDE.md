@@ -355,7 +355,7 @@ count.value // 抛 NODE_DISPOSED
 边界行为：
 
 - 经 `runtime.signal(value, options?)` 创建；返回窄节点视图，不暴露图边或内部方法。
-- `value = next`：`Object.is(next, 之前值)` 为真时短路，不推进版本、不触发下游；否则先向 `VersionClock` 领取新版本号再落值（领取失败——时钟耗尽——保持原子失败，绝不出现"值已变、版本未变"的陈旧状态）。
+- `value = next`：`Object.is(next, 之前值)` 为真时短路，不推进版本、不触发下游。创建时传了 `options.equals` 时，`Object.is` 判为不同后再调用 `equals(旧值, 新值)`（旧值在前）；返回 `true` 时同样视为相等：保留旧值（对象身份不变）、不推进版本、不触发下游；`equals` 抛错时这次写入以原错误抛出，值、版本与下游都不变。不传 `equals` 时只用 `Object.is`。`equals` 只属于 `signal`：`effect` 与 `observe` 的选项没有它。其余情况先向 `VersionClock` 领取新版本号再落值（领取失败——时钟耗尽——保持原子失败，绝不出现"值已变、版本未变"的陈旧状态）。
 - `dispose()` 幂等；释放时先标记 `disposed` 再断开全部下游订阅边（通知顺序：标记优先，确保被迫重跑的 Effect 读到明确的 `NODE_DISPOSED` 而不是重新订阅一个已释放节点）。
 - `addObservedHooks({ onObserved?, onUnobserved? })`：登记节点级生命周期钩子（多个调用方可各自登记互不覆盖），返回移除函数；多个钩子中若有失败，内部单个失败保留原实例，多个失败聚合为 `OBSERVER_FAILED` AggregateError；公开观察路径捕获并通过 `onError` 的 `lifecycle-hook` phase 报告，创建 Effect 不靠同步 throw 暴露 hook 失败。
 - 跨 `Runtime` 读取/订阅一个 `Signal` 会抛 `CROSS_RUNTIME`。
@@ -472,7 +472,7 @@ const runtime = createRuntime({
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 type IRuntime = {
-  signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T>
+  signal<T>(value: T, options?: IReactiveSignalOptions<T>): IReactiveSignal<T> // IReactiveNodeOptions & { equals?(prev, next) }
   computed<T>(fn: () => T, config?: IComputedConfig<T>): IReactiveComputed<T>
   effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IReactiveEffect // 返回现有节点的生命周期句柄
   batch<T>(fn: () => T): T

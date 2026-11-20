@@ -124,7 +124,7 @@ pnpm add @migaia/reactive
 | API                                                                     | 做什么                                                                             |
 | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | `createRuntime(options?)`                                               | 创建一个隔离的 Runtime；选项可设置调度方式、`maxFlushPasses`、`onError`、`onTrace` |
-| `runtime.signal(value)` / `runtime.computed(fn)` / `runtime.effect(fn)` | 创建可写值、派生值和副作用；都有 `dispose()`                                       |
+| `runtime.signal(value, { equals? })` / `runtime.computed(fn)` / `runtime.effect(fn)` | 创建可写值、派生值和副作用；都有 `dispose()`                                       |
 | `runtime.batch(fn)` / `runtime.flush()`                                 | 把多次写入合并成一次刷新 / 立即同步冲刷                                            |
 | `runtime.untracked(fn)`                                                 | 在不登记依赖的情况下读取                                                           |
 | `runtime.subscribeTrace(listener)`                                      | 订阅只读诊断事件                                                                   |

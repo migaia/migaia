@@ -6,7 +6,7 @@ import type {
   IDisposable,
   IObservable,
   IObserver,
-  IReactiveNodeOptions,
+  IReactiveSignalOptions,
   IRuntime
 } from '../runtime/types.ts'
 import { internalsOf, type IRuntimeInternals } from '../runtime/internals.ts'
@@ -59,15 +59,21 @@ export class Signal<T> implements IObservable, IDisposable {
   debugName?: string
   /** Committed source value changes only after reserving its next graph version. */
   #value: T
+  /**
+   * Optional owner equality consulted after `Object.is` reports a change; `undefined` keeps the
+   * original identity-only comparison on the write path.
+   */
+  readonly #equals: ((prev: T, next: T) => boolean) | undefined
   /** Terminal state rejects later reads and writes before touching graph state. */
   #disposed = false
   /** Registers ownership and subscriber metadata before reserving the initial source version. */
-  constructor(v: T, runtime: IRuntime, options: IReactiveNodeOptions = {}) {
+  constructor(v: T, runtime: IRuntime, options: IReactiveSignalOptions<T> = {}) {
     this.subs = registerSubs(this, this.#subs)
     this.runtime = runtime
     // 归属登记走唯一那张表，不再靠字段名让下游去猜
     claimOwnership(this, runtime)
     this.debugName = options.debugName
+    this.#equals = options.equals
     this.#value = v
     this.#internals = internalsOf(runtime)
     this.#version = this.#internals.clock.next()
@@ -94,6 +100,9 @@ export class Signal<T> implements IObservable, IDisposable {
   set value(next: T) {
     if (this.#disposed) this.#throwDisposed()
     if (Object.is(next, this.#value)) return // 相等短路，杜绝无效触发
+    /** Owner equality runs without a receiver; its throw leaves value, version and graph untouched. */
+    const equals = this.#equals
+    if (equals !== undefined && equals(this.#value, next)) return
     // 先领取版本，再提交值。时钟耗尽时赋值必须保持原子失败，不能留下
     // “值已变、version 未变、下游未通知”的永久陈旧状态。
     /** This node always uses its original Runtime services. */

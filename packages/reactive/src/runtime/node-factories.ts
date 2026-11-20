@@ -6,7 +6,7 @@ import type {
   IObservable,
   IObserver,
   IReactiveComputed,
-  IReactiveNodeOptions,
+  IReactiveSignalOptions,
   IReactiveSignal,
   IRuntime
 } from './types.ts'
@@ -21,7 +21,7 @@ import { ReactiveTraceReason } from './trace-constants.ts'
  * runtime tracker, scheduler, and clock objects.
  */
 export type IInternalRuntime = Omit<IRuntime, 'signal' | 'computed'> & {
-  signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T> & IObservable
+  signal<T>(value: T, options?: IReactiveSignalOptions<T>): IReactiveSignal<T> & IObservable
   computed<T>(
     fn: () => T,
     config?: IComputedConfig<T>

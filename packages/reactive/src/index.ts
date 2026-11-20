@@ -16,6 +16,7 @@ export type {
   IReactiveComputed,
   IReactiveEffect,
   IReactiveNodeOptions,
+  IReactiveSignalOptions,
   IDisposable,
   IDisposer,
   IRuntime,

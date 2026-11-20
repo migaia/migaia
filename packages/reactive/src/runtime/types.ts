@@ -26,6 +26,16 @@ export type IReactiveNodeOptions = {
 }
 
 /**
+ * Options of `runtime.signal`. `equals(prev, next)` runs only after `Object.is` reports a change;
+ * returning `true` keeps the old value (and its identity), the version and subscribers untouched. A
+ * throwing `equals` fails the write atomically with the original error. Effects and observers keep
+ * `IReactiveNodeOptions`, which has no `equals`.
+ */
+export type IReactiveSignalOptions<T> = IReactiveNodeOptions & {
+  equals?: (prev: T, next: T) => boolean
+}
+
+/**
  * Public writable node view. Graph bookkeeping stays behind Runtime internals; consumers only
  * receive value/lifecycle operations.
  */
@@ -132,7 +142,7 @@ export type IRuntime = {
    * Creates a writable node owned by this runtime and sharing its dependency graph and version
    * clock.
    */
-  signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T>
+  signal<T>(value: T, options?: IReactiveSignalOptions<T>): IReactiveSignal<T>
   computed<T>(fn: () => T, config?: IComputedConfig<T>): IReactiveComputed<T>
   /** Creates an immediately executed effect whose handle owns idempotent disposal. */
   effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IReactiveEffect
