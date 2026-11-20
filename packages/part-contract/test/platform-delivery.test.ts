@@ -36,7 +36,8 @@ describe('checkDelivery', () => {
   it('reports a definition neither the manifest nor a module provides', () => {
     expect(checkDelivery(snapshotOf(['button@1', 'x@1']), manifest)).toEqual({
       ok: false,
-      missing: ['x@1']
+      missing: ['x@1'],
+      missingStores: []
     })
   })
 
@@ -47,7 +48,8 @@ describe('checkDelivery', () => {
   it('reports every missing definition, not only the first', () => {
     expect(checkDelivery(snapshotOf(['y@1', 'x@1']), manifest)).toEqual({
       ok: false,
-      missing: ['y@1', 'x@1']
+      missing: ['y@1', 'x@1'],
+      missingStores: []
     })
   })
 })

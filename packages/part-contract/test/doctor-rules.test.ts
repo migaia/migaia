@@ -74,7 +74,8 @@ const cases: readonly (readonly [string, IPartNode, string])[] = [
     'root'
   ],
   ['flow.derive-no-write', rootWith({ props: { v: { $derive: 'wdrv@1' } } }), 'root'],
-  ['flow.bind-path', rootWith({ props: { v: { $state: 'global.x' } } }), 'root'],
+  // Offline views check syntax only; `global.x` is accepted here and refused by a host view (A6).
+  ['flow.bind-path', rootWith({ props: { v: { $state: 'global' } } }), 'root'],
   ['flow.call-target', rootWith({ events: { click: { handler: 'drv@1' } } }), 'root'],
   ['flow.derive-acyclic', rootWith({ props: { v: { $derive: 'cyc-a@1' } } }), 'root'],
   ['flow.scope', rootWith({ props: { v: { $state: 'section.zone.x' } } }), 'root'],

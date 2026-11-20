@@ -199,5 +199,9 @@ export const Z_INDEX_KEYS: ReadonlySet<string> = new Set(['z-index', 'zIndex'])
 /** Custom event name grammar: plugin name, colon, event name. */
 export const NAMESPACED_EVENT = /^[a-z0-9][a-z0-9-]*:[A-Za-z0-9-]+$/
 
-/** Bound state path grammar: scope, dot, key path. */
-export const STATE_PATH = /^(page|section|part)\.[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/
+/**
+ * Bound state path grammar: a namespace (`page`, `section`, `part` or a registered store name,
+ * lowercase first letter then letters and digits), then at least one `.`-separated key segment.
+ * Whether the namespace is registered is checked separately against the host catalog.
+ */
+export const STATE_PATH = /^[a-z][a-zA-Z0-9]*(\.[A-Za-z0-9_-]+)+$/

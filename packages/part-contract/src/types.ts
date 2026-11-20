@@ -271,6 +271,12 @@ export type IDescriptor = {
 /** Validation schema of an extension kind: required field names beyond the common ones. */
 export type IKindSchema = { readonly required?: readonly string[] }
 
+/**
+ * One state namespace a host knows: `page`, `section` and `part` (the default store, no schema) or
+ * a store a plugin registered, with the JSON Schema converted from its Standard Schema input.
+ */
+export type IStoreDescriptor = { readonly namespace: string; readonly schema?: IJsonSchema }
+
 /** Read-only catalog view the rule engine consults. */
 export type ICatalogView = {
   get(id: string): IDescriptor | undefined
@@ -278,6 +284,12 @@ export type ICatalogView = {
   writesFor(tag: string): readonly string[]
   /** Every current descriptor in registration order. */
   all(): Iterable<IDescriptor>
+  /**
+   * State namespaces of the host this view belongs to. Only a host catalog implements it; offline
+   * views (`descriptorView`, test catalogs) leave it out, so namespace registration is checked only
+   * where the host's registrations are known.
+   */
+  stores?(): readonly IStoreDescriptor[]
 }
 
 /**

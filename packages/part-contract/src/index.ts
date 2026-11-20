@@ -83,6 +83,12 @@ export {
   type IDeliveryResult
 } from './platform/manifest.ts'
 export {
+  collectStores,
+  DEFAULT_STATE_NAMESPACES,
+  isDefaultStateNamespace,
+  stateNamespaceOf
+} from './platform/stores.ts'
+export {
   artifactKey,
   ChangesetStatus,
   checkBase,
@@ -110,6 +116,7 @@ export type {
   IBlueprint,
   IBuiltinKind,
   ICatalogView,
+  IStoreDescriptor,
   IDescriptor,
   IEventDeclaration,
   IEventSubscription,

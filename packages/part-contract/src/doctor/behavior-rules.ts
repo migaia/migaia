@@ -3,6 +3,7 @@ import { defineRule, type IRuleContext } from '../rules.ts'
 import type { IEventDeclaration, IEventSubscription, IPartAddress } from '../types.ts'
 import { isDeriveBinding, isStateBinding, partOf, propValues, target } from './shared.ts'
 import { DOM_EVENTS, NAMESPACED_EVENT, STATE_PATH, Z_INDEX_KEYS } from './tables.ts'
+import { stateNamespaceOf } from '../platform/stores.ts'
 
 /** Both built-in phases. */
 const BOTH = ['authored', 'resolved'] as const
@@ -227,13 +228,43 @@ function checkDeriveNoWrite(context: IRuleContext<unknown>): void {
       context.report({ address, facet: 'props', path: key, messageKey: 'flow.derive-no-write' })
 }
 
-/** State bindings must name a scope and a key path. */
+/**
+ * Namespaces of a host catalog view, built once per view object; `undefined` for offline views that
+ * do not know the host's registrations.
+ */
+const viewNamespaces = new WeakMap<object, ReadonlySet<string>>()
+
+/** Registered namespaces of a view, or `undefined` when the view does not implement `stores`. */
+function namespacesOf(context: IRuleContext<unknown>): ReadonlySet<string> | undefined {
+  /** View under check. */
+  const view = context.catalog
+  if (view.stores === undefined) return undefined
+  /** Cached set of this view. */
+  let names = viewNamespaces.get(view)
+  if (names === undefined) {
+    names = new Set(view.stores().map((store) => store.namespace))
+    viewNamespaces.set(view, names)
+  }
+  return names
+}
+
+/**
+ * State bindings must name a namespace and at least one key segment (syntax, every view). Where the
+ * view knows the host's registrations (`stores`), the namespace must be registered as well.
+ */
 function checkBindPath(context: IRuleContext<unknown>): void {
   /** Node under check. */
   const { node, address } = target(context)
-  for (const { path, value } of propValues(node))
-    if (isStateBinding(value) && !STATE_PATH.test(value.$state))
+  /** Registered namespaces, when the view knows them. */
+  const namespaces = namespacesOf(context)
+  for (const { path, value } of propValues(node)) {
+    if (!isStateBinding(value)) continue
+    if (
+      !STATE_PATH.test(value.$state) ||
+      (namespaces !== undefined && !namespaces.has(stateNamespaceOf(value.$state)))
+    )
       context.report({ address, facet: 'props', path, messageKey: 'flow.bind-path' })
+  }
 }
 
 /** Section state is readable only below the section node with that id. */
