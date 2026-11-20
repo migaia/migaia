@@ -82,8 +82,11 @@ export async function until(condition: () => boolean, limit = 200): Promise<void
     if (condition()) return
     await new Promise((resolve) => setTimeout(resolve, 0))
   }
-  throw new Error('condition not reached')
+  throw new Error(UNTIL_TIMEOUT_TEXT)
 }
+
+/** Failure text of `until`, shared by every test that waits on a condition. */
+export const UNTIL_TIMEOUT_TEXT = 'condition not reached'
 
 /** One recorded call of an asynchronous store, settled by the test. */
 export type IAsyncCall = {

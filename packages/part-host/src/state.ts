@@ -472,10 +472,11 @@ export class ScopeState implements IScopeState {
       this.#default.setOptions(this.#defaultOptions())
       signal.addEventListener('abort', () => this.#dropDefault(registration), { once: true })
     }
-    for (const generation of admission.generations) {
-      generation.slot.addGeneration(generation)
+    // Every generation gets its abort listener first, so a failure while routing one (a throwing
+    // `subscribe`) still releases all of them when plugin-host rolls the install back.
+    for (const generation of admission.generations)
       signal.addEventListener('abort', () => this.#end(generation), { once: true })
-    }
+    for (const generation of admission.generations) generation.slot.addGeneration(generation)
   }
 
   /** Removes a default-store registration and applies the remaining newest one. */
