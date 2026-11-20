@@ -45,6 +45,24 @@ describe('delivery and install checks', () => {
       code: 'REMOTE_VERSION_REJECTED',
       tag: 'v4'
     })
+    // A version binding a namespace the client does not register is refused before install.
+    await answer('stage', {
+      snapshot: twoBlueprints('v5', blueprint('a', { $state: 'cart.total' }), blueprint('b', 'b5'))
+    })
+    /** Rejection of the version binding `cart`. */
+    const storeRejection = (await harness.remote.revalidate().catch((error: unknown) => error)) as {
+      readonly code?: unknown
+      readonly missing?: unknown
+      readonly missingStores?: unknown
+      readonly cause?: { readonly message?: string }
+    }
+    expect(storeRejection).toMatchObject({
+      code: 'REMOTE_VERSION_REJECTED',
+      tag: 'v5',
+      missing: [],
+      missingStores: ['cart']
+    })
+    expect(storeRejection.cause?.message).toContain('cart')
     expect(harness.screen.label('a')).toBe('a1')
     expect(harness.screen.label('b')).toBe('b1')
     expect(currentRemoteModules(harness.host)).toEqual(modules)

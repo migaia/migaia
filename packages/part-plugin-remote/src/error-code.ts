@@ -5,8 +5,9 @@ export const ERROR_SOURCE = 'part.remote'
 export const PartRemoteErrorCode = {
   /**
    * A delivered version was refused: delivery check (missing capabilities), chunk preload, module
-   * load or install check failed. The current version stays; the reason is on `cause`, and `tag`
-   * and `missing` are on the error. Publish a version the client supports.
+   * load or install check failed. The current version stays; the reason is on `cause`, and `tag`,
+   * `missing` (definition ids) and `missingStores` (state namespaces) are on the error. Publish a
+   * version the client supports.
    */
   versionRejected: 'REMOTE_VERSION_REJECTED',
   /**

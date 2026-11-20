@@ -93,11 +93,9 @@ export class VersionInstaller {
     if (!delivery.ok)
       throw rejected(
         tag,
-        PartRemoteText.missingReason(delivery.missing),
-        new TypeError(delivery.missing.join(', ')),
-        {
-          missing: delivery.missing
-        }
+        PartRemoteText.missingReason(delivery.missing, delivery.missingStores),
+        new TypeError(PartRemoteText.missingList(delivery.missing, delivery.missingStores)),
+        { missing: delivery.missing, missingStores: delivery.missingStores }
       )
     try {
       await preloadChunks(this.#options.chunks, parsed.lock.definitions, this.#loadedChunks)

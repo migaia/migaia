@@ -31,9 +31,18 @@ export const PartRemoteText = {
     `version ${tag} was rejected: ${reason}`,
   moduleIntegrity: (name: string): string => `remote module ${name} does not match its integrity`,
   fetchFailed: (url: string): string => `request to ${url} failed`,
-  /** Reason of a failed delivery check, naming every missing capability for the report. */
-  missingReason: (missing: readonly string[]): string =>
-    `${RejectReason.delivery}: missing ${missing.join(', ')}`,
+  /**
+   * Reason of a failed delivery check, naming every missing definition and state namespace for the
+   * report.
+   */
+  missingReason: (missing: readonly string[], missingStores: readonly string[]): string =>
+    `${RejectReason.delivery}: missing ${PartRemoteText.missingList(missing, missingStores)}`,
+  /**
+   * Missing capabilities as one list: definition ids, then `store <namespace>` entries, so the text
+   * is never empty when only namespaces are missing.
+   */
+  missingList: (missing: readonly string[], missingStores: readonly string[]): string =>
+    [...missing, ...missingStores.map((name) => `store ${name}`)].join(', '),
   isolatedKind: (name: string): string => `isolated module ${name} exports a non-effect definition`,
   isolatedMissing: (id: string): string => `effect ${id} is not in the current isolated table`,
   blueprintFailed: (id: string): string => `blueprint ${id} failed its install check`,
