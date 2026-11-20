@@ -11,6 +11,17 @@ RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipelin
 # package-owned prerequisite for store-wasm and therefore leads this plan.
 STORE_RELEASE_PACKAGES := wasm store-light store-keyed store-shared store-ssr store-worker store-indexed store-middleware store-react store-persist store-devtools store-wasm micro-hub
 PUBLISHABLE_PACKAGES := $(RELEASE_PACKAGES) $(STORE_RELEASE_PACKAGES)
+# Part platform packages are not released yet, but full and affected CI still gate them
+# like release packages (format, lint, types, coverage-captured tests, build freshness).
+PART_PACKAGES := part-contract part-host part-layouts part-plugin-dom part-plugin-react part-plugin-remote part-plugin-devtools partom-cli
+# Applications under apps/ are never built or released; CI runs their format, lint, type and
+# test scripts after the package pool drains.
+CI_APPS := part-catalog part-editor
+# Library families with their own CI. Each covers the family's packages and apps plus their
+# workspace dependency closure; scripts/ci-run.mjs owns the prefixes.
+CI_FAMILIES := storage rpc log part
+FAMILY_CI_TARGETS := $(addsuffix -ci,$(CI_FAMILIES))
+FAMILY_CI_FAST_TARGETS := $(addsuffix -ci-fast,$(CI_FAMILIES))
 RELEASE_BRANCH ?= main
 GITHUB_PACKAGES_REGISTRY := https://npm.pkg.github.com
 
@@ -83,7 +94,7 @@ endef
 	store-ship-cd store-release-plan-check \
 	dependencies-check check-package release-check git-release-check git-publish-check auth-check patch publish \
 	coverage-custody-report ci ci-affected ci-fast ci-conformance ci-website-test ci-website-check fmt-check docs-examples \
-	perf-guard long-test
+	perf-guard long-test $(FAMILY_CI_TARGETS) $(FAMILY_CI_FAST_TARGETS)
 
 # Ship has one visible direction: prove the whole plan, prove every package,
 # then enter the irreversible release loop. No package is versioned before all
@@ -109,7 +120,8 @@ ship-dry-run:
 # no release mutation or registry authentication runs.
 ci:
 	@CI_ALLOW_MISSING_TOOLCHAINS=$(CI_ALLOW_MISSING_TOOLCHAINS) node scripts/ci-run.mjs ci \
-		--release "$(RELEASE_PACKAGES)" --store "$(STORE_RELEASE_PACKAGES)"
+		--release "$(RELEASE_PACKAGES)" --store "$(STORE_RELEASE_PACKAGES)" \
+		--part "$(PART_PACKAGES)" --apps "$(CI_APPS)"
 
 # Maintained examples resolve built package exports; CI performs the preparation build first.
 docs-examples:
@@ -118,7 +130,8 @@ docs-examples:
 # Daily package selection retains full registry and custody rules; shared inputs widen to full CI.
 ci-affected:
 	@CI_ALLOW_MISSING_TOOLCHAINS=$(CI_ALLOW_MISSING_TOOLCHAINS) CI_BASE="$(CI_BASE)" node scripts/ci-run.mjs affected \
-		--release "$(RELEASE_PACKAGES)" --store "$(STORE_RELEASE_PACKAGES)"
+		--release "$(RELEASE_PACKAGES)" --store "$(STORE_RELEASE_PACKAGES)" \
+		--part "$(PART_PACKAGES)" --apps "$(CI_APPS)"
 
 # Daily checks run format before lint and types, without tests or builds.
 # Lint and typecheck gates replay Turbo's cache when package inputs are unchanged.
@@ -140,6 +153,17 @@ ci-fast:
 		run_gate required "website/$$gate" $(CI_MAKE) ci-website-check GATE="$$gate"; \
 	done; \
 	finish_ci
+
+# Family CI builds the family closure and runs every closure package's release chain, the
+# family's app gates and, for rpc, conformance and suite-parity. Repository gates (registry,
+# custody, website) stay in full ci.
+$(FAMILY_CI_TARGETS):
+	@CI_ALLOW_MISSING_TOOLCHAINS=$(CI_ALLOW_MISSING_TOOLCHAINS) node scripts/ci-run.mjs family \
+		--family $(@:-ci=)
+
+# Fast family CI runs only format, lint and type gates of the same closure, without a build.
+$(FAMILY_CI_FAST_TARGETS):
+	@node scripts/ci-run.mjs family --family $(@:-ci-fast=) --fast
 
 # A standalone invocation retains the website exit code; only ci downgrades it.
 ci-website-test:

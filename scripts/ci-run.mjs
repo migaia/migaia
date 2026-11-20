@@ -24,11 +24,23 @@ import { assertAllFresh, DistStampErrorCode } from './dist-stamp.mjs'
 
 /** @typedef {'required' | 'warning'} IGatePolicy */
 /** @typedef {{ name: string; state: string; code: number; seconds: number }} IGateResult */
-/** @typedef {{ name: string; gates: IGateResult[]; started: number; finished: number }} IPackageResult */
+/**
+ * @typedef {{
+ *   name: string
+ *   gates: IGateResult[]
+ *   started: number
+ *   finished: number
+ *   family: boolean
+ * }} IPackageResult
+ *   `family` marks an RPC owner whose test runs in the shared family capture.
+ */
 /** @typedef {{ jobs: number; workers: number; reportRoot: string; env: NodeJS.ProcessEnv }} ICiRuntime */
 /** @typedef {{ cwd?: string; env?: NodeJS.ProcessEnv; log?: string }} ICommandOptions */
 /** @typedef {{ rpc: boolean; website: boolean }} ICiScope */
 /** @typedef {{ name: string; path: string }} IWorkspaceProject */
+/** @typedef {{ part: string[]; apps: string[] }} ICiExtra */
+/** @typedef {{ prefixes: readonly string[]; rpc: boolean }} ICiFamily */
+/** @typedef {{ packages: string[]; apps: string[]; filters: string[] }} IFamilySelection */
 
 /** All commands resolve relative to the checkout containing this scheduler. */
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -47,6 +59,7 @@ const GateName = Object.freeze({
   release: 'release-plan-check',
   ship: 'ship-ci',
   store: 'store-ship-ci',
+  part: 'part-packages-ci',
   registry: 'registry:check',
   consumers: 'typecheck:consumers',
   docs: 'check-docs-independence',
@@ -65,6 +78,26 @@ const rootTestGates = Object.freeze([
   'test:release',
   'test:tree-shaking'
 ])
+/**
+ * Application gates in run order. Applications have no build output or coverage owner, so each gate
+ * is the app's own package script; `fmt` is the read-only Makefile check.
+ */
+const appGates = Object.freeze(['fmt', 'lint', 'typecheck', 'typecheck:test', 'test'])
+/** Fast application gates: the static prefix of `appGates`, without tests. */
+const appFastGates = Object.freeze(['fmt', 'lint', 'typecheck', 'typecheck:test'])
+/**
+ * Library families with their own CI target (`make <family>-ci`, `make <family>-ci-fast`). A family
+ * is every package and app whose directory starts with one of its prefixes, plus their workspace
+ * dependency closure. `rpc` adds the conformance and suite-parity gates.
+ *
+ * @type {Readonly<Record<string, ICiFamily>>}
+ */
+const ciFamilies = Object.freeze({
+  storage: Object.freeze({ prefixes: Object.freeze(['storage-']), rpc: false }),
+  rpc: Object.freeze({ prefixes: Object.freeze(['rpc-']), rpc: true }),
+  log: Object.freeze({ prefixes: Object.freeze(['log-']), rpc: false }),
+  part: Object.freeze({ prefixes: Object.freeze(['part-', 'partom-']), rpc: false })
+})
 /** Foreign conformance peers require the same executables as Makefile. */
 const conformanceTools = Object.freeze(['python3', 'rustc', 'cargo', 'go'])
 /** Both runtime owners and their integration suite participate in the one RPC capture. */
@@ -143,6 +176,15 @@ const packedCommands = Object.freeze({
     'node',
     'test/packed-export-smoke.mjs'
   ],
+  /**
+   * Family CI selects the integration runner; its packed smoke rebuilds every RPC owner first,
+   * which would clean `dist/` under the conformance lanes and other readers.
+   */
+  'rpc-integration': [
+    'pnpm -r --workspace-concurrency=2 --filter @migaia/rpc-contract --filter @migaia/rpc-host --filter @migaia/rpc-plugin-process --filter @migaia/rpc-plugin-thread --filter @migaia/rpc-plugin-browser --filter @migaia/rpc-plugin-coroutines --filter @migaia/rpc-plugin-pool --filter @migaia/rpc-plugin-devtools run build && node test/core/packed-export-smoke.mjs',
+    'node',
+    'test/core/packed-export-smoke.mjs'
+  ],
   'storage-plugin-browser': [
     'pnpm run build && vitest run test/bundle-boundary.spec.ts',
     'pnpm',
@@ -191,7 +233,7 @@ const text = Object.freeze({
   jobs: (jobs, workers) => `==> CI_JOBS=${jobs}; nested workers=${workers}`,
   invalidJobs: 'CI_JOBS must be a positive integer',
   invalidArguments:
-    'usage: node scripts/ci-run.mjs ci|affected --release "packages" --store "packages" | packages --packages "packages"',
+    'usage: node scripts/ci-run.mjs ci|affected --release "packages" --store "packages" [--part "packages"] [--apps "apps"] | packages --packages "packages" | family --family name [--fast]',
   invalidBase: 'CI_BASE must name an existing Git commit',
   affected: (base) => '==> affected scope; CI_BASE=' + base,
   selection: (names) => '==> selected packages: ' + (names.join(' ') || '(none)'),
@@ -200,6 +242,11 @@ const text = Object.freeze({
   emptyDiff: '==> affected scope: empty diff; no gates run',
   plan: (names) => '==> planned gates: ' + (names.join(' ') || '(none)'),
   missingPackage: (name) => `unknown CI package: ${name}`,
+  missingApp: (name) => `unknown CI app: ${name}`,
+  unknownFamily: (name) =>
+    `unknown CI family: ${name}; expected one of ${Object.keys(ciFamilies).join(', ')}`,
+  familySelection: (name, packages, apps) =>
+    `==> ${name} family closure: ${[...packages, ...apps.map((app) => 'apps/' + app)].join(' ')}`,
   packedChanged: (name) => `CI packed preparation no longer matches the declared ${name} script`,
   missingTools: (tools) => `rpc/test:conformance (missing: ${tools.join(' ')})`,
   family: '\n==> RPC family coverage (exclusive)',
@@ -377,6 +424,31 @@ const captureTest = async (name, runtime) => {
  * @returns {Promise<void>} Resolves after the prefix and, for ordinary owners, the complete chain.
  */
 const beginPackage = async (result, runtime) => {
+  await runStaticGates(result, runtime)
+  if (result.family) return
+  result.gates.push(
+    Object.hasOwn(NON_V8_PACKAGES, result.name)
+      ? await runGate(
+          `${result.name}/test`,
+          'required',
+          'pnpm',
+          ['--filter', `./packages/${result.name}`, 'run', 'test'],
+          { env: runtime.env }
+        )
+      : await captureTest(result.name, runtime)
+  )
+  await finishPackage(result, runtime)
+}
+
+/**
+ * Run one package's static gates: format check, lint, typecheck and every `typecheck:*` script.
+ * Full CI runs them before the package test; fast mode runs only these.
+ *
+ * @param {IPackageResult} result Mutable results owned by one package job.
+ * @param {ICiRuntime} runtime Child environment.
+ * @returns {Promise<void>} Resolves after the last static gate.
+ */
+const runStaticGates = async (result, runtime) => {
   /** Optional typecheck scripts are discovered exactly as release-check already does. */
   const manifest = readPackageManifest(result.name)
   console.log(text.package(result.name))
@@ -406,19 +478,7 @@ const beginPackage = async (result, runtime) => {
         { env: runtime.env }
       )
     )
-  if (familyOwners.includes(result.name)) return
-  result.gates.push(
-    Object.hasOwn(NON_V8_PACKAGES, result.name)
-      ? await runGate(
-          `${result.name}/test`,
-          'required',
-          'pnpm',
-          ['--filter', `./packages/${result.name}`, 'run', 'test'],
-          { env: runtime.env }
-        )
-      : await captureTest(result.name, runtime)
-  )
-  await finishPackage(result, runtime)
+  result.finished = Date.now()
 }
 
 /**
@@ -435,7 +495,7 @@ const finishPackage = async (result, runtime) => {
   const manifest = readPackageManifest(result.name)
   for (const gate of ['test:packed', 'test:e2e']) {
     if (!manifest.scripts?.[gate]) continue
-    /** Only the six current release scripts have a preparation prefix eligible for removal. */
+    /** Only scripts listed in `packedCommands` have a preparation prefix eligible for removal. */
     const packed = gate === 'test:packed' ? packedCommands[result.name] : null
     if (packed) {
       if (manifest.scripts[gate] !== packed[0]) throw new Error(text.packedChanged(result.name))
@@ -543,25 +603,44 @@ const captureFamily = async (packages, runtime) => {
  *
  * @param {string[]} names Existing package declaration order.
  * @param {ICiRuntime} runtime Global job budget.
- * @param {{ onFamilyReady?: () => void; onPoolDrained?: () => Promise<void> }} [hooks]
+ * @param {{
+ *   onFamilyReady?: () => void
+ *   onPoolDrained?: () => Promise<void>
+ *   partialFamilyAlone?: boolean
+ * }} [hooks]
  *   `onFamilyReady` runs synchronously as the family capture starts; `onPoolDrained` is root work
  *   started once the ordinary pool drains and may overlap the capture and its tails.
+ *   `partialFamilyAlone` (family CI) tests RPC owners with their own package configs unless every
+ *   runtime owner is selected, so a dependency such as `rpc-contract` does not pull in the whole
+ *   family capture.
  * @returns {Promise<IPackageResult[]>} Complete ordered package results; summaries never precede
  *   deferred tests or the drained-pool callback.
  */
 export const runPackages = async (names, runtime, hooks = {}) => {
   /** Package maps prevent duplicate selected owners from running a second capture. */
-  const results = [...new Set(names)].map((name) => {
+  /** Unique selection, so a duplicated owner never runs a second capture. */
+  const unique = [...new Set(names)]
+  /** Whether selected RPC owners share one capture; always true outside family CI. */
+  const shareCapture =
+    !hooks.partialFamilyAlone ||
+    RPC_COVERAGE_FAMILY.runtimeOwners.every((owner) => unique.includes(owner))
+  const results = unique.map((name) => {
     if (!existsSync(join(repositoryRoot, 'packages', name, 'package.json')))
       throw new Error(text.missingPackage(name))
-    return { name, gates: [], started: 0, finished: 0 }
+    return {
+      name,
+      gates: [],
+      started: 0,
+      finished: 0,
+      family: shareCapture && familyOwners.includes(name)
+    }
   })
   for (const result of results.filter(({ name }) => exclusivePackages.includes(name)))
     await beginPackage(result, runtime)
   /** Every remaining package chain keeps the original ordinary pool budget. */
   const ordinary = results.filter(({ name }) => !exclusivePackages.includes(name))
   /** The integration owner participates through the family config even when not publishable. */
-  const family = results.filter(({ name }) => familyOwners.includes(name))
+  const family = results.filter((result) => result.family)
   /** Queued and running non-family chains; capture may overlap only the last few of them. */
   let ordinaryRemaining = ordinary.length - family.length
   /** Family owners whose format/lint/typecheck prefix has not finished yet. */
@@ -578,7 +657,7 @@ export const runPackages = async (names, runtime, hooks = {}) => {
   /** Root work waits for the whole ordinary pool, never for the family capture. */
   const pool = runPool(ordinary, runtime.jobs, async (result) => {
     await beginPackage(result, runtime)
-    if (familyOwners.includes(result.name)) familyPrefixesRemaining -= 1
+    if (result.family) familyPrefixesRemaining -= 1
     else ordinaryRemaining -= 1
     if (familyPrefixesRemaining === 0 && ordinaryRemaining <= familyOverlapChains)
       familyReady.resolve()
@@ -723,19 +802,105 @@ const groupSummary = (name, names, packages) => {
 }
 
 /**
+ * Finish an admitted conformance gate, or report the missing peer toolchains as a skip row whose
+ * policy follows `CI_ALLOW_MISSING_TOOLCHAINS`.
+ *
+ * @param {ReturnType<typeof createConformanceGate> | undefined} conformance Admitted gate.
+ * @param {string[]} missingTools Missing peer executables when the gate was not admitted.
+ * @returns {Promise<IGateResult>} The conformance row.
+ */
+const finishConformance = (conformance, missingTools) =>
+  conformance
+    ? conformance.finish()
+    : Promise.resolve({
+        name: text.missingTools(missingTools),
+        code: process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1' ? 0 : 1,
+        state:
+          process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1'
+            ? GateState.skipWarning
+            : GateState.skipBlocking,
+        seconds: 0
+      })
+
+/**
+ * Run the RPC suite-parity check owned by the integration package.
+ *
+ * @param {ICiRuntime} runtime Invocation context.
+ * @returns {Promise<IGateResult>} The `rpc/test:suite-parity` row.
+ */
+const runParity = (runtime) =>
+  runGate(
+    GateName.parity,
+    'required',
+    'pnpm',
+    ['--filter', './packages/rpc-integration', 'run', 'test:suite-parity'],
+    { env: runtime.env }
+  )
+
+/**
+ * Run every application's gates in order. Applications consume the workspace build but own no build
+ * output or coverage unit, so their gates are their own scripts, run through pnpm.
+ *
+ * @param {string[]} apps Application directory names under `apps/`.
+ * @param {ICiRuntime} runtime Invocation context.
+ * @param {readonly string[]} [gates] Gates to run; fast mode passes `appFastGates`.
+ * @returns {Promise<IGateResult[]>} Ordered `app/gate` rows; a missing script is a blocking skip,
+ *   matching ci-fast.
+ * @throws {Error} A listed application has no manifest.
+ */
+const runAppGates = async (apps, runtime, gates = appGates) => {
+  /** Rows in application, then gate order. */
+  const results = []
+  for (const name of apps) {
+    /** Directory relative to the repository root, as Make and pnpm filters expect it. */
+    const directory = `./apps/${name}`
+    if (!existsSync(join(repositoryRoot, directory, 'package.json')))
+      throw new Error(text.missingApp(name))
+    /** Scripts decide which gates exist, as for packages. */
+    const scripts = JSON.parse(
+      readFileSync(join(repositoryRoot, directory, 'package.json'), 'utf8')
+    ).scripts
+    for (const gate of gates) {
+      /** Visible row name keeps the apps/ prefix so it never collides with a package row. */
+      const row = `apps/${name}/${gate}`
+      if (!scripts?.[gate]) {
+        results.push({ name: row, state: GateState.skipBlocking, code: 1, seconds: 0 })
+        continue
+      }
+      results.push(
+        gate === 'fmt'
+          ? await runGate(
+              row,
+              'required',
+              'make',
+              ['--no-print-directory', 'fmt-check', `DIRECTORY=${directory}`],
+              { env: runtime.env }
+            )
+          : await runGate(row, 'required', 'pnpm', ['--filter', directory, 'run', gate], {
+              env: runtime.env
+            })
+      )
+    }
+  }
+  return results
+}
+
+/**
  * Execute repository gates and the maintained documentation examples after the preparation build.
  *
  * @param {string[]} releasePackages Existing foundation release plan.
  * @param {string[]} storePackages Existing store release plan.
  * @param {ICiRuntime} runtime Invocation context.
  * @param {ICiScope} [scope] Affected mode selects RPC and website gates; full CI retains both.
+ * @param {ICiExtra} [extra] Unreleased part packages (package pool) and applications (root rows).
  * @returns {Promise<number>} Existing finish_ci blocking status.
  */
 export const runCi = async (
   releasePackages,
   storePackages,
   runtime,
-  scope = { rpc: true, website: true }
+  scope = { rpc: true, website: true },
+  extra = { part: [], apps: [] }
 ) => {
   /** Root rows stay in their old order even though both package groups now share one pool. */
   const results = []
@@ -754,91 +919,89 @@ export const runCi = async (
   const parityResults = []
   /** Website rows in their original fmt, lint, typecheck, test order. */
   const websiteResults = []
+  /** Application rows; they run after the root fixture gates, before the overlapping tails. */
+  const appResults = []
   /** Peer tools missing for conformance; an empty list admits the gate. */
   const missingTools = scope.rpc ? await missingConformanceTools() : []
   /** Admitted conformance gate; its early lane starts with the RPC family capture. */
   const conformance = scope.rpc && !missingTools.length ? createConformanceGate(runtime) : undefined
   /** All readers begin only after the one topological workspace build has finished. */
-  const packages = await runPackages([...releasePackages, ...storePackages], runtime, {
-    onFamilyReady: () => conformance?.startEarly(),
-    onPoolDrained: async () => {
-      for (const name of [GateName.registry, GateName.consumers])
+  const packages = await runPackages(
+    [...releasePackages, ...storePackages, ...extra.part],
+    runtime,
+    {
+      onFamilyReady: () => conformance?.startEarly(),
+      onPoolDrained: async () => {
+        for (const name of [GateName.registry, GateName.consumers])
+          rootResults.push(
+            await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env })
+          )
         rootResults.push(
-          await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env })
-        )
-      rootResults.push(
-        await runGate(GateName.docs, 'required', 'node', ['scripts/check-docs-independence.mjs'], {
-          env: runtime.env
-        })
-      )
-      rootResults.push(
-        await runGate(
-          GateName.docsExamples,
-          'required',
-          'make',
-          ['--no-print-directory', 'docs-examples'],
-          {
-            env: runtime.env
-          }
-        )
-      )
-      for (const name of rootTestGates)
-        rootResults.push(
-          await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env })
-        )
-      /** Conformance, suite-parity and the website chain share no inputs, so they overlap. */
-      await Promise.all([
-        scope.rpc &&
-          (conformance
-            ? conformance.finish()
-            : Promise.resolve({
-                name: text.missingTools(missingTools),
-                code: process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1' ? 0 : 1,
-                state:
-                  process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1'
-                    ? GateState.skipWarning
-                    : GateState.skipBlocking,
-                seconds: 0
-              })
-          ).then((result) => conformanceResults.push(result)),
-        scope.rpc &&
-          runGate(
-            GateName.parity,
+          await runGate(
+            GateName.docs,
             'required',
-            'pnpm',
-            ['--filter', './packages/rpc-integration', 'run', 'test:suite-parity'],
-            { env: runtime.env }
-          ).then((result) => parityResults.push(result)),
-        scope.website &&
-          (async () => {
-            for (const gate of ['fmt', 'lint', 'typecheck'])
+            'node',
+            ['scripts/check-docs-independence.mjs'],
+            {
+              env: runtime.env
+            }
+          )
+        )
+        rootResults.push(
+          await runGate(
+            GateName.docsExamples,
+            'required',
+            'make',
+            ['--no-print-directory', 'docs-examples'],
+            {
+              env: runtime.env
+            }
+          )
+        )
+        for (const name of rootTestGates)
+          rootResults.push(
+            await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env })
+          )
+        appResults.push(...(await runAppGates(extra.apps, runtime)))
+        /** Conformance, suite-parity and the website chain share no inputs, so they overlap. */
+        await Promise.all([
+          scope.rpc &&
+            finishConformance(conformance, missingTools).then((result) =>
+              conformanceResults.push(result)
+            ),
+          scope.rpc && runParity(runtime).then((result) => parityResults.push(result)),
+          scope.website &&
+            (async () => {
+              for (const gate of ['fmt', 'lint', 'typecheck'])
+                websiteResults.push(
+                  await runGate(
+                    `website/${gate}`,
+                    'required',
+                    'make',
+                    ['--no-print-directory', 'ci-website-check', `GATE=${gate}`],
+                    { env: runtime.env }
+                  )
+                )
               websiteResults.push(
                 await runGate(
-                  `website/${gate}`,
-                  'required',
+                  'website/test',
+                  'warning',
                   'make',
-                  ['--no-print-directory', 'ci-website-check', `GATE=${gate}`],
-                  { env: runtime.env }
+                  ['--no-print-directory', 'ci-website-test'],
+                  {
+                    env: runtime.env
+                  }
                 )
               )
-            websiteResults.push(
-              await runGate(
-                'website/test',
-                'warning',
-                'make',
-                ['--no-print-directory', 'ci-website-test'],
-                {
-                  env: runtime.env
-                }
-              )
-            )
-          })()
-      ])
+            })()
+        ])
+      }
     }
-  })
+  )
   if (releasePackages.length) results.push(groupSummary(GateName.ship, releasePackages, packages))
   if (storePackages.length) results.push(groupSummary(GateName.store, storePackages, packages))
-  results.push(...rootResults)
+  if (extra.part.length) results.push(groupSummary(GateName.part, extra.part, packages))
+  results.push(...rootResults, ...appResults)
   /** Custody starts only after every capture, exit marker and family tail has completed. */
   results.push(
     await runGate(GateName.custody, 'required', 'node', ['scripts/coverage-custody.mjs'], {
@@ -875,11 +1038,18 @@ const listProjects = (filters = []) =>
  *
  * @param {string[]} release Foundation release inventory owned by Makefile.
  * @param {string[]} store Store release inventory owned by Makefile.
- * @returns {{ release: string[]; store: string[]; scope: ICiScope; empty: boolean }} Selected
- *   gates.
+ * @param {ICiExtra} unreleased Part package and application inventories owned by Makefile.
+ * @returns {{
+ *   release: string[]
+ *   store: string[]
+ *   extra: ICiExtra
+ *   scope: ICiScope
+ *   empty: boolean
+ * }}
+ *   Selected gates.
  * @throws {Error} CI_BASE is empty or cannot resolve to a Git commit.
  */
-const selectAffected = (release, store) => {
+const selectAffected = (release, store, unreleased) => {
   /** The default remains explicit; an empty configured base is not silently replaced. */
   const base = process.env.CI_BASE ?? 'origin/main'
   if (!base) throw new Error(text.invalidBase)
@@ -907,7 +1077,13 @@ const selectAffected = (release, store) => {
   console.log(text.affected(base))
   if (!changed.length) {
     console.log(text.emptyDiff)
-    return { release: [], store: [], scope: { rpc: false, website: false }, empty: true }
+    return {
+      release: [],
+      store: [],
+      extra: { part: [], apps: [] },
+      scope: { rpc: false, website: false },
+      empty: true
+    }
   }
   /** The short fallback list is a CI policy; package consumers remain pnpm's responsibility. */
   const shared = changed.filter(
@@ -918,8 +1094,15 @@ const selectAffected = (release, store) => {
   )
   if (shared.length) {
     console.log(text.fallback(shared))
-    console.log(text.selection([...release, ...store]))
-    return { release, store, scope: { rpc: true, website: true }, empty: false }
+    console.log(
+      text.selection([
+        ...release,
+        ...store,
+        ...unreleased.part,
+        ...unreleased.apps.map((name) => 'apps/' + name)
+      ])
+    )
+    return { release, store, extra: unreleased, scope: { rpc: true, website: true }, empty: false }
   }
   /** Longest paths distinguish nested projects without treating the repository root as an owner. */
   const inventory = listProjects()
@@ -936,25 +1119,153 @@ const selectAffected = (release, store) => {
   }
   /** Multiple pnpm filters form a union, including each changed package and its dependents. */
   const selected = listProjects(['...[' + base + ']', ...extra])
+  /** Repository-relative project paths, used to bind selection to the Makefile lists. */
+  const paths = selected.map((project) =>
+    relative(repositoryRoot, project.path).split(sep).join('/')
+  )
   /** Directory names bind selection to the existing Makefile release lists. */
   const names = new Set(
-    selected
-      .map((project) => relative(repositoryRoot, project.path).split(sep).join('/'))
+    paths
       .filter((path) => /^packages\/[^/]+$/.test(path))
       .map((path) => path.slice('packages/'.length))
+  )
+  /** Selected application directory names. */
+  const appNames = new Set(
+    paths.filter((path) => /^apps\/[^/]+$/.test(path)).map((path) => path.slice('apps/'.length))
   )
   /** The website generator documents every current library, excluding the integration-only owner. */
   const website =
     selected.some((project) => resolve(project.path) === join(repositoryRoot, 'website')) ||
     [...names].some((name) => name !== RPC_COVERAGE_FAMILY.runner)
-  console.log(text.selection([...names]))
+  console.log(text.selection([...names, ...[...appNames].map((name) => 'apps/' + name)]))
   console.log(text.selectionReason)
   return {
     release: release.filter((name) => names.has(name)),
     store: store.filter((name) => names.has(name)),
+    extra: {
+      part: unreleased.part.filter((name) => names.has(name)),
+      apps: unreleased.apps.filter((name) => appNames.has(name))
+    },
     scope: { rpc: [...names].some((name) => name.startsWith('rpc-')), website },
     empty: false
   }
+}
+
+/**
+ * Resolve one family to its members and their workspace dependency closure.
+ *
+ * @param {string} name Family key from `ciFamilies`.
+ * @returns {IFamilySelection} Package and app directory names in sorted order, plus the pnpm
+ *   `<name>...` selectors that build the closure.
+ * @throws {Error} Unknown family name.
+ */
+const selectFamily = (name) => {
+  /** Family definition; unknown names fail before any command runs. */
+  const family = Object.hasOwn(ciFamilies, name) ? ciFamilies[name] : undefined
+  if (!family) throw new Error(text.unknownFamily(name))
+  /** Every workspace project with a repository-relative directory. */
+  const projects = listProjects().map((project) => ({
+    name: project.name,
+    path: relative(repositoryRoot, project.path).split(sep).join('/')
+  }))
+  /** `<name>...` selects a member and all of its workspace dependencies. */
+  const filters = projects
+    .filter(({ path }) =>
+      family.prefixes.some(
+        (prefix) => path.startsWith('packages/' + prefix) || path.startsWith('apps/' + prefix)
+      )
+    )
+    .map((project) => project.name + '...')
+  /** Closure paths reported by pnpm for the union of member selectors. */
+  const closure = listProjects(filters).map((project) =>
+    relative(repositoryRoot, project.path).split(sep).join('/')
+  )
+  return {
+    packages: directoryNames(closure, 'packages/'),
+    apps: directoryNames(closure, 'apps/'),
+    filters
+  }
+}
+
+/**
+ * Keep direct children of one workspace root and return their sorted directory names.
+ *
+ * @param {string[]} paths Repository-relative project paths.
+ * @param {string} root `packages/` or `apps/`.
+ * @returns {string[]} Directory names in code-unit order.
+ */
+const directoryNames = (paths, root) =>
+  paths
+    .filter((path) => path.startsWith(root) && !path.slice(root.length).includes('/'))
+    .map((path) => path.slice(root.length))
+    /** Default string sort compares UTF-16 code units, so the order is locale-independent. */
+    .sort()
+
+/**
+ * Run one family's CI. Fast mode runs the static gates of every closure package and app without a
+ * build. Full mode builds the closure, runs every package chain (RPC owners share the family
+ * capture only when all runtime owners are selected), then the app gates and, for `rpc`, the
+ * conformance and suite-parity gates. Coverage custody and other repository gates stay in full CI.
+ *
+ * @param {string} name Family key.
+ * @param {IFamilySelection} selection Resolved closure.
+ * @param {boolean} fast Whether to run only static gates.
+ * @param {ICiRuntime} runtime Invocation context.
+ * @returns {Promise<number>} Blocking status.
+ */
+const runFamily = async (name, selection, fast, runtime) => {
+  for (const member of selection.packages)
+    if (!existsSync(join(repositoryRoot, 'packages', member, 'package.json')))
+      throw new Error(text.missingPackage(member))
+  if (fast) {
+    /** Static rows per package, in closure order. */
+    const results = selection.packages.map((member) => ({
+      name: member,
+      gates: [],
+      started: 0,
+      finished: 0,
+      family: false
+    }))
+    await runPool(results, runtime.jobs, (result) => runStaticGates(result, runtime))
+    /** App rows run after the package pool, in app order. */
+    const appResults = await runAppGates(selection.apps, runtime, appFastGates)
+    return printSummary([...results.flatMap((result) => result.gates), ...appResults])
+  }
+  /** The closure build; readers below need its output. */
+  const build = await runGate(
+    `${name}/build`,
+    'required',
+    'pnpm',
+    [
+      '-r',
+      '--workspace-concurrency=2',
+      ...selection.filters.flatMap((filter) => ['--filter', filter]),
+      'run',
+      'build'
+    ],
+    { env: runtime.env }
+  )
+  if (build.code !== 0) return printSummary([build])
+  /** Whether this family owns the RPC conformance and suite-parity gates. */
+  const rpc = ciFamilies[name].rpc
+  /** Peer tools missing for conformance; an empty list admits the gate. */
+  const missingTools = rpc ? await missingConformanceTools() : []
+  /** Admitted conformance gate; its early lane starts with the RPC family capture. */
+  const conformance = rpc && !missingTools.length ? createConformanceGate(runtime) : undefined
+  /** Rows produced once the package pool drains. */
+  const tailRows = []
+  const packages = await runPackages(selection.packages, runtime, {
+    partialFamilyAlone: true,
+    onFamilyReady: () => conformance?.startEarly(),
+    onPoolDrained: async () => {
+      tailRows.push(...(await runAppGates(selection.apps, runtime)))
+      if (rpc)
+        tailRows.push(
+          ...(await Promise.all([finishConformance(conformance, missingTools), runParity(runtime)]))
+        )
+    }
+  })
+  return printSummary([build, ...packages.map(packageSummary), ...tailRows])
 }
 
 /**
@@ -963,9 +1274,10 @@ const selectAffected = (release, store) => {
  * @param {string[]} release Selected foundation packages.
  * @param {string[]} store Selected Store packages.
  * @param {ICiScope} scope RPC and website consumers enabled by this selection.
+ * @param {ICiExtra} extra Selected part packages and applications.
  * @returns {void}
  */
-const printPlan = (release, store, scope) => {
+const printPlan = (release, store, scope, extra) => {
   /** Registry and custody remain full checks even when release checks select only affected owners. */
   const gates = [
     GateName.build,
@@ -973,10 +1285,12 @@ const printPlan = (release, store, scope) => {
     GateName.release,
     ...(release.length ? [GateName.ship] : []),
     ...(store.length ? [GateName.store] : []),
+    ...(extra.part.length ? [GateName.part] : []),
     GateName.registry,
     GateName.consumers,
     GateName.docs,
     ...rootTestGates,
+    ...extra.apps.flatMap((name) => appGates.map((gate) => `apps/${name}/${gate}`)),
     GateName.custody,
     ...(scope.rpc ? [GateName.conformance, GateName.parity] : []),
     ...(scope.website ? ['website/fmt', 'website/lint', 'website/typecheck', 'website/test'] : [])
@@ -1006,30 +1320,97 @@ const preparePackages = async (runtime) => {
  * Parse the small Makefile CLI and preserve package declaration order.
  *
  * @param {string[]} argv Mode and explicit package-list options.
- * @returns {{ mode: string; release: string[]; store: string[]; packages: string[] }} Resolved
- *   command.
+ * @returns {{
+ *   mode: string
+ *   release: string[]
+ *   store: string[]
+ *   part: string[]
+ *   apps: string[]
+ *   packages: string[]
+ *   family: string[]
+ *   fast: boolean
+ * }}
+ *   Resolved command.
  * @throws {Error} Unsupported mode, option or missing option value.
  */
 const parseArguments = (argv) => {
   /** Make passes each package list as one argument, avoiding shell splitting inside this module. */
   const [mode, ...args] = argv
-  if (mode !== 'ci' && mode !== 'packages' && mode !== 'affected')
+  if (mode !== 'ci' && mode !== 'packages' && mode !== 'affected' && mode !== 'family')
     throw new Error(text.invalidArguments)
-  /** The three accepted lists are explicit inputs rather than a second release inventory. */
-  const options = { release: [], store: [], packages: [] }
-  for (let index = 0; index < args.length; index += 2) {
+  /** The accepted lists are explicit inputs rather than a second release inventory. */
+  const options = {
+    release: [],
+    store: [],
+    part: [],
+    apps: [],
+    packages: [],
+    family: [],
+    fast: false
+  }
+  /** Cursor over the remaining arguments; `--fast` takes no value, every list option takes one. */
+  let index = 0
+  while (index < args.length) {
+    if (args[index] === '--fast') {
+      options.fast = true
+      index += 1
+      continue
+    }
     /** An option without its full package-list argument cannot produce a trustworthy selection. */
     const key = args[index].slice(2)
     if (
       !args[index].startsWith('--') ||
+      key === 'fast' ||
       !Object.hasOwn(options, key) ||
       args[index + 1] === undefined
     )
       throw new Error(text.invalidArguments)
     options[key] = args[index + 1].trim().split(/\s+/).filter(Boolean)
+    index += 2
   }
+  if ((mode === 'family') !== (options.family.length === 1) || (options.fast && mode !== 'family'))
+    throw new Error(text.invalidArguments)
   return { mode, ...options }
 }
+
+/**
+ * Family entrypoint: resolve the closure, print it, honour `CI_DRY_RUN`, then run.
+ *
+ * @param {string} name Family key.
+ * @param {boolean} fast Whether to run only static gates.
+ * @returns {Promise<number>} Blocking status.
+ */
+const mainFamily = async (name, fast) => {
+  /** Closure resolution is read-only and precedes any report directory. */
+  const selection = selectFamily(name)
+  console.log(text.familySelection(name, selection.packages, selection.apps))
+  if (process.env.CI_DRY_RUN === '1') {
+    console.log(text.plan(familyPlan(name, selection, fast)))
+    return 0
+  }
+  return runFamily(name, selection, fast, createRuntime())
+}
+
+/**
+ * List a family's planned rows without running anything.
+ *
+ * @param {string} name Family key.
+ * @param {IFamilySelection} selection Resolved closure.
+ * @param {boolean} fast Whether only static gates run.
+ * @returns {string[]} Row names in run order.
+ */
+const familyPlan = (name, selection, fast) =>
+  fast
+    ? [
+        ...selection.packages.map((member) => member + '/static'),
+        ...selection.apps.flatMap((app) => appFastGates.map((gate) => `apps/${app}/${gate}`))
+      ]
+    : [
+        name + '/build',
+        ...selection.packages.map((member) => member + '/release-check'),
+        ...selection.apps.flatMap((app) => appGates.map((gate) => `apps/${app}/${gate}`)),
+        ...(ciFamilies[name].rpc ? [GateName.conformance, GateName.parity] : [])
+      ]
 
 /**
  * Makefile entrypoint; reports every gate before returning the original aggregate blocking status.
@@ -1040,29 +1421,42 @@ const parseArguments = (argv) => {
 export const main = async (argv) => {
   /** Parse before creating reports so invalid invocations have no filesystem effect. */
   const options = parseArguments(argv)
+  if (options.mode === 'family') return mainFamily(options.family[0], options.fast)
   /** Selection and dry-run are read-only and must precede raw report allocation. */
   const selection =
     options.mode === 'affected'
-      ? selectAffected(options.release, options.store)
+      ? selectAffected(options.release, options.store, {
+          part: options.part,
+          apps: options.apps
+        })
       : {
           release: options.release,
           store: options.store,
+          extra: { part: options.part, apps: options.apps },
           scope: { rpc: true, website: true },
           empty: false
         }
   if (selection.empty) return 0
   if (process.env.CI_DRY_RUN === '1') {
     if (options.mode === 'packages') console.log(text.selection(options.packages))
-    else console.log(text.selection([...selection.release, ...selection.store]))
+    else
+      console.log(
+        text.selection([
+          ...selection.release,
+          ...selection.store,
+          ...selection.extra.part,
+          ...selection.extra.apps.map((name) => 'apps/' + name)
+        ])
+      )
     if (options.mode === 'packages')
       console.log(text.plan(options.packages.map((name) => name + '/release-check')))
-    else printPlan(selection.release, selection.store, selection.scope)
+    else printPlan(selection.release, selection.store, selection.scope, selection.extra)
     return 0
   }
   /** One runtime owns the entire invocation's reports and nested worker budget. */
   const runtime = createRuntime()
   if (options.mode !== 'packages')
-    return runCi(selection.release, selection.store, runtime, selection.scope)
+    return runCi(selection.release, selection.store, runtime, selection.scope, selection.extra)
   /** Standalone ship/store begins with fresh output, then never rebuilds inside package jobs. */
   const prepared = await preparePackages(runtime)
   if (prepared !== 0) return prepared
