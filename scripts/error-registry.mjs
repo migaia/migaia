@@ -129,6 +129,13 @@ const firstSentence = (body) => {
   return (boundary < 0 ? text : text.slice(0, boundary + 1)).replaceAll('|', '\\|').trim()
 }
 
+/**
+ * Workspace directories that hold code-owning units. Packages and applications both declare
+ * boundary errors in `src/error-code.ts`; a missing directory (for example in a test fixture root)
+ * is skipped.
+ */
+const ERROR_CODE_ROOTS = ['packages', 'apps']
+
 /** Lowercase semantic domains allow dotted segments and hyphens within each segment. */
 const SOURCE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?:\.[a-z][a-z0-9]*(?:-[a-z0-9]+)*)*$/
 /**
@@ -168,8 +175,10 @@ export const collectErrorRegistry = (root = repositoryRoot) => {
   const rows = []
   /** First declaration path for each public source/code pair. */
   const owners = new Map()
-  /** Declaration files live only below package source trees. */
-  const files = findErrorCodeFiles(join(root, 'packages')).sort(codeUnitCompare)
+  /** Declaration files live below package and application source trees. */
+  const files = ERROR_CODE_ROOTS.filter((directory) => existsSync(join(root, directory)))
+    .flatMap((directory) => findErrorCodeFiles(join(root, directory)))
+    .sort(codeUnitCompare)
   /**
    * One optional JSDoc block directly followed by a `key: 'CODE'` entry. The JSDoc group may not
    * cross a closing `*\/`, so a file header comment can never be attributed to a later code.
