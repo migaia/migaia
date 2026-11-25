@@ -111,15 +111,15 @@ export async function openWorker(entry: URL) {
 import { PluginHost } from '@migaia/plugin-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 
-export async function installAndRelease(entry: URL) {
-  const owner = new PluginHost<Record<string, never>>({
-    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }
-  })
-  try {
-    await owner.use(processPlugin({ name: 'worker', spawn: entry }))
-  } finally {
-    await owner.dispose()
-  }
+// 应用已有的 PluginHost：启动时装一次子进程插件，之后一直复用
+const owner = new PluginHost<Record<string, never>>({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }
+})
+await owner.use(processPlugin({ name: 'worker', spawn: new URL('./worker.ts', import.meta.url) }))
+
+// 应用退出时释放：子进程随插件一起停止
+export async function shutdown() {
+  await owner.dispose()
 }
 ```
 

@@ -24,15 +24,20 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 
-export async function doubleInWorker(worker: Worker) {
-  const host = await createRpcHost({
-    plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })]
-  })
-  try {
-    return await host.worker.request('double', 21)
-  } finally {
-    await host.close()
-  }
+const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+// 页面启动时连接一次，之后的调用都复用这个 host
+const host = await createRpcHost({
+  plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })]
+})
+
+export function double(value: number) {
+  return host.worker.request('double', value)
+}
+
+// 不再需要 Worker 时：先关闭 host，再终止自己创建的 Worker
+export async function stopWorker() {
+  await host.close()
+  worker.terminate()
 }
 ```
 
@@ -44,15 +49,20 @@ Worker 端模块见 README，使用 Worker 全局类型。`host.worker` 是默�
 import { createRpcHost } from '@migaia/rpc-host'
 import { windowPlugin } from '@migaia/rpc-plugin-browser'
 
-export async function callFrame(target: Window, origin: string) {
-  const host = await createRpcHost({
-    plugins: [windowPlugin({ window: target, origin, receiver: window })]
-  })
-  try {
-    return await host.window.request('title')
-  } finally {
-    await host.close()
-  }
+const frame = document.querySelector('iframe')!
+// iframe 加载后连接一次，之后的调用都复用这个 host
+const host = await createRpcHost({
+  plugins: [
+    windowPlugin({
+      window: frame.contentWindow!,
+      origin: 'https://child.example.com',
+      receiver: window
+    })
+  ]
+})
+
+export function frameTitle() {
+  return host.window.request('title')
 }
 ```
 
@@ -66,15 +76,14 @@ Window 在对端监听安装前会丢弃消息，载体通过 `startupMessagesMa
 import { createRpcHost } from '@migaia/rpc-host'
 import { sharedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 
-export async function readSharedValue(worker: SharedWorker) {
-  const host = await createRpcHost({
-    plugins: [sharedWorkerPlugin({ sharedWorker: worker })]
-  })
-  try {
-    return await host.sharedWorker.request('value')
-  } finally {
-    await host.close()
-  }
+const shared = new SharedWorker(new URL('./shared.ts', import.meta.url), { type: 'module' })
+// 每个页面连接一次；多个页面共用同一个 SharedWorker
+const host = await createRpcHost({
+  plugins: [sharedWorkerPlugin({ sharedWorker: shared })]
+})
+
+export function readSharedValue() {
+  return host.sharedWorker.request('value')
 }
 ```
 
@@ -104,15 +113,19 @@ export async function listenOnChannel(channel: BroadcastChannel) {
 import { createRpcHost } from '@migaia/rpc-host'
 import { serviceWorkerPlugin } from '@migaia/rpc-plugin-browser'
 
-export async function askServiceWorker(worker: ServiceWorker) {
-  const host = await createRpcHost({
-    plugins: [serviceWorkerPlugin({ serviceWorker: worker, receiver: navigator.serviceWorker })]
-  })
-  try {
-    return await host.serviceWorker.request('version')
-  } finally {
-    await host.close()
-  }
+const registration = await navigator.serviceWorker.ready
+// 页面启动时连接当前激活的 Service Worker，之后复用
+const host = await createRpcHost({
+  plugins: [
+    serviceWorkerPlugin({
+      serviceWorker: registration.active!,
+      receiver: navigator.serviceWorker
+    })
+  ]
+})
+
+export function serviceWorkerVersion() {
+  return host.serviceWorker.request('version')
 }
 ```
 
@@ -124,14 +137,14 @@ export async function askServiceWorker(worker: ServiceWorker) {
 import { createRpcHost } from '@migaia/rpc-host'
 import { rtcDataChannelPlugin } from '@migaia/rpc-plugin-browser'
 
-export async function callRtc(channel: RTCDataChannel) {
+// 信令完成、频道打开后调用一次；返回的对象可以反复调用
+export async function connectPeer(channel: RTCDataChannel) {
   const host = await createRpcHost({
     plugins: [rtcDataChannelPlugin({ rtcDataChannel: channel })]
   })
-  try {
-    return await host.rtcDataChannel.request('echo', 'hello')
-  } finally {
-    await host.close()
+  return {
+    echo: (text: string) => host.rtcDataChannel.request('echo', text),
+    close: () => host.close()
   }
 }
 ```
@@ -144,14 +157,14 @@ export async function callRtc(channel: RTCDataChannel) {
 import { createRpcHost } from '@migaia/rpc-host'
 import { webTransportPlugin, type IWebTransportPluginOptions } from '@migaia/rpc-plugin-browser'
 
-export async function callReliableSession(session: IWebTransportPluginOptions['session']) {
+// 拿到 WebTransport 会话后调用一次；返回的对象可以反复调用
+export async function connectSession(session: IWebTransportPluginOptions['session']) {
   const host = await createRpcHost({
     plugins: [webTransportPlugin({ session, connect: { timeoutMs: 1500 } })]
   })
-  try {
-    return await host.webTransport.request('echo', 'hello')
-  } finally {
-    await host.close()
+  return {
+    echo: (text: string) => host.webTransport.request('echo', text),
+    close: () => host.close()
   }
 }
 ```

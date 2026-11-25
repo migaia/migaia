@@ -24,15 +24,20 @@ Jump to the section for what you want to do:
 import { createRpcHost } from '@migaia/rpc-host'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 
-export async function doubleInWorker(worker: Worker) {
-  const host = await createRpcHost({
-    plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })]
-  })
-  try {
-    return await host.worker.request('double', 21)
-  } finally {
-    await host.close()
-  }
+const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+// Connect once when the page starts; every later call reuses this host
+const host = await createRpcHost({
+  plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })]
+})
+
+export function double(value: number) {
+  return host.worker.request('double', value)
+}
+
+// When the Worker is no longer needed: close the host, then terminate the Worker you created
+export async function stopWorker() {
+  await host.close()
+  worker.terminate()
 }
 ```
 
@@ -44,15 +49,20 @@ See README for the Worker module with Worker globals. Calls use `host.worker` by
 import { createRpcHost } from '@migaia/rpc-host'
 import { windowPlugin } from '@migaia/rpc-plugin-browser'
 
-export async function callFrame(target: Window, origin: string) {
-  const host = await createRpcHost({
-    plugins: [windowPlugin({ window: target, origin, receiver: window })]
-  })
-  try {
-    return await host.window.request('title')
-  } finally {
-    await host.close()
-  }
+const frame = document.querySelector('iframe')!
+// Connect once after the iframe loads; every later call reuses this host
+const host = await createRpcHost({
+  plugins: [
+    windowPlugin({
+      window: frame.contentWindow!,
+      origin: 'https://child.example.com',
+      receiver: window
+    })
+  ]
+})
+
+export function frameTitle() {
+  return host.window.request('title')
 }
 ```
 
@@ -66,15 +76,14 @@ Window drops messages sent before the opposite listener is installed, so its car
 import { createRpcHost } from '@migaia/rpc-host'
 import { sharedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 
-export async function readSharedValue(worker: SharedWorker) {
-  const host = await createRpcHost({
-    plugins: [sharedWorkerPlugin({ sharedWorker: worker })]
-  })
-  try {
-    return await host.sharedWorker.request('value')
-  } finally {
-    await host.close()
-  }
+const shared = new SharedWorker(new URL('./shared.ts', import.meta.url), { type: 'module' })
+// Each page connects once; all pages share one SharedWorker
+const host = await createRpcHost({
+  plugins: [sharedWorkerPlugin({ sharedWorker: shared })]
+})
+
+export function readSharedValue() {
+  return host.sharedWorker.request('value')
 }
 ```
 
@@ -104,15 +113,19 @@ Even when the first broadcast join is lost before another participant exists, th
 import { createRpcHost } from '@migaia/rpc-host'
 import { serviceWorkerPlugin } from '@migaia/rpc-plugin-browser'
 
-export async function askServiceWorker(worker: ServiceWorker) {
-  const host = await createRpcHost({
-    plugins: [serviceWorkerPlugin({ serviceWorker: worker, receiver: navigator.serviceWorker })]
-  })
-  try {
-    return await host.serviceWorker.request('version')
-  } finally {
-    await host.close()
-  }
+const registration = await navigator.serviceWorker.ready
+// Connect to the active Service Worker once when the page starts, then reuse it
+const host = await createRpcHost({
+  plugins: [
+    serviceWorkerPlugin({
+      serviceWorker: registration.active!,
+      receiver: navigator.serviceWorker
+    })
+  ]
+})
+
+export function serviceWorkerVersion() {
+  return host.serviceWorker.request('version')
 }
 ```
 
@@ -124,14 +137,14 @@ export async function askServiceWorker(worker: ServiceWorker) {
 import { createRpcHost } from '@migaia/rpc-host'
 import { rtcDataChannelPlugin } from '@migaia/rpc-plugin-browser'
 
-export async function callRtc(channel: RTCDataChannel) {
+// Call once after signaling has opened the channel; call the returned object as often as needed
+export async function connectPeer(channel: RTCDataChannel) {
   const host = await createRpcHost({
     plugins: [rtcDataChannelPlugin({ rtcDataChannel: channel })]
   })
-  try {
-    return await host.rtcDataChannel.request('echo', 'hello')
-  } finally {
-    await host.close()
+  return {
+    echo: (text: string) => host.rtcDataChannel.request('echo', text),
+    close: () => host.close()
   }
 }
 ```
@@ -144,14 +157,14 @@ The application completes signaling and opens the channel first. Require ordered
 import { createRpcHost } from '@migaia/rpc-host'
 import { webTransportPlugin, type IWebTransportPluginOptions } from '@migaia/rpc-plugin-browser'
 
-export async function callReliableSession(session: IWebTransportPluginOptions['session']) {
+// Call once with the WebTransport session; call the returned object as often as needed
+export async function connectSession(session: IWebTransportPluginOptions['session']) {
   const host = await createRpcHost({
     plugins: [webTransportPlugin({ session, connect: { timeoutMs: 1500 } })]
   })
-  try {
-    return await host.webTransport.request('echo', 'hello')
-  } finally {
-    await host.close()
+  return {
+    echo: (text: string) => host.webTransport.request('echo', text),
+    close: () => host.close()
   }
 }
 ```

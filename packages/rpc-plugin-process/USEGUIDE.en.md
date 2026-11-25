@@ -111,15 +111,15 @@ Use `host.process.members` for queries and controls. `list/get` return safe nati
 import { PluginHost } from '@migaia/plugin-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 
-export async function installAndRelease(entry: URL) {
-  const owner = new PluginHost<Record<string, never>>({
-    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }
-  })
-  try {
-    await owner.use(processPlugin({ name: 'worker', spawn: entry }))
-  } finally {
-    await owner.dispose()
-  }
+// The application's existing PluginHost: install the process plugin once at startup and keep it
+const owner = new PluginHost<Record<string, never>>({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }
+})
+await owner.use(processPlugin({ name: 'worker', spawn: new URL('./worker.ts', import.meta.url) }))
+
+// Release on application exit; the child process stops with the plugin
+export async function shutdown() {
+  await owner.dispose()
 }
 ```
 
