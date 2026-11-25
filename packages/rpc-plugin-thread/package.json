@@ -48,7 +48,6 @@
     "@migaia/plugin-host": "workspace:^",
     "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-host": "workspace:*",
-    "@migaia/utils": "workspace:^",
     "@playwright/test": "^1.62.1",
     "@types/node": "24.13.2",
     "cborg": "6.1.1",
