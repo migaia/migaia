@@ -188,7 +188,6 @@ export const QdrantText = {
   onHttpRequest: 'onHttpRequest',
   json: 'application/json',
   apiKey: 'api-key',
-  sdkMinimum: '1.11.0',
   search: 'vector.search',
   /** Native extra-slot packets and their write operation share this Feature-owned discriminator. */
   rescore: 'qdrant.rescore',

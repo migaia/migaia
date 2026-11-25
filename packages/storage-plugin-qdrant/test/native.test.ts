@@ -29,6 +29,46 @@ function closeStubServer(server: Server): Promise<void> {
   return promise
 }
 
+/** Handles one redirect or failure stub request while recording URLs and destination hits. */
+async function handleRedirectStubRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  destinations: string[],
+  requests: string[]
+): Promise<void> {
+  for await (const _ of request) void _
+  requests.push(request.url!)
+  if (request.url?.startsWith('/destination')) {
+    destinations.push(request.url)
+    response.end(JSON.stringify({ result: { operation_id: 1, status: 'completed' } }))
+    return
+  }
+  /** Synthetic HTTP status chosen from the requested collection name. */
+  const status = request.url?.includes('308')
+    ? 308
+    : request.url?.includes('307')
+      ? 307
+      : request.url?.includes('404')
+        ? 404
+        : request.url?.includes('503')
+          ? 503
+          : 200
+  response.writeHead(status, {
+    'Content-Type': 'application/json',
+    ...(status === 307 || status === 308 ? { Location: '/destination' } : {})
+  })
+  response.end(
+    status === 200 ? 'broken json' : JSON.stringify({ error: 'native complete response ' + status })
+  )
+}
+
+/** Creates an HTTP stub server testing redirect non-replay and error status mapping. */
+function createRedirectStubServer(destinations: string[], requests: string[]): Server {
+  return createServer((request, response) => {
+    void handleRedirectStubRequest(request, response, destinations, requests)
+  })
+}
+
 /** Handles one native feature stub request for version, points/query, and points/query/groups. */
 async function handleNativeFeatureStubRequest(
   request: IncomingMessage,
@@ -72,6 +112,36 @@ function createNativeFeatureStubServer(received: { path: string; body: unknown }
   return createServer((request, response) => {
     void handleNativeFeatureStubRequest(request, response, received)
   })
+}
+
+/**
+ * Builds a fake SDK client whose generated `upsertPoints` records bodies and returns a valid
+ * result.
+ */
+function createCaptureQdrantClient(capturedBodies: unknown[]): QdrantClient {
+  /** Generated API surface stub recording each mutation body. */
+  const api = {
+    async upsertPoints(body: unknown) {
+      capturedBodies.push(body)
+      return { data: { result: { operation_id: 1, status: 'completed' } } }
+    }
+  }
+  return {
+    api: () => api
+  } as unknown as QdrantClient
+}
+
+/** Builds a fake SDK client whose generated `upsertPoints` returns a fixed malformed payload. */
+function createFixedResponseQdrantClient(payload: unknown): QdrantClient {
+  /** Generated API surface stub returning the provided malformed response. */
+  const api = {
+    async upsertPoints() {
+      return payload
+    }
+  }
+  return {
+    api: () => api
+  } as unknown as QdrantClient
 }
 describe('native Qdrant protocol adapters', () => {
   it.skipIf(!url).each(['fetch', 'sdk'] as const)(
@@ -339,38 +409,14 @@ describe('native Qdrant protocol adapters', () => {
     30_000
   )
   it('does not replay native SDK or fetch modifications across redirects and retains full native failures', async () => {
-    const destinations: string[] = [],
-      requests: string[] = []
-    const server = createServer(async (request, response) => {
-      for await (const _ of request) void _
-      requests.push(request.url!)
-      if (request.url?.startsWith('/destination')) {
-        destinations.push(request.url)
-        response.end(JSON.stringify({ result: { operation_id: 1, status: 'completed' } }))
-        return
-      }
-      const status = request.url?.includes('308')
-        ? 308
-        : request.url?.includes('307')
-          ? 307
-          : request.url?.includes('404')
-            ? 404
-            : request.url?.includes('503')
-              ? 503
-              : 200
-      response.writeHead(status, {
-        'Content-Type': 'application/json',
-        ...(status === 307 || status === 308 ? { Location: '/destination' } : {})
-      })
-      response.end(
-        status === 200
-          ? 'broken json'
-          : JSON.stringify({ error: 'native complete response ' + status })
-      )
-    })
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-    const address = server.address() as { port: number },
-      origin = 'http://127.0.0.1:' + address.port
+    /** Redirect target URLs reached; must remain empty. */
+    const destinations: string[] = []
+    /** All request URLs observed by the stub server. */
+    const requests: string[] = []
+    /** Ephemeral stub server answering redirect and failure statuses. */
+    const server = createRedirectStubServer(destinations, requests)
+    /** Bound origin URL of the stub server. */
+    const origin = await listenStubServer(server)
     try {
       for (const http of [fetchHttp(origin), qdrantClientHttp(new QdrantClient({ url: origin }))]) {
         for (const status of [307, 308])
@@ -481,6 +527,108 @@ describe('native Qdrant protocol adapters', () => {
       ])
     } finally {
       await closeStubServer(server)
+    }
+  })
+  it('rejects disallowed with_lookup in qdrantGroupBy and invalid or legacy flat inputs in qdrantRecommend', async () => {
+    /** Recorded native requests; must remain empty for rejected inputs. */
+    const received: { path: string; body: unknown }[] = []
+    /** Local HTTP stub answering version handshake without accepting rejected queries. */
+    const server = createNativeFeatureStubServer(received)
+    /** Bound origin URL of the stub server. */
+    const origin = await listenStubServer(server)
+    try {
+      /** Storage host with recommend and group-by features installed. */
+      const host = await createStorageHost({
+        plugins: [
+          qdrantBackendPlugin({
+            url: origin,
+            http: fetchHttp(origin),
+            features: {
+              recommend: qdrantRecommendFeature(),
+              groups: qdrantGroupByFeature()
+            }
+          })
+        ] as const
+      })
+      try {
+        /** Bound Qdrant backend store handle. */
+        const store = host.backend('qdrant')
+        await expect(
+          store.api.qdrantGroupBy.search('items', {
+            query: [1, 0],
+            group_by: 'category',
+            with_lookup: 'other_collection'
+          } as unknown as Parameters<typeof store.api.qdrantGroupBy.search>[1])
+        ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+
+        /** Non-object group-by requests that must fail with a coded input error. */
+        const invalidGroupByInputs: unknown[] = [null, undefined, [], 'bad', 123]
+        for (const badInput of invalidGroupByInputs) {
+          await expect(
+            store.api.qdrantGroupBy.search(
+              'items',
+              badInput as Parameters<typeof store.api.qdrantGroupBy.search>[1]
+            )
+          ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+        }
+
+        /** Invalid and legacy flat recommend requests that must fail validation. */
+        const invalidRecommendInputs: unknown[] = [
+          { positive: [1], limit: 1 },
+          { query: [1, 0], limit: 1 },
+          { query: null, limit: 1 },
+          { query: { nearest: [1, 0] }, limit: 1 },
+          { query: { recommend: null }, limit: 1 },
+          { query: { recommend: [1] }, limit: 1 }
+        ]
+        for (const badInput of invalidRecommendInputs) {
+          await expect(
+            store.api.qdrantRecommend.recommend(
+              'items',
+              badInput as Parameters<typeof store.api.qdrantRecommend.recommend>[1]
+            )
+          ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+        }
+        expect(received).toHaveLength(0)
+      } finally {
+        await host.dispose()
+      }
+    } finally {
+      await closeStubServer(server)
+    }
+  })
+  it('prevents collection_name parameter override, rejects non-string collections, and validates malformed SDK responses', async () => {
+    /** Recorded request bodies passed into the generated SDK mutation API. */
+    const capturedBodies: unknown[] = []
+    /** Fake SDK client whose upsertPoints captures bodies and returns a valid result. */
+    const overrideClient = createCaptureQdrantClient(capturedBodies)
+    /** SDK HTTP adapter backed by the capture client. */
+    const overrideHttp = qdrantClientHttp(overrideClient)
+    await overrideHttp.upsert('target_collection', {
+      collection_name: 'overridden_collection',
+      points: []
+    } as unknown as Parameters<typeof overrideHttp.upsert>[1])
+    expect(capturedBodies).toEqual([
+      {
+        collection_name: 'target_collection',
+        points: []
+      }
+    ])
+
+    await expect(
+      overrideHttp.upsert(123 as unknown as string, { points: [] })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+
+    /** Malformed response payloads returned by a broken SDK mutation call. */
+    const malformedPayloads: unknown[] = [undefined, null, {}, { data: null }, { data: 'invalid' }]
+    for (const malformed of malformedPayloads) {
+      /** Fake SDK client returning the malformed mutation response. */
+      const brokenClient = createFixedResponseQdrantClient(malformed)
+      /** SDK HTTP adapter backed by the broken client. */
+      const brokenHttp = qdrantClientHttp(brokenClient)
+      await expect(brokenHttp.upsert('target_collection', { points: [] })).rejects.toMatchObject({
+        code: 'QDRANT_RESPONSE_INVALID'
+      })
     }
   })
 })

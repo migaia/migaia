@@ -4,11 +4,18 @@ import { throwIfAborted } from '@migaia/storage-host/sdk'
 import { nativeHttp } from './native.ts'
 import { nativeResult } from './protocol.ts'
 import { qdrantWireValue } from './wire.ts'
-import { normalizeQdrantError } from './errors.ts'
+import { invalidArgument, normalizeQdrantError, qdrantError } from './errors.ts'
 import { QdrantRoute } from './constants.ts'
 import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
-import { qdrantError } from './errors.ts'
 import type { IQdrantHttp, IQdrantOperationName } from './types.ts'
+
+/** Projects every native call argument through float wire encoding in one linear pass. */
+function wireArgs(args: readonly unknown[]): unknown[] {
+  /** Wire-encoded positional arguments. */
+  const encoded: unknown[] = []
+  for (const arg of args) encoded.push(qdrantWireValue(arg))
+  return encoded
+}
 /** Borrow one real SDK client; its timeout/configuration and lifetime remain caller-owned. */
 export function qdrantClientHttp(client: QdrantClient): IQdrantHttp {
   /** Borrowed client ports belong to one named adapter, never a second client or cleanup owner. */
@@ -66,16 +73,17 @@ class QdrantSdkTransport {
     ctx: IOperationContext | undefined
   ): Promise<Awaited<ReturnType<IQdrantHttp[K]>>> => {
     throwIfAborted(ctx?.signal)
+    /** Route metadata determines collection argument and request body shape. */
+    const route = QdrantRoute[operation]
+    if (route.collection && typeof args[0] !== 'string') throw invalidArgument()
     try {
       if (Object.hasOwn(this.#writes, operation)) {
-        /** Route metadata determines body shape before the one native mutation call. */
-        const route = QdrantRoute[operation]
         /** Float wire projection preserves integer multivectors on the official SDK path. */
         const parameters = qdrantWireValue(args[route.collection ? 1 : 0] ?? {})
-        /** The original generated API expects the collection in its request object. */
+        /** User parameters spread first so they cannot override the route's target collection. */
         const body = {
-          ...(route.collection ? { collection_name: args[0] } : {}),
-          ...(parameters as object)
+          ...(parameters as object),
+          ...(route.collection ? { collection_name: args[0] } : {})
         }
         /** The membership check above admits only an existing finite generated mutation port. */
         const ports = this.#writes as unknown as Record<
@@ -83,10 +91,17 @@ class QdrantSdkTransport {
           (
             body: unknown,
             options: { redirect: 'manual' }
-          ) => Promise<{ readonly data: { readonly result?: unknown } }>
+          ) => Promise<{ readonly data?: { readonly result?: unknown } }>
         >
         /** Direct dispatch keeps the adapter/native API receiver and does not retry. */
         const response = await ports[operation](body, { redirect: 'manual' })
+        if (
+          !response ||
+          typeof response !== 'object' ||
+          !response.data ||
+          typeof response.data !== 'object'
+        )
+          throw qdrantError(QdrantErrorCode.responseInvalid)
         return nativeResult(operation, response.data.result)
       }
       /** Read dispatch uses the actual borrowed client as receiver. */
@@ -94,10 +109,7 @@ class QdrantSdkTransport {
         IQdrantOperationName,
         (...args: unknown[]) => Promise<unknown>
       >
-      return nativeResult(
-        operation,
-        await client[operation](...args.map((arg) => qdrantWireValue(arg)))
-      )
+      return nativeResult(operation, await client[operation](...wireArgs(args)))
     } catch (cause) {
       throw normalizeQdrantError(cause)
     }
