@@ -1,13 +1,13 @@
 [
   {
     "entry": "scripts/fixtures/bundle-size-entries/PluginHost.ts",
-    "gzip": 37451,
+    "gzip": 37058,
     "owner": "plugin-host",
     "forbidden": ["packages/capability/**", "packages/plugin-host/src/modules/**"]
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/createLogHost.ts",
-    "gzip": 54806,
+    "gzip": 54937,
     "owner": "log-host",
     "forbidden": [
       "packages/plugin-host/src/modules/enablement/**",
@@ -18,13 +18,13 @@
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/defineHost-definePlugin.ts",
-    "gzip": 38906,
+    "gzip": 38501,
     "owner": "plugin-host",
     "forbidden": ["packages/capability/**", "packages/plugin-host/src/modules/**"]
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/createRpcHost.ts",
-    "gzip": 116857,
+    "gzip": 117161,
     "owner": "rpc-host",
     "forbidden": [
       "packages/plugin-host/src/modules/enablement/**",
@@ -39,7 +39,7 @@
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/storage-host.ts",
-    "gzip": 83238,
+    "gzip": 83413,
     "owner": "storage-host",
     "forbidden": [
       "packages/plugin-host/src/modules/enablement/**",
@@ -53,7 +53,7 @@
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/createTray.ts",
-    "gzip": 200312,
+    "gzip": 200674,
     "owner": "tray",
     "forbidden": [
       "packages/plugin-host/src/modules/enablement/**",
@@ -68,7 +68,7 @@
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/store-middleware.ts",
-    "gzip": 54317,
+    "gzip": 54056,
     "owner": "store-middleware",
     "forbidden": [
       "packages/capability/**",
@@ -78,7 +78,7 @@
   },
   {
     "entry": "scripts/fixtures/bundle-size-entries/micro-hub.ts",
-    "gzip": 47476,
+    "gzip": 47471,
     "owner": "micro-hub",
     "forbidden": ["packages/capability/**", "packages/plugin-host/src/modules/**"]
   }
