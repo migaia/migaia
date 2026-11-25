@@ -17,7 +17,7 @@ import { filePlugin } from '@migaia/log-plugin-file'
 class MemoryWriter {
   /** 保留每次 append 的完整批次，便于应用转交实际存储。 */
   readonly writes: { path: string; text: string }[] = []
-  /** append 的兑现表示本批内容已由 writer 接纳。 */
+  /** Append 的兑现表示本批内容已由 writer 接纳。 */
   async append(path: string, text: string): Promise<void> {
     this.writes.push({ path, text })
   }

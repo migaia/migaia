@@ -87,9 +87,11 @@ export type IFeatureRequiredExpose<TFeature> =
       ? TExpose
       : TExpose &
           IFeatureRecordRequiredExpose<{
-            readonly [K in keyof TDependencies as TDependencies[K] extends IFeature<any, any, any>
-              ? K
-              : never]: Extract<TDependencies[K], IFeature<any, any, any>>
+            readonly [
+              K in keyof TDependencies as TDependencies[K] extends IFeature<any, any, any>
+                ? K
+                : never
+            ]: Extract<TDependencies[K], IFeature<any, any, any>>
           }>
     : never
 

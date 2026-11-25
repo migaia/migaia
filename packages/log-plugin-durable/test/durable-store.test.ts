@@ -447,12 +447,12 @@ async function durableCase13(): Promise<void> {
   })
   const original = new Error('native close failed after releasing connection')
   const close = DatabaseSync.prototype.close
-  const replacement = vi
-    .spyOn(DatabaseSync.prototype, 'close')
-    .mockImplementationOnce(function (this: DatabaseSync) {
-      Reflect.apply(close, this, [])
-      throw original
-    })
+  const replacement = vi.spyOn(DatabaseSync.prototype, 'close').mockImplementationOnce(function (
+    this: DatabaseSync
+  ) {
+    Reflect.apply(close, this, [])
+    throw original
+  })
   try {
     const explicit = store.dispose()
     const symbolic = store[asyncDisposeKey]()

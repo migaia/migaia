@@ -159,9 +159,8 @@ type INativeTransactionRdfApi<TUse> = TUse extends {
   (capability: infer TFirst): infer TFirstApi
   (capability: infer TSecond): infer TSecondApi
 }
-  ?
-      | (TFirst extends typeof rdf ? TFirstApi : never)
-      | (TSecond extends typeof rdf ? TSecondApi : never)
+  ? | (TFirst extends typeof rdf ? TFirstApi : never)
+    | (TSecond extends typeof rdf ? TSecondApi : never)
   : never
 /** Only an existing native RDF match gains RDF Feature methods; raw and native refinements survive. */
 type IWithNativeTransactionRdfMethods<

@@ -332,12 +332,12 @@ describe('IndexedDB complete native transaction views', () => {
       reports.push(args)
     })
     /** Native close fails once after releasing the test database so no test-owned resource remains. */
-    const close = vi
-      .spyOn(IDBDatabase.prototype, 'close')
-      .mockImplementationOnce(function (this: IDBDatabase) {
-        Reflect.apply(nativeClose, this, [])
-        throw cause
-      })
+    const close = vi.spyOn(IDBDatabase.prototype, 'close').mockImplementationOnce(function (
+      this: IDBDatabase
+    ) {
+      Reflect.apply(nativeClose, this, [])
+      throw cause
+    })
     try {
       const disposal = store.dispose()
       expect(store.dispose()).toBe(disposal)
@@ -691,12 +691,12 @@ describe('IndexedDB complete native transaction views', () => {
     let waiterStarted = false
     /** Observe the actual abort event rather than estimating when native rollback finishes. */
     const nativeAbort = IDBTransaction.prototype.abort
-    const abort = vi
-      .spyOn(IDBTransaction.prototype, 'abort')
-      .mockImplementation(function (this: IDBTransaction) {
-        this.addEventListener('abort', () => nativeAborted.resolve(), { once: true })
-        return Reflect.apply(nativeAbort, this, [])
-      })
+    const abort = vi.spyOn(IDBTransaction.prototype, 'abort').mockImplementation(function (
+      this: IDBTransaction
+    ) {
+      this.addEventListener('abort', () => nativeAborted.resolve(), { once: true })
+      return Reflect.apply(nativeAbort, this, [])
+    })
     /** The existing race reporter must still receive a late non-cancellation rejection once. */
     const reporter = vi.spyOn(console, 'error').mockImplementation(() => {})
     /** This accepted user Promise belongs to the native attempt even after rollback. */
