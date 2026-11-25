@@ -6,6 +6,7 @@ import { qdrantBackendPlugin, type IQdrantHttp } from '@migaia/storage-plugin-qd
 import { fetchHttp } from '@migaia/storage-plugin-qdrant/http'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 import { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'
+import { sweepQdrantCollections } from './helpers/live-cleanup.ts'
 
 /** Native service configuration comes only from the existing shared storage-services launcher. */
 const url = process.env.MIGAIA_QDRANT_URL
@@ -16,6 +17,8 @@ async function fixture() {
   const native = fetchHttp(url!)
   /** Every physical collection in this list was created through this fresh fixture's namespace. */
   const created: string[] = []
+  /** Every attempted collection name recorded before network I/O for failure-safe cleanup. */
+  const tracked = new Set<string>()
   /** Wire observations prove which native count/deletion strategy the semantic call actually used. */
   const events: string[] = []
   /** Actual ranking requests prove semantic reads use the selected vector engine. */
@@ -27,6 +30,7 @@ async function fixture() {
   const http: IQdrantHttp = {
     ...native,
     async createCollection(...args) {
+      tracked.add(args[0])
       const result = await native.createCollection(...args)
       created.push(args[0])
       return result
@@ -104,8 +108,11 @@ async function fixture() {
       afterScroll = write
     },
     close: async () => {
-      await host.dispose()
-      for (const name of created) await native.deleteCollection(name)
+      try {
+        await host.dispose()
+      } finally {
+        await sweepQdrantCollections(native, tracked)
+      }
     }
   }
 }
