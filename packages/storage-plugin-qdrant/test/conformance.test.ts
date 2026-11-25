@@ -20,6 +20,7 @@ import { qdrantRescoreFeature } from '../src/features/rescore.ts'
 import { nativeHttp } from '../src/native.ts'
 import { QdrantManagedVectorName } from '../src/constants.ts'
 import type { IQdrantHttp } from '../src/types.ts'
+import { collections } from './helpers/collections.ts'
 /** Real service addresses come exclusively from the shared fixture launcher. */
 const url = process.env.MIGAIA_QDRANT_URL
 /** Cleanup is restricted to fresh collection names created by this exact fixture. */
@@ -32,6 +33,7 @@ function native() {
     async (operation, args, ctx): Promise<Awaited<ReturnType<IQdrantHttp[typeof operation]>>> => {
       calls.push(operation)
       requests.push({ operation, args })
+      if (operation === 'createCollection') collections.track(args[0] as string)
       const result = await Reflect.apply(original[operation], original, [...args, ctx])
       if (operation === 'createCollection') created.push(args[0] as string)
       return result as Awaited<ReturnType<IQdrantHttp[typeof operation]>>
@@ -47,9 +49,120 @@ function native() {
     calls,
     requests,
     close: async () => {
-      for (const name of created) await original.deleteCollection(name)
+      await collections.release(url!, original)
     }
   }
+}
+/** Builds a dense or two-row multivector extra-slot test vector for `x`. */
+function rescoreTestVector(x: number, multivector: 'max_sim' | undefined): number[] | number[][] {
+  return multivector
+    ? [
+        [x, 0],
+        [0, 1]
+      ]
+    : [x, 0]
+}
+
+/** Strict weak ordering comparator for physical point id records. */
+function comparePhysicalId(
+  a: { readonly physical: string },
+  b: { readonly physical: string }
+): number {
+  return a.physical < b.physical ? -1 : a.physical > b.physical ? 1 : 0
+}
+
+/** Plugin core type received by `definePlugin`'s `setup` callback. */
+type ITransformCore = Parameters<Parameters<typeof definePlugin>[0]['setup']>[0]
+
+/** Pipeline stage input type passed to `useAsyncPipeline` handlers. */
+type ITransformStageInput = Parameters<Parameters<ITransformCore['useAsyncPipeline']>[0]>[0]
+
+/** Pipeline stage continuation type passed to `useAsyncPipeline` handlers. */
+type ITransformStageNext = Parameters<Parameters<ITransformCore['useAsyncPipeline']>[0]>[1]
+
+/** Named pipeline-transform fixture avoiding nested callbacks inside the conformance test body. */
+class TransformPipelineFixture {
+  /** Per-operation invocation counts recorded by the async pipeline stage. */
+  readonly #counts: Map<string, number>
+  /** Original business error thrown while `fail` is true. */
+  readonly #business: Error
+  /** Host plugin core captured during setup and bound on install. */
+  #core: ITransformCore | undefined
+  /** Controls whether the pipeline stage throws the business error or rewrites upserts. */
+  fail = true
+
+  /** Captures shared assertion counters and the business error instance. */
+  constructor(counts: Map<string, number>, business: Error) {
+    this.#counts = counts
+    this.#business = business
+  }
+
+  /** Creates the storage-host plugin bound to this fixture's state. */
+  createPlugin() {
+    return definePlugin({
+      name: 'transform',
+      setup: (core) => this.#setup(core)
+    })
+  }
+
+  /** Captures the plugin core and returns the install lifecycle hook. */
+  #setup(core: ITransformCore) {
+    this.#core = core
+    return {
+      install: () => this.#install()
+    }
+  }
+
+  /** Registers the async pipeline hook when the plugin installs. */
+  #install() {
+    this.#core!.useAsyncPipeline((input, next) => this.#handle(input, next))
+    return {}
+  }
+
+  /** Counts each operation and either throws the business error or rewrites `vector.upsert`. */
+  async #handle(input: ITransformStageInput, next: ITransformStageNext): Promise<void> {
+    this.#counts.set(input.operation, (this.#counts.get(input.operation) ?? 0) + 1)
+    if (this.fail) throw this.#business
+    await next(
+      input.operation === 'vector.upsert'
+        ? {
+            ...input,
+            input: [{ id: 'changed', vector: [0, 1], payload: { category: 'new' } }]
+          }
+        : input
+    )
+  }
+}
+
+/** Runs the filtered vector query and records visited payload groups alongside hit ids. */
+async function executeFilteredVectorQuery(collection: {
+  near(
+    vector: readonly number[],
+    options: { readonly exact: true }
+  ): {
+    where(filter: { readonly group: string }): {
+      where(predicate: (payload: { readonly group: string }) => boolean): {
+        topK(limit: number): { all(): Promise<readonly { readonly id: string }[]> }
+      }
+    }
+  }
+}): Promise<{ readonly ids: string[]; readonly seen: string[] }> {
+  /** Group values observed by the post-filter predicate. */
+  const seen: string[] = []
+  /** Matching vector hits returned by the collection. */
+  const hits = await collection
+    .near([2, 1], { exact: true })
+    .where({ group: 'kept' })
+    .where((payload) => {
+      seen.push(payload.group)
+      return true
+    })
+    .topK(2)
+    .all()
+  /** Hit ids collected in result order. */
+  const ids: string[] = []
+  for (const hit of hits) ids.push(hit.id)
+  return { ids, seen }
 }
 /** The portable stage runs against this backend's real declared vector and TTL capabilities. */
 describe.skipIf(!url)('Qdrant canonical vector subject', () => {
@@ -75,7 +188,7 @@ describe.skipIf(!url)('Qdrant canonical vector subject', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http
             })
           ] as const
@@ -103,7 +216,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http,
               features: {
                 rescore: qdrantRescoreFeature({
@@ -120,13 +233,6 @@ describe('real native vector backend', () => {
             dimensions: 2,
             metric: 'dot'
           })
-        const extra = (x: number) =>
-          multivector
-            ? [
-                [x, 0],
-                [0, 1]
-              ]
-            : [x, 0]
         try {
           await collection.upsert([
             { id: 'a', vector: [5, 0], payload: { active: true } },
@@ -153,11 +259,11 @@ describe('real native vector backend', () => {
             expect(fixture.calls.slice(before)).toEqual(['updateVectors'])
           }
           const operation = await store.api.qdrantRescore.updateVectors('points', [
-            { id: 'a', vector: extra(0) },
-            { id: 'b', vector: extra(3) },
-            { id: 'c', vector: extra(2) },
-            { id: 'inactive', vector: extra(100) },
-            { id: 'expired', vector: extra(90) }
+            { id: 'a', vector: rescoreTestVector(0, multivector) },
+            { id: 'b', vector: rescoreTestVector(3, multivector) },
+            { id: 'c', vector: rescoreTestVector(2, multivector) },
+            { id: 'inactive', vector: rescoreTestVector(100, multivector) },
+            { id: 'expired', vector: rescoreTestVector(90, multivector) }
           ])
           expect(operation.status).toBe('completed')
           const foreign = host.org(other).backend('qdrant')
@@ -166,7 +272,7 @@ describe('real native vector backend', () => {
             .collection('points')
             .upsert([{ id: 'foreign', vector: [1000, 0], payload: { active: true } }])
           await foreign.api.qdrantRescore.updateVectors('points', [
-            { id: 'foreign', vector: extra(1000) }
+            { id: 'foreign', vector: rescoreTestVector(1000, multivector) }
           ])
           const queryVector = multivector
             ? [
@@ -255,7 +361,7 @@ describe('real native vector backend', () => {
     'keeps an existing collection without an extra slot usable and refuses only rescoring',
     async () => {
       const fixture = native()
-      const prefix = crypto.randomUUID()
+      const prefix = collections.prefix('old')
       const first = await createStorageHost({
         plugins: [
           qdrantBackendPlugin({ url: url!, collectionPrefix: prefix, http: fixture.http })
@@ -310,7 +416,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http
             })
           ] as const
@@ -383,7 +489,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http,
               features: {
                 management: qdrantManagementFeature(),
@@ -446,7 +552,7 @@ describe('real native vector backend', () => {
         },
         host = await createStorageHost({
           plugins: [
-            qdrantBackendPlugin({ url: url!, collectionPrefix: crypto.randomUUID(), http })
+            qdrantBackendPlugin({ url: url!, collectionPrefix: collections.prefix(), http })
           ] as const
         }),
         store = host.backend('qdrant'),
@@ -471,7 +577,7 @@ describe('real native vector backend', () => {
           points = 'points' in nativeRequest ? nativeRequest.points : [],
           ordered = points
             .map((point, index) => ({ physical: String(point.id), logical: initial[index]!.id }))
-            .sort((a, b) => (a.physical < b.physical ? -1 : 1)),
+            .sort(comparePhysicalId),
           low = ordered[0]!.logical,
           high = ordered.at(-1)!.logical,
           changed = ordered[1]!.logical
@@ -519,7 +625,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http,
               features: { management: qdrantManagementFeature() }
             })
@@ -621,7 +727,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http
             })
           ] as const
@@ -729,7 +835,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http,
               features: { management: qdrantManagementFeature() }
             })
@@ -840,7 +946,7 @@ describe('real native vector backend', () => {
           ] as const
         }),
         store = host.backend('qdrant'),
-        name = 'features_' + crypto.randomUUID().replaceAll('-', '')
+        name = collections.collection('features')
       try {
         expect(
           await store.api.qdrantManagement!.createCollection(name, {
@@ -936,21 +1042,30 @@ describe('real native vector backend', () => {
           (await fixture.http.retrieve(name, { ids: [1], with_vector: true }))[0]!.vector
         ).toMatchObject({ dense: [1, 0], sparse: { indices: [1, 3], values: [2, 3] } })
         expect(
-          await store.api.qdrantRecommend!.recommend(name, {
-            positive: [1],
-            using: 'dense',
-            strategy: 'best_score',
-            limit: 1
-          })
+          (
+            await store.api.qdrantRecommend!.recommend(name, {
+              query: { recommend: { positive: [1], strategy: 'best_score' } },
+              using: 'dense',
+              limit: 1
+            })
+          ).points
         ).toHaveLength(1)
         expect(fixture.requests.at(-1)).toMatchObject({
-          operation: 'recommend',
-          args: [name, { positive: [1], using: 'dense', strategy: 'best_score', limit: 1 }]
+          operation: 'query',
+          args: [
+            name,
+            {
+              query: { recommend: { positive: [1], strategy: 'best_score' } },
+              using: 'dense',
+              limit: 1
+            }
+          ]
         })
         expect(
           (
             await store.api.qdrantGroupBy!.search(name, {
-              vector: { name: 'dense', vector: [1, 0] },
+              query: [1, 0],
+              using: 'dense',
               group_by: 'category',
               group_size: 2,
               limit: 2
@@ -958,11 +1073,12 @@ describe('real native vector backend', () => {
           ).groups
         ).toHaveLength(2)
         expect(fixture.requests.at(-1)).toMatchObject({
-          operation: 'searchPointGroups',
+          operation: 'queryGroups',
           args: [
             name,
             {
-              vector: { name: 'dense', vector: [1, 0] },
+              query: [1, 0],
+              using: 'dense',
               group_by: 'category',
               group_size: 2,
               limit: 2
@@ -999,7 +1115,7 @@ describe('real native vector backend', () => {
     'discovers schemas after restart without new-org DDL and drops every owned collection without touching another namespace',
     async () => {
       const fixture = native(),
-        prefix = crypto.randomUUID(),
+        prefix = collections.prefix('restart'),
         org = createOrgId(),
         other = createOrgId()
       const first = await createStorageHost({
@@ -1013,7 +1129,7 @@ describe('real native vector backend', () => {
         plugins: [
           qdrantBackendPlugin({
             url: url!,
-            collectionPrefix: crypto.randomUUID(),
+            collectionPrefix: collections.prefix(),
             http: fixture.http
           })
         ] as const
@@ -1102,33 +1218,16 @@ describe('real native vector backend', () => {
         business = new RangeError('pipeline business failed'),
         stack = business.stack,
         counts = new Map<string, number>()
-      let fail = true
-      const stage = definePlugin({
-        name: 'transform',
-        setup: (core) => ({
-          install() {
-            core.useAsyncPipeline(async (input, next) => {
-              counts.set(input.operation, (counts.get(input.operation) ?? 0) + 1)
-              if (fail) throw business
-              await next(
-                input.operation === 'vector.upsert'
-                  ? {
-                      ...input,
-                      input: [{ id: 'changed', vector: [0, 1], payload: { category: 'new' } }]
-                    }
-                  : input
-              )
-            })
-            return {}
-          }
-        })
-      })
+      /** Pipeline transform fixture toggling business failure and upsert rewrite. */
+      const pipeline = new TransformPipelineFixture(counts, business)
+      /** Storage host plugin backed by the transform fixture. */
+      const stage = pipeline.createPlugin()
       const host = await createStorageHost({
           autoDetect: false,
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http
             }),
             stage
@@ -1160,7 +1259,7 @@ describe('real native vector backend', () => {
         expect(business).toBeInstanceOf(RangeError)
         expect(business.stack).toBe(stack)
         expect(fixture.calls).toEqual([])
-        fail = false
+        pipeline.fail = false
         await collection.upsert([{ id: 'old', vector: [1, 0], payload: { category: 'old' } }])
         expect(await collection.near([0, 1]).topK(1).withVector().all()).toEqual([
           { id: 'changed', score: 1, vector: [0, 1], payload: { category: 'new' } }
@@ -1190,7 +1289,7 @@ it.skipIf(!url)(
         return fixture.http.createCollection(...args)
       }
     }
-    const prefix = crypto.randomUUID()
+    const prefix = collections.prefix('race')
     const first = await createStorageHost({
       plugins: [qdrantBackendPlugin({ url: url!, http, collectionPrefix: prefix })] as const
     })
@@ -1274,7 +1373,7 @@ for (const malformed of ['missing', 'dimension', 'cosine', 'hnsw', 'quantized', 
       }
       const host = await createStorageHost({
         plugins: [
-          qdrantBackendPlugin({ url: url!, http, collectionPrefix: crypto.randomUUID() })
+          qdrantBackendPlugin({ url: url!, http, collectionPrefix: collections.prefix() })
         ] as const
       })
       try {
@@ -1306,7 +1405,7 @@ for (const metric of ['cosine', 'dot', 'euclid'] as const)
           qdrantBackendPlugin({
             url: url!,
             http: fixture.http,
-            collectionPrefix: crypto.randomUUID()
+            collectionPrefix: collections.prefix()
           })
         ] as const
       })
@@ -1334,20 +1433,9 @@ for (const metric of ['cosine', 'dot', 'euclid'] as const)
           for (const [index, hit] of hits.entries())
             expect(hit.score).toBeCloseTo(expected[index]!.score, 5)
         }
-        const execute = async (collection: typeof memory) => {
-          const seen: string[] = []
-          const hits = await collection
-            .near([2, 1], { exact: true })
-            .where({ group: 'kept' })
-            .where((payload) => {
-              seen.push(payload.group)
-              return true
-            })
-            .topK(2)
-            .all()
-          return { ids: hits.map((hit) => hit.id), seen }
-        }
-        expect(await execute(engine)).toEqual(await execute(memory))
+        expect(await executeFilteredVectorQuery(engine)).toEqual(
+          await executeFilteredVectorQuery(memory)
+        )
       } finally {
         await host.dispose()
         await fixture.close()

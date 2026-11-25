@@ -45,8 +45,10 @@ import type { IPluginHostOptions } from './host-options-types.ts'
 /** Each qualified name retains its own original payload rather than a union of sibling specs. */
 type IQualifiedPipelines<TPlugin> = TPlugin extends { readonly name: infer TName extends string }
   ? {
-      readonly [K in keyof import('./plugin-definition-types.ts').IPluginDeclaredPipelines<TPlugin> &
-        string as `${TName}.${K}`]: import('./plugin-definition-types.ts').IPluginDeclaredPipelines<TPlugin>[K]
+      readonly [
+        K in keyof import('./plugin-definition-types.ts').IPluginDeclaredPipelines<TPlugin> &
+          string as `${TName}.${K}`
+      ]: import('./plugin-definition-types.ts').IPluginDeclaredPipelines<TPlugin>[K]
     }
   : Record<never, never>
 
@@ -106,10 +108,12 @@ type IHostSurfaceFactory<
   TPublicSurface extends object,
   TPipelines extends IPipelineDefinitions
 > = (native: IHostSurfaceOperations<TDomainCore, TValue, TPipelines>) => TPublicSurface & {
-  readonly [K in Exclude<
-    keyof ICompleteHostHandle<Record<string, never>, never, readonly []>,
-    'use' | 'unUse'
-  >]?: never
+  readonly [
+    K in Exclude<
+      keyof ICompleteHostHandle<Record<string, never>, never, readonly []>,
+      'use' | 'unUse'
+    >
+  ]?: never
 }
 
 /** Construction options retain their original type axes; the final axis types borrowed mutations. */

@@ -209,13 +209,16 @@ it('completes 5000 sequential requests and releases every actual default replay 
   /** The genuine original owner performs each settlement before its actual state is inspected. */
   const original = RequestReplayLedger.prototype.settle
   /** No fixture counter substitutes for real ledger membership or source cleanup membership. */
-  const settled = vi
-    .spyOn(RequestReplayLedger.prototype, 'settle')
-    .mockImplementation(function (this: RequestReplayLedger, key, entry, now) {
-      Reflect.apply(original, this, [key, entry, now])
-      expect(this.has(key, now)).toBe(false)
-      expect(entry.source.replayKeys.size).toBe(0)
-    })
+  const settled = vi.spyOn(RequestReplayLedger.prototype, 'settle').mockImplementation(function (
+    this: RequestReplayLedger,
+    key,
+    entry,
+    now
+  ) {
+    Reflect.apply(original, this, [key, entry, now])
+    expect(this.has(key, now)).toBe(false)
+    expect(entry.source.replayKeys.size).toBe(0)
+  })
   try {
     await pair.open({
       sign: (value) => value,
@@ -481,14 +484,16 @@ it('does not inspect unexpired numeric or window replay bodies on lookup and adm
   /** Native Map insertion and entry identity are unchanged by the observation passthrough. */
   const originalSet = Map.prototype.set
   /** Every layout passes its real stored body or header through this same native operation. */
-  const stores = vi
-    .spyOn(Map.prototype, 'set')
-    .mockImplementation(function (this: Map<unknown, unknown>, key, value) {
-      /** Headers are followed to their existing entry, so a new layout cannot make the probe blind. */
-      const body = observeStoredReplayBody(value, sources, read)
-      if (settling && body) completedBodies.add(body)
-      return Reflect.apply(originalSet, this, [key, value])
-    })
+  const stores = vi.spyOn(Map.prototype, 'set').mockImplementation(function (
+    this: Map<unknown, unknown>,
+    key,
+    value
+  ) {
+    /** Headers are followed to their existing entry, so a new layout cannot make the probe blind. */
+    const body = observeStoredReplayBody(value, sources, read)
+    if (settling && body) completedBodies.add(body)
+    return Reflect.apply(originalSet, this, [key, value])
+  })
   /** Existing numeric leases retain their default capacity; no new duration limit is configured. */
   const ledger = new RequestReplayLedger()
   try {

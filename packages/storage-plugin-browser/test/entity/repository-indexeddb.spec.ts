@@ -308,14 +308,16 @@ describe('repository over real indexedDbHost backend', () => {
     /** Borrow the supplied backend through the installed repository capability factories. */
     const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.name](store)
     const observedRanges: IDBKeyRange[] = []
-    const spy = vi
-      .spyOn(IDBIndex.prototype, 'openKeyCursor')
-      .mockImplementation(function (this: IDBIndex, range, direction) {
-        if (range !== undefined && range !== null && typeof range === 'object' && 'lower' in range)
-          observedRanges.push(range as IDBKeyRange)
-        spy.mockRestore()
-        return this.openKeyCursor(range, direction)
-      })
+    const spy = vi.spyOn(IDBIndex.prototype, 'openKeyCursor').mockImplementation(function (
+      this: IDBIndex,
+      range,
+      direction
+    ) {
+      if (range !== undefined && range !== null && typeof range === 'object' && 'lower' in range)
+        observedRanges.push(range as IDBKeyRange)
+      spy.mockRestore()
+      return this.openKeyCursor(range, direction)
+    })
 
     await expect(repository.query().index('score', { lower: 2, upper: 4 }).all()).resolves.toEqual([
       { id: 'u2', score: 2 },
@@ -370,14 +372,16 @@ describe('repository over real indexedDbHost backend', () => {
     /** Borrow the supplied backend through the installed repository capability factories. */
     const repository = repositoryEntityPluginHost.extensions[repositoryEntityPlugin.name](store)
     const observedRanges: IDBKeyRange[] = []
-    const spy = vi
-      .spyOn(IDBIndex.prototype, 'openKeyCursor')
-      .mockImplementation(function (this: IDBIndex, range, direction) {
-        if (range !== undefined && range !== null && typeof range === 'object' && 'lower' in range)
-          observedRanges.push(range as IDBKeyRange)
-        spy.mockRestore()
-        return this.openKeyCursor(range, direction)
-      })
+    const spy = vi.spyOn(IDBIndex.prototype, 'openKeyCursor').mockImplementation(function (
+      this: IDBIndex,
+      range,
+      direction
+    ) {
+      if (range !== undefined && range !== null && typeof range === 'object' && 'lower' in range)
+        observedRanges.push(range as IDBKeyRange)
+      spy.mockRestore()
+      return this.openKeyCursor(range, direction)
+    })
 
     const values = await repository.query().index('value').all()
     expect(values.map((value) => value.id).sort()).toEqual([

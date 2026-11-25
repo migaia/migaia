@@ -40,7 +40,7 @@
     "@migaia/reactive": "workspace:^",
     "@migaia/wasm": "workspace:^",
     "typescript": "^7.0.2",
-    "vitest": "4.1.10"
+    "vitest": "4.1.12"
   },
   "peerDependencies": {
     "@migaia/reactive": "workspace:^",

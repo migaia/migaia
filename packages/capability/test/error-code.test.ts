@@ -163,7 +163,8 @@ function verifyDoesNotExposeThePreExtractionStoreMessagePrefix(): void {
 
 /**
  * Executes the existing case: code values are unique and the table has 9 entries (capability codes
- * + INVALID_OPTION).
+ *
+ * - INVALID_OPTION).
  */
 function verifyCodeValuesAreUniqueAndTheTableHas9EntriesCapabilityCodesINVALIDOPTION(): void {
   const declared = Object.values(CapabilityErrorCode)

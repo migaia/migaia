@@ -19,6 +19,7 @@ import {
   storageProgramBatchObservations
 } from '../../storage-plugin-sqlite/test/helpers/program-app.ts'
 import { definePlugin } from '@migaia/storage-host/sdk'
+import { sweepRedisNamespace } from './helpers/live-cleanup.ts'
 
 /** All native addresses come from the existing repository service launcher. */
 const redisUrl = process.env.MIGAIA_REDIS_URL,
@@ -112,11 +113,18 @@ it.each(['memory', 'sqlite', 'redis', 'postgres'] as const)(
         await plain.dispose()
       }
     } finally {
-      await host.dispose()
-      await logger.shutdown('manual')
-      await connection.dispose()
-      await pool.close()
-      await pg.end()
+      try {
+        await host.dispose()
+      } finally {
+        try {
+          if (backend === 'redis') await sweepRedisNamespace(redisUrl, prefix)
+        } finally {
+          await logger.shutdown('manual')
+          await connection.dispose()
+          await pool.close()
+          await pg.end()
+        }
+      }
     }
   }
 )

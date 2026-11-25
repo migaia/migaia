@@ -244,24 +244,22 @@ class RetryInvocation<T> {
     }
     this.#count += 1
     try {
-      void this.#input!
-        .invoke(this.#signal, budget, {
-          expectedCarrierId: available?.carrierId,
-          expectedGeneration: available?.generation,
-          idempotencyKey: this.#key,
-          onWriteStart: () => {
-            send.sent = true
-          }
-        })
-        .then(
-          (value) => {
-            if (!send.departed) this.#finish(value, true)
-          },
-          (error: unknown) => {
-            if (send.departed) this.#reportDeparted(send, error)
-            else this.#finish(error, false)
-          }
-        )
+      void this.#input!.invoke(this.#signal, budget, {
+        expectedCarrierId: available?.carrierId,
+        expectedGeneration: available?.generation,
+        idempotencyKey: this.#key,
+        onWriteStart: () => {
+          send.sent = true
+        }
+      }).then(
+        (value) => {
+          if (!send.departed) this.#finish(value, true)
+        },
+        (error: unknown) => {
+          if (send.departed) this.#reportDeparted(send, error)
+          else this.#finish(error, false)
+        }
+      )
     } catch (error) {
       if (send.departed) this.#reportDeparted(send, error)
       else this.#finish(error, false)

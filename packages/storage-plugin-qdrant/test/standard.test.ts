@@ -6,6 +6,7 @@ import { runConformance } from '@migaia/storage-contract/conformance'
 import { qdrantBackendPlugin, type IQdrantHttp } from '../src/index.ts'
 import { fetchHttp } from '../src/http.ts'
 import { qdrantClientHttp } from '../src/client.ts'
+import { collections } from './helpers/collections.ts'
 
 /** Both actual adapters consume the same service address from the repository fixture launcher. */
 const url = process.env.MIGAIA_QDRANT_URL
@@ -42,6 +43,7 @@ for (const transport of ['http', 'client'] as const)
             http: IQdrantHttp = {
               ...original,
               async createCollection(...args) {
+                collections.track(args[0])
                 const result = await original.createCollection(...args)
                 created.push(args[0])
                 return result
@@ -52,7 +54,7 @@ for (const transport of ['http', 'client'] as const)
                 qdrantBackendPlugin({
                   url: url!,
                   http,
-                  collectionPrefix: crypto.randomUUID()
+                  collectionPrefix: collections.prefix('standard')
                 })
               ] as const
             })
@@ -60,7 +62,7 @@ for (const transport of ['http', 'client'] as const)
             try {
               await host.dispose()
             } finally {
-              for (const collection of created) await original.deleteCollection(collection)
+              await collections.release(url!, original)
             }
           }
           return host.backend('qdrant')

@@ -18,20 +18,19 @@ assert.ok(url, 'configured native Qdrant service required')
 assert.equal(STORAGE_QDRANT_ERROR_SOURCE, 'storage.backend.qdrant')
 /** One function boundary keeps actual public consumer inference independent of the transport loop. */
 async function exercise(native: IQdrantHttp, url: string): Promise<void> {
-  const created: string[] = [],
+  const created = new Set<string>(),
     http: IQdrantHttp = {
       ...native,
       createCollection: async (...args: Parameters<typeof native.createCollection>) => {
-        const result = await native.createCollection(...args)
-        created.push(args[0])
-        return result
+        created.add(args[0])
+        return native.createCollection(...args)
       }
     },
     org = createOrgId()
   const plugin = qdrantBackendPlugin({
     url,
     http,
-    collectionPrefix: crypto.randomUUID(),
+    collectionPrefix: 'qtest_runtime_' + crypto.randomUUID(),
     features: {
       management: qdrantManagementFeature(),
       hybrid: qdrantHybridFeature(),
@@ -77,8 +76,19 @@ async function exercise(native: IQdrantHttp, url: string): Promise<void> {
     assert.equal('deleteByFilter' in store, false)
     await host.dropOrg(org)
   } finally {
-    await host.dispose()
-    for (const name of created) await native.deleteCollection(name)
+    try {
+      await host.dispose()
+    } finally {
+      const existing = new Set((await native.getCollections()).collections.map((c) => c.name))
+      for (const name of created) {
+        if (!existing.has(name)) continue
+        try {
+          await native.deleteCollection(name)
+        } catch {
+          // Continue removing remaining test-owned collections.
+        }
+      }
+    }
   }
   assert.match(await native.getVersion(), /^1\./)
 }

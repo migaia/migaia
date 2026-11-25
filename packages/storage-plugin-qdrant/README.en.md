@@ -93,10 +93,10 @@ This package is currently `private: true` for use in this repository's workspace
 
 ```bash
 pnpm add --workspace @migaia/storage-host @migaia/storage-contract @migaia/storage-plugin-qdrant
-pnpm add @qdrant/js-client-rest@^1.11.0
+pnpm add @qdrant/js-client-rest@^1.18.0
 ```
 
-Use Node.js 24 or later and Qdrant protocol 1.11 or later. The default fetch entry does not load the SDK at runtime; `/client` borrows a real `QdrantClient`. The multivector example uses capabilities supported by Qdrant 1.15.5.
+Supports `@qdrant/js-client-rest` 1.18.0 and above. Use Node.js 24 or later and Qdrant protocol 1.11 or later. The default fetch entry does not load the SDK at runtime; `/client` borrows a real `QdrantClient`. The multivector example uses capabilities supported by Qdrant 1.15.5.
 
 ## Essential API
 

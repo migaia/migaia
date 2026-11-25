@@ -16,12 +16,12 @@ describe('finite backend authoring functions', () => {
     /** Native UUID failure must retain its identity behind the existing capability boundary. */
     const original = new Error('native UUID failed')
     /** The original supported native crypto function is the only replaced test dependency. */
-    const native = vi
-      .spyOn(globalThis.crypto, 'randomUUID')
-      .mockImplementation(function (this: typeof globalThis.crypto) {
-        expect(this).toBe(globalThis.crypto)
-        throw original
-      })
+    const native = vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(function (
+      this: typeof globalThis.crypto
+    ) {
+      expect(this).toBe(globalThis.crypto)
+      throw original
+    })
     try {
       expect(() => createStorageToken()).toThrowError(
         expect.objectContaining({

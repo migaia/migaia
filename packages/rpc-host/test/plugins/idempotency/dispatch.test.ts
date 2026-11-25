@@ -25,18 +25,21 @@ it('withdraws cancelled pending claims without retaining their waiters or cancel
   const setAdd = Set.prototype.add
   /** Count registration independently from cleanup, including the expected failing implementation. */
   let registrations = 0
-  const mapSpy = vi
-    .spyOn(Map.prototype, 'set')
-    .mockImplementation(function (this: Map<unknown, unknown>, key, value) {
-      if (key === 'cancelled-key' && value?.waiters instanceof Set) stored = value
-      return Reflect.apply(mapSet, this, [key, value])
-    })
-  const setSpy = vi
-    .spyOn(Set.prototype, 'add')
-    .mockImplementation(function (this: Set<unknown>, value) {
-      if (this === stored?.waiters) registrations += 1
-      return Reflect.apply(setAdd, this, [value])
-    })
+  const mapSpy = vi.spyOn(Map.prototype, 'set').mockImplementation(function (
+    this: Map<unknown, unknown>,
+    key,
+    value
+  ) {
+    if (key === 'cancelled-key' && value?.waiters instanceof Set) stored = value
+    return Reflect.apply(mapSet, this, [key, value])
+  })
+  const setSpy = vi.spyOn(Set.prototype, 'add').mockImplementation(function (
+    this: Set<unknown>,
+    value
+  ) {
+    if (this === stored?.waiters) registrations += 1
+    return Reflect.apply(setAdd, this, [value])
+  })
   /** Every replay and waiter belongs to the real public store installed on the server. */
   const store = createRpcIdempotencyStore()
   const server = coreMemoryServer('waiter-server')

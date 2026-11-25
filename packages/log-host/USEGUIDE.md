@@ -48,9 +48,9 @@ import { consolePlugin } from '@migaia/log-plugin-console'
 
 /** 冷定义可以复用；每个插件安装独立拥有 live 门槛状态。 */
 const threshold = thresholdFeature({ level: 'warn' })
-/** filter 定义不包含控制；安装后的插件扩展提供 add。 */
+/** Filter 定义不包含控制；安装后的插件扩展提供 add。 */
 const filters = filterFeature()
-/** entry feature 只在 host 级执行一次。 */
+/** Entry feature 只在 host 级执行一次。 */
 const log = createLogHost({
   plugins: [
     defineLogPlugin({

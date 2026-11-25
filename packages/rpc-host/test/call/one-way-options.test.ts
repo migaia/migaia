@@ -15,14 +15,16 @@ it('ordinary notifications release their records and caller listeners when physi
   /** Inspect the canonical table at native insertion instead of adding a production counter. */
   let records: Map<unknown, unknown> | undefined
   const mapSet = Map.prototype.set
-  const stored = vi
-    .spyOn(Map.prototype, 'set')
-    .mockImplementation(function (this: Map<unknown, unknown>, key, value) {
-      /** Native set returns the same table whose membership this oracle observes. */
-      const map = Reflect.apply(mapSet, this, [key, value])
-      if (value instanceof CallRecord && value.task.mode === 'notify') records = map
-      return map
-    })
+  const stored = vi.spyOn(Map.prototype, 'set').mockImplementation(function (
+    this: Map<unknown, unknown>,
+    key,
+    value
+  ) {
+    /** Native set returns the same table whose membership this oracle observes. */
+    const map = Reflect.apply(mapSet, this, [key, value])
+    if (value instanceof CallRecord && value.task.mode === 'notify') records = map
+    return map
+  })
   /** Provider signals prove that aborting after send no longer cancels remote business. */
   const signals: AbortSignal[] = []
   let completed = 0

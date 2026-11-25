@@ -146,7 +146,7 @@ import { defineLogPlugin } from '@migaia/log-host/sdk'
 import { thresholdFeature, uuidFeature } from '@migaia/log-host/features'
 import { consolePlugin } from '@migaia/log-plugin-console'
 
-/** host 级策略作为每个输出的默认值；entry 策略只执行一次。 */
+/** Host 级策略作为每个输出的默认值；entry 策略只执行一次。 */
 const log = createLogHost({
   plugins: [
     defineLogPlugin({

@@ -205,20 +205,20 @@ console.log((await tenant.near([1, 0]).topK(1).all())[0]?.score)
 
 在工厂选项的 `features` 里选择 Feature，增加 store.api 下的方法，没有事务投影。
 
-| 子入口与工厂                                          | API 与边界                                                                                                                                                            |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/features/hybrid` · `qdrantHybridFeature()`          | qdrantHybrid.query 恰好两个 named dense/sparse prefetch 分支，fusion 为 rrf；updateSparseVectors 只更新已配置 sparse 槽，indices 为唯一非负整数且与有限 values 等长。 |
-| `/features/recommend` · `qdrantRecommendFeature()`    | qdrantRecommend.recommend 保留 best_score、lookup 与原生样本策略。                                                                                                    |
-| `/features/group-by` · `qdrantGroupByFeature()`       | qdrantGroupBy.search 保留原生多值分组，不提供 SDK 1.11 未转发的 with_lookup。                                                                                         |
-| `/features/management` · `qdrantManagementFeature()`  | 集合、别名、快照与显式删除。                                                                                                                                          |
-| `/features/rescore` · `qdrantRescoreFeature(options)` | 额外槽更新与查询链重排。                                                                                                                                              |
+| 子入口与工厂                                          | API 与边界                                                                                                                                                                                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/features/hybrid` · `qdrantHybridFeature()`          | qdrantHybrid.query 恰好两个 named dense/sparse prefetch 分支，fusion 为 rrf；updateSparseVectors 只更新已配置 sparse 槽，indices 为唯一非负整数且与有限 values 等长。                                                                 |
+| `/features/recommend` · `qdrantRecommendFeature()`    | `qdrantRecommend.recommend(collection, { query: { recommend: { positive, negative?, strategy? } }, using?, limit?, ... })` 走 `points/query`，保留 `best_score`、`lookup_from` 与原生样本策略，返回 `QueryResponse`（`{ points }`）。 |
+| `/features/group-by` · `qdrantGroupByFeature()`       | `qdrantGroupBy.search(collection, { query, using?, group_by, group_size?, limit?, ... })` 走 `points/query/groups`，保留原生多值分组，不接受 `with_lookup`，返回 `GroupsResult`（`{ groups }`）。                                     |
+| `/features/management` · `qdrantManagementFeature()`  | 集合、别名、快照与显式删除。                                                                                                                                                                                                          |
+| `/features/rescore` · `qdrantRescoreFeature(options)` | 额外槽更新与查询链重排。                                                                                                                                                                                                              |
 
 自管原生方法使用物理 collection 名，仅默认组织可用。管理 `deleteByFilter(logicalCollection, where, options?, ctx?)` 与 `purgeExpired(logicalCollection, options?, ctx?)` 也可按组织执行。前者不加存活条件；后者一次采样墙钟清理过期点。两者无 count/scroll，返回 `{operationId, status}`；wait 默认 true，filter 删除的 ordering 可为 weak、medium、strong。operationId 不是删除数；其他方法保留原生 boolean/可空 snapshot。
 
 ## 连接与失败处理
 
-根默认使用 fetch。`/http` 的 `fetchHttp(url, apiKey?)` 可创建端口；`/client` 的 `qdrantClientHttp(client)` 借用真实 SDK client，不改其配置，也不关闭它。SDK 1.11 没有 per-call signal，已发请求必须等待真实结算；fetch 接收操作取消信号。关闭拒绝新调用，等待实际请求与 iterator。检测检查标准 vector、TTL 和组织清理所需方法；可选原生 Feature 方法在调用时检查，缺少时在修改前报 UNSUPPORTED_CAPABILITY。
+根默认使用 fetch。`/http` 的 `fetchHttp(url, apiKey?)` 可创建端口；`/client` 的 `qdrantClientHttp(client)` 借用真实 SDK client（支持 `@qdrant/js-client-rest` 1.18.0 及以上），不改其配置，也不关闭它。SDK 没有 per-call signal，已发请求必须等待真实结算；fetch 接收操作取消信号。关闭拒绝新调用，等待实际请求与 iterator。检测检查标准 vector、TTL 和组织清理所需方法；可选原生 Feature 方法在调用时检查，缺少时在修改前报 UNSUPPORTED_CAPABILITY。
 
-修改不自动重试，不跟随重定向。4xx 用 QDRANT_REQUEST_FAILED，网络/5xx 用 QDRANT_UNAVAILABLE，坏响应用 QDRANT_RESPONSE_INVALID，source 为 storage.backend.qdrant。HTTP 保留可取得的 status/body；SDK 1.11 非等待 snapshot 遇到 202 可能丢失 status 并截断消息，此时 response-invalid 不代表操作未接受；fetch 返回原生 null。先核实原生状态，再决定是否重试。
+修改不自动重试，不跟随重定向。4xx 用 QDRANT_REQUEST_FAILED，网络/5xx 用 QDRANT_UNAVAILABLE，坏响应用 QDRANT_RESPONSE_INVALID，source 为 storage.backend.qdrant。HTTP 保留可取得的 status/body；SDK 非等待 snapshot 遇到 202 可能丢失 status 并截断消息，此时 response-invalid 不代表操作未接受；fetch 返回原生 null。先核实原生状态，再决定是否重试。
 
 hooks 仅观察，抛错或拒绝交给 report，不取消业务；修改行为使用 host pipeline。遥测不含认证头或正文。只有组织和期限保留路径强制建索引，动态 payload 路径可能没有索引；成本取决于引擎计划、候选数和传输字节。

@@ -300,19 +300,16 @@ describe('native memory capacity', () => {
     /** Count actual Map iteration, including the bounded inverse log, without timing evidence. */
     let visits = 0
     const original = Map.prototype.entries
-    const iterator = vi
-      .spyOn(Map.prototype, Symbol.iterator)
-      .mockImplementation(function* (this: Map<unknown, unknown>): Generator<
-        [unknown, unknown],
-        undefined
-      > {
-        const entries = Reflect.apply(original, this, []) as MapIterator<[unknown, unknown]>
-        for (const entry of entries) {
-          visits += 1
-          yield entry
-        }
-        return undefined
-      })
+    const iterator = vi.spyOn(Map.prototype, Symbol.iterator).mockImplementation(function* (
+      this: Map<unknown, unknown>
+    ): Generator<[unknown, unknown], undefined> {
+      const entries = Reflect.apply(original, this, []) as MapIterator<[unknown, unknown]>
+      for (const entry of entries) {
+        visits += 1
+        yield entry
+      }
+      return undefined
+    })
     try {
       const victims = index.preview([
         { id: 'new', channel: 'value', encoded: 'new', key: 'new', bytes: 1 }

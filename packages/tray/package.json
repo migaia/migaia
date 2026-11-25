@@ -64,7 +64,7 @@
   "devDependencies": {
     "@migaia/rpc-contract": "workspace:*",
     "typescript": "^7.0.2",
-    "vitest": "4.1.10"
+    "vitest": "4.1.12"
   },
   "peerDependencies": {
     "@migaia/rpc-contract": "workspace:*"

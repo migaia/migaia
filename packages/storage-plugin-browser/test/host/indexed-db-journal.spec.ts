@@ -145,15 +145,17 @@ describe('native IndexedDB private journal namespaces', () => {
     })
     const original = new RangeError('actual native journal write abort')
     const put = IDBObjectStore.prototype.put
-    const failure = vi
-      .spyOn(IDBObjectStore.prototype, 'put')
-      .mockImplementation(function (this: IDBObjectStore, value, key) {
-        if (Array.isArray(key) && key[1] === 'journal' && key[3] === 'head') {
-          this.transaction.abort()
-          throw original
-        }
-        return Reflect.apply(put, this, [value, key])
-      })
+    const failure = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      value,
+      key
+    ) {
+      if (Array.isArray(key) && key[1] === 'journal' && key[3] === 'head') {
+        this.transaction.abort()
+        throw original
+      }
+      return Reflect.apply(put, this, [value, key])
+    })
     try {
       const rejected = await log
         .append([{ kind: 'aborted', payload: null }])

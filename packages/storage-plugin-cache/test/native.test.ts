@@ -26,6 +26,7 @@ import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
 import { cachePlugin } from '../src/index.ts'
 import { vector, type IStorageChange, type IVectorCollection } from '@migaia/storage-contract'
 import { lockKey, definePlugin } from '@migaia/storage-host/sdk'
+import { sweepQdrantCollections, sweepRedisNamespace } from './helpers/live-cleanup.ts'
 
 /** Required service fixtures are injected by the repository's sole native-service launcher. */
 const redisUrl = process.env.MIGAIA_REDIS_URL,
@@ -169,14 +170,13 @@ describe('native borrowed cache tiers', () => {
     const pool = createClientPool({ url: stackUrl }, { maximum: 8 }),
       pg = new Pool({ connectionString: pgUrl }),
       native = fetchHttp(qdrantUrl),
-      created: string[] = [],
+      created = new Set<string>(),
       prefix = 'integrated_' + crypto.randomUUID().slice(0, 8),
       http: IQdrantHttp = {
         ...native,
         async createCollection(...args) {
-          const result = await native.createCollection(...args)
-          created.push(args[0])
-          return result
+          created.add(args[0])
+          return native.createCollection(...args)
         }
       }
     await pool.connect()
@@ -245,10 +245,20 @@ describe('native borrowed cache tiers', () => {
         ).toEqual({ before: ['default', 'one', 'two'], after: ['default', null, 'two'] })
       }
     } finally {
-      await host.dispose()
-      for (const name of created) await native.deleteCollection(name)
-      await pool.close()
-      await pg.end()
+      try {
+        await host.dispose()
+      } finally {
+        try {
+          await sweepQdrantCollections(native, created)
+        } finally {
+          try {
+            await sweepRedisNamespace(stackUrl, prefix)
+          } finally {
+            await pool.close()
+            await pg.end()
+          }
+        }
+      }
     }
   })
 
@@ -370,10 +380,15 @@ describe('native borrowed cache tiers', () => {
         await replay.dispose()
       }
     } finally {
-      await host.backend('redis').clearAll()
-      await pool.sendCommand(['DEL', prefix + ':reads', prefix + ':loads'])
-      await host.dispose()
-      await pool.close()
+      try {
+        await host.dispose()
+      } finally {
+        try {
+          await sweepRedisNamespace(redisUrl, prefix)
+        } finally {
+          await pool.close()
+        }
+      }
     }
   }, 20000)
   it('combines Memory, SQLite, Redis and PostgreSQL through actual public entries', async () => {
@@ -514,9 +529,16 @@ describe('native borrowed cache tiers', () => {
         expect(nativePorts).toContainEqual({ backend: id, operation: 'removeByPrefix' })
       expect(await cache.get('all-native')).toBeNull()
     } finally {
-      await host.dispose()
-      await pool.close()
-      await pg.end()
+      try {
+        await host.dispose()
+      } finally {
+        try {
+          await sweepRedisNamespace(redisUrl, prefix)
+        } finally {
+          await pool.close()
+          await pg.end()
+        }
+      }
     }
   })
   it('invalidates an upper native SQLite copy and resumes from its persisted Redis cursor', async () => {
@@ -688,10 +710,17 @@ describe('native borrowed cache tiers', () => {
       await host.backend('cache').clearAll()
       await peer.backend('lower').clearAll()
     } finally {
-      await host.dispose()
-      await peer.dispose()
-      await pool.close()
-      await rm(directory, { recursive: true, force: true })
+      try {
+        await host.dispose()
+        await peer.dispose()
+      } finally {
+        try {
+          await sweepRedisNamespace(redisUrl, prefix)
+        } finally {
+          await pool.close()
+          await rm(directory, { recursive: true, force: true })
+        }
+      }
     }
   })
   it('resets stale upper data when a persisted native cursor expires', async () => {
@@ -771,10 +800,17 @@ describe('native borrowed cache tiers', () => {
       await host.backend('cache').clearAll()
       await peer.backend('lower').clearAll()
     } finally {
-      await host.dispose()
-      await peer.dispose()
-      await pool.close()
-      await rm(directory, { recursive: true, force: true })
+      try {
+        await host.dispose()
+        await peer.dispose()
+      } finally {
+        try {
+          await sweepRedisNamespace(redisUrl, prefix)
+        } finally {
+          await pool.close()
+          await rm(directory, { recursive: true, force: true })
+        }
+      }
     }
   }, 20000)
 })

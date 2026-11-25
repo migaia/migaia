@@ -9,6 +9,7 @@ import { qdrantBackendPlugin } from '../src/plugin.ts'
 import { qdrantClientHttp } from '../src/client.ts'
 import { qdrantManagementFeature } from '../src/features/management.ts'
 import { definePlugin } from '@migaia/storage-host/sdk'
+import { collections } from './helpers/collections.ts'
 
 /** The canonical launcher supplies the actual engine; no alternate service or private API is used. */
 const url = process.env.MIGAIA_QDRANT_URL
@@ -56,10 +57,14 @@ async function forwardedNative() {
       })
       /** Reading the complete upstream body establishes actual native settlement before holding. */
       const text = await upstream.text()
-      /** Only successful creates transfer fixture cleanup ownership of a fresh collection. */
+      /** Track physical collection creation before upstream I/O so timeouts cannot leak it. */
       const path = new URL(wire.path, url!).pathname
-      if (upstream.ok && wire.method === 'PUT' && /^\/collections\/[^/]+$/.test(path))
-        created.add(decodeURIComponent(path.split('/')[2]!))
+      if (wire.method === 'PUT' && /^\/collections\/[^/]+$/.test(path)) {
+        /** Target collection name decoded from the PUT request path. */
+        const collectionName = decodeURIComponent(path.split('/')[2]!)
+        collections.track(collectionName)
+        if (upstream.ok) created.add(collectionName)
+      }
       if (
         selected !== undefined &&
         wire.method === selected.method &&
@@ -102,7 +107,7 @@ async function forwardedNative() {
     close: async () => {
       resume.resolve()
       try {
-        for (const name of created) await client.deleteCollection(name)
+        await collections.release(url!)
       } finally {
         await new Promise<void>((resolve, reject) =>
           server.close((error) => (error ? reject(error) : resolve()))
@@ -118,21 +123,23 @@ describe('real SDK request and backend lifetime boundaries', () => {
     'drains an already-sent SDK snapshot after cancellation and preserves both disposal Promises',
     async () => {
       const native = await forwardedNative()
-      const name = 'lifetime_' + crypto.randomUUID().replaceAll('-', '')
-      await native.client.createCollection(name, { vectors: { size: 2, distance: 'Dot' } })
-      const host = await createStorageHost({
-        plugins: [
-          storageProbe(),
-          qdrantBackendPlugin({
-            url: native.origin,
-            http: native.http,
-            features: { management: qdrantManagementFeature() }
-          })
-        ]
-      })
-      const store = host.backend('qdrant')
-      const caller = new AbortController()
+      const name = collections.collection('lifetime')
+      let host: { dispose(): Promise<void> } | undefined
       try {
+        await native.client.createCollection(name, { vectors: { size: 2, distance: 'Dot' } })
+        const createdHost = await createStorageHost({
+          plugins: [
+            storageProbe(),
+            qdrantBackendPlugin({
+              url: native.origin,
+              http: native.http,
+              features: { management: qdrantManagementFeature() }
+            })
+          ]
+        })
+        host = createdHost
+        const store = createdHost.backend('qdrant')
+        const caller = new AbortController()
         native.control('/snapshots', 'hold')
         let settled = false
         const pending = store.api.qdrantManagement
@@ -175,8 +182,11 @@ describe('real SDK request and backend lifetime boundaries', () => {
         })
       } finally {
         native.release()
-        await host.dispose()
-        await native.close()
+        try {
+          await host?.dispose()
+        } finally {
+          await native.close()
+        }
       }
     },
     30_000
@@ -192,7 +202,7 @@ describe('real SDK request and backend lifetime boundaries', () => {
           qdrantBackendPlugin({
             url: native.origin,
             http: native.http,
-            collectionPrefix: crypto.randomUUID()
+            collectionPrefix: collections.prefix('lifecycle')
           })
         ]
       })
@@ -258,7 +268,7 @@ describe('real SDK request and backend lifetime boundaries', () => {
           qdrantBackendPlugin({
             url: native.origin,
             http: native.http,
-            collectionPrefix: crypto.randomUUID()
+            collectionPrefix: collections.prefix('lifecycle')
           }),
           stage
         ],

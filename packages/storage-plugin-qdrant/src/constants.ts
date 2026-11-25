@@ -82,18 +82,10 @@ export const QdrantRoute: {
     collection: true,
     parameters: true
   },
-  recommend: {
-    name: 'recommend',
+  queryGroups: {
+    name: 'queryGroups',
     method: 'POST',
-    path: 'collections/:collection/points/recommend',
-    query: ['consistency', 'timeout'],
-    collection: true,
-    parameters: true
-  },
-  searchPointGroups: {
-    name: 'searchPointGroups',
-    method: 'POST',
-    path: 'collections/:collection/points/search/groups',
+    path: 'collections/:collection/points/query/groups',
     query: ['consistency', 'timeout'],
     collection: true,
     parameters: true
@@ -196,7 +188,6 @@ export const QdrantText = {
   onHttpRequest: 'onHttpRequest',
   json: 'application/json',
   apiKey: 'api-key',
-  sdkMinimum: '1.11.0',
   search: 'vector.search',
   /** Native extra-slot packets and their write operation share this Feature-owned discriminator. */
   rescore: 'qdrant.rescore',

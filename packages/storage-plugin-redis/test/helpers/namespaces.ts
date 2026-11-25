@@ -23,6 +23,11 @@ export class RedisTestNamespaces {
   readonly #tags: string[] = []
   /** Raw key stems; every key starting with a stem is released. */
   readonly #stems: string[] = []
+  /**
+   * Explicit RediSearch index names allocated outside `prefix()` (for example literal-prefix
+   * tests).
+   */
+  readonly #indexes: string[] = []
 
   /** Allocate one fresh storage prefix whose physical keys are released after the file. */
   prefix(): string {
@@ -40,16 +45,40 @@ export class RedisTestNamespaces {
     return value
   }
 
+  /** Record an explicit RediSearch index name so `afterAll` drops it even if a test times out. */
+  index(name: string): string {
+    this.#indexes.push(name)
+    return name
+  }
+
   /** Remove every recorded key and vector index on each configured service. */
   async release(): Promise<void> {
-    if (this.#tags.length === 0 && this.#stems.length === 0) return
+    if (this.#tags.length === 0 && this.#stems.length === 0 && this.#indexes.length === 0) return
+    /**
+     * Snapshot recorded tags, stems and explicit indexes so one failing service cannot prevent
+     * clearing state.
+     */
+    const tags = [...this.#tags]
+    const stems = [...this.#stems]
+    const indexes = [...this.#indexes]
+    this.#tags.length = 0
+    this.#stems.length = 0
+    this.#indexes.length = 0
+    /** Collect errors across services so all endpoints still get cleaned up. */
+    const failures: unknown[] = []
     for (const service of serviceUrls) {
       /** The service address comes from scripts/storage-services.mts run. */
       const url = process.env[service]
-      if (url) await releaseOn(url, this.#tags, this.#stems)
+      if (!url) continue
+      try {
+        await releaseOn(url, tags, stems, indexes)
+      } catch (error) {
+        failures.push(error)
+      }
     }
-    this.#tags.length = 0
-    this.#stems.length = 0
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1)
+      throw new AggregateError(failures, 'failed to release one or more Redis test namespaces')
   }
 }
 
@@ -57,34 +86,64 @@ export class RedisTestNamespaces {
 async function releaseOn(
   url: string,
   tags: readonly string[],
-  stems: readonly string[]
+  stems: readonly string[],
+  explicitIndexes: readonly string[]
 ): Promise<void> {
   /** Independent of the clients the tests already closed. */
   const client = createReleaseClient(url)
   await client.connect()
+  /** Collect cleanup failures so dropping one index or tag never aborts the rest. */
+  const failures: unknown[] = []
   try {
-    await dropIndexes(client, tags)
-    for (const tag of tags) await unlinkMatching(client, tag + ':*')
-    for (const stem of stems) await unlinkMatching(client, stem + '*')
+    await dropIndexes(client, tags, explicitIndexes, failures)
+    for (const tag of tags) {
+      try {
+        await unlinkMatching(client, tag + ':*')
+      } catch (error) {
+        failures.push(error)
+      }
+    }
+    for (const stem of stems) {
+      try {
+        await unlinkMatching(client, stem + '*')
+      } catch (error) {
+        failures.push(error)
+      }
+    }
   } finally {
     client.destroy()
   }
+  if (failures.length === 1) throw failures[0]
+  if (failures.length > 1)
+    throw new AggregateError(failures, 'failed to clean up one or more Redis test resources')
 }
 
 /** Drop vector indexes owned by the released prefixes; skipped where search is not loaded. */
-async function dropIndexes(client: IReleaseClient, tags: readonly string[]): Promise<void> {
+async function dropIndexes(
+  client: IReleaseClient,
+  tags: readonly string[],
+  explicitIndexes: readonly string[],
+  failures: unknown[]
+): Promise<void> {
   /** COMMAND INFO returns a nil entry for a command the server does not provide (Valkey). */
   const [info] = (await client.sendCommand(['COMMAND', 'INFO', 'FT._LIST'])) as unknown[]
   if (info === null || info === undefined) return
   /** Tag lookup keeps the pass linear in the listed indexes. */
   const owned = new Set(tags)
+  /** Explicit index lookup handles literal-prefix tests that cannot drop whole tags. */
+  const explicit = new Set(explicitIndexes)
   /** One listing serves every tag of this file. */
   const indexes = (await client.sendCommand(['FT._LIST'])) as string[]
   for (const index of indexes) {
     /** Vector indexes are named `<tag>:vi:<collection>`. */
     const marker = index.indexOf(':vi:')
-    if (marker > 0 && owned.has(index.slice(0, marker)))
-      await client.sendCommand(['FT.DROPINDEX', index])
+    if (explicit.has(index) || (marker > 0 && owned.has(index.slice(0, marker)))) {
+      try {
+        await client.sendCommand(['FT.DROPINDEX', index])
+      } catch (error) {
+        failures.push(error)
+      }
+    }
   }
 }
 

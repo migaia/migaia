@@ -564,9 +564,9 @@ type IPluginStore<P> =
  * surface.
  */
 export type IPluginStoreMap<P extends readonly IStorageBackendPluginHandle[]> = {
-  readonly [V in P[number] as IPluginStore<V> extends never
-    ? never
-    : IStoragePluginName<V>]: IPluginStore<V>
+  readonly [
+    V in P[number] as IPluginStore<V> extends never ? never : IStoragePluginName<V>
+  ]: IPluginStore<V>
 }
 /** Return one literal plugin name, excluding widened names and unions. */
 export type IStoragePluginName<P> = P extends { readonly name: infer N extends string }

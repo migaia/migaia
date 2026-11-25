@@ -55,8 +55,8 @@
     "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
-    "fmt": "oxfmt src test README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
-    "lint": "oxlint src test",
+    "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "lint": "oxlint src test vitest.config.ts",
     "typecheck": "bun check -p tsconfig.json",
     "typecheck:test": "bun check -p tsconfig.test.json",
     "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
@@ -73,11 +73,11 @@
   },
   "devDependencies": {
     "@migaia/storage-host": "workspace:^",
-    "@qdrant/js-client-rest": "1.11.0"
+    "@qdrant/js-client-rest": "1.20.0"
   },
   "peerDependencies": {
     "@migaia/storage-host": "workspace:^",
-    "@qdrant/js-client-rest": "^1.11.0"
+    "@qdrant/js-client-rest": "^1.18.0"
   },
   "engines": {
     "node": ">=24.0.0"

@@ -70,12 +70,12 @@
     "msgpackr": "2.1.0",
     "protobufjs": "8.8.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   },
   "peerDependencies": {
     "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-host": "workspace:*",
-    "electron": "^44.0.0",
+    "electron": "^44.11.5",
     "koffi": "^3.1.6"
   },
   "peerDependenciesMeta": {

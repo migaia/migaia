@@ -97,7 +97,9 @@ type IEntityIndexQueryKey<TDomain, TIndex> = TIndex extends {
   : TIndex extends { readonly paths: infer TPaths }
     ? TPaths extends readonly IObjectPathInput<TDomain>[]
       ? {
-          readonly [TIndexPosition in keyof TPaths]: TPaths[TIndexPosition] extends IObjectPathInput<TDomain>
+          readonly [
+            TIndexPosition in keyof TPaths
+          ]: TPaths[TIndexPosition] extends IObjectPathInput<TDomain>
             ? Extract<IObjectPathValue<TDomain, TPaths[TIndexPosition]>, IStorageKey>
             : never
         }
@@ -152,10 +154,7 @@ export type IEntityPluginOptions<
   readonly codec?: ICodec<unknown, unknown>
   /** Positive safe-integer envelope version; defaults to 1. */
   readonly version?: number
-  /**
-   * Complete own step table from version 2 through the configured version; omitted only for version
-   * 1.
-   */
+  /** Complete own step table from version 2 through the configured version; omitted only for version 1. */
   readonly migrations?: Readonly<Record<number, IMigrationStep>>
   /**
    * Defaults to `true` because persisted data survives version changes, making invalid reads more

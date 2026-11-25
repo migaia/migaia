@@ -98,8 +98,7 @@ export const ReactiveErrorCode = {
   versionExhausted: 'VERSION_EXHAUSTED',
 
   /**
-   * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is
-   * 100.
+   * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is 100.
    *
    * This usually indicates an effect writes to its own dependency and triggers itself. The
    * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop.
