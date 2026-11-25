@@ -77,7 +77,8 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
             })
           ] as const
         })
-        const vectorIndex = service === 'MIGAIA_REDIS_URL' ? layout.vectorIndex(name) : undefined
+        const vectorIndex =
+          service === 'MIGAIA_REDIS_URL' ? namespaces.index(layout.vectorIndex(name)) : undefined
         try {
           const store = host.org(org).backend('redis')
           await store.set('point', 'text')
