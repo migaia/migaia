@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, realpathSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
@@ -270,11 +278,14 @@ const browserBundleBytes = (directory: string): { minified: number; gzip: number
 /** Build and pack the unchanged fixed main source with normal repository commands in this window. */
 async function measureMainBrowserBaseline(smokeDirectory: string) {
   const sourceRoot = join(smokeDirectory, 'baseline-source')
-  execFileSync('git', ['worktree', 'add', '--detach', sourceRoot, browserBaselineCommit], {
-    cwd: repositoryRoot,
-    stdio: 'pipe'
-  })
+  /** Tracks whether git registered the temporary baseline worktree so cleanup runs only when added. */
+  let worktreeAdded = false
   try {
+    execFileSync('git', ['worktree', 'add', '--detach', sourceRoot, browserBaselineCommit], {
+      cwd: repositoryRoot,
+      stdio: 'pipe'
+    })
+    worktreeAdded = true
     execFileSync('pnpm', ['install', '--offline', '--frozen-lockfile', '--ignore-scripts'], {
       cwd: sourceRoot,
       stdio: 'pipe'
@@ -406,11 +417,13 @@ async function measureMainBrowserBaseline(smokeDirectory: string) {
     )
     return browserBundleBytes(join(consumer, 'bundle'))
   } finally {
-    /** This newly created fixture worktree contains only reproducible installs/build artifacts. */
-    execFileSync('git', ['worktree', 'remove', '--force', sourceRoot], {
-      cwd: repositoryRoot,
-      stdio: 'pipe'
-    })
+    if (worktreeAdded) {
+      /** This newly created fixture worktree contains only reproducible installs/build artifacts. */
+      execFileSync('git', ['worktree', 'remove', '--force', sourceRoot], {
+        cwd: repositoryRoot,
+        stdio: 'pipe'
+      })
+    }
   }
 }
 
@@ -669,8 +682,8 @@ function authorizeImporterResolvedPackages(
 
 describe('browser bundle boundary', () => {
   it('keeps the unchanged entity query within ceilings and excludes unused dependencies', async () => {
-    const smokeDirectory = join(tmpdir(), 'migaia-storage-v2-c2-r4-packed-stable')
-    mkdirSync(smokeDirectory)
+    /** Unique temp root per run avoids colliding with any stale worktree registration. */
+    const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-storage-browser-bundle-'))
     try {
       const consumerDirectory = join(smokeDirectory, 'consumer')
       const artifacts = packReleaseArtifacts(smokeDirectory)
