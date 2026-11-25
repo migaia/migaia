@@ -20,6 +20,7 @@ import { qdrantRescoreFeature } from '../src/features/rescore.ts'
 import { nativeHttp } from '../src/native.ts'
 import { QdrantManagedVectorName } from '../src/constants.ts'
 import type { IQdrantHttp } from '../src/types.ts'
+import { collections } from './helpers/collections.ts'
 /** Real service addresses come exclusively from the shared fixture launcher. */
 const url = process.env.MIGAIA_QDRANT_URL
 /** Cleanup is restricted to fresh collection names created by this exact fixture. */
@@ -32,6 +33,7 @@ function native() {
     async (operation, args, ctx): Promise<Awaited<ReturnType<IQdrantHttp[typeof operation]>>> => {
       calls.push(operation)
       requests.push({ operation, args })
+      if (operation === 'createCollection') collections.track(args[0] as string)
       const result = await Reflect.apply(original[operation], original, [...args, ctx])
       if (operation === 'createCollection') created.push(args[0] as string)
       return result as Awaited<ReturnType<IQdrantHttp[typeof operation]>>
@@ -47,7 +49,7 @@ function native() {
     calls,
     requests,
     close: async () => {
-      for (const name of created) await original.deleteCollection(name)
+      await collections.release(url!, original)
     }
   }
 }
@@ -186,7 +188,7 @@ describe.skipIf(!url)('Qdrant canonical vector subject', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http
             })
           ] as const
@@ -214,7 +216,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http,
               features: {
                 rescore: qdrantRescoreFeature({
@@ -359,7 +361,7 @@ describe('real native vector backend', () => {
     'keeps an existing collection without an extra slot usable and refuses only rescoring',
     async () => {
       const fixture = native()
-      const prefix = crypto.randomUUID()
+      const prefix = collections.prefix('old')
       const first = await createStorageHost({
         plugins: [
           qdrantBackendPlugin({ url: url!, collectionPrefix: prefix, http: fixture.http })
@@ -414,7 +416,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http
             })
           ] as const
@@ -487,7 +489,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http,
               features: {
                 management: qdrantManagementFeature(),
@@ -550,7 +552,7 @@ describe('real native vector backend', () => {
         },
         host = await createStorageHost({
           plugins: [
-            qdrantBackendPlugin({ url: url!, collectionPrefix: crypto.randomUUID(), http })
+            qdrantBackendPlugin({ url: url!, collectionPrefix: collections.prefix(), http })
           ] as const
         }),
         store = host.backend('qdrant'),
@@ -623,7 +625,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http,
               features: { management: qdrantManagementFeature() }
             })
@@ -725,7 +727,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http
             })
           ] as const
@@ -833,7 +835,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http,
               features: { management: qdrantManagementFeature() }
             })
@@ -944,7 +946,7 @@ describe('real native vector backend', () => {
           ] as const
         }),
         store = host.backend('qdrant'),
-        name = 'features_' + crypto.randomUUID().replaceAll('-', '')
+        name = collections.collection('features')
       try {
         expect(
           await store.api.qdrantManagement!.createCollection(name, {
@@ -1113,7 +1115,7 @@ describe('real native vector backend', () => {
     'discovers schemas after restart without new-org DDL and drops every owned collection without touching another namespace',
     async () => {
       const fixture = native(),
-        prefix = crypto.randomUUID(),
+        prefix = collections.prefix('restart'),
         org = createOrgId(),
         other = createOrgId()
       const first = await createStorageHost({
@@ -1127,7 +1129,7 @@ describe('real native vector backend', () => {
         plugins: [
           qdrantBackendPlugin({
             url: url!,
-            collectionPrefix: crypto.randomUUID(),
+            collectionPrefix: collections.prefix(),
             http: fixture.http
           })
         ] as const
@@ -1225,7 +1227,7 @@ describe('real native vector backend', () => {
           plugins: [
             qdrantBackendPlugin({
               url: url!,
-              collectionPrefix: crypto.randomUUID(),
+              collectionPrefix: collections.prefix(),
               http: fixture.http
             }),
             stage
@@ -1287,7 +1289,7 @@ it.skipIf(!url)(
         return fixture.http.createCollection(...args)
       }
     }
-    const prefix = crypto.randomUUID()
+    const prefix = collections.prefix('race')
     const first = await createStorageHost({
       plugins: [qdrantBackendPlugin({ url: url!, http, collectionPrefix: prefix })] as const
     })
@@ -1371,7 +1373,7 @@ for (const malformed of ['missing', 'dimension', 'cosine', 'hnsw', 'quantized', 
       }
       const host = await createStorageHost({
         plugins: [
-          qdrantBackendPlugin({ url: url!, http, collectionPrefix: crypto.randomUUID() })
+          qdrantBackendPlugin({ url: url!, http, collectionPrefix: collections.prefix() })
         ] as const
       })
       try {
@@ -1403,7 +1405,7 @@ for (const metric of ['cosine', 'dot', 'euclid'] as const)
           qdrantBackendPlugin({
             url: url!,
             http: fixture.http,
-            collectionPrefix: crypto.randomUUID()
+            collectionPrefix: collections.prefix()
           })
         ] as const
       })

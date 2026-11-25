@@ -7,6 +7,7 @@ import { fetchHttp } from '../src/http.ts'
 import { qdrantClientHttp } from '../src/client.ts'
 import { qdrantRecommendFeature } from '../src/features/recommend.ts'
 import { qdrantGroupByFeature } from '../src/features/group-by.ts'
+import { collections } from './helpers/collections.ts'
 /** The original shared launcher supplies the actual native-service address. */
 const url = process.env.MIGAIA_QDRANT_URL
 
@@ -151,14 +152,14 @@ describe('native Qdrant protocol adapters', () => {
       const http =
         transport === 'fetch' ? fetchHttp(url!) : qdrantClientHttp(new QdrantClient({ url: url! }))
       /** Only this fixture owns and removes this fresh native collection. */
-      const name = 'multivector_' + crypto.randomUUID().replaceAll('-', '')
-      await http.createCollection(name, {
-        vectors: {
-          multi: { size: 2, distance: 'Dot', multivector_config: { comparator: 'max_sim' } }
-        },
-        sparse_vectors: { sparse: {} }
-      })
+      const name = collections.collection('multivector')
       try {
+        await http.createCollection(name, {
+          vectors: {
+            multi: { size: 2, distance: 'Dot', multivector_config: { comparator: 'max_sim' } }
+          },
+          sparse_vectors: { sparse: {} }
+        })
         await http.upsert(name, {
           points: [
             {
@@ -275,17 +276,17 @@ describe('native Qdrant protocol adapters', () => {
     async () => {
       const adapters = [fetchHttp(url!), qdrantClientHttp(new QdrantClient({ url: url! }))]
       for (const http of adapters) {
-        const name = 'native_' + crypto.randomUUID().replaceAll('-', ''),
+        const name = collections.collection('native'),
           alias = name + '_alias'
         expect(await http.getVersion()).toMatch(/^1\./)
-        await http.createCollection(name, {
-          vectors: {
-            dense: { size: 2, distance: 'Cosine' },
-            source: { size: 2, distance: 'Dot', hnsw_config: { m: 0, payload_m: 0 } }
-          },
-          sparse_vectors: { sparse: {} }
-        })
         try {
+          await http.createCollection(name, {
+            vectors: {
+              dense: { size: 2, distance: 'Cosine' },
+              source: { size: 2, distance: 'Dot', hnsw_config: { m: 0, payload_m: 0 } }
+            },
+            sparse_vectors: { sparse: {} }
+          })
           expect(
             (await http.getCollections()).collections.some((collection) => collection.name === name)
           ).toBe(true)
