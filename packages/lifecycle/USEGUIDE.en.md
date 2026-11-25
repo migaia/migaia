@@ -1308,11 +1308,15 @@ const failures = await runPromise
 ```ts
 import { createSyncLifecycleScope } from '@migaia/lifecycle'
 
-function withListeners() {
-  using scope = createSyncLifecycleScope() // [Symbol.dispose]() runs on leaving the block, synchronously
-  const handler = () => console.log('tick')
-  window.addEventListener('tick', handler)
-  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })
+// Record the change events dispatched on target while run() executes; the listener is removed synchronously on return
+export function collectChanges(target: EventTarget, run: () => void): string[] {
+  using scope = createSyncLifecycleScope() // [Symbol.dispose]() runs on leaving the function
+  const seen: string[] = []
+  const handler = (event: Event) => seen.push(event.type)
+  target.addEventListener('change', handler)
+  scope.own(handler, { syncSafe: true, force: () => target.removeEventListener('change', handler) })
+  run()
+  return seen
 }
 ```
 
