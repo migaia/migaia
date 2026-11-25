@@ -61,7 +61,7 @@
   "peerDependencies": {
     "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-host": "workspace:*",
-    "electron": "^44.0.0"
+    "electron": "^44.11.5"
   },
   "peerDependenciesMeta": {
     "electron": {
