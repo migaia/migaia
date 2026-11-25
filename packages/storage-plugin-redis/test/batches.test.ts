@@ -77,7 +77,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
             })
           ] as const
         })
-        let vectorIndex: string | undefined
+        const vectorIndex = service === 'MIGAIA_REDIS_URL' ? layout.vectorIndex(name) : undefined
         try {
           const store = host.org(org).backend('redis')
           await store.set('point', 'text')
@@ -113,7 +113,6 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
                 .use(vector)
                 .collection(name, { dimensions: 2, metric: 'dot' })
                 .upsert([{ id: 'point', vector: [1, 2] }])
-              vectorIndex = layout.vectorIndex(name)
               physical.push(layout.vectorPoint(name, 'point'))
             } finally {
               await search.dispose()
@@ -127,9 +126,21 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
           await host.dropOrg(org)
           for (const key of physical) expect(await driver.command(['EXISTS', key])).toBe(0)
         } finally {
-          await host.dropOrg(org)
-          await host.dispose()
-          if (vectorIndex) await driver.command(['FT.DROPINDEX', vectorIndex])
+          try {
+            await host.dropOrg(org)
+          } finally {
+            try {
+              await host.dispose()
+            } finally {
+              if (vectorIndex) {
+                try {
+                  await driver.command(['FT.DROPINDEX', vectorIndex])
+                } catch {
+                  // Index may not have been created if setup failed before FT.CREATE.
+                }
+              }
+            }
+          }
         }
       }
     })
