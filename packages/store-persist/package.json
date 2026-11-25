@@ -59,7 +59,7 @@
     "@migaia/store-keyed": "workspace:^",
     "@migaia/store-light": "workspace:^",
     "typescript": "^7.0.2",
-    "vitest": "4.1.10"
+    "vitest": "4.1.12"
   },
   "peerDependencies": {
     "@migaia/store-indexed": "workspace:^",
