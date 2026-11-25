@@ -93,10 +93,10 @@ export async function writePoint(url: string) {
 
 ```bash
 pnpm add --workspace @migaia/storage-host @migaia/storage-contract @migaia/storage-plugin-qdrant
-pnpm add @qdrant/js-client-rest@^1.11.0
+pnpm add @qdrant/js-client-rest@^1.18.0
 ```
 
-需要 Node.js 24 或更新版本，Qdrant 协议最低 1.11。默认 fetch 入口不在运行时加载 SDK；显式 `/client` 入口借用真实 `QdrantClient`。多向量示例使用 Qdrant 1.15.5 支持的能力。
+支持 `@qdrant/js-client-rest` 1.18.0 及以上。需要 Node.js 24 或更新版本，Qdrant 协议最低 1.11。默认 fetch 入口不在运行时加载 SDK；显式 `/client` 入口借用真实 `QdrantClient`。多向量示例使用 Qdrant 1.15.5 支持的能力。
 
 ## 常用 API
 

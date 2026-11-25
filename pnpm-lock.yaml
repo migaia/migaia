@@ -162,6 +162,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@qdrant/js-client-rest>undici': '>=7.30.2'
+
 importers:
 
   .:
@@ -1166,8 +1169,8 @@ importers:
         specifier: workspace:^
         version: link:../storage-host
       '@qdrant/js-client-rest':
-        specifier: 1.11.0
-        version: 1.11.0(typescript@7.0.2)
+        specifier: 1.20.0
+        version: 1.20.0(typescript@7.0.2)
 
   packages/storage-plugin-redis:
     dependencies:
@@ -2024,10 +2027,6 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@fastify/busboy@2.1.1':
-    resolution: {integrity: sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA==}
-    engines: {node: '>=14'}
-
   '@ioredis/commands@2.0.0':
     resolution: {integrity: sha512-vrx0AE/T0h7cRZwfo1M39Cr+ZhZrkf0V8mQN75wucKCxCLD9l/VX6no3gFvrLqD1IlG/1LtzWovqEw3t0Vr9zg==}
 
@@ -2559,9 +2558,9 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
-  '@qdrant/js-client-rest@1.11.0':
-    resolution: {integrity: sha512-RzF+HxL8A7bb/uaxU1jVS1a919bb3FCo1giB/D19UT3d50AYl4+4AyklbsjlXpWEHekbNocQAQ016fqT9hSRtQ==}
-    engines: {node: '>=18.0.0', pnpm: '>=8'}
+  '@qdrant/js-client-rest@1.20.0':
+    resolution: {integrity: sha512-NhvW4z3rbxYc1e+ksHci5hE8vNBpbi5YoB7z3dzaVcskM2el7O/exNg5fclAN+G5MXn/TRx2Rcie8YTXo2YQdg==}
+    engines: {node: '>=22.0.0'}
     peerDependencies:
       typescript: '>=4.7'
 
@@ -2711,9 +2710,6 @@ packages:
 
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
-
-  '@sevinf/maybe@0.5.0':
-    resolution: {integrity: sha512-ARhyoYDnY1LES3vYI0fiG6e9esWfTNcXcO6+MPJJXcnyMV3bim4lnFt45VXouV7y82F4x3YH8nOQ6VztuvUiWg==}
 
   '@sinclair/typebox@0.34.52':
     resolution: {integrity: sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==}
@@ -3637,10 +3633,6 @@ packages:
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
-  undici@5.28.5:
-    resolution: {integrity: sha512-zICwjrDrcrUE0pyyJc1I2QzBkLM8FINsgOrt6WjA+BgajVq9Nxu2PbFFXUrAggLfDXlZGZBVZYw7WNV5KiBiBA==}
-    engines: {node: '>=14.0'}
-
   undici@7.30.2:
     resolution: {integrity: sha512-mLyPQnHwUxaM/rideoK/+KL8DaAJLRl4aBCfmX444aCSLnIaomqPLtNRe2jdCYcsk5wZzXrDIQC8ZeYNRAYyIA==}
     engines: {node: '>=20.18.1'}
@@ -4156,8 +4148,6 @@ snapshots:
 
   '@exodus/bytes@1.15.1': {}
 
-  '@fastify/busboy@2.1.1': {}
-
   '@ioredis/commands@2.0.0': {}
 
   '@jridgewell/resolve-uri@3.1.2': {}
@@ -4435,12 +4425,11 @@ snapshots:
     dependencies:
       playwright: 1.62.1
 
-  '@qdrant/js-client-rest@1.11.0(typescript@7.0.2)':
+  '@qdrant/js-client-rest@1.20.0(typescript@7.0.2)':
     dependencies:
       '@qdrant/openapi-typescript-fetch': 1.2.6
-      '@sevinf/maybe': 0.5.0
       typescript: 7.0.2
-      undici: 5.28.5
+      undici: 7.30.2
 
   '@qdrant/openapi-typescript-fetch@1.2.6': {}
 
@@ -4519,8 +4508,6 @@ snapshots:
     optional: true
 
   '@rolldown/pluginutils@1.0.1': {}
-
-  '@sevinf/maybe@0.5.0': {}
 
   '@sinclair/typebox@0.34.52': {}
 
@@ -5465,10 +5452,6 @@ snapshots:
   uint8array-extras@1.5.0: {}
 
   undici-types@7.18.2: {}
-
-  undici@5.28.5:
-    dependencies:
-      '@fastify/busboy': 2.1.1
 
   undici@7.30.2: {}
 

@@ -16,12 +16,14 @@ export function qdrantClientHttp(client: QdrantClient): IQdrantHttp {
   return nativeHttp(adapter.invoke, adapter.version)
 }
 
-/** Resolve the official generated APIs once while preserving direct method receivers. */
+/** Resolve the official generated API once while preserving direct method receivers. */
 function readQdrantSdkPorts(client: QdrantClient) {
+  /** Official generated OpenAPI client exposes all route groups on one receiver. */
+  const api = client.api()
   return {
-    points: client.api('points'),
-    collections: client.api('collections'),
-    snapshots: client.api('snapshots')
+    points: api,
+    collections: api,
+    snapshots: api
   }
 }
 

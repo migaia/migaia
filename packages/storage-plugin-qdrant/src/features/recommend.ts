@@ -14,7 +14,7 @@ export function qdrantRecommendFeature(): IStorageFeature<IQdrantBackend, IQdran
         qdrantRecommend: {
           recommend(collection: string, request: IQdrantRecommendRequest, ctx?: IOperationContext) {
             return readNativeFeaturePort(this.store).run(
-              'recommend',
+              'query',
               [collection, nativeRequest(request)],
               ctx,
               false

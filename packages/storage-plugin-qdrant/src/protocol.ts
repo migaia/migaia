@@ -18,7 +18,7 @@ export function nativeResult<K extends IQdrantOperationName>(
   } else if (name === QdrantRoute.createSnapshot.name) {
     if (value !== null && (typeof value !== 'object' || Array.isArray(value)))
       throwResponseInvalid()
-  } else if (name === QdrantRoute.retrieve.name || name === QdrantRoute.recommend.name) {
+  } else if (name === QdrantRoute.retrieve.name) {
     if (!Array.isArray(value)) throwResponseInvalid()
   } else if (value === null || typeof value !== 'object' || Array.isArray(value))
     throwResponseInvalid()

@@ -82,18 +82,10 @@ export const QdrantRoute: {
     collection: true,
     parameters: true
   },
-  recommend: {
-    name: 'recommend',
+  queryGroups: {
+    name: 'queryGroups',
     method: 'POST',
-    path: 'collections/:collection/points/recommend',
-    query: ['consistency', 'timeout'],
-    collection: true,
-    parameters: true
-  },
-  searchPointGroups: {
-    name: 'searchPointGroups',
-    method: 'POST',
-    path: 'collections/:collection/points/search/groups',
+    path: 'collections/:collection/points/query/groups',
     query: ['consistency', 'timeout'],
     collection: true,
     parameters: true

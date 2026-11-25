@@ -936,21 +936,30 @@ describe('real native vector backend', () => {
           (await fixture.http.retrieve(name, { ids: [1], with_vector: true }))[0]!.vector
         ).toMatchObject({ dense: [1, 0], sparse: { indices: [1, 3], values: [2, 3] } })
         expect(
-          await store.api.qdrantRecommend!.recommend(name, {
-            positive: [1],
-            using: 'dense',
-            strategy: 'best_score',
-            limit: 1
-          })
+          (
+            await store.api.qdrantRecommend!.recommend(name, {
+              query: { recommend: { positive: [1], strategy: 'best_score' } },
+              using: 'dense',
+              limit: 1
+            })
+          ).points
         ).toHaveLength(1)
         expect(fixture.requests.at(-1)).toMatchObject({
-          operation: 'recommend',
-          args: [name, { positive: [1], using: 'dense', strategy: 'best_score', limit: 1 }]
+          operation: 'query',
+          args: [
+            name,
+            {
+              query: { recommend: { positive: [1], strategy: 'best_score' } },
+              using: 'dense',
+              limit: 1
+            }
+          ]
         })
         expect(
           (
             await store.api.qdrantGroupBy!.search(name, {
-              vector: { name: 'dense', vector: [1, 0] },
+              query: [1, 0],
+              using: 'dense',
               group_by: 'category',
               group_size: 2,
               limit: 2
@@ -958,11 +967,12 @@ describe('real native vector backend', () => {
           ).groups
         ).toHaveLength(2)
         expect(fixture.requests.at(-1)).toMatchObject({
-          operation: 'searchPointGroups',
+          operation: 'queryGroups',
           args: [
             name,
             {
-              vector: { name: 'dense', vector: [1, 0] },
+              query: [1, 0],
+              using: 'dense',
               group_by: 'category',
               group_size: 2,
               limit: 2

@@ -17,7 +17,7 @@ export function qdrantGroupByFeature(): IStorageFeature<IQdrantBackend, IQdrantG
             const captured = nativeRequest(request)
             if (Object.hasOwn(captured, 'with_lookup')) throw invalidArgument()
             return readNativeFeaturePort(this.store).run(
-              'searchPointGroups',
+              'queryGroups',
               [collection, captured],
               ctx,
               false

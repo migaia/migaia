@@ -45,8 +45,12 @@ export type IQdrantHybridOutput = IStorageFeatureOutput<
   {},
   { readonly store: { readonly qdrantHybrid: IQdrantHybridApi }; readonly transaction: {} }
 >
-export type IQdrantRecommendRequest = Parameters<QdrantClient['recommend']>[1]
-export type IQdrantRecommendResult = Awaited<ReturnType<QdrantClient['recommend']>>
+/** Native Qdrant recommend query request carrying a `query.recommend` payload. */
+export type IQdrantRecommendRequest = Omit<Parameters<QdrantClient['query']>[1], 'query'> & {
+  query: Schemas['RecommendQuery']
+}
+/** Native Qdrant query response returned by `qdrantRecommend.recommend`. */
+export type IQdrantRecommendResult = Awaited<ReturnType<QdrantClient['query']>>
 export type IQdrantRecommendApi = {
   recommend(
     collection: string,
@@ -59,11 +63,10 @@ export type IQdrantRecommendOutput = IStorageFeatureOutput<
   {},
   { readonly store: { readonly qdrantRecommend: IQdrantRecommendApi }; readonly transaction: {} }
 >
-export type IQdrantGroupByRequest = Omit<
-  Parameters<QdrantClient['searchPointGroups']>[1],
-  'with_lookup'
->
-export type IQdrantGroupByResult = Awaited<ReturnType<QdrantClient['searchPointGroups']>>
+/** Native Qdrant group-by query request with cross-collection `with_lookup` omitted. */
+export type IQdrantGroupByRequest = Omit<Parameters<QdrantClient['queryGroups']>[1], 'with_lookup'>
+/** Native Qdrant grouped query response returned by `qdrantGroupBy.search`. */
+export type IQdrantGroupByResult = Awaited<ReturnType<QdrantClient['queryGroups']>>
 export type IQdrantGroupByApi = {
   search(
     collection: string,

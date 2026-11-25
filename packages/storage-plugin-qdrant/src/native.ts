@@ -27,10 +27,8 @@ export function nativeHttp(
       invoke(QdrantRoute.deleteCollection.name, [collection, parameters], ctx),
     query: (collection, parameters, ctx) =>
       invoke(QdrantRoute.query.name, [collection, parameters], ctx),
-    recommend: (collection, parameters, ctx) =>
-      invoke(QdrantRoute.recommend.name, [collection, parameters], ctx),
-    searchPointGroups: (collection, parameters, ctx) =>
-      invoke(QdrantRoute.searchPointGroups.name, [collection, parameters], ctx),
+    queryGroups: (collection, parameters, ctx) =>
+      invoke(QdrantRoute.queryGroups.name, [collection, parameters], ctx),
     updateVectors: (collection, parameters, ctx) =>
       invoke(QdrantRoute.updateVectors.name, [collection, parameters], ctx),
     updateCollectionAliases: (parameters, ctx) =>

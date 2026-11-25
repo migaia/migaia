@@ -1,10 +1,78 @@
-import { createServer } from 'node:http'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { describe, it, expect } from 'vitest'
 import { QdrantClient } from '@qdrant/js-client-rest'
+import { createStorageHost } from '@migaia/storage-host'
+import { qdrantBackendPlugin } from '../src/index.ts'
 import { fetchHttp } from '../src/http.ts'
 import { qdrantClientHttp } from '../src/client.ts'
+import { qdrantRecommendFeature } from '../src/features/recommend.ts'
+import { qdrantGroupByFeature } from '../src/features/group-by.ts'
 /** The original shared launcher supplies the actual native-service address. */
 const url = process.env.MIGAIA_QDRANT_URL
+
+/** Binds an HTTP stub server to an ephemeral loopback port and returns its origin URL. */
+async function listenStubServer(server: Server): Promise<string> {
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  /** Ephemeral bound loopback address. */
+  const address = server.address() as { port: number }
+  return 'http://127.0.0.1:' + address.port
+}
+
+/** Closes an HTTP stub server and resolves once all sockets drain. */
+function closeStubServer(server: Server): Promise<void> {
+  /** Deferred promise settled when the server close callback fires. */
+  const { promise, resolve, reject } = Promise.withResolvers<void>()
+  server.close((error) => {
+    if (error) reject(error)
+    else resolve()
+  })
+  return promise
+}
+
+/** Handles one native feature stub request for version, points/query, and points/query/groups. */
+async function handleNativeFeatureStubRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  received: { path: string; body: unknown }[]
+): Promise<void> {
+  /** Collected request body byte chunks. */
+  const chunks: Buffer[] = []
+  for await (const chunk of request) chunks.push(chunk as Buffer)
+  /** Decoded UTF-8 JSON body text. */
+  const raw = Buffer.concat(chunks).toString('utf8')
+  /** Request URL path. */
+  const path = request.url ?? ''
+  response.writeHead(200, { 'Content-Type': 'application/json' })
+  if (path === '/') {
+    response.end(JSON.stringify({ title: 'qdrant', version: '1.15.5' }))
+    return
+  }
+  received.push({ path, body: raw ? JSON.parse(raw) : undefined })
+  if (path.endsWith('/points/query/groups')) {
+    response.end(
+      JSON.stringify({
+        result: {
+          groups: [{ id: 'a', hits: [{ id: 1, version: 1, score: 0.9 }] }]
+        }
+      })
+    )
+    return
+  }
+  response.end(
+    JSON.stringify({
+      result: {
+        points: [{ id: 2, version: 1, score: 0.8 }]
+      }
+    })
+  )
+}
+
+/** Creates an HTTP stub server answering version, points/query, and points/query/groups. */
+function createNativeFeatureStubServer(received: { path: string; body: unknown }[]): Server {
+  return createServer((request, response) => {
+    void handleNativeFeatureStubRequest(request, response, received)
+  })
+}
 describe('native Qdrant protocol adapters', () => {
   it.skipIf(!url).each(['fetch', 'sdk'] as const)(
     '%s encodes two-row integer multivectors for native upsert, update and query',
@@ -225,17 +293,19 @@ describe('native Qdrant protocol adapters', () => {
             sparse: { indices: [1], values: [0.5] }
           })
           expect(
-            await http.recommend(name, {
-              positive: [1],
-              using: 'dense',
-              strategy: 'best_score',
-              limit: 1
-            })
+            (
+              await http.query(name, {
+                query: { recommend: { positive: [1], strategy: 'best_score' } },
+                using: 'dense',
+                limit: 1
+              })
+            ).points
           ).toHaveLength(1)
           expect(
             (
-              await http.searchPointGroups(name, {
-                vector: { name: 'dense', vector: [1, 0] },
+              await http.queryGroups(name, {
+                query: [1, 0],
+                using: 'dense',
                 group_by: 'category',
                 group_size: 1,
                 limit: 2
@@ -323,9 +393,94 @@ describe('native Qdrant protocol adapters', () => {
       expect(requests.filter((path) => path.includes('c307'))).toHaveLength(2)
       expect(requests.filter((path) => path.includes('c308'))).toHaveLength(2)
     } finally {
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve()))
-      )
+      await closeStubServer(server)
+    }
+  })
+  it('routes qdrantRecommend to points/query and qdrantGroupBy to points/query/groups for both fetch and SDK', async () => {
+    /** Recorded request path and parsed JSON body for each native feature dispatch. */
+    const received: { path: string; body: unknown }[] = []
+    /** Local HTTP stub answering version, points/query, and points/query/groups. */
+    const server = createNativeFeatureStubServer(received)
+    /** Bound origin URL of the native feature stub server. */
+    const origin = await listenStubServer(server)
+    try {
+      for (const http of [fetchHttp(origin), qdrantClientHttp(new QdrantClient({ url: origin }))]) {
+        /** Storage host configured with recommend and group-by native features. */
+        const host = await createStorageHost({
+          plugins: [
+            qdrantBackendPlugin({
+              url: origin,
+              http,
+              features: {
+                recommend: qdrantRecommendFeature(),
+                groups: qdrantGroupByFeature()
+              }
+            })
+          ] as const
+        })
+        try {
+          /** Bound Qdrant backend store handle. */
+          const store = host.backend('qdrant')
+          /** Recommend query result from the native points/query endpoint. */
+          const rec = await store.api.qdrantRecommend.recommend('items', {
+            query: { recommend: { positive: [1], negative: [3], strategy: 'best_score' } },
+            using: 'dense',
+            limit: 1
+          })
+          expect(rec.points).toHaveLength(1)
+          /** Group-by query result from the native points/query/groups endpoint. */
+          const grp = await store.api.qdrantGroupBy.search('items', {
+            query: [1, 0],
+            using: 'dense',
+            group_by: 'category',
+            group_size: 2,
+            limit: 2
+          })
+          expect(grp.groups).toHaveLength(1)
+        } finally {
+          await host.dispose()
+        }
+      }
+      expect(received).toEqual([
+        {
+          path: '/collections/items/points/query',
+          body: {
+            query: { recommend: { positive: [1], negative: [3], strategy: 'best_score' } },
+            using: 'dense',
+            limit: 1
+          }
+        },
+        {
+          path: '/collections/items/points/query/groups',
+          body: {
+            query: [1, 0],
+            using: 'dense',
+            group_by: 'category',
+            group_size: 2,
+            limit: 2
+          }
+        },
+        {
+          path: '/collections/items/points/query',
+          body: {
+            query: { recommend: { positive: [1], negative: [3], strategy: 'best_score' } },
+            using: 'dense',
+            limit: 1
+          }
+        },
+        {
+          path: '/collections/items/points/query/groups',
+          body: {
+            query: [1, 0],
+            using: 'dense',
+            group_by: 'category',
+            group_size: 2,
+            limit: 2
+          }
+        }
+      ])
+    } finally {
+      await closeStubServer(server)
     }
   })
 })
